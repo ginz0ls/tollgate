@@ -48,14 +48,14 @@ Le sezioni sono quelle della **revisione 3** (0-17). Ogni sezione è stata riscr
 
 | Punto di vista | Cicli | Ultimo esito | Contatore vuoti |
 |---|---|---|---|
-| Chi esegue | 1 | 13 rilievi → **da ripetere** | 0 |
+| Chi esegue | 1, 10 | 10: 1 grave → **da ripetere** | 0 |
 | Chi attacca | 2, 4 (revisione avversariale a contesto pulito, sulla revisione 1) | 36 rilievi (7 bloccanti) → **da ripetere sulla revisione 3** | 0 |
 | Chi usa | 3 | 4 rilievi → **da ripetere** | 0 |
-| Chi paga | — | mai applicato | 0 |
-| Chi arriva dopo | — | mai applicato | 0 |
-| Lo scettico | — | mai applicato | 0 |
-| Il caso limite | — | mai applicato | 0 |
-| Chi integra | — | mai applicato | 0 |
+| Chi paga | 5 | 3 rilievi → **da ripetere** | 0 |
+| Chi arriva dopo | 6 | 1 rilievo → **da ripetere** | 0 |
+| Lo scettico | 7 | 1 minore (non azzera) | 1 |
+| Il caso limite | 8 | 4 rilievi → **da ripetere** | 0 |
+| Chi integra | 9 | 3 rilievi → **da ripetere** | 0 |
 
 ## Rilievi (cicli 1-3, corretti nella revisione 2 della specifica)
 
@@ -131,6 +131,29 @@ Il report completo è in `2026-10-08-revisione-avversariale-spec-nucleo.md`, con
 | 35 `/security-review` non è un agente | Rilevante | **Corretto**: `specialist-runner` o `context: fork`, da verificare |
 | 36 Redazionali | Minore | **Corretto** |
 
+
+## Rilievi dei cicli 5-10 (sulla revisione 3, da correggere nella revisione 4)
+
+| ID | Ciclo | Gravità | Stato | Sezione | Rilievo | Correzione prevista |
+|---|---|---|---|---|---|---|
+| B-01 | 5 chi paga | Rilevante | [RAGIONATO] | 8.4 | `finish check` riesegue `verify` **e** `test_all`; se `verify` comprende già i test (come la verifica tipica di un progetto) i test girano due volte | Comandi del gate configurabili: `[commands] gate = ["verify"]` (predefinito), e il conteggio dei test si legge dal reporter di quel comando |
+| B-02 | 5 chi paga | Rilevante | [RAGIONATO] | 9 | Un verificatore **per ogni rilievo** vuol dire N subagenti per giro di revisione: il costo cresce con i rilievi | Un solo subagente verificatore per giro, che controlla ogni rilievo separatamente con le sue prove; tetto `max_findings` per giro (predefinito 15, in ordine di gravità) |
+| B-03 | 5 chi paga | Rilevante | [RAGIONATO] | 8.3, 8.4 | Molti tipi di approvazione (piano, deroghe oltre il tetto, `comando`, presenza, non verificato, livello): rischio di approvazioni date senza leggere | `/tollgate:status` mostra gli atti in sospeso con il motivo e il costo dichiarato. Nessuna approvazione cumulativa |
+| B-04 | 6 chi arriva dopo | Rilevante | [RAGIONATO] | 2, 15 | «Intervallo di versioni di Superpowers» senza valori | `>=6.4.1 <7.0.0`; un cambio di versione maggiore va verificato a mano sul formato del registro |
+| B-05 | 7 lo scettico | Minore | [RAGIONATO] | 10.2 | Le colonne `lease_*` non servono al nucleo: le due sessioni si rilevano dagli eventi | Tenute come aggancio deciso per C (`COSA-TENERE.md`), segnate «non usate nel nucleo» |
+| B-06 | 8 caso limite | Rilevante | [RAGIONATO] | 6.1, 12 | Repo senza remote GitHub, `gh` non autenticato, repo senza commit, ramo base assente, issue chiusa: comportamento non definito | `start` si rifiuta con un messaggio chiaro; per un'issue chiusa avvisa e chiede conferma. La v1 richiede un remote GitHub |
+| B-07 | 8 caso limite | Rilevante | [RAGIONATO] | 8.2 | Un file di test **rinominato** risulta «cancellato» | Diff con rilevamento delle rinomine (`-M`): una rinomina non è una cancellazione e il conteggio per nome segue il test |
+| B-08 | 8 caso limite | Rilevante | [RAGIONATO] | 6.3, 7.2 | La guardia del contesto scatta durante `finish` e nega i subagenti di revisione: `finish` resta a metà | `finish` riprende dal punto registrato nel DB dopo `/clear` (check fatto, giro di revisione N) |
+| B-09 | 8 caso limite | Minore | [RAGIONATO] | 2 | Sistemi supportati non dichiarati (il wrapper è uno script shell) | Linux e macOS; Windows fuori dalla v1 |
+| B-10 | 9 chi integra | Rilevante | [RAGIONATO] | 1.1, 11 | B deve aggiungere comandi di gate, checklist e specialisti per profilo, ma il nucleo non definisce il punto di estensione: B dovrebbe toccare `finish` | Contratto minimo di un profilo: `[profiles.<nome>]` con `paths`, `gate` (comandi), `checklist` (file per il revisore), `specialists`. Nel nucleo esiste solo `base`, ma `finish` già itera sui profili attivi |
+| B-11 | 9 chi integra | Rilevante | [RAGIONATO] | 9, 15 | «Codex come parere, se installato»: come si invoca non è scritto | Tramite `specialist-runner`, con il comando documentato di codex-plugin-cc; il meccanismo va verificato (sezione 15) |
+| B-12 | 9 chi integra | Minore | [RAGIONATO] | 6.3 | La descrizione della PR è solo testo: C e la dashboard non la possono leggere | Un blocco JSON in un commento HTML nella descrizione della PR |
+| B-13 | 10 chi esegue (sulla rev. 3) | **Grave** | [RAGIONATO] | 6.4, 7.4 | Il plugin è abilitato per tutti i progetti: le «regole valide ovunque» (merge e push negati) bloccherebbero `git push` anche nei repo che non usano tollgate o fuori dai rami `tg/*`. Inoltre fuori da un lavoro non c'è `work_base_sha` da cui leggere `tollgate.toml` | Senza `tollgate.toml` nel ramo base tollgate è **inerte**. In un repo con tollgate ma fuori dai rami `tg/*` valgono solo i comandi distruttivi e la protezione dei file di tollgate; la configurazione si legge dalla punta del ramo base. Push, merge e PR sono regolati solo per i rami `tg/*` e per i merge verso la base da un ramo `tg/*` |
+| B-14 | 10 chi esegue | Minore | [RAGIONATO] | 8.1 | `test_related {files}`: quali file non è detto | I file del diff rispetto alla base del lavoro |
+| B-15 | 10 chi attacca (sulla rev. 3) | Rilevante | [RAGIONATO] | 7.2, 8.4 | `docs/superpowers/**` sempre scrivibile in ogni fase: ci si può nascondere codice eseguibile importato da altri file | Sempre permessi solo i `.md` sotto `docs/superpowers/`; gli altri file lì valgono come codice |
+| B-16 | 10 chi attacca | Rilevante | [RAGIONATO] | 7.2, 8.4 | `.superpowers/**` sempre scrivibile: se finisce in un commit nasconde codice | Scrivibile, ma un file sotto `.superpowers/` nel diff a `finish` è fuori scope |
+| B-17 | 10 chi attacca | Rilevante | [RAGIONATO] | 11 | I lockfile sempre ammessi permettono di aggiungere una dipendenza senza toccare il manifest | Un lockfile è ammesso solo se il suo manifest è nello scope; altrimenti serve una deroga |
+
 ## Fatti verificati
 
 | Fatto | Fonte | Data |
@@ -170,4 +193,11 @@ Il report completo è in `2026-10-08-revisione-avversariale-spec-nucleo.md`, con
 
 | 4 | Chi attacca (revisione avversariale a contesto pulito) | L1-L10 | V-1 … V-36 (vedi sopra) |
 
-Revisione 3 della specifica scritta. **Prossimo passo**: cicli 5 e successivi con i punti di vista mai applicati (chi paga, chi arriva dopo, lo scettico, il caso limite, chi integra), poi chi esegue, chi attacca e chi usa sulla revisione 3, fino a due cicli vuoti per ciascuno.
+| 5 | Chi paga | L1-L10 | B-01, B-02, B-03 |
+| 6 | Chi arriva dopo | L1-L10 | B-04 |
+| 7 | Lo scettico | L1-L10 | B-05 (minore). Scartati: `slices` decorativa (no: serve a `start`), `report` superfluo (no: senza conteggio non si vede la ricevuta vuota), eval a 3 esecuzioni troppo costosi (no: 6 casi × 3) |
+| 8 | Il caso limite | L9 in particolare | B-06, B-07, B-08, B-09 |
+| 9 | Chi integra | L2, L7 | B-10, B-11, B-12 |
+| 10 | Chi esegue e chi attacca, sulla rev. 3 | L1-L10 | B-13 … B-17 |
+
+Revisione 3 della specifica scritta. **Prossimo passo** (dopo la seconda revisione avversariale, in corso sulla rev. 3): revisione 4, poi cicli 5 e successivi con i punti di vista mai applicati (chi paga, chi arriva dopo, lo scettico, il caso limite, chi integra), poi chi esegue, chi attacca e chi usa sulla revisione 3, fino a due cicli vuoti per ciascuno.
