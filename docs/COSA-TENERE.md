@@ -231,6 +231,14 @@ Fonte: `docs/RICERCA-PAPER.md`, sezione 3. Prevalgono sulle voci precedenti dove
 
 **Limite residuo, dichiarato.** Resta fuori dalla v1 il caso dell'agente che usa le tue credenziali GitHub per agire al posto tuo (merge, etichette). Lo limitano gli hook locali e la raccomandazione di dargli un token separato con permessi ridotti.
 
+## 11. Audit della spec nel flusso (deciso l'8 ottobre 2026)
+
+In L2 la spec passa da un **audit prima del piano**:
+- **giri avversariali a contesto pulito**, finché un giro non produce più né bloccanti né gravi;
+- **audit a lenti**, con una versione di `prd-audit` incorporata in tollgate, quando c'è un piano principale.
+
+**Perché.** Nell'audit della spec di tollgate i revisori avversariali a contesto pulito hanno trovato i difetti più gravi (7, 10, 4 e 4 bloccanti, in calo a ogni giro), e l'audit a lenti ha coperto il resto. Il metodo ha funzionato.
+
 ## Verifica sulla documentazione ufficiale (8 ottobre 2026)
 
 Fonti: [hooks](https://code.claude.com/docs/en/hooks.md), [sub-agents](https://code.claude.com/docs/en/sub-agents.md), [statusline](https://code.claude.com/docs/en/statusline.md), [plugin components](https://code.claude.com/docs/en/plugins/components.md), [dependencies](https://code.claude.com/docs/en/plugins/dependencies.md), [plugin evals](https://code.claude.com/docs/en/plugin-evals.md). Ho controllato anche il codice di Superpowers 6.4.1 installato.
