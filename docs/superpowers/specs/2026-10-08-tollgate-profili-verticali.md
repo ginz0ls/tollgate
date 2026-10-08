@@ -1,7 +1,7 @@
 # tollgate: catalogo dei profili verticali
 
 Data: 8 ottobre 2026. Stato: **bozza: le regole `rules-<area>` vanno scritte e riviste dall'utente**.
-Spec del nucleo: `2026-10-08-tollgate-nucleo-design.md` (revisione 18, sezioni 6.3, 8.6, 8.7, 10 e 11.4). Il nucleo dà il contratto e l'instradamento; questo documento dice **quali profili** esistono e cosa porta ciascuno. Li realizza il sotto-progetto B.
+Spec del nucleo: `2026-10-08-tollgate-nucleo-design.md` (revisione 19, sezioni 6.3, 8.6, 8.7, 10 e 11.4). Il nucleo dà il contratto e l'instradamento; questo documento dice **quali profili** esistono e cosa porta ciascuno. Li realizza il sotto-progetto B.
 
 Fonti: tre ricerche dell'8 ottobre 2026 (catalogo di 1.015 skill e 644 agenti su disco, ricerca web per area e ruolo, raccolte esistenti di subagenti). I riassunti sono nella sezione 7.
 

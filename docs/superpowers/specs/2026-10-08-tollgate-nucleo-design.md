@@ -1,7 +1,7 @@
 # tollgate: specifica del nucleo (sotto-progetto A)
 
 Data: 8 ottobre 2026.
-Revisione: **18**: pratiche delle software house (task piccoli, standard del revisore, disaccordo istruito, budget per task, Definition of Done, report a campi fissi, spec con «cosa non fare»), da `docs/RICERCA-ORGANIZZAZIONE.md` (decisione dell'utente). Revisione 17: profili verticali e trasversali, precedenza per specificità, CI del progetto non più protetta. Revisione 16: implementatori e revisori per area, specialisti finali in L2, tetto di 3 skill. Il catalogo dei profili è in `2026-10-08-tollgate-profili-verticali.md`. La revisione 14 ha chiuso l'audit come «sospeso»; i residui sono nel file di stato. Le revisioni precedenti sono nella sezione 20.
+Revisione: **19**: must-have legati ai test, `tollgate stats`, `attenzione` diviso tra «da leggere» e «informative» (decisione dell'utente dopo l'analisi dei problemi d'uso). Revisione 18: pratiche delle software house (task piccoli, standard del revisore, disaccordo istruito, budget per task, Definition of Done, report a campi fissi, spec con «cosa non fare»), da `docs/RICERCA-ORGANIZZAZIONE.md` (decisione dell'utente). Revisione 17: profili verticali e trasversali, precedenza per specificità, CI del progetto non più protetta. Revisione 16: implementatori e revisori per area, specialisti finali in L2, tetto di 3 skill. Il catalogo dei profili è in `2026-10-08-tollgate-profili-verticali.md`. La revisione 14 ha chiuso l'audit come «sospeso»; i residui sono nel file di stato. Le revisioni precedenti sono nella sezione 20.
 Stato: **audit sospeso, pronta per il piano** (`docs/audit/2026-10-08-audit-spec-nucleo-stato.md`).
 Fonti: `docs/REPORT-CONFRONTO-WORKFLOW.md`, `docs/COSA-TENERE.md`, `docs/RICERCA-PAPER.md`. I codici R e H usati nel testo sono spiegati nella sezione 19.
 
@@ -207,6 +207,7 @@ tollgate/
 | `sync`, `adopt`, `cleanup`, `abandon` | La skill omonima, **dopo** l'atto | L'hook registra solo l'atto (8.4), senza rete e senza lavoro lungo. La skill lancia il sottocomando, che rifiuta se non trova un atto `pending`, non scaduto, della stessa sessione e con lo stesso oggetto, e lo consuma. 6.5 e 12.4 |
 | `db restore` | L'utente, **solo dal terminale** (nessuna skill) | 12.1. Non richiede un atto: funziona solo se il DB non supera `PRAGMA integrity_check` e chiede conferma su un terminale interattivo |
 | `task start <k> [--fix]`, `task start --from-findings <ciclo>`, `task start --from-gate`, `task review-prepare <k>`, `task done <k>` | Skill `execute` | Gestiscono `tasks` con le transizioni di 6.3: lancio dell'implementatore e brief, task di correzione dai rilievi, brief del revisore del task, chiusura |
+| `stats [--since <data>] [--work <N>]` | Utente, agente | Sola lettura, dagli eventi: tempo per lavoro e per fase, veti per regola, blocchi `needs_you`, deroghe e `approve finding` (gli «scavalcamenti»), ore con tollgate spento, token per lavoro e per agente, giri di correzione e cicli di revisione. Serve a vedere con i numeri se tollgate rallenta più di quanto protegge; la kanban di C e gli eval di D partono da qui |
 | `events --after-seq <n>` | C, D, strumenti esterni | Esporta in JSONL, ordinati per `seq`, gli eventi con `seq` maggiore di `n`, con la busta di 18.4. È l'unico contratto di lettura: il DB è privato di tollgate e lo schema può cambiare con le migrazioni. La chiave di un evento tra più DB è (`host`, `seq`) |
 | `gate run`, `gate evaluate`, `gate guard`, `gate base-ids` | `finish check` e i workflow | Stesso codice in locale e su GitHub |
 | `status --checkpoint` | Skill e coordinatore | Scrive il checkpoint (0) |
@@ -537,6 +538,8 @@ L'ambito è quello di 6.6. Le regole sono «best effort».
 
 Le intestazioni si cambiano in `[plan] required_sections`, e i profili possono aggiungerne altre.
 
+**Must-have legati ai test** (L1 e L2). Nella sezione `## Must-have` ogni voce ha la forma `M<n>. <proprietà> — test: <identificativo>` (uno o più identificativi, nella forma `classname::name` del report JUnit). `plan-check` rifiuta un must-have senza test. Così, quando approvi il piano, approvi anche **quali test dimostrano** che il lavoro fa ciò che volevi: il gate verifica una cosa decisa da te, non solo la coerenza del lavoro con se stesso. Un must-have che non si può verificare con un test (per esempio una proprietà visiva) porta `— test: manuale` e finisce tra le voci «da leggere» di `attenzione`.
+
 **Lo scope del piano.**
 - Si ricava da `Create:`, `Modify:` e `Test:` di ogni task (formato verificato in writing-plans, righe 100-102).
 - Solo file: niente pattern, niente cartelle; gli intervalli di righe vengono tolti.
@@ -686,7 +689,7 @@ Il lavoro che non rispetta la Definition of Done non conta (Scrum Guide 2020; Gi
 | test-guard e scope senza violazioni non derogate | sì | sì | sì | hook e gate |
 | Ogni task `done` con verdetto `approved` del revisore del task | — | sì | sì | `tasks` |
 | Nessun rilievo `blocker` o `major` confermato senza `approve finding` | — | sì | sì | `findings` |
-| Ogni must-have del piano citato in almeno un report | — | sì | sì | report dei task |
+| Ogni must-have ha i suoi test eseguiti e verdi nella ricevuta finale (`— test: manuale` va tra le voci «da leggere») | — | sì | sì | piano e report JUnit; il gate lo ricalcola dal JUnit |
 | Skill dei profili usate | — | sì | sì | `tasks.skills_used` |
 | Spec e piano approvati, report avversariali presenti | — | — | sì | file di approvazione (18.3) |
 | Specialisti finali passati | — | — | sì | `findings` per fonte |
@@ -735,9 +738,11 @@ Se qualcosa non torna pubblica `error`. Le PR verso altri rami ricevono «non ap
 | Scope: coerenza con il **piano unico** del lavoro, letto alla versione registrata (`plan` e `plan_sha` nel JSON, 18.1), con gli esenti e con le deroghe. Solo per le PR dei lavori | `verdict` | Rosso. Senza piano e oltre le soglie di L0 → rosso. Piano in testa diverso da `plan_sha`: `attenzione` rosso con il diff nel commento |
 | File di approvazione (L2): il loro `sha` è quello della spec e del piano in testa | `verdict` | `attenzione` rosso con il diff se non coincidono |
 | Livello dichiarato contro minimo. In L2: spec, piano e report dell'avversario sempre; report a lenti solo se le fette previste sono più di una; intestazioni valide (18.3). Per una fetta successiva alla prima, i report della spec si cercano in `spec_reviews_dir` sul ramo predefinito | `verdict` | **Rosso** se il livello è sotto il minimo senza un tetto dichiarato, o se manca un report o un file di approvazione L2 richiesto. Con un tetto dichiarato: `attenzione` rosso. Un componente spento in `[components]` (letto dal ramo predefinito) toglie il report corrispondente e dà `attenzione` rosso. Si verifica che i file esistano, non la loro qualità |
-| Deroghe da segnalare (8.4), piano diverso dal primo, lockfile senza manifest, test della base che falliscono sulla testa, PR non `tg/*`, PR `tollgate-config/*`, periodi con tollgate spento dichiarati, `allow_no_tests` attivo, tetto di livello, revisione «non verificata», audit «sospesi», rilievi confermati declassati o archiviati, `approve unverified-tests`, task oltre `task_lines_max` con `size_reason`, skill dei profili segnate come assenti | `verdict` | `attenzione` rosso, non obbligatorio, con l'elenco nel commento visibile (il blocco JSON è un commento HTML che GitHub non mostra). I file di `verification_watch` toccati sono solo elencati nel commento |
+| Deroghe da segnalare (8.4), piano diverso dal primo, lockfile senza manifest, test della base che falliscono sulla testa, PR non `tg/*`, PR `tollgate-config/*`, periodi con tollgate spento dichiarati, `allow_no_tests` attivo, tetto di livello, revisione «non verificata», audit «sospesi», rilievi confermati declassati o archiviati, `approve unverified-tests`, task oltre `task_lines_max` con `size_reason`, skill dei profili segnate come assenti | `verdict` | `attenzione` rosso, non obbligatorio, con l'elenco nel commento visibile (il blocco JSON è un commento HTML che GitHub non mostra). I file di `verification_watch` toccati sono solo elencati nel commento. Le voci sono divise in due gruppi (sotto) |
 
 **Profili attivi** = quelli elencati in `[profiles] active` più quelli il cui `paths` tocca il diff, calcolati con la configurazione del ramo predefinito. Il livello minimo del gate è il massimo tra quello calcolato da percorsi ed etichette e i `min_level` dei profili attivi. I comandi di un profilo si chiamano `<profilo>.<comando>` in ricevute, artefatti e JSON.
+
+**Due gruppi di `attenzione`.** Per non abituarsi a ignorarlo, il commento mette in cima le voci **«da leggere»**, quelle che cambiano cosa garantisce la PR: deroghe `test`, `ci`, `threshold`, `command` e per pattern; livello sotto il minimo con tetto; revisione «non verificata» e audit «sospesi»; rilievi `blocker`/`major` declassati o archiviati; `approve unverified-tests`; must-have con `— test: manuale`; merge non verificati segnalati da `sentinel`; periodi con tollgate spento. Tutto il resto (deroghe `scope` entro il secondo, `allow_no_tests`, `verification_watch`, task oltre `task_lines_warn`, skill assenti, PR non `tg/*`, PR `tollgate-config/*`) è **«informativo»**, in un blocco richiudibile. `tollgate/attention` diventa rosso solo se c'è almeno una voce «da leggere»; con sole voci informative resta verde con una nota.
 
 **Il commento.** Riporta lo SHA e non viene aggiornato se lo SHA non è più la testa. Il testo che viene dall'agente è neutralizzato: va in blocchi di codice con un recinto più lungo di qualunque sequenza di backtick contenuta, le menzioni sono disattivate e c'è una lunghezza massima.
 
@@ -973,6 +978,7 @@ sentinel = true
 task_size = true        # 6.3: soglie di righe e file
 task_budget = true      # 6.3: maxTurns e tetto di token
 definition_of_done = true  # 8.7
+must_have_tests = true  # 7.5: ogni must-have legato a un test
 report_fields = true    # 18.5: report a campi fissi
 reviewer_standard = true   # 8.6: standard del revisore e disaccordo istruito
 spec_pitch = true       # 6.2: «Tane di coniglio» e «Cosa non fare»
@@ -1235,6 +1241,9 @@ Ogni criterio è un'azione con un esito binario.
 39. **Task piccoli e budget.** Un task con 600 righe e senza `size_reason` → report non valido; con `size_reason` → `attenzione` lo riporta. Un implementatore oltre `max_tokens` o che esaurisce `maxTurns` → task `blocked` e `needs_you`; `status` dice quale tetto ha fermato il lavoro. Un report senza i campi obbligatori → veto (hook, integrazione).
 40. **Revisione.** Un rilievo `minor` non porta il task a `changes`; un rilievo senza `rule`, oppure senza file e riga → scartato dal verificatore (integrazione).
 41. **Definition of Done.** `finish check` stampa la DoD voce per voce; con un task non `done` → `open-pr` rifiuta. Una spec L2 senza `## Cosa non fare` → rilievo dell'avversario (integrazione).
+42. **Must-have legati ai test.** Un piano L1 con un must-have senza `— test:` → `plan-check` rifiuta. Con `M1 — test: tests/test_x.py::test_a` e quel test assente o rosso nella ricevuta finale → la DoD non passa e `open-pr` rifiuta; il gate ricalcola la stessa voce dal JUnit (script, gate).
+43. **Statistiche.** Dopo un lavoro con due veti, un `needs_you` e un'ora di `OFF`, `tollgate stats --work N` riporta esattamente quei numeri, più tempo per fase e token (script).
+44. **`attenzione` a due gruppi.** Una PR con sola deroga `scope` entro la seconda → `tollgate/attention` verde con nota; con una deroga `test` → rosso, e la deroga `test` compare in cima nel gruppo «da leggere» (gate).
 
 ---
 
@@ -1442,3 +1451,4 @@ L'elenco completo è in `docs/COSA-TENERE.md`.
 | 16 | 08/10/2026 | Decisione dell'utente: profili verticali. Implementatore e revisore del task per area a tutti i livelli (sostituiscono i generici); specialisti finali in L2 solo per i profili con `final_specialist` (sicurezza e database); tetto di 3 skill obbligatorie per agente; campi `reviewer`, `reviewer_skills`, `final_specialist`; catalogo in un documento a parte; criterio 38 riscritto |
 | 17 | 08/10/2026 | Decisioni dell'utente: profili `vertical` e `cross` con campo `cross`; precedenza al pattern più specifico; file di tollgate ristretti ai workflow `tollgate-*`, workflow del progetto controllati da `guard` (permessi ed eventi) e coperti dal profilo `ci`; verifica di `skills:` e `mcpServers` negli agenti di plugin |
 | 18 | 08/10/2026 | Decisione dell'utente, da `docs/RICERCA-ORGANIZZAZIONE.md`: dimensione e budget del task (`[tasks]`), report dell'implementatore a campi fissi, standard del revisore e disaccordo istruito con regola citata, Definition of Done per livello (8.7, campo `dod` dei profili e del JSON), spec L2 con «Tane di coniglio» e «Cosa non fare»; criteri 39-41; ogni pratica è un componente spegnibile in `[components]`, e `status` indica quale tetto ha fermato il lavoro |
+| 19 | 08/10/2026 | Decisione dell'utente dopo l'analisi dei problemi d'uso: must-have legati ai test (7.5, 8.7, componente `must_have_tests`); `tollgate stats` dagli eventi (3.1); voci di `attenzione` divise in «da leggere» e «informative», con lo stato rosso solo per le prime (9.2); criteri 42-44 |
