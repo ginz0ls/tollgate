@@ -3,6 +3,8 @@
 Data: 8 ottobre 2026.
 Stato: **analisi conclusa, nessuna implementazione avviata**. Tre decisioni dell'utente sono aperte (sezione 6): finché non arrivano, non si progetta né si scrive codice.
 Destinatario: un agente nuovo, con contesto pulito, che riprende da qui.
+
+> **Documento storico.** Stato all'8 ottobre 2026 (mattina). Le decisioni della sezione 6 sono state prese e il progetto è un repository git. Le decisioni in vigore sono in `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 18); per riprendere il lavoro si parte da quella e dal piano principale `docs/superpowers/plans/2026-10-08-tollgate-nucleo-piano-principale.md`.
 Sede del progetto (decisione dell'utente, 08/10): `/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow`, cartella autonoma. Non è ancora un repository git. L'analisi è nata in una sessione della Piattaforma Perizie. I percorsi assoluti dei tre progetti stanno nella sezione 2; nel resto del documento i percorsi relativi si riferiscono alla cartella del progetto di cui si parla.
 
 ## 1. Cosa ha chiesto l'utente

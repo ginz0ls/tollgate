@@ -2,6 +2,8 @@
 
 Data: 2026-10-08. Legenda: [V] letto (testo completo o parti rilevanti), [S] solo secondario/snippet di ricerca. Numeri riportati solo se letti.
 
+> **Nota storica (8 ottobre 2026).** Questo file registra cosa dice la letteratura. Decisione in vigore: spec revisioni 16-18, con un revisore del task **per area che sostituisce** quello generico (nessun revisore in più) e specialisti finali solo in L2 per security e database. Perché è coerente con questa ricerca: nota in `docs/RICERCA-PAPER.md`, sezione 2.12.
+
 ## Esito in una riga
 Nessuno studio controllato confronta, a parita' di modello e budget, "1 revisore con checklist" vs "N revisori per dimensione" su code review. Le evidenze indirette dicono: (a) la verifica/filtro migliora la precisione, (b) piu' passate indipendenti dello stesso prompt migliorano la recall con rendimenti decrescenti oltre n=5, (c) la specializzazione "per ruolo/persona" non ha prova di beneficio, (d) la decomposizione aiuta quando riduce il carico di istruzioni o l'ampiezza del contesto, non per il ruolo in se'.
 

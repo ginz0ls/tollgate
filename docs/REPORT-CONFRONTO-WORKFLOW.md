@@ -4,6 +4,8 @@ Data: 8 ottobre 2026.
 Input: `HANDOFF.md` (stessa cartella).
 Stato: analisi. Nessun codice del plugin scritto: le decisioni aperte (sezione 12) restano dell'utente.
 
+> **Documento storico.** Stato all'8 ottobre 2026. Le decisioni in vigore sono in `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 18); profili e pratiche in `docs/superpowers/specs/2026-10-08-tollgate-profili-verticali.md` e `docs/RICERCA-ORGANIZZAZIONE.md`. Le sezioni 12-13 registrano le decisioni del momento: dove differiscono, vale la spec.
+
 ---
 
 ## 0. Sintesi in una pagina

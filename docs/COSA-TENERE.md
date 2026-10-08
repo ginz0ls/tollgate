@@ -2,7 +2,9 @@
 
 Data: 8 ottobre 2026.
 Fonte: `docs/REPORT-CONFRONTO-WORKFLOW.md`, sezioni 0-10 e 13.
-Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre, incluse le H del gruppo 7, aspettano la tua revisione. Per cambiarne una basta citarne il numero.
+Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre, incluse le H del gruppo 7, aspettano la tua revisione. Per cambiarne una basta citarne il numero. 
+
+> **Superato da:** le voci sono state in gran parte decise nelle sezioni 8-11 e poi nella spec `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 18), che prevale dove questo documento differisce. Le voci cambiate sono marcate *Superato da*. Decisioni successive non elencate qui: repo privati in modalità `detect`; workflow di GitHub `tollgate-guard/run/verdict/base/sentinel`; esecuzione con `tollgate:execute`; profili verticali; pratiche delle software house (`docs/RICERCA-ORGANIZZAZIONE.md`); audit della spec sospeso al ciclo 54 sulla revisione 14.
 
 ---
 
@@ -14,17 +16,17 @@ Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre, incluse 
 | Tracker | GitHub Issues |
 | Harness | Claude Code. Portabilità verso altri harness: dopo |
 | Autonomia | v1 interattiva. Avvio da etichetta GitHub con Action: dopo |
-| Flusso | **Quello di Superpowers** (brainstorming → writing-plans → subagent-driven/executing → review). tollgate aggiunge solo quello che manca |
+| Flusso | **Quello di Superpowers** (brainstorming → writing-plans → subagent-driven/executing → review). tollgate aggiunge solo quello che manca *Superato da: esecuzione con `tollgate:execute` (non subagent-driven-development) e chiusura con `/tollgate:finish`; brainstorming si ferma prima di writing-plans per l'audit della spec in L2 (spec rev. 13-18).* |
 | Approccio | Hook più due comandi: `/tollgate:start #N` e `/tollgate:finish`. Lo stato esplicito sta in SQLite |
 | Obblighi imposti dagli hook | Niente «fatto» senza ricevute; test non indebolibili; effetti esterni solo con la tua conferma; scope limitato ai file del piano |
 | Deroghe | L'agente le registra e prosegue. **Oltre 2 per fetta si ferma e chiede a te**. Tutte compaiono nella PR |
 | Livelli | L0 rapido, L1 standard, L2 alto. Li sceglie uno script, possono solo salire e tu puoi alzarli |
-| Piano principale | Come in Perizie: si crea solo se il lavoro non sta in una fetta |
+| Piano principale | Come in Perizie: si crea solo se il lavoro non sta in una fetta *Superato da: fette e piano principale dei lavori nel sotto-progetto C; nel nucleo solo il contratto minimo (`--spec`, «Fette previste»).* |
 | Kanban | Ibrida: SQLite locale per il lavoro in corso, GitHub Issues e Projects per il lavoro deciso e accettato |
 | Dashboard | Dopo la v1 |
-| Profili v1 | Base, frontend, backend (Supabase edge, Cloudflare Worker, server locale), database, sicurezza, AI/LLM, bugfix |
+| Profili v1 | Base, frontend, backend (Supabase edge, Cloudflare Worker, server locale), database, sicurezza, AI/LLM, bugfix *Superato da: catalogo `docs/superpowers/specs/2026-10-08-tollgate-profili-verticali.md` (13 verticali + 2 trasversali), regole e agenti nel sotto-progetto B.* |
 | Pubblicazione | Privato ora, pubblico poi: nel codice niente percorsi né nomi dei tuoi progetti |
-| Sotto-progetti | A nucleo → B profili → C kanban e ponte GitHub → D eval |
+| Sotto-progetti | A nucleo → B profili → C kanban e ponte GitHub → D eval *Integrato da: B = regole e agenti per area; C = anche fette e piano principale; D = eval e altri harness.* |
 | Contesto | **Niente context rot**: ogni attività parte con un contesto pulito (gruppo 6) |
 
 ---
@@ -40,7 +42,7 @@ Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre, incluse 
 | 5 | Scope per task | Orchestratore | **Tenere** | Si ricava da `Create:` e `Modify:` dei piani Superpowers |
 | 6 | Nessuna autorizzazione concessa in automatico | Orchestratore | **Tenere** | Per gli effetti esterni Claude Code ti chiede conferma |
 | 7 | Skill obbligatorie lette e legate all'hash | Orchestratore | **Scartare** | Complesso, poco valore |
-| 8 | Blocco della chiusura senza prove, per sessione | ralph-loop | **Modificare** | Hook `SubagentStop` che blocca **solo i subagenti che hanno prodotto commit senza una ricevuta verde su quel commit**. Il criterio è un fatto, non il nome: Superpowers lancia implementatore e revisore entrambi come `general-purpose`, quindi il tipo di agente non basta a distinguerli. Verificato sulla documentazione (vedi sotto) |
+| 8 | Blocco della chiusura senza prove, per sessione | ralph-loop | **Modificare** | Hook `SubagentStop` che blocca **solo i subagenti che hanno prodotto commit senza una ricevuta verde su quel commit**. Il criterio è un fatto, non il nome: Superpowers lancia implementatore e revisore entrambi come `general-purpose`, quindi il tipo di agente non basta a distinguerli. Verificato sulla documentazione (vedi sotto) *Superato da: con `tollgate:execute` implementatori e revisori sono agenti propri, quindi la premessa su `general-purpose` non vale più.* |
 | 9 | Blocco del codice se prima non c'è un test che fallisce | tdd-guard | **Modificare** | Solo per i bugfix: test di riproduzione rosso → verde, con ricevuta di entrambi. Ovunque costa circa 3 volte i token senza migliorare la qualità |
 | 10 | Blocco dei comandi distruttivi (force push, `reset --hard`, `--no-verify`, `rm -rf`) | cc-safety-net | **Tenere** | Coincide con le regole del CLAUDE.md globale |
 | 11 | CI del ramo base verde prima di partire | lezione di Perizie (notturna rossa) | **Tenere** | Si controlla a `start` |
@@ -68,9 +70,9 @@ Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre, incluse 
 |---|---|---|---|---|
 | 24 | Verdetto su una riga JSON con gravità, file e riga | codex-workflow | **Tenere** | Gestendo il JSON malformato, che in codex-workflow è un bug |
 | 25 | Tetto di 4 giri di revisione finale che non si azzera; un rilievo lo chiude solo chi l'ha aperto | Orchestratore | **Tenere** | Sulla revisione finale. Il ciclo di correzione per task resta quello di Superpowers |
-| 26 | Filtro di confidenza ≥80 contro i falsi positivi | plugin code-review | **Tenere** | Evita di rincorrere rilievi deboli, che portano a over-engineering |
-| 27 | Panel di più revisori | agent-skills `/ship` | **Tenere solo in L2 con profilo sicurezza** | Costa molto: va usato dove serve |
-| 28 | Revisore con un motore diverso (Codex) | codex-plugin-cc | **Deciso: opzionale** | Se codex-plugin-cc è installato si usa in L2, altrimenti c'è un revisore Claude a contesto fresco |
+| 26 | Filtro di confidenza ≥80 contro i falsi positivi | plugin code-review | **Tenere** | Evita di rincorrere rilievi deboli, che portano a over-engineering *Superato da: sezione 9 (verificatore per ogni rilievo) e spec, sezione 10.* |
+| 27 | Panel di più revisori | agent-skills `/ship` | **Tenere solo in L2 con profilo sicurezza** | Costa molto: va usato dove serve *Superato da: specialisti della revisione finale solo in L2 e solo per security e database (spec rev. 16).* |
+| 28 | Revisore con un motore diverso (Codex) | codex-plugin-cc | **Deciso: opzionale** | Se codex-plugin-cc è installato si usa in L2, altrimenti c'è un revisore Claude a contesto fresco *Superato da: Codex come revisore dopo la v1 (spec rev. 10); con lui anche R16.* |
 
 ## 4. Stato, ripresa, GitHub
 
@@ -101,7 +103,7 @@ Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre, incluse 
 | # | Regola | Da | Come la applichiamo |
 |---|---|---|---|
 | 37 | La sessione principale coordina e basta | GSD | Non legge codice né log. Lavora solo con stato (DB), brief e report su file, così il suo contesto resta piccolo per tutta la fetta |
-| 38 | Ogni attività parte con un subagente nuovo | Superpowers (subagent-driven), Orchestratore (un thread per fase) | Task, review, verifica e revisione avversariale ricevono un brief su file e restituiscono un report su file. Nella sessione principale torna solo un riepilogo di poche righe |
+| 38 | Ogni attività parte con un subagente nuovo | Superpowers (subagent-driven), Orchestratore (un thread per fase) | Task, review, verifica e revisione avversariale ricevono un brief su file e restituiscono un report su file. Nella sessione principale torna solo un riepilogo di poche righe *Il principio resta; l'esecuzione è di `tollgate:execute` (spec rev. 13).* |
 | 39 | L'output dei comandi va su file | Superpowers `task-done` | `tollgate verify` salva i log completi e mostra solo l'esito e le ultime righe |
 | 40 | Una fetta per sessione | Anthropic (sessioni lunghe), lezione di Perizie | A fine fetta `finish` salva lo stato e suggerisce `/clear`. Il `start` successivo riparte dal DB. Lo stesso vale tra spec approvata e piano |
 | 41 | Avvio con il minimo indispensabile | evidenze ICLR 2026 e Vercel | Nessuna meta-skill caricata a ogni sessione. All'avvio entrano solo poche righe: issue, fase, livello, prossimo passo |
@@ -140,7 +142,7 @@ tollgate prende la stessa idea e la rende obbligatoria e legata allo SHA.
 | H19-H20 | Memoria con un tetto in caratteri, fotografata a inizio sessione e controllata contro le injection | `tools/memory_tool.py:1-23`, `:228-260` | **Tenere** l'idea per i file di stato iniettati a `start` (voce 41) |
 | H22 | Elenco di comandi pericolosi che richiedono approvazione | `tools/approval.py:909` | **Modificare**: diventa l'elenco degli effetti esterni (voce 6) |
 | H23 | Un elenco minimo di blocchi che nessuna modalità può aggirare | `approval.py:430-455` | **Tenere**: in L2 nessuna deroga li supera |
-| H24 | Il file di configurazione è protetto anche da `sed`, `tee` e `>` | `approval.py:358-372` | **Tenere**: `tollgate.toml` e gli hook non sono modificabili dall'agente, altrimenti il gate si spegne da solo |
+| H24 | Il file di configurazione è protetto anche da `sed`, `tee` e `>` | `approval.py:358-372` | **Tenere**: `tollgate.toml` e gli hook non sono modificabili dall'agente, altrimenti il gate si spegne da solo *Precisato da: file protetti = `tollgate.toml`, workflow `tollgate-*.yml`, `.github/actions/tollgate-*/**`, `.github/tollgate/**`, `.tollgate/waivers/**`, `docs/superpowers/reviews/**` (spec rev. 17).* |
 | H26 | Scrittura limitata sotto una cartella radice | `agent/file_safety.py:93` | **Modificare**: la radice diventa l'elenco dei file del piano (voce 5) |
 | H28 | Hook shell con lo stesso contratto di Claude Code; possono fallire «chiusi» | `agent/shell_hooks.py:1-75` | **Tenere**: gli hook di gate di tollgate falliscono chiusi, cioè se si rompono bloccano invece di lasciar passare |
 | H32 | File sentinella che mette in pausa solo il lavoro nuovo | `agent/estop.py:1-20` | **Tenere**: un file `PAUSE` |
@@ -183,14 +185,14 @@ Fonte: `docs/RICERCA-PAPER.md`, sezione 3. Prevalgono sulle voci precedenti dove
 | R1 | Via d'uscita «test e specifica in conflitto»: un blocco con un tipo preciso che ferma l'agente e lo manda da te | Nucleo | Integra le deroghe (voce 14) e H36 |
 | R2 | Test correlati alla modifica nel brief e in `verify`; suite completa a `finish` | Nucleo | **Ridimensionata**: niente grafo nostro, si usa il comando del progetto (`vitest related`, `jest --findRelatedTests`, `pytest-testmon`) dichiarato in `tollgate.toml` |
 | R3 | La ricevuta è necessaria ma non sufficiente: il revisore finale cerca casi speciali scritti per i test e test indeboliti | Nucleo | Integra le voci 1, 20, 24 |
-| R4 | Al massimo 2 giri di correzione automatica per task, poi contesto pulito o passaggio a te | Nucleo | **Ridimensionata (rev. 5 della spec)**: in Superpowers 6.4.1 i giri 1-3 riprendono lo stesso implementatore, che un hook non può fermare. Vale il tetto di Superpowers; tollgate conta i giri e li riporta nella PR |
+| R4 | Al massimo 2 giri di correzione automatica per task, poi contesto pulito o passaggio a te | Nucleo | **Ridimensionata (rev. 5 della spec)**: in Superpowers 6.4.1 i giri 1-3 riprendono lo stesso implementatore, che un hook non può fermare. Vale il tetto di Superpowers; tollgate conta i giri e li riporta nella PR *Superato da: i giri di correzione li gestisce `tollgate:execute` (tetto 5, spec 6.3), con budget per task (rev. 18).* |
 | R5 | A ogni nuovo task un hook rimette nel contesto il passo corrente del piano e il suo scope | Nucleo | Poche righe |
 | R6 | In L1 controllo automatico della struttura del piano; la rilettura a contesto pulito resta in L2 | Nucleo | **Ridimensionata** |
 | R7 | Soglie del contesto della sessione principale: avviso al 45%, stop al 55%. Subagente sotto circa 30K token; ritorno al padre di 1-2K token più il percorso del report | Nucleo | Soglie configurabili, da tarare con gli eval. Sostituiscono l'85% della statusline nella voce 42 |
 | R9 | Budget di istruzioni: si misura quanti token aggiunge tollgate a ogni sessione, con un tetto | Nucleo | — |
 | R10 | Ogni componente si può spegnere da `tollgate.toml` | Nucleo | Base delle prove con un componente spento alla volta negli eval |
 | R14 | Le domande di chiarimento dipendono dal livello: L0 non passa dal brainstorming | Nucleo | **Ridimensionata**: le domande le fa già Superpowers |
-| R16 | Il revisore Codex dà solo un parere, non modifica il codice | Nucleo | Integra la voce 28 |
+| R16 | Il revisore Codex dà solo un parere, non modifica il codice | Nucleo | Integra la voce 28 *Superato da: segue Codex, rinviato a dopo la v1 (spec rev. 10).* |
 | R8 | Le regole dei profili si caricano tramite hook, non con l'attivazione automatica delle skill | Sotto-progetto B | — |
 | R11 | Un hook su ogni installazione controlla che il pacchetto esista e quanto è vecchio | Sotto-progetto B | Profilo base |
 | R12 | Analisi statica (SAST) e test di sicurezza obbligatori nel profilo sicurezza | Sotto-progetto B | — |
@@ -202,8 +204,8 @@ Fonte: `docs/RICERCA-PAPER.md`, sezione 3. Prevalgono sulle voci precedenti dove
 **Ruoli.**
 - **Coordinatore.** È la sessione principale. Parla con te, fa il brainstorming, **scrive spec e piano** (non c'è un subagente pianificatore), lancia i subagenti e legge solo i verdetti. Non scrive codice, tranne in L0.
 - **Implementatore.** Un subagente nuovo per ogni task. È l'unico che scrive codice, un task alla volta.
-- **Revisore del task.** Quello di Superpowers, in sola lettura, dopo ogni task.
-- **Avversario del piano.** Solo in L2, in sola lettura, riceve piano e spec senza le motivazioni di chi li ha scritti.
+- **Revisore del task.** Quello di Superpowers, in sola lettura, dopo ogni task. *(Superato da: revisore del task di tollgate, per area, a tutti i livelli: spec rev. 13 e 16. Ruoli completi in spec, sezione 4.)*
+- **Avversario del piano.** Solo in L2, in sola lettura, riceve piano e spec senza le motivazioni di chi li ha scritti. *(Integrato da: in L2 anche gli avversari della spec e l'audit a lenti, spec 6.2.)*
 - **Script.** `verify`, `test-guard` e `state` producono i fatti; gli hook li fanno rispettare.
 
 **Revisione finale** (fonte: `docs/ricerca/06-revisori-specializzati.md`).
@@ -212,20 +214,20 @@ Fonte: `docs/RICERCA-PAPER.md`, sezione 3. Prevalgono sulle voci precedenti dove
 |---|---|
 | L0 | Nessun agente: ricevute degli script e merge tuo |
 | L1 | **Revisore finale di tollgate** con la checklist dei profili attivi → **verificatore di tollgate per ogni problema segnalato** (conferma con prove o scarta) → verdetto JSON |
-| L2 | Revisore finale di tollgate + **specialisti di Anthropic** scelti in base ai profili attivi, al massimo 3, ognuno con il suo contesto: sicurezza → `/security-review`; test → `pr-review-toolkit:pr-test-analyzer`; backend → `pr-review-toolkit:silent-failure-hunter`. Più Codex come parere, se installato → stesso verificatore → verdetto JSON |
+| L2 | Revisore finale di tollgate + **specialisti di Anthropic** scelti in base ai profili attivi, al massimo 3, ognuno con il suo contesto: sicurezza → `/security-review`; test → `pr-review-toolkit:pr-test-analyzer`; backend → `pr-review-toolkit:silent-failure-hunter`. Più Codex come parere, se installato → stesso verificatore → verdetto JSON *Superato da: in L2 solo specialisti di tollgate per security e database; specialisti esterni e Codex dopo la v1 (spec rev. 10 e 16).* |
 
 **Decisioni.**
 - **Revisore finale e verificatore li scrive tollgate.** Sono gli unici che conoscono piano, scope, must-have e ricevute, cercano i trucchi sui test (R3) e restituiscono il verdetto JSON che il gate legge.
 - **Il verificatore per ogni problema sostituisce il filtro di confidenza ≥80** (voce 26). La ricerca indica che conta la verifica con prove, non il numero di revisori né il punteggio di confidenza.
-- **Gli specialisti sono di Anthropic** (`pr-review-toolkit`, licenza Apache 2.0, e `/security-review`), dichiarati come dipendenza con un intervallo di versioni. Il gate dipende solo dal verificatore di tollgate. Ogni specialista si può spegnere (R10). Sostituisce la voce 27.
+- **Gli specialisti sono di Anthropic** (`pr-review-toolkit`, licenza Apache 2.0, e `/security-review`), dichiarati come dipendenza con un intervallo di versioni. Il gate dipende solo dal verificatore di tollgate. Ogni specialista si può spegnere (R10). Sostituisce la voce 27. *(Superato da: vedi la riga L2 della tabella sopra.)*
 - **Il plugin `code-review` di Anthropic non si usa come gate.** Serve a commentare le PR e per scelta scarta copertura dei test e sicurezza; inoltre cambia nel tempo. Il `/code-review` integrato in Claude Code resta solo come passata extra opzionale.
-- **In L1 non ci sono revisori specializzati.** Non ci sono prove di beneficio e il costo è alto. La soglia sotto cui basta un revisore va misurata negli eval.
+- **In L1 non ci sono revisori specializzati.** Non ci sono prove di beneficio e il costo è alto. La soglia sotto cui basta un revisore va misurata negli eval. *(Superato da: in L1 il revisore del task è quello dell'area e sostituisce il generico, senza revisori in più; il revisore finale resta unico. Spiegazione in `docs/RICERCA-PAPER.md`, sezione 2.12.)*
 
 ## 10. Dove sta il controllo autorevole (deciso l'8 ottobre 2026)
 
 **Decisione: su GitHub.**
 - **Come funziona**: una GitHub Action, con il workflow letto dal ramo base, ricalcola in un ambiente pulito i comandi del gate, test-guard e scope sul diff della PR. La protezione del ramo richiede quel controllo verde e il merge lo fai tu.
-- **Il ruolo degli hook locali**: diventano **guardrail** contro scorciatoie ed errori onesti, cioè test modificati, «fatto» senza prove, file fuori scope. Fermano il problema subito, senza aspettare la PR.
+- **Il ruolo degli hook locali**: diventano **guardrail** contro scorciatoie ed errori onesti, cioè test modificati, «fatto» senza prove, file fuori scope. Fermano il problema subito, senza aspettare la PR. *(Precisato da: dove c'è la protezione del ramo vale la modalità `protected`; sui repo privati GitHub Free la modalità `detect` con `tollgate-sentinel`, misurata da `init`, spec rev. 11-12.)*
 
 **Perché.** La seconda revisione avversariale ha mostrato che un agente con Bash sulla stessa macchina può alterare tutto quello che è locale: DB, variabili d'ambiente, un Claude figlio che si spaccia per te, la configurazione dei test. Sulla macchina dell'agente nessun controllo è inattaccabile.
 
@@ -235,7 +237,7 @@ Fonte: `docs/RICERCA-PAPER.md`, sezione 3. Prevalgono sulle voci precedenti dove
 
 In L2 la spec passa da un **audit prima del piano**:
 - **giri avversariali a contesto pulito**, finché un giro non produce più né bloccanti né gravi;
-- **audit a lenti**, con una versione di `prd-audit` incorporata in tollgate, quando c'è un piano principale.
+- **audit a lenti**, con una versione di `prd-audit` incorporata in tollgate, quando c'è un piano principale. *(Precisato da: audit a lenti se la spec prevede più di una fetta; file `spec-approval`/`plan-approval`; spec con «Tane di coniglio» e «Cosa non fare», spec 6.2.)*
 
 **Perché.** Nell'audit della spec di tollgate i revisori avversariali a contesto pulito hanno trovato i difetti più gravi (7, 10, 4 e 4 bloccanti, in calo a ogni giro), e l'audit a lenti ha coperto il resto. Il metodo ha funzionato.
 

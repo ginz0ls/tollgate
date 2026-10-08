@@ -5,6 +5,8 @@ Metodo: skill `prd-audit` (lenti L1-L10, otto punti di vista, due cicli vuoti pe
 Giudice esterno (`/goal`): **non usato**, per scelta dell'utente l'08/10/2026. La chiusura la decide chi conduce l'audit.
 Stato: **SOSPESO al ciclo 54, non chiuso**, sulla revisione 14. Prosecuzione oltre il tetto di 30 decisa dall'utente; chiusura come sospeso decisa dall'utente. Vedi «Esito finale» in fondo.
 
+> Stato al ciclo 54 (revisione 14). Le revisioni 15-18 della spec sono decisioni dell'utente prese dopo l'audit e **non sono state riauditate**. Le decisioni in vigore sono in `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 18).
+
 ## Perimetro
 
 - **Dentro**: la specifica e i documenti con cui deve essere coerente, cioè `docs/COSA-TENERE.md` (decisioni: voci 1-42, H, R1-R16, sezione 9) e `docs/RICERCA-PAPER.md`. Più i fatti esterni: documentazione di Claude Code e Superpowers 6.4.1 installato.
