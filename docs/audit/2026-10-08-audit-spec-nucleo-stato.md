@@ -3,7 +3,7 @@
 Documento auditato: `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md`.
 Metodo: skill `prd-audit` (lenti L1-L10, otto punti di vista, due cicli vuoti per ciascuno, tetto di 30 cicli). In parallelo: revisione avversariale a contesto pulito, senza le motivazioni dell'autore (`2026-10-08-revisione-avversariale-spec-nucleo.md`).
 Giudice esterno (`/goal`): **non usato**, per scelta dell'utente l'08/10/2026. La chiusura la decide chi conduce l'audit.
-Stato: **SOSPESO al ciclo 30** (tetto raggiunto, non chiuso). Vedi «Esito» in fondo.
+Stato: **SOSPESO al ciclo 54, non chiuso**, sulla revisione 14. Prosecuzione oltre il tetto di 30 decisa dall'utente; chiusura come sospeso decisa dall'utente. Vedi «Esito finale» in fondo.
 
 ## Perimetro
 
@@ -536,3 +536,31 @@ Nessun bloccante. Gravi stabili a 11 nel giro ridotto: quasi tutti nascono dal t
 - J8 `finish` senza vincolo di sessione in 8.4, con vincolo nel criterio 12 (52).
 
 Andamento complessivo: giri completi 65 → 43 → 37; giri ridotti 21 → 22 (gravi 11 → 11). I bloccanti sono a zero da quattro giri. I gravi si concentrano sul testo appena scritto: è il regime in cui ogni correzione apre superficie nuova.
+
+**Revisione 14** (commit bcaaf85): correzioni di J1-J8 e dei rilevanti dei cicli 51-54.
+
+## Esito finale
+
+**Audit SOSPESO al ciclo 54, non chiuso.** L'utente ha scelto di passare al piano dopo la revisione 14, senza un altro giro (08/10/2026).
+
+**Matrice finale.** Nessun punto di vista ha prodotto un ciclo vuoto: il contatore è a 0 per tutti. La revisione 14 non è stata riauditata.
+
+| Punto di vista | Ultimo ciclo | Ultimo esito (rev) | Contatore vuoti |
+|---|---|---|---|
+| Chi esegue | 51 | 5 rilievi, 1 grave (rev 13) | 0 |
+| Chi usa | 40 | 2 rilievi, 1 grave (rev 11) | 0 |
+| Chi attacca | 52 | 7 rilievi, 4 gravi (rev 13) | 0 |
+| Chi paga | 42 | 4 rilievi, 0 gravi (rev 11) | 0 |
+| Chi arriva dopo | 43 | 4 rilievi, 1 grave (rev 11) | 0 |
+| Lo scettico | 53 | 5 rilievi, 3 gravi (rev 13) | 0 |
+| Il caso limite | 45 | 5 rilievi, 1 grave (rev 11) | 0 |
+| Chi integra | 54 | 5 rilievi, 3 gravi (rev 13) | 0 |
+
+**Andamento.** Bloccanti a zero dai cicli 31-38 in poi. Totali per giro completo 65 → 43 → 37; per giro ridotto 21 → 22. I gravi si concentrano sul testo appena scritto: ogni revisione ha chiuso i rilievi del giro precedente e aperto superficie nuova.
+
+**Cosa resta senza verifica.**
+- Il testo nuovo della revisione 14 (`PreToolUse SendMessage`, transizioni di `tasks`, `reopen`, `--from-findings`, `--from-gate`, registrazione del piano in L2).
+- Chi usa, chi paga, chi arriva dopo e il caso limite non hanno visto le revisioni 12-14.
+- Le voci «Ancora da verificare» della sezione 16 della spec (fatti di piattaforma da provare prima del codice).
+
+**Come il piano copre i residui.** Ogni meccanismo della spec diventa un test scritto prima del codice (TDD), e i 37 criteri di accettazione diventano test di integrazione o di hook. Le voci di 16 vanno in testa al piano come task di verifica, perché alcune possono cambiare il disegno (per esempio `SubagentStart` alla ripresa con `SendMessage`).
