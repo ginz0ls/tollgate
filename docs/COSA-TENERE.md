@@ -171,7 +171,7 @@ tollgate prende la stessa idea e la rende obbligatoria e legata allo SHA.
 4. **I confini si scrivono come divieti espliciti**, e servono controlli meccanici: un modello non sospetta l'assurdo.
 5. **Un task scritto una volta e letto testualmente non si deteriora**, mentre uno riformulato a ogni passaggio sì. Quindi l'issue e il piano si leggono così come sono scritti.
 6. **Le regole valgono solo se qualcosa le impone.** Hermes non le impone tra processi separati.
-7. **SQLite in modalità WAL si degrada su dischi di rete e FUSE.** Per tollgate: il DB in `CLAUDE_PLUGIN_DATA` (sotto `~/.claude`) va bene, ma **non deve mai stare dentro MEGA**. Lo stesso vale per i worktree: MEGA li sincronizzerebbe di continuo.
+7. **SQLite in modalità WAL si degrada su dischi di rete e FUSE.** Per tollgate: il DB sta in `CLAUDE_PLUGIN_DATA` (sotto `~/.claude`), su disco locale. Le cartelle di MEGA oggi non sono sincronizzate (verificato con l'utente l'8 ottobre 2026), quindi i worktree restano nella posizione predefinita.
 8. **Un solo processo scrive nel DB per volta**, con un lock non bloccante.
 
 ## Verifica sulla documentazione ufficiale (8 ottobre 2026)
