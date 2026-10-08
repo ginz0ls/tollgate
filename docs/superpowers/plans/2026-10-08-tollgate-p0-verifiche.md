@@ -291,11 +291,26 @@ Expected: I1 vuoto = i comandi `!` non passano da `PreToolUse`; I2 una riga per 
 
 Aggiungere al rapporto la tabella con le colonne di Task 2 (Id, Voce, Esito, Evidenza, Conseguenza) e le righe I1-I3.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Salvare gli input reali degli hook come fixture per P2**
+
+I test degli hook di P2 devono usare input veri di Claude Code, non inventati (piano principale, sezione 5). Si salva un esempio per ogni coppia evento/strumento vista, con i percorsi della home sostituiti.
+
+Run:
+```bash
+mkdir -p spikes/fixtures/hook-inputs
+cat /tmp/tollgate-p0/e*.jsonl /tmp/tollgate-p0/interactive.jsonl 2>/dev/null \
+  | jq -c 'select(.event) | {key: (.event + "-" + (.input.tool_name // "none")), value: .input}' \
+  | jq -s 'map({(.key): .value}) | add' \
+  | sed "s#$HOME#/home/USER#g" > spikes/fixtures/hook-inputs/samples.json
+jq 'keys' spikes/fixtures/hook-inputs/samples.json
+```
+Expected: un elenco di chiavi come `PreToolUse-Bash`, `SubagentStart-none`, `UserPromptExpansion-none`. Controllare a occhio che il file non contenga token o contenuti personali; se ne contiene, toglierli prima del commit.
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add docs/verifiche/2026-10-08-p0-esiti.md
-git commit -m "verifiche P0: esiti degli esperimenti interattivi"
+git add docs/verifiche/2026-10-08-p0-esiti.md spikes/fixtures/hook-inputs/samples.json
+git commit -m "verifiche P0: esiti degli esperimenti interattivi e fixture degli hook"
 ```
 
 ---
