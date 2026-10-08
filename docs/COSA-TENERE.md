@@ -105,7 +105,7 @@ Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre aspettano
 | 39 | L'output dei comandi va su file | Superpowers `task-done` | `tollgate verify` salva i log completi e mostra solo l'esito e le ultime righe |
 | 40 | Una fetta per sessione | Anthropic (sessioni lunghe), lezione di Perizie | A fine fetta `finish` salva lo stato e suggerisce `/clear`. Il `start` successivo riparte dal DB. Lo stesso vale tra spec approvata e piano |
 | 41 | Avvio con il minimo indispensabile | evidenze ICLR 2026 e Vercel | Nessuna meta-skill caricata a ogni sessione. All'avvio entrano solo poche righe: issue, fase, livello, prossimo passo |
-| 42 | Guardia sulla dimensione del contesto | nuova | **Modificata dopo la verifica.** Nessun hook riceve la percentuale di contesto; la riceve solo la statusline (`context_window.used_percentage`). Si fa così: la statusline di tollgate scrive la percentuale su un file per sessione; un hook `PreToolUse` sullo strumento Agent la legge e, sopra soglia, nega l'avvio di nuovi task chiedendo checkpoint e `/clear`. Un hook non può lanciare `/clear` da solo. Se usi già una tua statusline, tollgate la richiama dentro la sua. Senza statusline la guardia si spegne con un avviso, perché le voci 37-41 tengono già piccola la sessione principale |
+| 42 | Guardia sulla dimensione del contesto | nuova | **Modificata dopo la verifica.** Nessun hook riceve la percentuale di contesto; la riceve solo la statusline (`context_window.used_percentage`). Si fa così: **la statusline è quella dell'utente, importata in `statusline/statusline.sh`**. Legge già `used_percentage` e ha la soglia di autocompact all'85%. Le si aggiunge una sola cosa: scrivere la percentuale su un file per sessione. Un hook `PreToolUse` sullo strumento Agent legge quel file e, sopra soglia, nega l'avvio di nuovi task chiedendo checkpoint e `/clear`. Un hook non può lanciare `/clear` da solo. Senza statusline la guardia si spegne con un avviso, perché le voci 37-41 tengono già piccola la sessione principale |
 
 Unica eccezione: il **brainstorming** si fa nella sessione principale, perché è un dialogo con te. Subito dopo l'approvazione della spec si chiude e si riparte pulito.
 
@@ -130,7 +130,11 @@ Fonti: [hooks](https://code.claude.com/docs/en/hooks.md), [sub-agents](https://c
 | Tipi di handler degli hook | `command`, `http`, `mcp_tool`, `prompt`, `agent` (quest'ultimo sperimentale) | Usiamo solo `command`. `http` servirà per la dashboard |
 | `claude plugin eval` | Esiste. Struttura `evals/<caso>/prompt.md` più `graders/`. 3 esecuzioni per caso, soglia predefinita 1.0 | Base per il sotto-progetto D |
 
-Ancora da rileggere sulla pagina completa prima di scrivere codice: `updatedInput` e la semantica di `defer` in `PreToolUse`, e i campi di input di `PreCompact`.
+Ancora da rileggere sulla pagina completa prima di scrivere codice: `updatedInput` e la semantica di `defer` in `PreToolUse`, i campi di input di `PreCompact`, e **se un plugin può impostare la statusline** o se serve un comando di installazione che la configuri in `settings.json`.
+
+Note sulla statusline importata, da decidere prima della versione pubblica:
+- interroga `api.anthropic.com/api/oauth/usage` con il token OAuth locale. È un endpoint non documentato, quindi va bene per uso personale ma è da rendere opzionale nella versione pubblica;
+- a ogni aggiornamento scrive l'intero input JSON in `statusline.log`, che cresce senza limite.
 
 ## Prossimi passi
 
