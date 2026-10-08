@@ -1,7 +1,7 @@
 # tollgate: specifica del nucleo (sotto-progetto A)
 
 Data: 8 ottobre 2026.
-Revisione: **3** (correzioni dell'audit e della revisione avversariale, vedi la sezione 17).
+Revisione: **4** (correzioni dell'audit, vedi la sezione 17).
 Stato: **in audit** (`docs/audit/2026-10-08-audit-spec-nucleo-stato.md`).
 Fonti: `docs/REPORT-CONFRONTO-WORKFLOW.md`, `docs/COSA-TENERE.md` (voci 1-42, H1-H45, R1-R16, sezione 9), `docs/RICERCA-PAPER.md`.
 
@@ -18,6 +18,7 @@ Fonti: `docs/REPORT-CONFRONTO-WORKFLOW.md`, `docs/COSA-TENERE.md` (voci 1-42, H1
 | **scope** | L'insieme dei file che il piano della fetta autorizza a creare o modificare, più le deroghe |
 | **chiave del repo** | URL remoto `origin` normalizzato. Se manca, la radice comune di git (`git rev-parse --git-common-dir`) |
 | **cartella di stato** | `${TOLLGATE_STATE:-~/.local/state/tollgate}`. Contiene DB, log, file del contesto e interruttore |
+| **repo attivo** | Un repo che ha `tollgate.toml` sulla punta del ramo base. **Negli altri repo tollgate non fa niente** |
 | **atto dell'utente** | Un'operazione registrata dall'hook `UserPromptExpansion` quando l'utente digita un comando `/tollgate:*` |
 
 ---
@@ -72,7 +73,7 @@ Per questo ogni obbligo ha **due livelli di controllo**:
 | Harness | Claude Code |
 | Tracker | GitHub Issues, tramite `gh` |
 | Autonomia | Interattiva. L'avvio automatico viene dopo |
-| Flusso | Superpowers, dichiarato come dipendenza con un intervallo di versioni; `finishing-a-development-branch` è sostituito da `/tollgate:finish` |
+| Flusso | Superpowers `>=6.4.1 <7.0.0`, dichiarato come dipendenza. Un cambio di versione maggiore va verificato a mano sul formato del registro di subagent-driven-development. `finishing-a-development-branch` è sostituito da `/tollgate:finish` |
 | Struttura | Hook e script. Le skill gestiscono le parti che richiedono il modello; i passi deterministici li esegue `bin/tollgate` |
 | Stato | SQLite locale nella cartella di stato. Ci scrive solo il codice di tollgate (CLI e hook) |
 | Pianificatore | Il coordinatore, cioè la sessione principale, che può fare domande |
@@ -81,6 +82,8 @@ Per questo ogni obbligo ha **due livelli di controllo**:
 | Livello | Lo script lo può solo alzare. Lo può abbassare **solo l'utente**, con un atto registrato e un motivo |
 | Pubblicazione | Privato ora, pubblico poi. Nel codice niente percorsi né nomi di progetti dell'utente |
 | Lingua | Nomi in inglese per plugin, comandi, script e file; documentazione in italiano |
+| Sistemi | Linux e macOS (il wrapper degli hook è uno script shell). Windows fuori dalla v1 |
+| Requisiti del repo | Remote GitHub e `gh` autenticato |
 
 ---
 
@@ -93,7 +96,7 @@ tollgate/
   skills/
     start/SKILL.md      /tollgate:start #N                          anche il modello
     finish/SKILL.md     /tollgate:finish                            anche il modello
-    status/SKILL.md     /tollgate:status                            anche il modello (sola lettura)
+    status/SKILL.md     /tollgate:status   stato e atti in sospeso  anche il modello (sola lettura)
     init/SKILL.md       /tollgate:init       propone tollgate.toml  anche il modello (solo proposta)
     approve/SKILL.md    /tollgate:approve <oggetto> <id> [motivo]   solo l'utente
     resolve/SKILL.md    /tollgate:resolve <id> <nota>               solo l'utente
@@ -187,7 +190,9 @@ Il livello lo calcola `bin/tollgate`.
 ```
 /tollgate:start #N   (la skill chiama bin/tollgate start)
   0. prerequisiti   tollgate.toml presente nel ramo base (altrimenti: rifiuto e invito a /tollgate:init);
-                    versione di Superpowers nell'intervallo atteso
+                    versione di Superpowers nell'intervallo atteso; remote GitHub, `gh` autenticato,
+                    ramo base esistente con almeno un commit (altrimenti: rifiuto con il motivo);
+                    issue chiusa → avviso e conferma
   1. controlli      repo pulito; CI del ramo base verde (se è rossa: avviso e conferma)
   2. lavoro         lavoro esistente per (chiave del repo, issue, fetta)? → ripresa (10.3); altrimenti nuovo
   3. livello        proposto, confermato dall'utente
@@ -239,7 +244,8 @@ Se il coordinatore segue comunque Superpowers, gli hook negano merge locale, pus
                              blocchi o approvazioni in sospeso;
                              intento salvato → push → ls-remote → cerca una PR esistente → crea la PR
                              descrizione: livello (ed eventuale abbassamento), ricevute, deroghe, blocchi,
-                             verdetto, commit fuori controllo, effetti esterni confermati
+                             verdetto, commit fuori controllo, effetti esterni confermati;
+                             in coda un blocco JSON in un commento HTML, leggibile da C e dalla dashboard
   8. merge                   lo fa l'utente su GitHub; la fetta successiva parte in una sessione nuova
 ```
 
@@ -250,7 +256,10 @@ Se il coordinatore segue comunque Superpowers, gli hook negano merge locale, pus
   - usando lo strumento nativo per entrare nel worktree, se è adatto (sezione 15).
 - Il lavoro attivo si ricava dal ramo `tg/<N>-*` della directory di lavoro, non dal `session_id`, che cambia a ogni `/clear`.
 - `git worktree add` mentre esiste già un worktree per lo stesso lavoro viene negato, con il percorso esistente. Così using-git-worktrees di Superpowers non ne crea un secondo.
-- Fuori da un ramo `tg/*` tollgate applica solo le regole valide ovunque: comandi distruttivi, effetti esterni, file protetti, merge e push.
+- **Dove valgono le regole.**
+  - In un repo che non è attivo, tollgate non fa niente: il plugin è installato per tutti i progetti e non deve disturbare gli altri.
+  - In un repo attivo ma fuori dai rami `tg/*` valgono solo i comandi distruttivi e la protezione dei file di tollgate (configurazione, cartella di stato, file del plugin). La configurazione si legge dalla punta del ramo base.
+  - Push, merge, PR, scope, livelli ed effetti esterni sono regolati **solo sui rami `tg/*`**, più i merge verso la base fatti da un ramo `tg/*`.
 
 ---
 
@@ -276,7 +285,7 @@ Ogni hook scrive un evento in `events`.
 |---|---|---|---|
 | `SessionStart` | `startup`, `resume`, `clear`, `compact`, `fork` | Informativo. Con un lavoro attivo inietta al massimo 10 righe e 1.500 caratteri di stato (budget R9); senza lavoro attivo non aggiunge niente | 41, R5, R9 |
 | `UserPromptExpansion` | comandi `/tollgate:approve`, `/tollgate:resolve`, `/tollgate:off`, `/tollgate:on`, `/tollgate:setup` | Registra l'**atto dell'utente**: approvazione, risoluzione, abbassamento del livello, interruttore (file `OFF`, scritto direttamente dal wrapper senza Python), configurazione della statusline. Il modello non può generarlo, perché scatta solo quando digiti tu il comando | 14, R1 |
-| `PreToolUse` | `Edit`, `Write`, `NotebookEdit` (`MultiEdit` se presente) | **Fasi `piano` e `approvazione`**: solo `docs/superpowers/**`. **Fase `esecuzione`**: file fuori scope → `deny` con l'istruzione per la deroga; in L1 e L2, scrittura sul codice da parte della sessione principale (senza `agent_id`) → `deny`; file protetti → sempre `deny`. **Sempre permessi**: `docs/superpowers/**`, `.superpowers/**` e i file in `[scope] always`. **In L0** lo scope non si applica: vale il livello | 5, H24 |
+| `PreToolUse` | `Edit`, `Write`, `NotebookEdit` (`MultiEdit` se presente) | **Fasi `piano` e `approvazione`**: solo i file `.md` sotto `docs/superpowers/`. **Fase `esecuzione`**: file fuori scope → `deny` con l'istruzione per la deroga; in L1 e L2, scrittura sul codice da parte della sessione principale (senza `agent_id`) → `deny`; file protetti → sempre `deny`. **Sempre permessi**: i file `.md` sotto `docs/superpowers/`, i file sotto `.superpowers/` (che però, se finiscono in un commit, a `finish` contano come fuori scope) e i file in `[scope] always` alle condizioni della sezione 11. **In L0** lo scope non si applica: vale il livello | 5, H24 |
 | `PostToolUse` | `Edit`, `Write`, `MultiEdit` | Ricalcola il livello sul diff. Se il file è un piano (`docs/superpowers/plans/*.md`), esegue `plan-check`: se manca qualcosa → `decision: block` con l'elenco (il file resta scritto ma il piano non viene registrato); se è completo registra scope e fette | 13, R6 |
 | `PreToolUse` | `Bash` | Tabella 7.4 | 6, 10 |
 | `PreToolUse` | `mcp__.*` | Strumenti MCP che non sono in `[external_effects] mcp_allow` → `ask`. Si possono permettere solo gli strumenti in sola lettura | 6 |
@@ -294,11 +303,11 @@ Per `tollgate:*`, per gli specialisti e per i subagenti in `[review] parallel_ok
 
 ### 7.4 Regole su Bash
 
-Sono «best effort»: il controllo autorevole è quello della sezione 8.4.
+Valgono solo nei repo attivi, con l'ambito della sezione 6.4. Sono «best effort»: il controllo autorevole è quello della sezione 8.4.
 
 | Comando | Decisione |
 |---|---|
-| `git push`, `gh pr create`, `gh pr merge`, `git merge` verso il ramo base, `git branch -d/-D` di un ramo `tg/*`, `git worktree remove` del worktree del lavoro, `git worktree add` per un lavoro che ha già un worktree | `deny` |
+| Su un ramo `tg/*`: `git push`, `gh pr create`, `gh pr merge`. Ovunque: `git merge` di un ramo `tg/*` verso il ramo base, `git branch -d/-D` di un ramo `tg/*`, `git worktree remove` del worktree di un lavoro, `git worktree add` per un lavoro che ha già un worktree | `deny` |
 | Distruttivi: `push --force`, `reset --hard`, `--no-verify`, `rm -rf` fuori dal worktree | `deny` |
 | Che disattivano o alterano tollgate: `claude plugin disable/uninstall`; scrittura (`sed -i`, `>`, `>>`, `tee`, `cp`, `mv`, `sqlite3`) su impostazioni di Claude Code, `tollgate.toml`, cartella di stato o file del plugin | `deny` |
 | `tollgate hook …` | `deny` |
@@ -326,7 +335,7 @@ La skill `start`, quando passa a writing-plans, dà al coordinatore l'elenco di 
 
 ### 8.1 Ricevute
 
-- **Chi le produce**: solo `tollgate verify` e `tollgate finish check`, che eseguono i comandi di `tollgate.toml` (`verify`, `test_related`, `test_all`).
+- **Chi le produce**: solo `tollgate verify` e `tollgate finish check`, che eseguono i comandi di `tollgate.toml`. Durante il lavoro `verify` esegue `test_related` sui file del diff rispetto alla base del lavoro; `finish check` esegue i comandi del gate (8.4).
 - **Cosa registrano**:
   - SHA e worktree pulito;
   - **il comando risolto**: per `npm run x` il testo dello script preso da `package.json` in quello SHA;
@@ -356,8 +365,8 @@ La skill `start`, quando passa a writing-plans, dà al coordinatore l'elenco di 
 ### 8.2 test-guard
 
 Confronta il diff con la base del lavoro e segnala, **solo nei file di test** (`test_globs`, esclusi `fixture_globs`):
-- file di test cancellati;
-- casi di test diminuiti, contati **per file e per nome del test**: un test spostato in un altro file non conta come tolto;
+- file di test cancellati (con rilevamento delle rinomine: un file rinominato non è cancellato);
+- casi di test diminuiti, contati **per nome del test** in tutto il repo: un test spostato o rinominato di file non conta come tolto;
 - asserzioni diminuite (`assert_markers`);
 - `skip` e `only` aggiunti, cercati come parole intere (`\bxit\(`, `\.skip\(`), così `exit(` non scatta.
 
@@ -390,10 +399,10 @@ I pattern sono in `tollgate.toml`, con valori predefiniti per JavaScript, TypeSc
 2. **test-guard**: sul diff completo;
 3. **livello**: ricalcolato, perché può essere salito;
 4. **`tollgate.toml`**: invariato rispetto alla base; se è cambiato si blocca;
-5. **comandi**: il comando risolto di `verify` e `test_all` coincide con quello della base, oppure c'è una deroga `comando` approvata;
+5. **comandi**: il comando risolto di ogni comando del gate coincide con quello della base, oppure c'è una deroga `comando` approvata;
 6. **prova di presenza**: ogni commit tra la base e l'ultimo commit ha un evento `git commit` registrato dall'hook. I commit senza evento sono «commit fuori controllo»: vengono elencati e la PR si apre solo dopo `/tollgate:approve presence <sha>`;
 7. **atti in sospeso**: nessuna deroga o approvazione in attesa, nessun blocco aperto;
-8. **ricevute**: riesegue `verify` e `test_all` e usa solo le ricevute che produce lui stesso.
+8. **ricevute**: riesegue i comandi del gate (`[commands] gate`, predefinito `["verify"]`, più i comandi `gate` dei profili attivi) e usa solo le ricevute che produce lui stesso. Il conteggio dei test si legge dal reporter di quei comandi.
 
 ### 8.5 Effetti esterni
 
@@ -408,10 +417,14 @@ I pattern sono in `tollgate.toml`, con valori predefiniti per JavaScript, TypeSc
 | Livello | Revisori | Poi |
 |---|---|---|
 | L0 | Nessun agente | Ricevute e merge tuo |
-| L1 | `tollgate:final-reviewer` con la checklist dei profili attivi (nel nucleo: solo il profilo base) | `tollgate:finding-verifier` per ogni rilievo → verdetto |
-| L2 | `tollgate:final-reviewer` + al massimo 3 specialisti scelti in base ai profili attivi, **ognuno in un subagente con il suo contesto**, se installati: `pr-review-toolkit:pr-test-analyzer`, `pr-review-toolkit:silent-failure-hunter`, `security-review` eseguito da `tollgate:specialist-runner`. Codex come parere, se installato (R16) | `tollgate:finding-verifier` per ogni rilievo → verdetto |
+| L1 | `tollgate:final-reviewer` con la checklist dei profili attivi (nel nucleo: solo il profilo base) | `tollgate:finding-verifier` → verdetto |
+| L2 | `tollgate:final-reviewer` + al massimo 3 specialisti scelti in base ai profili attivi, **ognuno in un subagente con il suo contesto**, se installati: `pr-review-toolkit:pr-test-analyzer`, `pr-review-toolkit:silent-failure-hunter`, `security-review` eseguito da `tollgate:specialist-runner`. Codex come parere, se installato (R16) | `tollgate:finding-verifier` → verdetto |
+
+**Codex.** Si invoca tramite `tollgate:specialist-runner`, con il comando di revisione documentato di codex-plugin-cc (da verificare, sezione 15). Il suo parere passa dal verificatore come quello di ogni altro revisore.
 
 **Specialisti non installati.** Gli specialisti esterni **non sono dipendenze**: `pr-review-toolkit` non ha una versione semver da fissare. Se mancano, la PR dice quali specialisti sono stati saltati.
+
+**Il verificatore.** C'è **un solo subagente verificatore per giro di revisione**. Controlla ogni rilievo separatamente, con le sue prove, e li tratta in ordine di gravità fino a `max_findings` (predefinito 15). I rilievi oltre il tetto vengono elencati come «non verificati» e non fermano la PR, ma li trovi nella PR.
 
 **La revisione finale di Superpowers.** subagent-driven-development fa già una revisione finale dell'intero ramo. La skill `start` indica al coordinatore di saltarla e andare a `/tollgate:finish`. Se la fa comunque, il costo raddoppia ma non si perde nessun controllo. Il costo si misura in D.
 
@@ -436,7 +449,7 @@ I pattern sono in `tollgate.toml`, con valori predefiniti per JavaScript, TypeSc
 
 | Tabella | Colonne principali | Vincoli |
 |---|---|---|
-| `work_items` | id, chiave del repo, issue, issue madre, fetta, livello, livello abbassato (sì/no e motivo), fase, fase prima del blocco, ramo, worktree, `work_base_sha`, ultima sessione, `lease_owner` e `lease_until` (presa in carico solo locale, per C), date | univoco (chiave del repo, issue, fetta) |
+| `work_items` | id, chiave del repo, issue, issue madre, fetta, livello, livello abbassato (sì/no e motivo), fase, fase prima del blocco, ramo, worktree, `work_base_sha`, ultima sessione, `lease_owner` e `lease_until` (non usati nel nucleo; presa in carico solo locale, per C), date | univoco (chiave del repo, issue, fetta) |
 | `slices` | lavoro del piano principale, numero, titolo, dipendenze, stato | univoco (lavoro, numero) |
 | `scope` | lavoro, percorso, origine (`piano` o `deroga`) | |
 | `receipts` | lavoro, sha, worktree pulito, comando, comando risolto, exit, test eseguiti, test saltati, durata, log, `prodotta_da` (`verify` o `finish`), stato (`verde`, `rossa`, `vuota`, `senza_conteggio`, `instabile`, `non_verificato`) | |
@@ -471,6 +484,8 @@ L'agente non cambia mai fase.
 
 Se qualcosa non corrisponde si ferma e chiede.
 
+**`finish` interrotto.** Se `finish` si ferma a metà, per esempio per la guardia del contesto, riprende dal punto registrato nel DB (controllo fatto su quello SHA, giro di revisione N) dopo `/clear`, purché lo SHA non sia cambiato.
+
 **Due sessioni sullo stesso lavoro.** Se un'altra sessione ha registrato eventi su quel lavoro negli ultimi 10 minuti, `start` ti avvisa e chiede conferma.
 
 ### 10.4 Pulizia e migrazioni
@@ -493,6 +508,7 @@ base_branch = "main"
 verify       = "npm run check"               # verifica completa: lint, typecheck, test
 test_all     = "npx vitest run"
 test_related = "npx vitest related --run {files}"
+gate         = ["verify"]                    # comandi rieseguiti da finish check
 report       = "junit:reports/junit.xml"     # da dove leggere il numero di test
 timeout_s    = 900
 
@@ -507,7 +523,9 @@ warn_pct = 45
 stop_pct = 55
 
 [scope]
-always = ["package-lock.json", "pnpm-lock.yaml", "poetry.lock"]   # lockfile sempre ammessi
+# file ammessi anche fuori dal piano; un lockfile è ammesso solo se il suo manifest è nello scope
+always   = []
+lockfiles = { "package-lock.json" = "package.json", "pnpm-lock.yaml" = "package.json", "poetry.lock" = "pyproject.toml" }
 
 [external_effects]
 commands        = ["supabase db push", "supabase functions deploy", "wrangler deploy", "npm publish"]
@@ -523,7 +541,8 @@ skip_markers  = ["\\bxit\\(", "\\.skip\\(", "\\.only\\(", "@pytest\\.mark\\.skip
 assert_markers = ["\\bexpect\\(", "\\bassert\\b"]
 
 [review]
-parallel_ok = ["pr-review-toolkit:pr-test-analyzer", "pr-review-toolkit:silent-failure-hunter"]
+parallel_ok  = ["pr-review-toolkit:pr-test-analyzer", "pr-review-toolkit:silent-failure-hunter"]
+max_findings = 15
 
 [severity]   # lette dal revisore e dal verificatore
 bloccante = "dato sbagliato senza conferma, dati di altri utenti, azione eseguita due volte"
@@ -535,8 +554,14 @@ minore    = "redazionale"
 retention_days = 30
 events_days    = 180
 
-[profiles]   # riservata al sotto-progetto B; nel nucleo è attivo solo il profilo base
+[profiles]   # contratto di estensione per il sotto-progetto B; nel nucleo esiste solo "base"
 active = ["base"]
+
+[profiles.base]
+paths      = ["**"]                          # file che attivano il profilo
+gate       = []                              # comandi del gate aggiuntivi
+checklist  = ""                              # file con la checklist per il revisore finale
+specialists = []                             # specialisti per L2
 
 [components]  # mappa aperta (R10): ogni componente si può spegnere; B potrà aggiungere chiavi
 scope_check = true
@@ -561,7 +586,10 @@ specialists = true
 |---|---|
 | Script di controllo che va in errore, in crash o in timeout | Il wrapper esce con 2: l'azione viene bloccata e il messaggio indica il log e `/tollgate:off` |
 | Python o DB irrimediabilmente rotti | `/tollgate:off` scrive il file `OFF` senza passare da Python né dal DB; tutti gli hook lasciano passare |
-| `tollgate.toml` assente | `start` si rifiuta e invita a `/tollgate:init` |
+| `tollgate.toml` assente | Il repo non è attivo: tollgate non fa niente. `start` si rifiuta e invita a `/tollgate:init` |
+| Repo senza remote GitHub, `gh` non autenticato, ramo base assente o vuoto | `start` si rifiuta con il motivo |
+| Issue già chiusa | Avviso e conferma |
+| `finish` interrotto dalla guardia del contesto | Riprende dopo `/clear` dal punto registrato |
 | Effetto esterno nascosto in uno script del progetto | Va elencato in `project_scripts`. Per i commit lo copre la prova di presenza; **per i deploy resta un limite noto** |
 | Strumento MCP non elencato | `ask` |
 | Comando di verifica assente | «Non verificato»; `finish` richiede `/tollgate:approve unverified`, scritto nella PR |
@@ -633,7 +661,9 @@ Ogni criterio dice cosa si fa, cosa si deve osservare e quale test lo verifica.
 14. **Ricevute.** Zero test eseguiti → ricevuta «vuota» e non verde (script).
 15. **Sola lettura.** Un revisore che modifica il worktree → verdetto scartato e `serve_te` (hook).
 16. **Componenti.** Ogni chiave di `[components]` impostata a `false` spegne il suo comportamento, e c'è un test per ciascuna (script, hook).
-17. **Budget delle istruzioni.** Le righe iniettate da `SessionStart` sono al massimo 10 e 1.500 caratteri, misurato da un test (hook).
+17. **Repo non attivo.** In un repo senza `tollgate.toml`, `git push` e `gh pr create` passano e nessun hook aggiunge contesto (hook).
+18. **Rinomine.** Un file di test rinominato con gli stessi test → nessuna segnalazione (script).
+19. **Budget delle istruzioni.** Le righe iniettate da `SessionStart` sono al massimo 10 e 1.500 caratteri, misurato da un test (hook).
 
 ---
 
@@ -658,6 +688,7 @@ Ogni criterio dice cosa si fa, cosa si deve osservare e quale test lo verifica.
 - Il formato di `dependencies` e di `allowCrossMarketplaceDependenciesOn`, e il vincolo di versione su Superpowers.
 - La stabilità del formato del registro di subagent-driven-development (`Task <N>: fix round <R>/5`), da cui dipende R4. Va fissato l'intervallo di versioni di Superpowers.
 - Il formato dei reporter JUnit e JSON di vitest, jest e pytest, per contare i test.
+- Il comando di revisione di codex-plugin-cc e se si può eseguire dentro un subagente.
 
 ---
 
@@ -677,3 +708,4 @@ Questi limiti restano anche dopo le correzioni. Sono dichiarati qui perché ness
 | 1 | 08/10/2026 | Prima stesura |
 | 2 | 08/10/2026 | Correzioni dei cicli 1-3 dell'audit (A-01 … A-25) |
 | 3 | 08/10/2026 | Correzioni della revisione avversariale (V-01 … V-36) e verifica sulla documentazione: wrapper degli hook con uscita 2 e interruttore senza Python; atti dell'utente via `UserPromptExpansion`; statusline configurata dall'utente; specialisti esterni opzionali; comandi risolti e conteggio dei test nelle ricevute; file dei comandi sotto test-guard; test-guard su working tree più indice, solo nei file di test, con parole intere e conteggio delle asserzioni; effetti esterni via MCP, curl, gh api e shell annidate; intenti idempotenti con conferma alla ripresa; livello abbassabile solo dall'utente; `/tollgate:init`; glossario; chiave del repo e vincoli di unicità; coordinatore senza scrittura di codice in L1 e L2; controllo di sola lettura dei revisori; deroghe per singolo file; issue trattata come dato non fidato; override di stato e configurazione per i test; criteri riscritti come azione, osservazione e test; sezione «Cosa resta aperto» |
+| 4 | 08/10/2026 | Correzioni dei cicli 5-10 (B-01 … B-17): tollgate inerte nei repo senza `tollgate.toml` e regole su push e merge limitate ai rami `tg/*`; comandi del gate configurabili; un verificatore per giro con tetto; intervallo di versioni di Superpowers; prerequisiti del repo; rinomine; `finish` riprendibile; contratto dei profili per B; Codex tramite `specialist-runner`; blocco JSON nella PR; file sempre permessi più ristretti; lockfile legati al manifest |
