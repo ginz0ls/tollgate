@@ -17,6 +17,7 @@ Ci sono cinque filoni di ricerca, ciascuno con il suo report completo in `docs/r
 | 3 | Contesto e memoria | `ricerca/03-contesto-memoria.md` | 25 |
 | 4 | Review, sicurezza, produttività | `ricerca/04-review-sicurezza-produttivita.md` | circa 35 |
 | 5 | Specifiche, piani, valutazione | `ricerca/05-spec-piani-eval.md` | circa 30 |
+| 6 | Un revisore o più revisori specializzati | `ricerca/06-revisori-specializzati.md` | circa 20 |
 
 **Quanto fidarsi.**
 - **[V]** vuol dire che la pagina originale è stata aperta: abstract o testo su arXiv, oppure il post o la nota originale. **[S]** vuol dire fonte secondaria. Le voci [S] non vanno citate come fatti.
@@ -154,6 +155,22 @@ Ci sono cinque filoni di ricerca, ciascuno con il suo report completo in `docs/r
 - **Le baseline semplici spesso valgono gli agenti complessi**, che costano fino a 50 volte di più (Kapoor et al. [V], «AI Agents That Matter»).
 - **Non usare SWE-bench Verified come banco di prova principale**: ha contaminazione e test deboli (SWE-Bench+, SWE-Bench Illusion [V]).
 - **Superpowers non ha prove a favore.** L'unico confronto pubblicato (RigorBench [V, 2606.22678]) non mostra vantaggi di processo rispetto alla baseline. È un'evidenza debole: gli autori sono in conflitto di interessi e non c'è un test statistico.
+
+
+### 2.12 Un revisore o più revisori specializzati (filone 6)
+
+**Nessuno studio pubblicato confronta, a parità di modello, un revisore con checklist e più revisori specializzati per tema.** Le evidenze sono indirette ma vanno tutte nella stessa direzione: **conta il passo di verifica dopo la revisione, non il numero di revisori.**
+
+- **SWR-Bench** [V, 2509.01494]: il guadagno (+43,7% di F1) viene da più passate **dello stesso** revisore unite insieme. La specializzazione non viene testata e il sistema multi-agente si ferma al 9,22% di F1.
+- **Lu 2025** [V parziale, 2505.17928]: con 3 revisori aumentano i problemi trovati, ma anche i falsi allarmi (dal 78% all'89%). Dopo il validatore il vantaggio sul revisore singolo è quasi nullo.
+- **Adversarial Review** [V, 2608.18167]: più revisori indipendenti valgono quanto uno solo (F1 0,501 contro 0,495). Un revisore più un critico che deve portare prove arriva a 0,533, con circa 4,5 volte i token.
+- **Dare un ruolo al modello non migliora l'accuratezza** (persona prompting: Zheng 2024 [S]; Basil 2025 [S]).
+- **Una checklist di 10-20 voci non è un problema**: i Claude recenti rispettano il 94-100% delle istruzioni fino a 100 (IFScale [V]).
+- **OpenCodeReview** [V, 2608.09290]: criteri scelti in base al tipo di file più un filtro indipendente portano la precisione al 25-38%, con 5-15 volte meno token.
+- **Contro**: Qodo dichiara vantaggi per gli agenti separati, ma su un benchmark suo. Mao 2024 mostra un guadagno con ruoli in discussione, ma su un modello debole e con il 484% di token in più. Unire strumenti **diversi** aumenta i problemi trovati (c-CRAB [V]).
+- **Plugin ufficiale `code-review`**: la versione installata in locale usa 5 agenti specializzati per fonte di informazione e un punteggio di confidenza 0-100 con soglia 80. La versione attuale su GitHub è cambiata: usa un validatore per ogni problema, con esito sì/no. Il design è stato modificato nel tempo.
+
+**Conclusione per tollgate**: in L1 basta un revisore con la checklist dei profili attivi più un verificatore per ogni problema segnalato. In L2 gli specialisti si giustificano con **contesto e strumenti diversi** (schema e migrazioni per il database, flusso di autenticazione per la sicurezza), non con il ruolo.
 
 ---
 
