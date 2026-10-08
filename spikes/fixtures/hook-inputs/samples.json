@@ -1,0 +1,435 @@
+{
+  "SessionStart-none": {
+    "session_id": "dd41b5eb-29b5-40a2-bd61-492c61077246",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246.jsonl",
+    "cwd": "/tmp/tollgate-p0/wt-repo",
+    "scratchpad_dir": "/tmp/claude-1000/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246/scratchpad",
+    "hook_event_name": "SessionStart",
+    "source": "startup",
+    "model": "claude-opus-5-5"
+  },
+  "UserPromptSubmit-none": {
+    "session_id": "dd41b5eb-29b5-40a2-bd61-492c61077246",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246.jsonl",
+    "cwd": "/tmp/tollgate-p0/wt-repo",
+    "scratchpad_dir": "/tmp/claude-1000/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246/scratchpad",
+    "prompt_id": "19e24361-ba02-4022-88da-c68ff633d45a",
+    "permission_mode": "auto",
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "/hookprobe:probe-worktree"
+  },
+  "PreToolUse-Agent": {
+    "session_id": "1ddbf511-74af-416e-9027-03c2fae29b1d",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-turns/1ddbf511-74af-416e-9027-03c2fae29b1d.jsonl",
+    "cwd": "/tmp/tollgate-p0/turns",
+    "prompt_id": "c483c166-74f1-4cd7-bff3-5cebdbc0ea8b",
+    "permission_mode": "default",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Agent",
+    "tool_input": {
+      "description": "Esegui sonda probe-turns",
+      "prompt": "Esegui il compito descritto nelle tue istruzioni di sistema e restituisci la tua risposta finale.",
+      "subagent_type": "hookprobe:probe-turns",
+      "run_in_background": false
+    },
+    "tool_use_id": "toolu_012DSpPAz3xVKXfezJ8Buqrp"
+  },
+  "SubagentStart-none": {
+    "session_id": "1ddbf511-74af-416e-9027-03c2fae29b1d",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-turns/1ddbf511-74af-416e-9027-03c2fae29b1d.jsonl",
+    "cwd": "/tmp/tollgate-p0/turns",
+    "prompt_id": "c483c166-74f1-4cd7-bff3-5cebdbc0ea8b",
+    "agent_id": "a6d9aa6ed9c2f0269",
+    "agent_type": "hookprobe:probe-turns",
+    "hook_event_name": "SubagentStart"
+  },
+  "PostToolUse-Agent": {
+    "session_id": "1ddbf511-74af-416e-9027-03c2fae29b1d",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-turns/1ddbf511-74af-416e-9027-03c2fae29b1d.jsonl",
+    "cwd": "/tmp/tollgate-p0/turns",
+    "prompt_id": "c483c166-74f1-4cd7-bff3-5cebdbc0ea8b",
+    "permission_mode": "default",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Agent",
+    "tool_input": {
+      "description": "Esegui sonda probe-turns",
+      "prompt": "Esegui il compito descritto nelle tue istruzioni di sistema e restituisci la tua risposta finale.",
+      "subagent_type": "hookprobe:probe-turns",
+      "run_in_background": false
+    },
+    "tool_response": {
+      "status": "completed",
+      "prompt": "Esegui il compito descritto nelle tue istruzioni di sistema e restituisci la tua risposta finale.",
+      "agentId": "a6d9aa6ed9c2f0269",
+      "agentType": "hookprobe:probe-turns",
+      "harnessNoteCount": 1,
+      "harnessTailCount": 0,
+      "harnessSectionHash": "d5d7903db29fd097",
+      "content": [
+        {
+          "type": "text",
+          "text": "NOTE: this agent stopped at its 2-turn limit before finishing. The text below is PARTIAL output; treat it as incomplete. Send the agent a message (SendMessage) to let it continue from where it stopped.\n"
+        },
+        {
+          "type": "text",
+          "text": "letto 1"
+        }
+      ],
+      "resolvedModel": "claude-haiku-5-5",
+      "totalDurationMs": 4691,
+      "totalTokens": 15247,
+      "totalToolUseCount": 2,
+      "usage": {
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 853,
+        "cache_read_input_tokens": 14320,
+        "output_tokens": 72,
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 853
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 72,
+            "cache_read_input_tokens": 14320,
+            "cache_creation_input_tokens": 853,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 853,
+              "ephemeral_1h_input_tokens": 0
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "toolStats": {
+        "readCount": 2,
+        "searchCount": 0,
+        "bashCount": 0,
+        "editFileCount": 0,
+        "linesAdded": 0,
+        "linesRemoved": 0,
+        "otherToolCount": 0
+      },
+      "canContinueAgent": true
+    },
+    "tool_use_id": "toolu_012DSpPAz3xVKXfezJ8Buqrp",
+    "duration_ms": 4697
+  },
+  "SubagentStop-none": {
+    "session_id": "dd41b5eb-29b5-40a2-bd61-492c61077246",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-wt-1/dd41b5eb-29b5-40a2-bd61-492c61077246.jsonl",
+    "cwd": "/tmp/tollgate-p0/wt-1",
+    "scratchpad_dir": "/tmp/claude-1000/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246/scratchpad",
+    "prompt_id": "19e24361-ba02-4022-88da-c68ff633d45a",
+    "permission_mode": "auto",
+    "agent_id": "a2d87949c2e09c25e",
+    "agent_type": "",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "SubagentStop",
+    "stop_hook_active": false,
+    "agent_transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-wt-1/dd41b5eb-29b5-40a2-bd61-492c61077246/subagents/agent-a2d87949c2e09c25e.jsonl",
+    "background_tasks": [],
+    "session_crons": []
+  },
+  "PreToolUse-ToolSearch": {
+    "session_id": "dd41b5eb-29b5-40a2-bd61-492c61077246",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246.jsonl",
+    "cwd": "/tmp/tollgate-p0/wt-repo",
+    "scratchpad_dir": "/tmp/claude-1000/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246/scratchpad",
+    "prompt_id": "19e24361-ba02-4022-88da-c68ff633d45a",
+    "permission_mode": "auto",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PreToolUse",
+    "tool_name": "ToolSearch",
+    "tool_input": {
+      "query": "select:EnterWorktree",
+      "max_results": 1
+    },
+    "tool_use_id": "toolu_011dLsBuehR8SYiM7VThqCQw"
+  },
+  "PostToolUse-ToolSearch": {
+    "session_id": "dd41b5eb-29b5-40a2-bd61-492c61077246",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246.jsonl",
+    "cwd": "/tmp/tollgate-p0/wt-repo",
+    "scratchpad_dir": "/tmp/claude-1000/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246/scratchpad",
+    "prompt_id": "19e24361-ba02-4022-88da-c68ff633d45a",
+    "permission_mode": "auto",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "ToolSearch",
+    "tool_input": {
+      "query": "select:EnterWorktree",
+      "max_results": 1
+    },
+    "tool_response": {
+      "matches": [
+        "EnterWorktree"
+      ],
+      "query": "select:EnterWorktree",
+      "total_deferred_tools": 42
+    },
+    "tool_use_id": "toolu_011dLsBuehR8SYiM7VThqCQw",
+    "duration_ms": 5
+  },
+  "PreToolUse-SendMessage": {
+    "session_id": "213a893e-004e-4be3-ada8-cfba43a0c654",
+    "transcript_path": "/home/USER/.claude/projects/-tmp/213a893e-004e-4be3-ada8-cfba43a0c654.jsonl",
+    "cwd": "/tmp",
+    "prompt_id": "d171f1fc-8d89-47ff-a115-1936841ea1f6",
+    "permission_mode": "default",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PreToolUse",
+    "tool_name": "SendMessage",
+    "tool_input": {
+      "to": "contatore",
+      "summary": "Chiede di rispondere due",
+      "message": "Rispondi solo 'due'.",
+      "type": "message",
+      "recipient": "contatore",
+      "recipient_kind": "name",
+      "content": "Rispondi solo 'due'."
+    },
+    "tool_use_id": "toolu_01345fGTtMYwU98mhbCBSBUj"
+  },
+  "PostToolUse-SendMessage": {
+    "session_id": "213a893e-004e-4be3-ada8-cfba43a0c654",
+    "transcript_path": "/home/USER/.claude/projects/-tmp/213a893e-004e-4be3-ada8-cfba43a0c654.jsonl",
+    "cwd": "/tmp",
+    "prompt_id": "d171f1fc-8d89-47ff-a115-1936841ea1f6",
+    "permission_mode": "default",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "SendMessage",
+    "tool_input": {
+      "to": "contatore",
+      "summary": "Chiede di rispondere due",
+      "message": "Rispondi solo 'due'."
+    },
+    "tool_response": {
+      "success": true,
+      "message": "Resuming agent contatore",
+      "resumedAgentId": "ab08540583ba148ce",
+      "pin": {
+        "id": "ab08540583ba148ce",
+        "name": "contatore",
+        "ref": "84c317"
+      }
+    },
+    "tool_use_id": "toolu_01345fGTtMYwU98mhbCBSBUj",
+    "duration_ms": 28
+  },
+  "PreToolUse-SubagentHandback": {
+    "session_id": "e7df962b-7042-4b49-b62a-32bc71bfef7a",
+    "transcript_path": "/home/USER/.claude/projects/-tmp/e7df962b-7042-4b49-b62a-32bc71bfef7a.jsonl",
+    "cwd": "/tmp",
+    "prompt_id": "d4613d45-7d84-41d7-8119-3f3a02e7188a",
+    "permission_mode": "auto",
+    "agent_id": "aaf79e12a030de3c4",
+    "agent_type": "general-purpose",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PreToolUse",
+    "tool_name": "SubagentHandback",
+    "tool_input": {
+      "message": "uno"
+    },
+    "tool_use_id": "toolu_01Xw2jhYwTXTZWmxCk9R4K6g"
+  },
+  "PostToolUse-SubagentHandback": {
+    "session_id": "e7df962b-7042-4b49-b62a-32bc71bfef7a",
+    "transcript_path": "/home/USER/.claude/projects/-tmp/e7df962b-7042-4b49-b62a-32bc71bfef7a.jsonl",
+    "cwd": "/tmp",
+    "prompt_id": "d4613d45-7d84-41d7-8119-3f3a02e7188a",
+    "permission_mode": "auto",
+    "agent_id": "aaf79e12a030de3c4",
+    "agent_type": "general-purpose",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "SubagentHandback",
+    "tool_input": {
+      "message": "uno"
+    },
+    "tool_response": {
+      "success": true,
+      "message": "Report delivered to your caller."
+    },
+    "tool_use_id": "toolu_01Xw2jhYwTXTZWmxCk9R4K6g",
+    "duration_ms": 92
+  },
+  "PreToolUse-Bash": {
+    "session_id": "dd41b5eb-29b5-40a2-bd61-492c61077246",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-wt-1/dd41b5eb-29b5-40a2-bd61-492c61077246.jsonl",
+    "cwd": "/tmp/tollgate-p0/wt-1",
+    "scratchpad_dir": "/tmp/claude-1000/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246/scratchpad",
+    "prompt_id": "19e24361-ba02-4022-88da-c68ff633d45a",
+    "permission_mode": "auto",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git rev-parse --abbrev-ref HEAD; pwd",
+      "description": "Show current branch and directory"
+    },
+    "tool_use_id": "toolu_01RtH4mxBCA2myYSKZ4WriVj"
+  },
+  "UserPromptExpansion-none": {
+    "session_id": "dd41b5eb-29b5-40a2-bd61-492c61077246",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246.jsonl",
+    "cwd": "/tmp/tollgate-p0/wt-repo",
+    "scratchpad_dir": "/tmp/claude-1000/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246/scratchpad",
+    "prompt_id": "19e24361-ba02-4022-88da-c68ff633d45a",
+    "permission_mode": "auto",
+    "hook_event_name": "UserPromptExpansion",
+    "expansion_type": "slash_command",
+    "command_name": "hookprobe:probe-worktree",
+    "command_args": "",
+    "command_source": "plugin",
+    "prompt": "/hookprobe:probe-worktree"
+  },
+  "PreToolUse-Read": {
+    "session_id": "1ddbf511-74af-416e-9027-03c2fae29b1d",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-turns/1ddbf511-74af-416e-9027-03c2fae29b1d.jsonl",
+    "cwd": "/tmp/tollgate-p0/turns",
+    "prompt_id": "c483c166-74f1-4cd7-bff3-5cebdbc0ea8b",
+    "permission_mode": "default",
+    "agent_id": "a6d9aa6ed9c2f0269",
+    "agent_type": "hookprobe:probe-turns",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_input": {
+      "file_path": "/tmp/tollgate-p0/turns/2.txt"
+    },
+    "tool_use_id": "toolu_013VRB8TwQop7mKJmwcUb1tC"
+  },
+  "PostToolUse-Read": {
+    "session_id": "1ddbf511-74af-416e-9027-03c2fae29b1d",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-turns/1ddbf511-74af-416e-9027-03c2fae29b1d.jsonl",
+    "cwd": "/tmp/tollgate-p0/turns",
+    "prompt_id": "c483c166-74f1-4cd7-bff3-5cebdbc0ea8b",
+    "permission_mode": "default",
+    "agent_id": "a6d9aa6ed9c2f0269",
+    "agent_type": "hookprobe:probe-turns",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Read",
+    "tool_input": {
+      "file_path": "/tmp/tollgate-p0/turns/2.txt"
+    },
+    "tool_response": {
+      "type": "text",
+      "file": {
+        "filePath": "/tmp/tollgate-p0/turns/2.txt",
+        "content": "contenuto 2\n",
+        "numLines": 2,
+        "startLine": 1,
+        "totalLines": 2
+      }
+    },
+    "tool_use_id": "toolu_013VRB8TwQop7mKJmwcUb1tC",
+    "duration_ms": 16
+  },
+  "PostToolUse-Bash": {
+    "session_id": "dd41b5eb-29b5-40a2-bd61-492c61077246",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-wt-1/dd41b5eb-29b5-40a2-bd61-492c61077246.jsonl",
+    "cwd": "/tmp/tollgate-p0/wt-1",
+    "scratchpad_dir": "/tmp/claude-1000/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246/scratchpad",
+    "prompt_id": "19e24361-ba02-4022-88da-c68ff633d45a",
+    "permission_mode": "auto",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "git rev-parse --abbrev-ref HEAD; pwd",
+      "description": "Show current branch and directory"
+    },
+    "tool_response": {
+      "stdout": "tg/1-probe\n/tmp/tollgate-p0/wt-1",
+      "stderr": "",
+      "interrupted": false,
+      "isImage": false,
+      "noOutputExpected": false
+    },
+    "tool_use_id": "toolu_01RtH4mxBCA2myYSKZ4WriVj",
+    "duration_ms": 444
+  },
+  "PreToolUse-EnterWorktree": {
+    "session_id": "dd41b5eb-29b5-40a2-bd61-492c61077246",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246.jsonl",
+    "cwd": "/tmp/tollgate-p0/wt-repo",
+    "scratchpad_dir": "/tmp/claude-1000/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246/scratchpad",
+    "prompt_id": "19e24361-ba02-4022-88da-c68ff633d45a",
+    "permission_mode": "auto",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PreToolUse",
+    "tool_name": "EnterWorktree",
+    "tool_input": {
+      "path": "/tmp/tollgate-p0/wt-1"
+    },
+    "tool_use_id": "toolu_01LneCiaagpbSitqHoqJYAia"
+  },
+  "PostToolUse-EnterWorktree": {
+    "session_id": "dd41b5eb-29b5-40a2-bd61-492c61077246",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-wt-1/dd41b5eb-29b5-40a2-bd61-492c61077246.jsonl",
+    "cwd": "/tmp/tollgate-p0/wt-1",
+    "scratchpad_dir": "/tmp/claude-1000/-tmp-tollgate-p0-wt-repo/dd41b5eb-29b5-40a2-bd61-492c61077246/scratchpad",
+    "prompt_id": "19e24361-ba02-4022-88da-c68ff633d45a",
+    "permission_mode": "auto",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "EnterWorktree",
+    "tool_input": {
+      "path": "/tmp/tollgate-p0/wt-1"
+    },
+    "tool_response": {
+      "worktreePath": "/tmp/tollgate-p0/wt-1",
+      "worktreeBranch": "tg/1-probe",
+      "message": "Entered worktree at /tmp/tollgate-p0/wt-1 on branch tg/1-probe. The session is now working in the worktree. Use ExitWorktree to leave mid-session, or exit the session to be prompted."
+    },
+    "tool_use_id": "toolu_01LneCiaagpbSitqHoqJYAia",
+    "duration_ms": 591
+  }
+}
