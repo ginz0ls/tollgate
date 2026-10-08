@@ -1,7 +1,7 @@
 # tollgate: catalogo dei profili verticali
 
 Data: 8 ottobre 2026. Stato: **bozza: le regole `rules-<area>` vanno scritte e riviste dall'utente**.
-Spec del nucleo: `2026-10-08-tollgate-nucleo-design.md` (revisione 19, sezioni 6.3, 8.6, 8.7, 10 e 11.4). Il nucleo dà il contratto e l'instradamento; questo documento dice **quali profili** esistono e cosa porta ciascuno. Li realizza il sotto-progetto B.
+Spec del nucleo: `2026-10-08-tollgate-nucleo-design.md` (revisione 20, sezioni 6.3, 8.6, 8.7, 10 e 11.4). Il nucleo dà il contratto e l'instradamento; questo documento dice **quali profili** esistono e cosa porta ciascuno. Li realizza il sotto-progetto B.
 
 Fonti: tre ricerche dell'8 ottobre 2026 (catalogo di 1.015 skill e 644 agenti su disco, ricerca web per area e ruolo, raccolte esistenti di subagenti). I riassunti sono nella sezione 7.
 
@@ -69,9 +69,9 @@ Colonna «Skill»: le 3 obbligatorie, la prima sempre la nostra. In corsivo le e
 
 ### 2.2 Cosa distingue gli agenti di un'area
 
-Nei subagenti distribuiti da un plugin Claude Code **ignora `mcpServers`, `hooks` e `permissionMode`** (documentazione dei subagenti, da confermare in P0). Un agente per area non può quindi avere server MCP propri. Si distingue per:
+Nei subagenti distribuiti da un plugin Claude Code **ignora `mcpServers`, `hooks`, `permissionMode` e `initialPrompt`** (documentazione dei subagenti, confermata in P0). Un agente per area non può quindi avere server MCP propri. Si distingue per:
 - **prompt**: obblighi comuni di `tollgate:implementer` più le regole dell'area;
-- **skill**: precaricate con il campo `skills:` del frontmatter, che carica il contenuto intero (da qui il tetto di 3);
+- **skill**: precaricate con il campo `skills:` del frontmatter, che carica il contenuto intero (da qui il tetto di 3; precaricamento verificato in P0, esperimento E5);
 - **modello**: per esempio `inherit` per `security` e `database`, `sonnet` per `copy` e `docs`;
 - **strumenti**: i revisori hanno solo `Read, Grep, Glob, Bash` e `disallowedTools: Edit, Write`; gli implementatori hanno `Write, Edit, Bash`.
 
@@ -155,7 +155,7 @@ Fonti: frontend-design (Anthropic, Apache-2.0), frontend-ui-engineering (Addy Os
 
 1. ~~I workflow del progetto erano file protetti.~~ **Risolto (spec rev 17):** protetti solo i workflow `tollgate-*`; gli altri sono il profilo `ci` (L2), e `guard` rifiuta i workflow che potrebbero pubblicare stati falsi.
 2. ~~Sovrapposizioni tra profili verticali.~~ **Risolto (spec rev 17):** vince il pattern più specifico.
-3. **`mcpServers` ignorato nei subagenti di plugin.** Va confermato in P0 insieme a `skills:` nel frontmatter.
+3. ~~`mcpServers` ignorato nei subagenti di plugin.~~ **Risolto (P0, spec rev 20):** confermato dalla documentazione, insieme a `hooks`, `permissionMode` e `initialPrompt`; `skills:` precarica davvero (E5).
 4. **Profili per progetti non web** (Python di dati, CLI, librerie) non sono coperti: cadono nel generico. Si aggiungono quando servono.
 
 ---

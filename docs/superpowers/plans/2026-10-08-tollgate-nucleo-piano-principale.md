@@ -1,9 +1,9 @@
 # tollgate, nucleo: piano principale
 
 Data: 8 ottobre 2026.
-Spec: `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 19). La spec dice **cosa** fa tollgate e perché; questo documento dice **in che ordine** si costruisce e **quale piano** copre ogni parte della spec. Il codice e i passi stanno nei piani specifici P0-P5.
+Spec: `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 20). La spec dice **cosa** fa tollgate e perché; questo documento dice **in che ordine** si costruisce e **quale piano** copre ogni parte della spec. Il codice e i passi stanno nei piani specifici P0-P5.
 
-Stato: P0 scritto (`2026-10-08-tollgate-p0-verifiche.md`), P1-P5 da scrivere.
+Stato: P0 chiuso l'8 ottobre 2026 (`2026-10-08-tollgate-p0-verifiche.md`; esiti in `docs/verifiche/2026-10-08-p0-esiti.md`, applicati nella revisione 20 della spec). Nessun esito ha smentito un fatto portante: le sezioni 3 e 4 restano valide, con le note della matrice aggiornate. P1-P5 da scrivere.
 
 ---
 
@@ -58,7 +58,7 @@ Regola: `tollgate_analysis` non importa mai `tollgate_core`. Così il gate su Gi
 | P1 | P2, P3, P5 | Registrazione di un evento con la busta di 18.4 e `seq` monotono; esportazione `events --after-seq` in JSONL |
 | P1 | P2, P3 | Transizioni di fase (12.3) e di `tasks.state` (6.3) che rifiutano tutto ciò che non è in tabella |
 | P1 | P2, P3 | Atti: registrazione, legame a sessione/lavoro/oggetto, scadenza, consumo; `finish` legato allo SHA di HEAD (8.4) |
-| P2 | P3, P4 | Parsing del piano e scope (7.5), livello (5), test-guard (8.2), JUnit (formati confermati da P0), deroghe (18.2) |
+| P2 | P3, P4 | Parsing del piano e scope (7.5), livello (5), test-guard (8.2), JUnit (forma degli identificativi per strumento, spec 7.5), deroghe (18.2) |
 | P2 | P3 | Hook installati e registro dei controlli; `verify` produce ricevute (8.1) |
 | P3 | P4 | Blocco JSON della PR (18.1), report e file di approvazione (18.3), verdetti (18.5) |
 | P4 | P3 | `gate run` locale usato da `finish check` |
@@ -81,25 +81,25 @@ Regola: `tollgate_analysis` non importa mai `tollgate_core`. Così il gate su Gi
 | 5 Livelli | P2 (calcolo), P3 (tetto con `approve level`, fette con `--spec`), P4 (minimo nel gate) | |
 | 6.1 Avvio | P3 | |
 | 6.2 Spec e piano, audit della spec | P3 | Skill `spec-audit`, agenti avversari e auditor, file di approvazione, `reopen` |
-| 6.3 Esecuzione | P1 (`tasks`), P2 (controllo delle skill usate, `PostToolUse Skill`), P3 (`execute`, `task`, agenti, instradamento ai profili, dimensione e budget del task, report a campi fissi) | |
+| 6.3 Esecuzione | P1 (`tasks`), P2 (controllo delle skill usate, `PostToolUse Skill`), P3 (`execute`, `task`, agenti, instradamento ai profili, dimensione e budget del task, report a campi fissi) | Implementatori in primo piano con un nome fisso, ripresi per nome (rev 20) |
 | 6.4 Chiusura | P3 | `finish check` usa `gate run` di P4: in P3 si usa una versione locale minima, sostituita in P4 |
 | 6.5 Dopo la PR | P3 | |
 | 6.6 Dove valgono le regole | P2 | |
 | 7.1 Wrapper | P2 | |
-| 7.2 Tabella degli hook | P2 | `PreToolUse SendMessage` secondo l'esito di P0 (E1) |
+| 7.2 Tabella degli hook | P2 | Righe di rev 20: `PostToolUse Agent` (nome → `agent_id`, taglio di `maxTurns` con chiusura del subagente), token a `SubagentStop`, `PreToolUse SendMessage` per nome, `SubagentHandback` unica fonte in auto mode, subagenti interni ignorati |
 | 7.3 Sola lettura | P2 | |
 | 7.4 Regole su Bash | P2 | |
 | 7.5 `plan-check` | P2 | |
 | 8.1 Ricevute | P2 | |
 | 8.2 test-guard | P2 (analisi e hook), P4 (nel gate) | |
 | 8.3 Deroghe e blocchi | P2 | |
-| 8.4 Atti | P1 (modello), P2 (registrazione via hook), P3 (skill e consumo) | Dipende dall'esito di P0 (E4, I2) |
+| 8.4 Atti | P1 (modello), P2 (registrazione via hook), P3 (skill e consumo) | Atto da `command_name` e `command_args` (P0, rev 20) |
 | 8.5 Effetti esterni | P2 | |
 | 8.6 Revisori | P3 | Standard del revisore e disaccordo istruito (rev 18) |
 | 8.7 Definition of Done | P1 (calcolo dai dati), P3 (`finish check`), P4 (voci ricalcolate nel gate) | |
 | 9.1-9.6 Gate su GitHub | P4 | |
 | 10 Revisione finale | P3 | |
-| 11.1 Dipendenze | P2 | Intervallo secondo l'esito di P0 (tag) |
+| 11.1 Dipendenze | P2 | I tag esistono con il prefisso `v`; P2 verifica se il risolutore di `dependencies` lo accetta (spec 16), altrimenti il ripiego di 11.1 |
 | 11.2 `init` | P4 | |
 | 11.3 `setup` e statusline | P3 | Riusa `statusline/statusline.sh` |
 | 11.4 `tollgate.toml` | P1 (caricamento e validazione), P4 (`init` lo propone) | |
@@ -107,7 +107,7 @@ Regola: `tollgate_analysis` non importa mai `tollgate_core`. Così il gate su Gi
 | 12.4 Ripresa, adozione, pulizia | P1 (migrazioni), P3 (ripresa, `adopt`, `cleanup`) | |
 | 13 Errori e casi limite | P2, P3, P4 | Ogni riga va nel piano che possiede il meccanismo |
 | 14 Test del plugin | tutti (test), P5 (eval e CI) | |
-| 16 Da verificare | P0 | |
+| 16 Da verificare | P0 (chiuso) | Voci rimaste, da verificare all'inizio di P2: prefisso `v` in `dependencies`; taglio di `maxTurns` in background e durante una ripresa con `SendMessage` (riguarda i giri di correzione 1-3) |
 | 17 Cosa resta aperto | P5 | Documentazione dei limiti |
 | 18.1 Blocco JSON | P3 (scrittura), P4 (lettura) | |
 | 18.2 Deroghe | P2 | |
@@ -158,7 +158,7 @@ Casi di eval (spec 14, 1-9): P5.
 | P0 smentisce un fatto portante (E1 ripresa, E4/I2 atti) | Cambia 6.3 o 8.4 | P1 non parte finché la spec non è aggiornata (regola 2) |
 | `finish check` in P3 senza il gate completo | Doppio lavoro tra P3 e P4 | In P3 una versione minima dietro la stessa interfaccia di `gate run`, sostituita in P4 |
 | Le interfacce di P1 si rivelano scomode in P2-P4 | Riscritture | P1 espone poche funzioni con test; le modifiche passano da una nuova revisione delle sue interfacce, non da scorciatoie |
-| Testare gli hook senza Claude Code vero | Test che passano su input finti | Gli input JSON dei test di P2 si ricavano dai log reali della sonda di P0 (`/tmp/tollgate-p0/*.jsonl`), salvati come fixture |
+| Testare gli hook senza Claude Code vero | Test che passano su input finti | Gli input JSON dei test di P2 vengono dai log reali della sonda di P0: campioni in `spikes/fixtures/hook-inputs/samples.json`, log completi anonimizzati in `docs/verifiche/evidenze/hook/` |
 | Costo degli eval in P5 | Token e tempo | 3 esecuzioni per caso, come da spec; il costo si misura e si riporta |
 
 ---
