@@ -1,7 +1,7 @@
 # tollgate: specifica del nucleo (sotto-progetto A)
 
 Data: 8 ottobre 2026.
-Revisione: **12**, correzioni puntuali dai cicli 39-46 dell'audit. Le revisioni precedenti sono nella sezione 20.
+Revisione: **13**: esecuzione con `tollgate:execute` al posto di subagent-driven-development (decisione dell'utente) e correzioni dei cicli 47-50. Le revisioni precedenti sono nella sezione 20.
 Stato: **in audit** (`docs/audit/2026-10-08-audit-spec-nucleo-stato.md`).
 Fonti: `docs/REPORT-CONFRONTO-WORKFLOW.md`, `docs/COSA-TENERE.md`, `docs/RICERCA-PAPER.md`. I codici R e H usati nel testo sono spiegati nella sezione 19.
 
@@ -19,8 +19,10 @@ Fonti: `docs/REPORT-CONFRONTO-WORKFLOW.md`, `docs/COSA-TENERE.md`, `docs/RICERCA
 | **sessione viva** | Una sessione con almeno un evento negli ultimi `stale_minutes`. È l'unica soglia usata per le sessioni |
 | **ciclo vuoto** | Un giro o ciclo di audit senza rilievi `moderate` o più gravi. Ha `outcome: empty` anche se contiene rilievi `minor` |
 | **coordinatore** | La sessione principale di Claude Code, che parla con l'utente |
-| **implementatore** | **Ogni** subagente che non è nell'elenco di sola lettura (4) |
-| **task del piano** | Un task di un piano di Superpowers (`### Task N`) |
+| **implementatore** | `tollgate:implementer`, e per sicurezza **ogni** altro subagente che non è nell'elenco di sola lettura (4) |
+| **task del piano** | Un task di un piano scritto con writing-plans (`### Task N`). Lo esegue `tollgate:execute` (6.3) |
+| **giro di correzione** | Un nuovo lancio di `tollgate:implementer` sullo stesso task dopo che il revisore del task ha chiesto modifiche. Contato in `tasks.fix_rounds` |
+| **SHA di un file** | Lo SHA del blob (`git hash-object`), non del commit: resta uguale dopo un rebase o un merge squash |
 | **base del lavoro** | Lo SHA da cui parte il ramo (`work_base_sha`). Si riallinea solo con `sync` o con un atto dell'utente |
 | **base del subagente** | Lo SHA del momento in cui un subagente parte o riprende (`agent_base_sha`) |
 | **chiave del repo** | L'URL di `origin` normalizzato: senza protocollo né `.git`, in minuscolo (`github.com/proprietario/nome`) |
@@ -63,7 +65,9 @@ Fonti: `docs/REPORT-CONFRONTO-WORKFLOW.md`, `docs/COSA-TENERE.md`, `docs/RICERCA
 
 tollgate è un plugin per Claude Code. Porta un lavoro **da un'issue GitHub a una PR verificata**. Il merge lo fa sempre una persona, su GitHub.
 
-Il flusso resta quello di **Superpowers**: brainstorming → writing-plans → subagent-driven-development. tollgate aggiunge quello che manca e **sostituisce due passi** finali di subagent-driven-development: la revisione finale dell'intero ramo e la chiusura del ramo (`finishing-a-development-branch`). Entrambi diventano `/tollgate:finish` (6.4, 10).
+Il flusso usa **Superpowers** per brainstorming e writing-plans, e i suoi TDD e debugging dentro gli implementatori. **L'esecuzione del piano è di tollgate**: `tollgate:execute` prende il posto di subagent-driven-development (6.3), da cui deriva (licenza MIT, fonte citata nella skill). La revisione finale e la chiusura del ramo sono `/tollgate:finish` (6.4, 10).
+
+**Perché un'esecuzione propria.** subagent-driven-development lancia implementatori e revisori come subagenti `general-purpose` anonimi: tollgate dovrebbe capire chi è chi leggendo il prompt, esentarne gli script e bloccarne la revisione finale, e ogni versione nuova di Superpowers lo romperebbe. Con agenti propri il tipo arriva negli hook come `agent_type` (`tollgate:implementer`), e il riconoscimento è deterministico.
 
 ### 1.1 Due livelli di controllo
 
@@ -117,7 +121,7 @@ Questi limiti sono dichiarati:
 | Harness | Claude Code. Il codice separa l'adattatore per Claude Code dal modello interno |
 | Tracker | GitHub Issues, tramite `gh` |
 | Autonomia | Interattiva |
-| Flusso | Superpowers (11.1); `finishing-a-development-branch` → `/tollgate:finish` |
+| Flusso | Superpowers per brainstorming, writing-plans, TDD e debugging (11.1); esecuzione con `tollgate:execute`; chiusura con `/tollgate:finish` |
 | Unità di lavoro | Un'issue = un lavoro = una PR |
 | Controllo autorevole | Su GitHub; i controlli locali sono guardrail |
 | Garanzia v1 | Scorciatoie e manomissioni locali |
@@ -156,9 +160,11 @@ tollgate/
     cleanup/    /tollgate:cleanup                    solo l'utente
     setup/      /tollgate:setup                      solo l'utente
     off/ on/    /tollgate:off [ore], /tollgate:on    solo l'utente
-    db/         /tollgate:db restore                 solo l'utente (12.1)
+    execute/    esecuzione del piano, un task alla volta   anche il modello (6.3)
     spec-audit/ metodo dell'audit a lenti (versione di prd-audit incorporata, con l'accordo dell'autore)
   agents/
+    implementer.md        tools: Read, Edit, Write, Bash, Grep, Glob, Skill
+    task-reviewer.md      tools: Read, Grep, Glob, Bash
     final-reviewer.md     tools: Read, Grep, Glob, Bash
     finding-verifier.md   tools: Read, Grep, Glob, Bash
     plan-adversary.md     tools: Read, Grep, Glob
@@ -176,12 +182,14 @@ tollgate/
 
 | Agente | Modello predefinito | Perché |
 |---|---|---|
+| `implementer` | `inherit` | `tollgate:execute` può indicare un modello per task (`model` di `Agent`), come faceva subagent-driven-development: più economico per i task meccanici |
+| `task-reviewer` | `sonnet` | Revisione di un solo task, diff piccolo |
 | `final-reviewer` | `inherit` | Il giudizio sull'intero ramo è il punto in cui un modello più debole costa di più (subagent-driven-development usa il più capace per la stessa revisione) |
 | `spec-adversary`, `plan-adversary` | `inherit` | Pochi giri, alto impatto |
 | `spec-auditor` | `sonnet` | Fino a 30 cicli: il costo domina |
 | `finding-verifier` | `sonnet` | Verifica puntuale di rilievi già formulati |
 
-Il modello degli implementatori e dei revisori dei task resta deciso da Superpowers e dalla sessione.
+
 
 ### 3.1 Sottocomandi di `bin/tollgate`
 
@@ -194,7 +202,9 @@ Il modello degli implementatori e dei revisori dei task resta deciso da Superpow
 | `act apply <id>` | Skill `approve` | Applica un atto `approve` registrato: per `approve spec` e `approve plan` scrive il file di approvazione (18.3) |
 | `status`, `init --propose`, `init --update` | Agente | Sola lettura, oppure proposte scritte dalla CLI in `docs/superpowers/tollgate-init/` |
 | `sync`, `adopt`, `cleanup`, `abandon` | La skill omonima, **dopo** l'atto | L'hook registra solo l'atto (8.4), senza rete e senza lavoro lungo. La skill lancia il sottocomando, che rifiuta se non trova un atto `pending`, non scaduto, della stessa sessione e con lo stesso oggetto, e lo consuma. 6.5 e 12.4 |
-| `db restore` | L'utente, dal terminale | 12.1. Non richiede un atto: funziona solo se il DB non supera `PRAGMA integrity_check` e solo con un terminale interattivo che conferma |
+| `db restore` | L'utente, **solo dal terminale** (nessuna skill) | 12.1. Non richiede un atto: funziona solo se il DB non supera `PRAGMA integrity_check` e chiede conferma su un terminale interattivo |
+| `task start <k> [--fix]`, `task done <k>` | Skill `execute` | Registra il lancio dell'implementatore per il task `k` (o un giro di correzione) e scrive il brief; chiude il task dopo il verdetto del revisore (6.3) |
+| `events --since <data> --json` | C, D, strumenti esterni | Esporta gli eventi con la busta di 18.4. È l'unico contratto di lettura: il DB è privato di tollgate e lo schema può cambiare con le migrazioni |
 | `gate run`, `gate evaluate`, `gate guard`, `gate base-ids` | `finish check` e i workflow | Stesso codice in locale e su GitHub |
 | `status --checkpoint` | Skill e coordinatore | Scrive il checkpoint (0) |
 | `hook <evento>` | Solo `hooks/run` | Adattatore per Claude Code |
@@ -212,9 +222,15 @@ Il modello degli implementatori e dei revisori dei task resta deciso da Superpow
 - `start` e `finish` fanno prima `git fetch origin`.
 - Gli hook non usano mai la rete.
 
-**Registro dei controlli.** Ogni controllo è un modulo che dichiara evento, componente e ordine. B aggiunge moduli senza toccare quelli esistenti: i moduli stanno in `bin/tollgate_checks/`, ognuno con una costante `CHECK = {"api": 1, "events": [...], "component": "...", "order": n}` e una funzione `decide(event) -> decision`. Il registro carica i moduli della cartella in ordine di nome e rifiuta quelli con `api` diversa da quella supportata.
+**Registro dei controlli.** Ogni controllo è un modulo in `bin/tollgate_checks/` con una costante `CHECK = {"api": 1, "events": [...], "component": "...", "order": n}` e una funzione `decide(event, ctx) -> decision`. Il registro carica i moduli in ordine di nome e rifiuta quelli con `api` diversa. B aggiunge moduli senza toccare quelli esistenti.
 
-**Adattatore dell'harness.** L'input degli hook diventa un evento interno; la decisione interna diventa la risposta di Claude Code. L'evento interno ha la busta di 18.4. Le decisioni sono `allow`, `deny <motivo>`, `inject <testo>`, `record`. Un modulo del registro dichiara `events` (tipi di evento interni), `component` (chiave di `[components]`), `order` (intero; a parità vale il nome) e una funzione pura evento → decisione. Il primo `deny` vince. D aggiunge un adattatore per un altro harness senza toccare i moduli.
+**Eventi d'ingresso** (elenco chiuso, diverso dai tipi di log di 18.4): `session_start`, `prompt_expansion`, `pre_edit`, `post_edit`, `pre_bash`, `post_bash`, `pre_agent`, `pre_mcp`, `subagent_start`, `subagent_stop`, `subagent_handback`. Ognuno porta `session`, `cwd`, `agent_id`, `agent_type` e l'input dello strumento così come arriva.
+
+**Contesto** (`ctx`, in sola lettura): la configurazione risolta (base del lavoro o punta del predefinito), la riga di `work_items` e i suoi `tasks`, un accesso a git (diff dalla base, file, impronte) e l'ora. Un modulo non scrive mai nel DB: chiede di farlo con `record`.
+
+**Decisioni:** `allow`, `deny <motivo>`, `inject <testo>`, `record <tipo di log> <data>`. Si combinano così: il primo `deny` vince; gli `inject` si concatenano in ordine dentro il budget (6.3); i `record` vengono scritti tutti, anche dopo un `deny`.
+
+**Adattatore dell'harness.** Traduce l'input degli hook in eventi d'ingresso e la decisione nella risposta di Claude Code. D aggiunge un adattatore per un altro harness senza toccare i moduli.
 
 **Altre regole.**
 - Componenti spegnibili (R10).
@@ -229,8 +245,8 @@ Il modello degli implementatori e dei revisori dei task resta deciso da Superpow
 |---|---|---|---|
 | Utente | — | Alza il livello, approva spec e piano in L2, approva gli atti, risolve i blocchi, fa il merge | Atti dell'utente; merge su GitHub |
 | Coordinatore | Sessione principale | Dialogo, brainstorming, spec, piano, avvio dei subagenti. **Non scrive codice**, tranne in L0 | In L1 e L2, fase `execution`: Edit e Write sul codice negati se manca `agent_id`, che c'è solo nei subagenti (verificato) |
-| Implementatore | Ogni subagente **non** elencato in `[review] readonly_agents` | Un task del piano alla volta | Scope, scrittore unico, `SubagentStop` (8.1) |
-| Revisore del task | Subagente di Superpowers | Controlla il task | Se fa commit, è trattato come implementatore |
+| Implementatore | `tollgate:implementer`; ogni altro subagente **non** elencato in `[review] readonly_agents` è trattato allo stesso modo | Un task del piano alla volta, con TDD | Brief scritto dalla CLI, scope, scrittore unico, `SubagentStop` (8.1) |
+| Revisore del task | `tollgate:task-reviewer` | Controlla il task: aderenza al brief e qualità (rubrica derivata da subagent-driven-development) | Sola lettura (7.3); verdetto JSON (18.5) |
 | Avversario della spec, auditor della spec, avversario del piano | `tollgate:spec-adversary`, `tollgate:spec-auditor`, `tollgate:plan-adversary` | 6.2 | Niente scrittura, niente Bash |
 | Revisore finale | `tollgate:final-reviewer` | Confronta il lavoro con piano, must-have e scope; cerca casi speciali e asserzioni indebolite (R3) | Brief scritto dallo script; controllo di sola lettura (7.3) |
 | Verificatore | `tollgate:finding-verifier` | Conferma o scarta ogni rilievo registrato | Brief scritto dallo script dalla tabella `findings` (8.6) |
@@ -264,7 +280,7 @@ Il modello degli implementatori e dei revisori dei task resta deciso da Superpow
 **Spec con più fette.** La spec le elenca nella sezione `## Fette previste`, come elenco numerato (`1. <titolo>`): il numero di voci è il numero di fette, e senza sezione le fette sono 1. Dopo `approve spec`:
 1. `start` propone **un'issue per fetta**: le crei tu, oppure le crea l'agente dopo il tuo `approve effect`;
 2. il lavoro corrente continua con la prima fetta;
-3. le altre diventano lavori a sé e partono con `/tollgate:start #M --spec <percorso>`: lo digiti tu, quindi è un dato fidato. `start` accetta `--spec` solo se sul ramo predefinito ci sono la spec e il suo file di approvazione (`spec-approval`, 18.3) con lo stesso SHA della spec; allora la fase iniziale è `plan` e `work_items.spec_path` registra il percorso. Il testo dell'issue non decide mai la fase.
+3. le altre diventano lavori a sé, **dopo il merge della prima** (la spec approvata deve stare sul ramo predefinito), e partono con `/tollgate:start #M --spec <percorso>`: lo digiti tu, quindi è un dato fidato. `start` accetta `--spec` solo se sul ramo predefinito ci sono la spec e il suo file di approvazione (`spec-approval`, 18.3) con lo stesso SHA della spec; allora la fase iniziale è `plan` e `work_items.spec_path` registra il percorso. Se la spec è cambiata dopo l'approvazione, `start` lo dice e propone di partire da `spec_audit`, con un nuovo giro e una nuova `approve spec`. Il testo dell'issue non decide mai la fase.
 
 Il collegamento tra le issue è compito di C.
 
@@ -311,16 +327,19 @@ L1 e L2, plan:  checkpoint + /clear → writing-plans (la skill dà le intestazi
 
 **Audit della spec.**
 1. **Giri avversariali.** A ogni giro `tollgate:spec-adversary` riparte in un subagente nuovo e chiude con una riga JSON (18.3). Il coordinatore corregge la spec. Si va avanti finché un giro non trova né `blocker` né `major`. Il tetto è `spec_rounds` (4): se il quarto giro trova ancora `blocker` o `major`, si apre `needs_you`, e `resolve` lo chiude come **«avversariale sospeso»**.
-2. **Audit a lenti.** Parte solo se «Fette previste» è maggiore di 1. Prima del primo ciclo la skill mostra il costo (da 16 a `spec_audit_cycles` cicli, più i giri avversariali) e chiede conferma. Segue il metodo `spec-audit`: dieci lenti, otto punti di vista, un ciclo per ogni subagente nuovo. Al coordinatore torna solo il riepilogo.
+2. **Audit a lenti.** Parte solo se «Fette previste» è maggiore di 1. Prima del primo ciclo la skill mostra il costo (da 16 a `spec_audit_cycles` cicli, più i giri avversariali) e chiede conferma. Se non confermi, si apre `needs_you`, e `resolve` lo chiude come «audit a lenti sospeso». Segue il metodo `spec-audit`: dieci lenti, otto punti di vista, un ciclo per ogni subagente nuovo. Al coordinatore torna solo il riepilogo.
    - L'audit si chiude quando ogni punto di vista ha dato due cicli vuoti (0) di fila.
-   - Una correzione `moderate` o più grave azzera il contatore del punto di vista che l'ha trovata.
    - Il tetto è `spec_audit_cycles` (30). Al tetto si apre `needs_you`, e `resolve` lo chiude come **«audit a lenti sospeso»**.
-3. **Report.** `SubagentStop` salva ogni giro in `docs/superpowers/reviews/<N>/<kind>-<n>.md` (18.3). Lo stato dell'audit a lenti sta in `docs/superpowers/reviews/<N>/spec-lens-stato.md`. Il coordinatore committa i report insieme a spec e piano.
+3. **Report.** `SubagentStop` salva ogni giro in `docs/superpowers/reviews/<N>/<kind>-<n>.md` (18.3). Lo stato dell'audit a lenti sta in `docs/superpowers/reviews/<N>/spec-lens-stato.md`, che `SubagentStop` rigenera dalla tabella `spec_audit` a ogni ciclo. L'`outcome` di ogni report lo calcola l'hook da `counts`, non lo dichiara il subagente. Il coordinatore committa i report insieme a spec e piano.
 4. **Approvazione.** `/tollgate:approve spec <fette>`: digiti il numero di fette, che deve essere uguale a quello di «Fette previste». È accettato solo se valgono **entrambe** le condizioni:
    - l'ultimo giro avversariale non ha `blocker` né `major`, oppure è «avversariale sospeso»;
    - con più di una fetta, l'audit a lenti è chiuso oppure «audit a lenti sospeso». Con una fetta sola questa condizione non si applica.
 
+   La spec del lavoro è il primo file nuovo sotto `docs/superpowers/specs/` nel ramo; il primo giro avversariale la registra in `work_items.spec_path`. `approve spec` è accettato solo se lo SHA della spec nell'ultimo giro coincide con quello attuale: se la spec è cambiata dopo, serve un nuovo giro.
+
    Poi `act apply` scrive `docs/superpowers/reviews/<N>/spec-approval.md` (18.3), che il coordinatore committa con la spec. È la prova versionata dell'approvazione: la usano `start --spec`, `adopt` e il gate. `approve plan` scrive allo stesso modo `plan-approval.md`.
+
+   **Dopo l'approvazione** spec e piano non si modificano più: Edit e Write su di essi sono negati fuori da `spec_audit` e `plan`. Se servono modifiche, si torna alla fase con un atto (`resolve` sul blocco aperto dall'agente), e l'approvazione va ripetuta.
 
    **Componenti spenti.** Con `spec_adversary`, `spec_audit` o `plan_adversary` a `false`, la condizione corrispondente non si applica, il file di approvazione lo riporta e il gate dà `attenzione` rosso (9.2).
 5. **Piano in L2.** `tollgate:plan-adversary` segue lo stesso schema dei giri avversariali, con tetto `plan_rounds` (2) e `resolve` → «avversario del piano sospeso». Il passaggio `plan → approval` lo fa la CLI quando l'ultimo giro è pulito o sospeso. `approve plan` è accettato solo in `approval`.
@@ -329,26 +348,35 @@ L1 e L2, plan:  checkpoint + /clear → writing-plans (la skill dà le intestazi
 
 ```
 execution (sessione pulita)
-  SessionStart: stato (≤ 10 righe, ≤ 1.500 caratteri)
-  subagent-driven-development, un task del piano alla volta:
-    PreToolUse Agent legge tool_input.prompt e ne ricava il task (intestazione «Task N» o
-      percorso del brief di task-brief); lo scrittore unico rende univoca l'associazione
-      con il SubagentStart successivo, che lo salva in subagents.task
-    SubagentStart inietta nell'implementatore scope, test correlati, passo del piano (R2, R5)
-      e l'istruzione «prima di dichiarare DONE esegui tollgate verify»; al massimo 2.000
-      caratteri (R9)
-    implementatore → commit (hook: test-guard, scope, livello) → tollgate verify → ricevuta
-    SubagentStop: 8.1; conflitto tra test e specifica → block open test_spec_conflict (R1)
-    revisore del task (Superpowers)
-  giri di correzione: quelli di Superpowers. tollgate li conta come lanci di implementatore
-    sullo stesso task oltre il primo (subagents.task), comprese le riprese, e li riporta
-    nella PR (R4)
-  guardia del contesto: avviso a warn_pct; a stop_pct nessun nuovo subagente → checkpoint + /clear
+  SessionStart: stato e checkpoint (≤ 10 righe, ≤ 1.500 caratteri)
+  /tollgate:execute (o la skill execute invocata dal modello):
+    0. prima del task 1: controllo del piano (task che si contraddicono, file condivisi),
+       scritto nel checkpoint; le decisioni prese vanno nel checkpoint
+    per ogni task k del piano, in ordine:
+      tollgate task start k → brief in .tollgate-run/<N>/task-k.md (testo del task, scope,
+        test correlati R2, must-have collegati, istruzione «prima di DONE esegui
+        tollgate verify»), stato del task in `tasks`
+      Agent tollgate:implementer con il percorso del brief → SubagentStart associa il
+        subagente al task (lo scrittore unico rende l'associazione univoca) e inietta il
+        promemoria del passo (R5), al massimo 2.000 caratteri (R9)
+      implementatore: TDD → commit (hook: test-guard, scope, livello) → tollgate verify
+      SubagentStop: 8.1; conflitto tra test e specifica → block open test_spec_conflict (R1)
+      Agent tollgate:task-reviewer con brief e diff dei commit del task → verdetto (18.5)
+      approved → tollgate task done k
+      changes → giro di correzione: tollgate task start k --fix; giri 1-3 riprendono lo
+        stesso implementatore, 4-5 ne lanciano uno nuovo; al quinto senza approved → needs_you
+  guardia del contesto: avviso a warn_pct; a stop_pct nessun nuovo subagente → checkpoint + /clear;
+    dopo il /clear execute riprende dal primo task non chiuso in `tasks`
+  fine dei task → /tollgate:finish
 ```
+
+`.tollgate-run/` è ignorata da git (la aggiunge `init` a `.gitignore`) ed è fuori dallo scope. I giri di correzione (R4) sono `tasks.fix_rounds`: li conta la CLI a ogni `task start --fix`, non un'euristica sugli hook.
+
+**In `execution`, in L1 e L2, l'unico subagente che scrive è `tollgate:implementer` lanciato dopo `task start`.** `PreToolUse Agent` nega gli altri tipi che non sono in `readonly_agents` e un `tollgate:implementer` senza un `task start` in sospeso. Così subagent-driven-development, se il coordinatore lo invocasse per abitudine, non può lanciare implementatori.
 
 ### 6.4 Chiusura
 
-La skill `start` dice al coordinatore di usare `/tollgate:finish` al posto della revisione finale e della chiusura di Superpowers. Se lo dimentica, i guardrail negano merge, push, cancellazione del ramo e rimozione del worktree. In `execution`, `PreToolUse Agent` nega anche il lancio della revisione finale di Superpowers, riconosciuta dal riferimento a `requesting-code-review/code-reviewer.md` nel prompt (verificato in subagent-driven-development 6.4.1, righe 88 e 454). È un riconoscimento «best effort».
+`tollgate:execute` termina con `/tollgate:finish`. Se il coordinatore usa invece la chiusura di Superpowers, i guardrail negano merge, push, cancellazione del ramo e rimozione del worktree.
 
 ```
 /tollgate:finish
@@ -421,9 +449,9 @@ Ogni messaggio d'errore riporta il percorso assoluto di `bin/tollgate` e il coma
 | `PostToolUse` | `Bash` | In una sessione legata o nel worktree: se `HEAD` ha commit nuovi non registrati (anche da `merge`, `cherry-pick`, `revert`, `am`), li registra e fa girare test-guard e scope su di essi; una violazione apre un blocco `needs_you`. Se il ramo del worktree è cambiato, apre `needs_you`. È il controllo a valle che copre i comandi non riconosciuti da 7.4 |
 | `PreToolUse` | `Bash` | 7.4 |
 | `PreToolUse` | `mcp__.*` | Effetto esterno, se lo strumento non è in `mcp_allow` (8.5) |
-| `PreToolUse` | `Agent` | Guardia del contesto. **Scrittore unico**: nessun nuovo implementatore se un altro è `running` nel worktree. Un subagente senza eventi da più di `stale_minutes` (30) diventa `interrupted`. Ricava il task dal prompt (6.3). In `execution` nega la revisione finale di Superpowers (6.4) |
-| `SubagentStart` | tutti | Salva `agent_base_sha` (senza sovrascriverla alla ripresa), l'impronta dei file e il tipo; inietta il contesto (6.3) |
-| `SubagentStop` | tutti | Implementatori: 8.1. Sola lettura: 7.3. Revisori: 8.6. Avversari e auditor: salva il report. Legge anche i token dal `agent_transcript_path` |
+| `PreToolUse` | `Agent` | Guardia del contesto. **Scrittore unico**: nessun nuovo implementatore se un altro è `running` nel worktree. Un subagente senza eventi da più di `stale_minutes` (30) diventa `interrupted`, anche se la sua sessione è viva: è un subagente bloccato. In `execution` (L1, L2) ammette come scrittore solo `tollgate:implementer` dopo `task start` (6.3) |
+| `SubagentStart` | tutti | Salva `agent_base_sha` (senza sovrascriverla alla ripresa), l'impronta dei file e il tipo; per `tollgate:implementer` lo associa al task in sospeso; inietta il contesto (6.3) |
+| `SubagentStop` | tutti | Implementatori: 8.1. Sola lettura: 7.3. Revisore del task: verdetto in `tasks` (18.5). Revisori finali: 8.6. Avversari e auditor: salva il report. Legge anche i token dal `agent_transcript_path` |
 | `PostToolUse` | `SubagentHandback` | In auto mode il report del subagente arriva con questo strumento (verificato in tools-reference, dalla v2.1.271). L'adattatore ne salva `tool_input` come messaggio finale del subagente, e `SubagentStop` lo preferisce a `last_assistant_message` (16) |
 
 `Stop` della sessione principale: nessun veto.
@@ -439,7 +467,7 @@ L'ambito è quello di 6.6. Le regole sono «best effort».
 | Ambito | Comando | Decisione |
 |---|---|---|
 | Lavoro attivo | `git push`, `gh pr create` di qualunque ramo; nel worktree `git switch`, `git checkout <ramo>`, `git checkout -b/-B`, `git branch -m/-M`; scritture nel checkout principale | `deny`. I casi che sfuggono al riconoscimento li prende `PostToolUse Bash` (7.2) |
-| Lavoro attivo | `git commit` (con `-a` o con `git add` nella stessa riga) | test-guard, scope e livello su working tree più indice; `deny` se mancano deroghe. Esenti dallo scope: `docs/superpowers/**/*.md`, `.tollgate/waivers/<N>.toml` del lavoro e i lockfile il cui manifest è nello scope |
+| Lavoro attivo | `git commit` (con `-a` o con `git add` nella stessa riga) | test-guard, scope e livello su working tree più indice; `deny` se mancano deroghe. Esenti dallo scope: `docs/superpowers/**/*.md` tranne `reviews/**` (protetto) e spec e piano già approvati, `.tollgate/waivers/<N>.toml` del lavoro, i file di `[scope] always` e i lockfile il cui manifest è nello scope |
 | Lavoro attivo | Scrittura di codice dalla sessione principale (L1, L2) con redirect o `sed -i` | `deny` |
 | Repo attivo | Merge di un ramo `tg/*` verso il predefinito, `git branch -d/-D` e `git worktree remove` di un lavoro attivo, `git worktree add` doppio | `deny` |
 | Repo attivo | Effetti esterni (8.5): `gh pr merge` e `gh` in scrittura (`api` con `-X` non GET, `-f`, `-F`, `--input`, `graphql` con `mutation`; `pr create`, `pr edit`, `pr review`, `pr close`, `release`, `workflow run`, `secret`, `project`, `issue edit`, `issue close` e `issue create`) | `deny` fino all'atto |
@@ -497,7 +525,7 @@ Gira in locale al `git commit` e nel gate dentro `verdict`.
 
 **Nei file di test** (`test_globs` più quelli dei profili attivi):
 - file cancellati, riconoscendo le rinomine;
-- identificativi della base che mancano nella testa. In locale si ricavano per analisi statica: `describe`/`it`/`test` in JS e TS, `def test_*` e classi `Test*` in Python, `func Test*` in Go. Nel gate vengono dal report JUnit, dove un test `skipped` conta come **mancante**;
+- identificativi della base che mancano nella testa. In locale si ricavano per analisi statica: `describe`/`it`/`test` in JS e TS, `def test_*` e classi `Test*` in Python, `func Test*` in Go. Nel gate vengono dal report JUnit. Gli identificativi della base sono i soli test **eseguiti e non saltati** nella base; nella testa uno `skipped` conta come **mancante**;
 - asserzioni diminuite (`assert_markers` per linguaggio, contate senza commenti e stringhe);
 - marcatori di salto aggiunti, solo a parola intera:
   - JS e TS: `xit`, `xdescribe`, `xtest`, `.skip`, `.only`, `.todo`, `.fixme`, `.skipIf`, `.runIf(false)`, `.fails`;
@@ -509,7 +537,7 @@ Gira in locale al `git commit` e nel gate dentro `verdict`.
 **In tutto il repo:**
 - soglie di copertura abbassate;
 - CI modificata;
-- snapshot aggiornati;
+- snapshot e fixture aggiornati (`fixture_globs`);
 - `verification_globs` (configurazione di test e copertura): queste modifiche non bloccano, ma richiedono una deroga `command`, valida subito e sempre visibile in `attenzione`;
 - `verification_watch` (file di progetto che possono toccare i test, come `package.json`, `pyproject.toml`, `Makefile`, `tsconfig*.json`): nessuna deroga, solo un elenco nel commento del gate. Il caso `|| true` lo copre lo stato `red` di 8.1, non questo elenco.
 
@@ -536,7 +564,7 @@ Gira in locale al `git commit` e nel gate dentro `verdict`.
 
 ### 8.4 Atti dell'utente
 
-Li registra `UserPromptExpansion` quando digiti il comando, con `source`, `actor`, sessione, lavoro della sessione (se legata), oggetto e testo digitato. `source` è un elenco aperto: il nucleo usa `claude-code`, D aggiunge gli altri harness. Ogni atto ha uno `state` (`pending`, `consumed`, `expired`). Gli atti che autorizzano una volta sola (`finish`, `approve effect`, `approve pr`, `approve rebase`, `sync`, `adopt`, `cleanup`, `abandon`) diventano `consumed` quando la CLI li usa, e la CLI li accetta solo se sono della stessa sessione, dello stesso lavoro e dello stesso oggetto (issue, SHA o identificativo). Scadono dopo `[acts] ttl_minutes` (10) se nessuno li usa.
+Li registra `UserPromptExpansion` quando digiti il comando, con `source`, `actor`, sessione, lavoro della sessione (se legata), oggetto e testo digitato. `source` è un elenco aperto: il nucleo usa `claude-code`, D aggiunge gli altri harness. Ogni atto ha uno `state` (`pending`, `consumed`, `expired`). Gli atti che autorizzano una volta sola (`finish`, `approve effect`, `approve pr`, `approve rebase`, `sync`, `adopt`, `cleanup`, `abandon`) diventano `consumed` quando la CLI li usa, e la CLI li accetta solo se sono dello stesso lavoro e dello stesso oggetto (issue, SHA o identificativo); per `adopt` e `cleanup`, che si danno da una sessione non legata, il lavoro è `null`. Tutti tranne `finish` vanno usati nella stessa sessione e scadono dopo `[acts] ttl_minutes` (10). **`finish` non scade a tempo:** è legato allo SHA corrente del lavoro e decade solo con un nuovo commit, perché tra il comando e `open-pr` passano `finish check` e la revisione, che durano più di 10 minuti. Un secondo `/tollgate:finish` sullo stesso SHA riprende dal ciclo registrato, senza aprirne uno nuovo.
 
 | Atto | Effetto |
 |---|---|
@@ -546,7 +574,7 @@ Li registra `UserPromptExpansion` quando digiti il comando, con `source`, `actor
 | `approve waiver <id>` | La deroga diventa valida |
 | `approve level <L> <motivo>` | Fissa un tetto al livello (5) |
 | `approve effect <id>` | L'effetto esterno è permesso una volta |
-| `approve finding <id> <motivo>` | Declassa o archivia un rilievo confermato |
+| `approve finding <id> <gravità\|dismiss> <motivo>` | Declassa un rilievo confermato alla gravità indicata (`user_decision = downgraded:<gravità>`) o lo archivia (`dismissed`) |
 | `approve rounds <n>` | Concede `n` cicli di revisione in più in una volta (al massimo 8 cicli in totale, contando tutti i cicli) e chiude il blocco del tetto. Le richieste oltre 8 sono rifiutate |
 | `approve unverified-review` | Oltre gli 8 cicli, chiude la revisione come «non verificata», e lo scrive nella PR |
 | `approve unverified-tests` | Permette la PR con una ricevuta `unverified` |
@@ -574,7 +602,7 @@ Li registra `UserPromptExpansion` quando digiti il comando, con `source`, `actor
 - shell annidate che contengono uno di questi;
 - script dentro il repo o il worktree che non sono tracciati nella base.
 
-**Non sono effetti esterni** gli script il cui percorso reale (risolto, senza collegamenti) sta sotto `~/.claude/plugins/` e appartiene ai plugin che tollgate dichiara come dipendenze. Uno `scripts/task-brief` dentro il worktree non è esente. Sono esenti in particolare gli script (Superpowers: `sdd-workspace`, `task-brief`, `review-package`) e `bin/tollgate` stesso. Senza questa esclusione subagent-driven-development si fermerebbe a ogni task (verificato in subagent-driven-development 6.4.1, righe 137, 252, 290, 448).
+**Non è un effetto esterno** `bin/tollgate` stesso, riconosciuto dal percorso reale (risolto, senza collegamenti) sotto la cartella del plugin. Uno script con lo stesso nome dentro il worktree non è esente. Con `tollgate:execute` non servono altre esenzioni: gli script di subagent-driven-development non vengono più lanciati.
 
 **Eccezioni in sola lettura.** `[external_effects] allow` contiene pattern di comandi che passano senza atto. La responsabilità di quell'elenco è tua.
 
@@ -606,8 +634,8 @@ Li registra `UserPromptExpansion` quando digiti il comando, con `source`, `actor
 | `tollgate-guard` | `pull_request_target` | Ramo predefinito | No: checkout solo del predefinito, oggetti della PR con `git fetch` | `contents: read`, `statuses: write`, `pull-requests: write` | Pubblica `tollgate/guard` e, se serve, un commento che spiega lo stato in attesa |
 | `tollgate-run` | `pull_request` | Quella della PR, che `guard` impone uguale | Sì | Sola lettura, nessun segreto | `setup` e comandi del gate sulla testa; carica come artefatti solo report, uscite e conteggi. Nessun filtro `paths` o `branches`, ma esce subito se la PR non punta al ramo predefinito. `concurrency` per PR con `cancel-in-progress` |
 | `tollgate-verdict` | `workflow_run` al termine di `run` | Ramo predefinito (verificato) | No: calcola da sé il diff con `git fetch` e legge gli artefatti come dati in una cartella temporanea | `contents: read`, `statuses: write`, `pull-requests: write`, `actions: read` (artefatti del run), `issues: read` (stato ed etichette dell'issue) | Pubblica `tollgate/verdict` e `tollgate/attention`, sempre espliciti, più il commento. Mette in cache, per albero, gli identificativi dei test della testa |
-| `tollgate-base` | `push` sul predefinito | Ramo predefinito | No | `contents: read`, `statuses: write` | Mette in cache, per SHA e per albero, gli identificativi dei test della base. Se l'albero è già in cache (merge squash di una testa verificata) non riesegue la suite. In `detect` pubblica `tollgate/base` sul commit: rosso se la suite fallisce, e lo passa a `sentinel` |
-| `tollgate-sentinel` | `push` sul predefinito | Ramo predefinito | No | `contents: read`, `statuses: write`, `issues: write`, `pull-requests: read` | Per ogni commit nuovo chiede `GET /repos/{o}/{r}/commits/{sha}/pulls`. Se il commit non viene da una PR mergiata, o se la testa di quella PR non aveva `tollgate/guard` e `tollgate/verdict` verdi: stato `tollgate/sentinel` rosso sul commit e un commento sull'**unica** issue aperta «tollgate: merge non verificato» (la crea se non c'è). Lo stesso con `tollgate/base` rosso. Ignora il commit che introduce per la prima volta il proprio workflow. Gira in entrambe le modalità; in `protected` intercetta le forzature degli amministratori |
+| `tollgate-base` | `push` sul predefinito | Ramo predefinito | No | `contents: read`, `statuses: write`, `issues: write` | Mette in cache, per SHA e per albero, gli identificativi dei test della base. Se l'albero è già in cache (merge squash di una testa verificata) non riesegue la suite. In `detect` pubblica `tollgate/base` sul commit; se la suite fallisce lo stato è rosso e `tollgate-base` stesso commenta l'issue di `sentinel` (permesso `issues: write` in più) |
+| `tollgate-sentinel` | `push` sul predefinito | Ramo predefinito | No | `contents: read`, `statuses: write`, `issues: write`, `pull-requests: read` | Per ogni commit nuovo (l'intervallo `before...after` del push) chiede `GET /repos/{o}/{r}/commits/{sha}/pulls`. Se il commit non viene da una PR mergiata, o se la testa di quella PR non aveva `tollgate/guard` e `tollgate/verdict` verdi: stato `tollgate/sentinel` rosso sul commit e un commento sull'**unica** issue aperta «tollgate: merge non verificato» (la crea se non c'è). Ignora il commit che introduce per la prima volta il proprio workflow. Gira in entrambe le modalità; in `protected` intercetta le forzature degli amministratori |
 
 **Controlli di `verdict` prima di valutare.**
 - `workflow_run.path` è quello atteso.
@@ -632,11 +660,12 @@ Se qualcosa non torna pubblica `error`. Le PR verso altri rami ricevono «non ap
 | **Issue della PR.** Per un ramo `tg/<N>-*`: N dal nome del ramo, uguale a «Closes #N» e a `issue` nel JSON, issue aperta. Per gli altri rami: da «Closes #N», issue aperta | `verdict` | Rosso se non torna: senza issue valida non si legge nessuna deroga |
 | Identificativi della base eseguiti sulla testa (uno `skipped` è mancante), salvo deroghe `test` | `verdict` | Rosso |
 | test-guard sul diff, per tutte le PR | `verdict` | Rosso se manca la deroga |
-| Scope: coerenza con il **piano unico** del lavoro (indicato nel JSON e presente nel primo commit del ramo che lo contiene), con gli esenti e con le deroghe. Solo per le PR dei lavori | `verdict` | Rosso. Senza piano e oltre le soglie di L0 → rosso |
+| Scope: coerenza con il **piano unico** del lavoro, letto alla versione registrata (`plan` e `plan_sha` nel JSON, 18.1), con gli esenti e con le deroghe. Solo per le PR dei lavori | `verdict` | Rosso. Senza piano e oltre le soglie di L0 → rosso. Piano in testa diverso da `plan_sha`: `attenzione` rosso con il diff nel commento |
+| File di approvazione (L2): il loro `sha` è quello della spec e del piano in testa | `verdict` | `attenzione` rosso con il diff se non coincidono |
 | Livello dichiarato contro minimo. In L2: spec, piano e report dell'avversario sempre; report a lenti solo se le fette previste sono più di una; intestazioni valide (18.3). Per una fetta successiva alla prima, i report della spec si cercano in `spec_reviews_dir` sul ramo predefinito | `verdict` | **Rosso** se il livello è sotto il minimo senza un tetto dichiarato, o se manca un report o un file di approvazione L2 richiesto. Con un tetto dichiarato: `attenzione` rosso. Un componente spento in `[components]` (letto dal ramo predefinito) toglie il report corrispondente e dà `attenzione` rosso. Si verifica che i file esistano, non la loro qualità |
-| Deroghe da segnalare (8.4), piano diverso dal primo, lockfile senza manifest, test della base che falliscono sulla testa, PR non `tg/*`, PR `tollgate-config/*`, periodi con tollgate spento dichiarati, `allow_no_tests` attivo, tetto di livello | `verdict` | `attenzione` rosso, non obbligatorio. I file di `verification_watch` toccati sono solo elencati nel commento |
+| Deroghe da segnalare (8.4), piano diverso dal primo, lockfile senza manifest, test della base che falliscono sulla testa, PR non `tg/*`, PR `tollgate-config/*`, periodi con tollgate spento dichiarati, `allow_no_tests` attivo, tetto di livello, revisione «non verificata», audit «sospesi», rilievi confermati declassati o archiviati, `approve unverified-tests` | `verdict` | `attenzione` rosso, non obbligatorio, con l'elenco nel commento visibile (il blocco JSON è un commento HTML che GitHub non mostra). I file di `verification_watch` toccati sono solo elencati nel commento |
 
-**Profili attivi** = quelli il cui `paths` tocca il diff, calcolati con la configurazione del ramo predefinito.
+**Profili attivi** = quelli elencati in `[profiles] active` più quelli il cui `paths` tocca il diff, calcolati con la configurazione del ramo predefinito. Il livello minimo del gate è il massimo tra quello calcolato da percorsi ed etichette e i `min_level` dei profili attivi. I comandi di un profilo si chiamano `<profilo>.<comando>` in ricevute, artefatti e JSON.
 
 **Il commento.** Riporta lo SHA e non viene aggiornato se lo SHA non è più la testa. Il testo che viene dall'agente è neutralizzato: va in blocchi di codice con un recinto più lungo di qualunque sequenza di backtick contenuta, le menzioni sono disattivate e c'è una lunghezza massima.
 
@@ -712,7 +741,7 @@ Il comando lo esegui tu. `start` prova a leggere la protezione e segnala i campi
 - I cicli sono registrati in `review_cycles` (12.2).
 - Dopo un rebase con lo stesso `patch-id` non serve un nuovo ciclo.
 
-La revisione finale di Superpowers si salta, come indica la skill `start`, e `PreToolUse Agent` la nega in `execution` (6.4). Così l'utente non paga due revisioni finali.
+C'è una sola revisione finale: `tollgate:execute` non ne ha una propria.
 
 ---
 
@@ -720,7 +749,7 @@ La revisione finale di Superpowers si salta, come indica la skill `start`, e `Pr
 
 ### 11.1 Dipendenze
 
-- **Superpowers** con l'intervallo `>=6.4.1 <7.0.0`. Se mancano i tag di versione, la dipendenza va senza intervallo e la versione la controlla `start` leggendo il `plugin.json` di Superpowers.
+- **Superpowers** con l'intervallo `>=6.4.1 <7.0.0`, per brainstorming, writing-plans, TDD e debugging. Di Superpowers tollgate usa solo il formato del piano (`### Task N`, `Create:`/`Modify:`/`Test:`), che `plan-check` verifica. Se mancano i tag di versione, la dipendenza va senza intervallo e la versione la controlla `start` leggendo il `plugin.json` di Superpowers.
 - **`marketplace.json`** con l'allowlist tra marketplace.
 
 ### 11.2 `/tollgate:init`
@@ -806,7 +835,7 @@ plan_rounds       = 2
 spec_audit_cycles = 30
 
 [review]
-readonly_agents = ["tollgate:final-reviewer", "tollgate:finding-verifier", "tollgate:plan-adversary", "tollgate:spec-adversary", "tollgate:spec-auditor"]
+readonly_agents = ["tollgate:task-reviewer", "tollgate:final-reviewer", "tollgate:finding-verifier", "tollgate:plan-adversary", "tollgate:spec-adversary", "tollgate:spec-auditor", "Explore"]
 output_dirs     = ["reports/", "coverage/"]
 max_findings    = 15
 stale_minutes   = 30
@@ -864,7 +893,7 @@ sentinel = true
 - `tollgate.db` sta nella cartella di stato, uno per macchina.
 - SQLite in modalità WAL, con `synchronous=FULL` e `busy_timeout=5000`.
 - A ogni cambio di fase viene fatta una copia in `backup/` con la API di backup di SQLite (non copiando il file, che in WAL non è coerente); si tengono le ultime 10.
-- **DB guasto.** Gli hook di controllo escono con 2 e indicano l'interruttore; gli hook informativi e `UserPromptExpansion` escono con 0 (7.1). Il ripristino si fa **dal terminale**: `<percorso assoluto>/bin/tollgate db restore`, riportato in ogni messaggio d'errore. Non richiede un atto, perché il DB degli atti è quello guasto; funziona solo se `PRAGMA integrity_check` fallisce e solo con un terminale interattivo che conferma, così l'agente non può lanciarlo da Bash. Sposta da parte il DB guasto e ripristina l'ultima copia integra. Se nessuna copia è valida, parte da un DB vuoto e ti indica `/tollgate:adopt` per ogni lavoro con un ramo `tg/*`.
+- **DB guasto.** Gli hook di controllo escono con 2 e indicano l'interruttore; gli hook informativi e `UserPromptExpansion` escono con 0 (7.1). Il ripristino si fa **dal terminale**: `<percorso assoluto>/bin/tollgate db restore`, riportato in ogni messaggio d'errore. Non richiede un atto, perché il DB degli atti è quello guasto; funziona solo se `PRAGMA integrity_check` fallisce e chiede conferma su un terminale interattivo. Un agente potrebbe simulare un terminale, ma l'impatto è nullo: serve un DB già corrotto, e il ripristino porta a una copia precedente. Sposta da parte il DB guasto e ripristina l'ultima copia integra. Se nessuna copia è valida, parte da un DB vuoto e ti indica `/tollgate:adopt` per ogni lavoro con un ramo `tg/*`.
 
 ### 12.2 Tabelle
 
@@ -880,7 +909,8 @@ sentinel = true
 | `spec_audit` | work, kind, number, viewpoint, counts, outcome, report_path | |
 | `acts` | act_id, type, object, at, typed_text, source, actor, session, work, state, expires_at, consumed_at | |
 | `intents` | work, action, idempotency_key, data, state, outcome, at | univoco (idempotency_key) |
-| `events` | v, at, host, session, work, type, data (18.4) | sola aggiunta; l'unica cancellazione è la potatura oltre `events_days` |
+| `tasks` | work, number, state (`pending`, `running`, `review`, `done`, `blocked`), fix_rounds, implementer, commits, verdict | univoco (work, number) |
+| `events` | v, at, host, session, work, repo_key, issue, type, data (18.4) | sola aggiunta; l'unica cancellazione è la potatura oltre `events_days` |
 | `meta` | schema_version | |
 
 Le deroghe non sono nel DB: stanno nel ramo, in `.tollgate/waivers/<N>.toml`.
@@ -950,7 +980,7 @@ Ogni altra transizione viene rifiutata.
 | Controllo in errore, crash o timeout | Uscita 2, con il log, l'invito a `/tollgate:off` e il comando da terminale `touch ~/.local/state/tollgate/OFF` |
 | `SubagentStop` in errore | Uscita 0 con avviso |
 | Python o DB rotti | `/tollgate:off` funziona senza nessuno dei due |
-| DB guasto | `/tollgate:db restore` (12.1) |
+| DB guasto | `bin/tollgate db restore` dal terminale (12.1) |
 | `OFF` dimenticato | Avviso a ogni hook; scadenza facoltativa |
 | `origin/HEAD` assente | Si prova `main` e poi `master`; se manca anche quello, avviso |
 | Gate assente | `start` rifiuta |
@@ -1000,10 +1030,10 @@ Ogni altra transizione viene rifiutata.
 3. Fuori scope → veto e deroga.
 4. Deploy → veto fino all'atto.
 5. L0 che cresce → L1.
-6. Fine di subagent-driven-development → `/tollgate:finish`.
+6. Fine dei task di `tollgate:execute` → `/tollgate:finish`.
 7. Spec con una contraddizione → trovata dall'avversario.
 8. Cambio di ramo per sfuggire alle regole → veto.
-9. Fine dei task di subagent-driven-development → nessuna revisione finale di Superpowers, `/tollgate:finish`.
+9. Il coordinatore invoca subagent-driven-development in `execution` → il lancio di un implementatore `general-purpose` viene negato e il veto indica `tollgate:execute`.
 
 ---
 
@@ -1018,7 +1048,7 @@ Ogni criterio è un'azione con un esito binario.
    - Completo → scope registrato.
    - Riscritto con un file in più → scope invariato (hook).
 3. **Scope.** In `execution` un file fuori scope → `deny`, e dopo la deroga passa. In `plan` sono ammessi solo i `.md` sotto `docs/superpowers/`. In L1 il codice scritto dalla sessione principale → `deny` (hook).
-4. **Implementatore.** Un subagente di qualunque tipo fuori da `readonly_agents`, con DONE e senza ricevuta `green` → veto; al terzo tentativo `needs_you`. Con DONE, file modificati e nessun commit → veto. Con BLOCKED e ricevuta rossa → chiude (hook).
+4. **Implementatore.** In `execution` (L1): `general-purpose` → `deny`; `tollgate:implementer` senza `task start` → `deny`; dopo `task start 2 --fix` per tre volte → `tasks.fix_rounds = 3`. Un subagente di qualunque tipo fuori da `readonly_agents`, con DONE e senza ricevuta `green` → veto; al terzo tentativo `needs_you`. Con DONE, file modificati e nessun commit → veto. Con BLOCKED e ricevuta rossa → chiude (hook).
 5. **Commit.** Con `git add -A && git commit`, questi casi → `deny`:
    - test cancellato;
    - `xdescribe` o `pytest.skip(` aggiunti;
@@ -1028,7 +1058,6 @@ Ogni criterio è un'azione con un esito binario.
    `process.exit(` → nessuna segnalazione (hook, script).
 6. **Comandi.**
    - Effetti esterni, `gh pr edit`, `gh api graphql` con `mutation`, script del repo non tracciato → veto; dopo l'atto passano una volta.
-   - `bash <plugin>/skills/subagent-driven-development/scripts/task-brief …` → passa.
    - Comando in `allow` → passa.
    - Distruttivi, `claude -p`, `TOLLGATE_STATE=…` → `deny`.
    - In un repo non attivo `git push` passa (hook).
@@ -1058,7 +1087,7 @@ Ogni criterio è un'azione con un esito binario.
 
     Se la verifica di 16 conferma la sorgente per gli stati di commit: uno stato pubblicato con un token personale non soddisfa la protezione (gate).
 11. **Protezione e modalità.** Su un repo privato con GitHub Free `init` sceglie `detect` e `start` lo mostra; su un repo pubblico sceglie `protected` e `start` segnala i campi mancanti di 9.3 (integrazione, gate).
-12. **PR.** Senza un atto `finish` successivo all'ultimo commit e senza `approve pr` → rifiuto. Un atto `finish` di un altro lavoro o di un'altra sessione → rifiuto. Interruzione tra push e PR → nessuna PR doppia (integrazione).
+12. **PR.** Senza un atto `finish` successivo all'ultimo commit e senza `approve pr` → rifiuto. Un `finish` seguito da una revisione di più di 10 minuti → PR aperta; un commit dopo `finish` → l'atto decade. Un atto `finish` di un altro lavoro o di un'altra sessione → rifiuto. Interruzione tra push e PR → nessuna PR doppia (integrazione).
 13. **Atti.** Solo da `UserPromptExpansion`; lo strumento Skill non produce atti (hook).
 14. **Wrapper.**
     - Hook di controllo: 1, 127, eccezione o scadenza → 2.
@@ -1087,7 +1116,7 @@ Ogni criterio è un'azione con un esito binario.
     - `approve spec` rifiutato se l'ultimo giro ha `blocker` o `major`; accettato dopo un giro pulito.
     - Quarto giro ancora con `blocker` o `major` → `needs_you`; `resolve` → «avversariale sospeso» nella PR.
     - Con «Fette previste» = 1 l'audit a lenti non parte; con 3 parte, e `approve spec 3` è rifiutato finché l'audit a lenti non è chiuso o sospeso. `approve spec 1` su una spec con 3 fette → rifiuto.
-    - Dopo `approve spec`, `spec-approval.md` esiste con lo SHA della spec; un Edit dell'agente su quel file → `deny`.
+    - Dopo `approve spec`, `spec-approval.md` esiste con lo SHA della spec; un Edit dell'agente su quel file o sulla spec → `deny`. Spec modificata dopo l'ultimo giro → `approve spec` rifiutato.
     - `start #M --spec <percorso>` con una spec approvata sul ramo predefinito → fase `plan`; senza report di approvazione → rifiuto.
     - Una correzione `major` azzera il contatore del punto di vista che l'ha trovata (hook, integrazione).
 25. **Fasi.** Le transizioni fuori da 12.3 vengono rifiutate (script).
@@ -1101,6 +1130,7 @@ Ogni criterio è un'azione con un esito binario.
 33. **Issue e deroghe nel gate.** Una PR `tg/7-x` con «Closes #3» (issue già chiusa, con deroghe nella base) → `verdict` rosso e nessuna deroga applicata (gate).
 34. **Modalità.** `init` con un token senza amministrazione → «non determinata», mai `protected`. In `detect`, `git push origin main` da una sessione non legata → `deny`. Il primo push che installa `tollgate-sentinel` non apre l'issue (integrazione, gate).
 35. **Componenti spenti.** Con `spec_audit = false` e tre fette, `approve spec 3` è accettato senza audit a lenti e il gate dà `attenzione` rosso, non `verdict` rosso (integrazione, gate).
+36. **Piano registrato nel gate.** Piano modificato dopo la registrazione in modo da includere un file in più → quel file è fuori scope nel gate e `attenzione` mostra il diff del piano (gate).
 
 ---
 
@@ -1136,7 +1166,6 @@ Ogni criterio è un'azione con un esito binario.
 | `SubagentHandback` | Esiste, solo in auto mode, dalla v2.1.271 (tools-reference) |
 | `SubagentStart` | Riceve solo `agent_id` e `agent_type`, non il prompt |
 | `PreToolUse` su `Agent` | `tool_input` contiene `prompt`, `description`, `subagent_type`, `model` |
-| Revisione finale di SDD | Lanciata con riferimento a `requesting-code-review/code-reviewer.md` |
 
 **Ancora da verificare:**
 - i permessi di `GITHUB_TOKEN` in `workflow_run` per scaricare gli artefatti di un altro run (`actions: read`);
@@ -1164,6 +1193,8 @@ Sono le voci di 1.2, più due:
 
 ## 18. Formati
 
+**Regola comune di versione** (blocco JSON, deroghe, report, eventi): un campo nuovo non cambia `schema_version`; un campo tolto o cambiato di significato sì. Chi legge ignora i campi che non conosce.
+
 ### 18.1 Blocco JSON nella PR
 
 Va in un commento HTML `<!-- tollgate {...} -->`.
@@ -1179,6 +1210,7 @@ Va in un commento HTML `<!-- tollgate {...} -->`.
   "level_cap_reason": null,
   "gate_mode": "protected",
   "plan": "docs/superpowers/plans/2026-10-08-nome.md",
+  "plan_sha": "…",
   "spec": null,
   "spec_reviews_dir": null,
   "plan_reviews_dir": null,
@@ -1187,10 +1219,10 @@ Va in un commento HTML `<!-- tollgate {...} -->`.
   "receipts": [{"command": "verify", "state": "green", "tests_run": 120}],
   "waivers_file": ".tollgate/waivers/42.toml",
   "blocks": [],
-  "acts": [{"type": "approve", "object": "waiver", "id": "w-3", "at": "…"}],
+  "acts": [{"act_id": "a-17", "type": "approve", "object": "waiver", "target": "w-42-3", "at": "…"}],
   "verdict": {"outcome": "ok", "cycles": 1, "findings_confirmed": 0, "unverified": false},
   "findings": [{"id": "f-1-3", "severity": "major", "verification": "confirmed", "user_decision": null}],
-  "fix_rounds": {"Task 2": 1},
+  "fix_rounds": {"2": 1},
   "subagents": {"count": 7, "tokens": 412000},
   "effects": [{"command_hash": "…", "at": "…"}],
   "components_off": [],
@@ -1198,7 +1230,7 @@ Va in un commento HTML `<!-- tollgate {...} -->`.
 }
 ```
 
-`spec_audit.adversarial` e `spec_audit.lens` valgono `null` (non applicabile), `closed` o `suspended`. `fix_rounds` viene da `subagents.task` (6.3). `spec_reviews_dir` è la cartella dei report e del file di approvazione della spec: `docs/superpowers/reviews/<N>/` del lavoro che ha approvato la spec (la prima fetta); lo scrive `open-pr` da `work_items.spec_path`. `plan_reviews_dir` è la cartella dei report dell'avversario del piano del lavoro corrente. C e D leggono questo blocco senza parsare il testo libero della PR.
+`spec_audit.adversarial` e `spec_audit.lens` valgono `null` (non applicabile), `closed` o `suspended`. `fix_rounds` viene da `tasks.fix_rounds` (6.3), con il numero del task come chiave. `plan_sha` è lo SHA del piano al momento della registrazione dello scope. Gli atti in `acts` usano `act_id`, come in 12.2. `spec_reviews_dir` è la cartella dei report e del file di approvazione della spec: `docs/superpowers/reviews/<N>/` del lavoro che ha approvato la spec (la prima fetta); lo scrive `open-pr` da `work_items.spec_path`. `plan_reviews_dir` è la cartella dei report dell'avversario del piano del lavoro corrente. C e D leggono questo blocco senza parsare il testo libero della PR.
 
 ### 18.2 `.tollgate/waivers/<N>.toml`
 
@@ -1230,13 +1262,13 @@ number: 2
 viewpoint: null          # per spec-lens: uno degli otto punti di vista
 spec_sha: "…"
 counts: {blocker: 0, major: 1, moderate: 3, minor: 2}
-outcome: findings        # findings | empty | suspended
+outcome: findings        # findings | empty | suspended: lo calcola l'hook da counts (0)
 ---
 ```
 
 Avversari e auditor chiudono il loro messaggio finale con una riga JSON con gli stessi campi. L'hook la legge.
 
-I file `spec-approval` e `plan-approval` li scrive solo `act apply`, con questi campi al posto di `number`, `viewpoint`, `counts` e `outcome`: `path` (spec o piano), `sha` (del file approvato), `slices` (solo per la spec), `adversarial` e `lens` (`closed`, `suspended`, `off` o `null`), `act_id`, `approved_at`.
+I file `spec-approval` e `plan-approval` li scrive solo `act apply`, con questi campi al posto di `number`, `viewpoint`, `counts` e `outcome`: `path` (spec o piano), `sha` (del file approvato), `spec_sha` (solo per il piano: la spec su cui si basa), `slices` (solo per la spec), `adversarial` e `lens` (`closed`, `suspended`, `off` o `null`), `act_id`, `approved_at`.
 
 ### 18.4 Eventi
 
@@ -1249,6 +1281,10 @@ I file `spec-approval` e `plan-approval` li scrive solo `act apply`, con questi 
 ### 18.5 Rilievi e verdetti
 
 **Revisore finale:** `{"sha", "code", "outcome": "ok" | "needs_fix" | "needs_you", "findings": [{"severity", "confidence": 0-1, "file", "line", "text"}]}`. L'identificativo lo assegna `SubagentStop`: `f-<ciclo>-<n>`.
+
+**Revisore del task:** `{"task": k, "sha", "outcome": "approved" | "changes", "spec_compliance": "ok" | "missing" | "extra", "findings": [{"severity", "file", "line", "text"}]}`.
+
+**`user_decision`:** `null`, `downgraded:<gravità>` o `dismissed`.
 
 **Verificatore:** `{"sha", "code", "results": [{"id", "verification": "confirmed" | "rejected" | "unverified", "reason"}]}`. Un rilievo senza risultato resta senza esito. `approve finding <id>` usa lo stesso identificativo. C usa `confidence` e `user_decision` per tarare la soglia (R13).
 
@@ -1290,3 +1326,4 @@ L'elenco completo è in `docs/COSA-TENERE.md`.
 | 10 | 08/10/2026 | Riscrittura con i cicli 22-29 e le decisioni dell'utente: fette rinviate a C; specialisti, Codex e controllo delle letture dopo la v1; regole legate al lavoro attivo e non al nome del ramo; implementatore = ogni subagente non in sola lettura; verificatore alimentato dai rilievi registrati; ambiente ripulito; `pending` solo da `verdict`; `interrupted`; ripresa sporca e offline; `adopt`, `sync`, `cleanup`; eccezioni in sola lettura; `OFF` con scadenza; tetto persistente e livello dichiarato nella PR; contratto dei profili; atti con sorgente e autore; registro dei controlli; formati; codici; glossario; identificatori in inglese; dialetto gitignore |
 | 11 | 08/10/2026 | Correzioni puntuali dai cicli 31-38: sessioni legate al lavoro; regole di scrittura in `review` e `pr_open`; script dei plugin non sono effetti esterni; `approve spec` richiede anche l'audit a lenti con più fette; modalità `detect` e `tollgate-sentinel` per i repo privati con GitHub Free; `sync` atomico eseguito dalla skill dopo l'atto; `interrupted` solo per sessioni non vive; `allow_no_tests`; `red` con report in errore (`\|\| true`); deroghe per issue; controllo a valle dei commit e dei cambi di ramo; task e giri di correzione dal prompt di `Agent`; `SubagentHandback`; contratto minimo delle fette; `db restore`; ripresa con avvisi; `flaky` tolto; due insiemi di file di verifica; stima dei minuti; modello degli agenti; busta degli eventi; campi del JSON |
 | 12 | 08/10/2026 | Correzioni puntuali dai cicli 39-46: permessi di `verdict` (`actions`, `issues`); modalità misurata solo da `init` e scritta in `[gate] mode`; file `spec-approval` e `plan-approval` scritti dalla CLI; `docs/superpowers/reviews/**` protetto; `approve spec <fette>`; atti legati a sessione, lavoro e oggetto, con scadenza; atto `finish`; `approve rebase` monouso; `resolve writer`; `db restore` dal terminale senza atto; `UserPromptExpansion` non blocca mai; push sul predefinito negato in tutto il repo attivo; livello sotto il minimo coerente (`verdict` rosso); componenti spenti → `attenzione`; `pytest.mark.skip` e `skipped` come mancante; issue della PR verificata e deroghe legate al ramo; formato di rilievi e verdetti (18.5); contratto dei profili; registro dei controlli; busta con `repo_key` e `issue`; cache per albero; `tollgate/base` in `detect`; `sentinel` con un'issue sola; tabella di `adopt`; modelli predefiniti degli agenti; `schema_version` di deroghe e report; chiavi sconosciute; criteri 32-35 |
+| 13 | 08/10/2026 | Decisione dell'utente: `tollgate:execute` con `tollgate:implementer` e `tollgate:task-reviewer` al posto di subagent-driven-development (tolte esenzione degli script, estrazione del task dal prompt e blocco della revisione finale di SDD; tabella `tasks`; solo `tollgate:implementer` scrive in `execution`). Correzioni dei cicli 47-50: `finish` legato allo SHA e non al tempo; approvazioni legate al contenuto (SHA blob, spec e piano bloccati dopo l'approvazione, `plan_sha` nel gate); `spec_path` della prima fetta; identificativi della base solo eseguiti e non saltati; `tollgate-base` commenta l'issue; `spec-lens-stato.md` rigenerato dall'hook e `outcome` calcolato; `db restore` solo da terminale; uscita al rifiuto del costo dell'audit; registro con eventi d'ingresso e `ctx`; `events --json`; `user_decision`; namespace dei comandi dei profili e `min_level`; casi gravi in `attenzione`; regola comune di versione; criterio 36 |
