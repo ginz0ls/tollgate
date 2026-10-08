@@ -969,7 +969,15 @@ spec_audit = true
 plan_adversary = true
 base_test_ids = true
 sentinel = true
+task_size = true        # 6.3: soglie di righe e file
+task_budget = true      # 6.3: maxTurns e tetto di token
+definition_of_done = true  # 8.7
+report_fields = true    # 18.5: report a campi fissi
+reviewer_standard = true   # 8.6: standard del revisore e disaccordo istruito
+spec_pitch = true       # 6.2: «Tane di coniglio» e «Cosa non fare»
 ```
+
+Le soglie della revisione 18 vengono da pratiche pensate per le persone (Google, GitLab, DORA, Shape Up) e non sono misurate sugli agenti: si regolano in `[tasks]` e si tarano con le misure del sotto-progetto D. Quando un lavoro si ferma, `status` dice **quale** tetto l'ha fermato (budget del task, giri di correzione o cicli di revisione).
 
 ---
 
@@ -1431,4 +1439,4 @@ L'elenco completo è in `docs/COSA-TENERE.md`.
 | 15 | 08/10/2026 | Decisione dell'utente: specializzazione per area. Campi `skills` e `agent` nel contratto dei profili; skill nel brief e controllate da `SubagentStop` tramite `PostToolUse Skill`; in L2 implementatore per area scelto da `task start` quando il task tocca un solo profilo con `agent`; agenti concreti in B; criterio 38 |
 | 16 | 08/10/2026 | Decisione dell'utente: profili verticali. Implementatore e revisore del task per area a tutti i livelli (sostituiscono i generici); specialisti finali in L2 solo per i profili con `final_specialist` (sicurezza e database); tetto di 3 skill obbligatorie per agente; campi `reviewer`, `reviewer_skills`, `final_specialist`; catalogo in un documento a parte; criterio 38 riscritto |
 | 17 | 08/10/2026 | Decisioni dell'utente: profili `vertical` e `cross` con campo `cross`; precedenza al pattern più specifico; file di tollgate ristretti ai workflow `tollgate-*`, workflow del progetto controllati da `guard` (permessi ed eventi) e coperti dal profilo `ci`; verifica di `skills:` e `mcpServers` negli agenti di plugin |
-| 18 | 08/10/2026 | Decisione dell'utente, da `docs/RICERCA-ORGANIZZAZIONE.md`: dimensione e budget del task (`[tasks]`), report dell'implementatore a campi fissi, standard del revisore e disaccordo istruito con regola citata, Definition of Done per livello (8.7, campo `dod` dei profili e del JSON), spec L2 con «Tane di coniglio» e «Cosa non fare»; criteri 39-41 |
+| 18 | 08/10/2026 | Decisione dell'utente, da `docs/RICERCA-ORGANIZZAZIONE.md`: dimensione e budget del task (`[tasks]`), report dell'implementatore a campi fissi, standard del revisore e disaccordo istruito con regola citata, Definition of Done per livello (8.7, campo `dod` dei profili e del JSON), spec L2 con «Tane di coniglio» e «Cosa non fare»; criteri 39-41; ogni pratica è un componente spegnibile in `[components]`, e `status` indica quale tetto ha fermato il lavoro |
