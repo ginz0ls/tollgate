@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tests.helpers import TempState, git, make_repo
 from tollgate_core.config import (
@@ -120,6 +121,49 @@ class LoadFromGitTest(unittest.TestCase):
         git(self.repo, "commit", "-qm", "rm")
         with self.assertRaises(ConfigNotFound):
             load_config_at(self.repo, "HEAD")
+
+    def test_accented_text_round_trips(self):
+        (self.repo / "tollgate.toml").write_text(
+            MIN + '[severity]\nminor = "redazionalità"\n', encoding="utf-8")
+        git(self.repo, "commit", "-qam", "accenti")
+        self.assertEqual(load_config_at(self.repo, "HEAD").get("severity.minor"), "redazionalità")
+
+    def test_invalid_utf8_committed_is_config_error(self):
+        (self.repo / "tollgate.toml").write_bytes(MIN.encode() + b'[severity]\nminor = "\xff\xfe"\n')
+        git(self.repo, "commit", "-qam", "bytes")
+        with self.assertRaises(ConfigError):
+            load_config_at(self.repo, "HEAD")
+
+    def test_unknown_ref_is_plain_config_error(self):
+        with self.assertRaises(ConfigError) as cm:
+            load_config_at(self.repo, "nonesiste")
+        self.assertIs(type(cm.exception), ConfigError)
+
+    def test_git_missing_is_config_error(self):
+        with mock.patch("tollgate_core.config.subprocess.run", side_effect=FileNotFoundError("git")):
+            with self.assertRaisesRegex(ConfigError, "git non disponibile"):
+                load_config_at(self.repo, "HEAD")
+
+    def test_invalid_utf8_override_is_config_error(self):
+        t = TempState()
+        try:
+            f = t.dir / "test.toml"
+            f.write_bytes(MIN.encode() + b'[severity]\nminor = "\xff\xfe"\n')
+            env = {"TOLLGATE_STATE": str(t.dir), "TOLLGATE_TEST_CONFIG": str(f)}
+            with self.assertRaises(ConfigError):
+                load_config(t.state, self.repo, "HEAD", env)
+        finally:
+            t.cleanup()
+
+    def test_missing_override_is_config_error(self):
+        t = TempState()
+        try:
+            f = t.dir / "non-esiste.toml"
+            env = {"TOLLGATE_STATE": str(t.dir), "TOLLGATE_TEST_CONFIG": str(f)}
+            with self.assertRaisesRegex(ConfigError, "non-esiste.toml"):
+                load_config(t.state, self.repo, "HEAD", env)
+        finally:
+            t.cleanup()
 
     def test_test_config_override_only_in_test_mode(self):
         t = TempState()

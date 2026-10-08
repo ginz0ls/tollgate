@@ -225,15 +225,34 @@ def load_config_text(text: str, source: str = "tollgate.toml") -> Config:
 
 def load_config_at(repo: Path, ref: str) -> Config:
     """Legge tollgate.toml da un riferimento git, mai dal working tree (spec 3.2)."""
-    r = subprocess.run(["git", "-C", str(repo), "show", f"{ref}:tollgate.toml"],
-                       capture_output=True, text=True)
+    try:
+        check = subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"],
+            capture_output=True)
+        if check.returncode != 0:
+            raise ConfigError(f"riferimento git non valido: {ref}")
+        r = subprocess.run(["git", "-C", str(repo), "show", f"{ref}:tollgate.toml"],
+                           capture_output=True)
+    except FileNotFoundError as e:
+        raise ConfigError("git non disponibile") from e
     if r.returncode != 0:
         raise ConfigNotFound(f"tollgate.toml assente in {ref}")
-    return load_config_text(r.stdout, source=f"{ref}:tollgate.toml")
+    source = f"{ref}:tollgate.toml"
+    try:
+        text = r.stdout.decode("utf-8")
+    except UnicodeDecodeError as e:
+        raise ConfigError(f"{source}: codifica non UTF-8") from e
+    return load_config_text(text, source=source)
 
 
 def load_config(state: State, repo: Path, ref: str, env=None) -> Config:
     override = test_env(state, "TOLLGATE_TEST_CONFIG", env)
     if override:
-        return load_config_text(Path(override).read_text(), source=override)
+        try:
+            text = Path(override).read_text(encoding="utf-8")
+        except OSError as e:
+            raise ConfigError(f"impossibile leggere {override}: {e.strerror}") from e
+        except UnicodeDecodeError as e:
+            raise ConfigError(f"{override}: codifica non UTF-8") from e
+        return load_config_text(text, source=override)
     return load_config_at(repo, ref)
