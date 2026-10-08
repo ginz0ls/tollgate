@@ -10,7 +10,7 @@
 
 **Tech Stack:** Claude Code 2.1.294, bash, `jq`, `gh` 2.46, Python 3.13, Node 26 (vitest, jest), pytest.
 
-**Spec:** `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 17), sezione 16.
+**Spec:** `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 18), sezione 16.
 
 ## Global Constraints
 
@@ -27,7 +27,7 @@
 2. **Differenza tra `-p` e sessione interattiva.** Un comportamento visto con `claude -p` può non valere in sessione interattiva (e viceversa): il rapporto indica sempre in quale modalità è stato visto.
 3. **Versione.** Ogni esito vale per Claude Code 2.1.294 e `gh` 2.46: il rapporto lo scrive in testa.
 4. **Repo di prova lasciati in giro.** L'ultimo task propone all'utente di cancellarli; non li cancella da solo.
-5. **Esito che smentisce la spec.** Se un fatto contraddice la spec, il task finale lo porta in una nuova revisione (18) e non lo lascia solo nel rapporto.
+5. **Esito che smentisce la spec.** Se un fatto contraddice la spec, il task finale lo porta in una nuova revisione (19) e non lo lascia solo nel rapporto.
 
 ---
 
@@ -652,7 +652,7 @@ Mostrare l'elenco e chiedere conferma prima di modificare la spec. Gli esiti che
 
 - [ ] **Step 3: Aggiornare la spec**
 
-Spostare le voci verificate da «Ancora da verificare» alla tabella «Verificato» della sezione 16 con data ed esito; applicare le modifiche approvate; aggiungere la riga 18 alla sezione 20.
+Spostare le voci verificate da «Ancora da verificare» alla tabella «Verificato» della sezione 16 con data ed esito; applicare le modifiche approvate; aggiungere la riga 19 alla sezione 20.
 
 - [ ] **Step 4: [CONFERMA] Proporre la cancellazione dei repo di prova**
 
@@ -662,5 +662,5 @@ Chiedere all'utente se cancellare `tollgate-probe` e `tollgate-probe-public`. So
 
 ```bash
 git add docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md docs/verifiche/2026-10-08-p0-esiti.md
-git commit -m "spec: revisione 18 (esiti delle verifiche P0)"
+git commit -m "spec: revisione 19 (esiti delle verifiche P0)"
 ```

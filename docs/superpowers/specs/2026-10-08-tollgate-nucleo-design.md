@@ -1,7 +1,7 @@
 # tollgate: specifica del nucleo (sotto-progetto A)
 
 Data: 8 ottobre 2026.
-Revisione: **17**: profili verticali e trasversali, precedenza per specificità, CI del progetto non più protetta (decisioni dell'utente). Revisione 16: implementatori e revisori per area, specialisti finali in L2, tetto di 3 skill. Il catalogo dei profili è in `2026-10-08-tollgate-profili-verticali.md`. La revisione 14 ha chiuso l'audit come «sospeso»; i residui sono nel file di stato. Le revisioni precedenti sono nella sezione 20.
+Revisione: **18**: pratiche delle software house (task piccoli, standard del revisore, disaccordo istruito, budget per task, Definition of Done, report a campi fissi, spec con «cosa non fare»), da `docs/RICERCA-ORGANIZZAZIONE.md` (decisione dell'utente). Revisione 17: profili verticali e trasversali, precedenza per specificità, CI del progetto non più protetta. Revisione 16: implementatori e revisori per area, specialisti finali in L2, tetto di 3 skill. Il catalogo dei profili è in `2026-10-08-tollgate-profili-verticali.md`. La revisione 14 ha chiuso l'audit come «sospeso»; i residui sono nel file di stato. Le revisioni precedenti sono nella sezione 20.
 Stato: **audit sospeso, pronta per il piano** (`docs/audit/2026-10-08-audit-spec-nucleo-stato.md`).
 Fonti: `docs/REPORT-CONFRONTO-WORKFLOW.md`, `docs/COSA-TENERE.md`, `docs/RICERCA-PAPER.md`. I codici R e H usati nel testo sono spiegati nella sezione 19.
 
@@ -333,6 +333,7 @@ L1 e L2, plan:  checkpoint + /clear → writing-plans (la skill dà le intestazi
 ```
 
 **Audit della spec.**
+0. **Forma della spec in L2.** Oltre a «Fette previste», la spec ha le sezioni `## Tane di coniglio` (punti incerti che possono far esplodere il lavoro, con la scelta fatta per ciascuno) e `## Cosa non fare` (ciò che resta fuori, anche se sembra utile). L'avversario della spec le controlla: una tana di coniglio senza scelta è un rilievo `major` (Shape Up, il «pitch»).
 1. **Giri avversariali.** A ogni giro `tollgate:spec-adversary` riparte in un subagente nuovo e chiude con una riga JSON (18.3). Il coordinatore corregge la spec. Si va avanti finché un giro non trova né `blocker` né `major`. Il tetto è `spec_rounds` (4): se il quarto giro trova ancora `blocker` o `major`, si apre `needs_you`, e `resolve` lo chiude come **«avversariale sospeso»**.
 2. **Audit a lenti.** Parte solo se «Fette previste» è maggiore di 1. Prima del primo ciclo la skill mostra il costo (da 16 a `spec_audit_cycles` cicli, più i giri avversariali) e chiede conferma. Se non confermi, si apre `needs_you`, e `resolve` lo chiude come «audit a lenti sospeso». Segue il metodo `spec-audit`: dieci lenti, otto punti di vista, un ciclo per ogni subagente nuovo. Al coordinatore torna solo il riepilogo.
    - L'audit si chiude quando ogni punto di vista ha dato due cicli vuoti (0) di fila.
@@ -368,6 +369,7 @@ execution (sessione pulita)
         subagente al task (lo scrittore unico rende l'associazione univoca) e inietta il
         promemoria del passo (R5), al massimo 2.000 caratteri (R9)
       implementatore: TDD → commit (hook: test-guard, scope, livello) → tollgate verify
+        → report a campi fissi (18.5), entro il budget del task (sotto)
       SubagentStop: 8.1; conflitto tra test e specifica → block open test_spec_conflict (R1)
       tollgate task review-prepare k → brief del revisore con l'intervallo di SHA del task
         (tasks.commits, riempito da PostToolUse Bash) e un codice
@@ -394,6 +396,11 @@ execution (sessione pulita)
 - **Cosa rende diverso un implementatore per area:** prompt con le regole dell'area, strumenti propri (per esempio un server MCP del database o gli strumenti del browser), modello proprio. Deriva dallo stesso testo di `tollgate:implementer` e ne mantiene gli obblighi (TDD, `verify`, stati, report). Un nome di ruolo senza contesto o strumenti diversi non giustifica un agente a sé (ricerca, filone 6).
 - **Vincoli per gli agenti dei profili:** l'implementatore si chiama `<plugin>:implementer-<area>` e non è mai in `readonly_agents`; vale per lui tutto ciò che vale per `tollgate:implementer` (scope, scrittore unico, ricevuta, sola scrittura dopo `task start`). Il revisore si chiama `<plugin>:reviewer-<area>` e lo specialista finale `<plugin>:final-<area>`: entrambi entrano automaticamente in `readonly_agents`. Un agente per area funziona anche senza le sue skill (non installate su quella macchina): sono un rinforzo, non una dipendenza.
 - **Catalogo.** I profili verticali concreti (aree, percorsi, comandi, agenti, skill, checklist) sono definiti in `docs/superpowers/specs/2026-10-08-tollgate-profili-verticali.md` e realizzati dal sotto-progetto B.
+
+**Dimensione e budget del task** (task piccoli: Google small CLs, GitLab, DORA small batches; budget fisso: Shape Up).
+- **Dimensione.** A `task review-prepare` si misurano le righe aggiunte più rimosse del task, esclusi lockfile e file generati. Oltre `task_lines_warn` (200) il brief del revisore lo segnala; oltre `task_lines_max` (500) il report dell'implementatore deve contenere una motivazione, e `attenzione` lo riporta. Test e codice stanno nello stesso task; un refactoring va in un task a sé. `plan-adversary` segnala i task del piano che toccano più di `task_files_warn` (8) file.
+- **Budget.** Ogni implementatore ha `maxTurns` nel frontmatter (predefinito `[tasks] max_turns`, 60) e un tetto di token per livello (`[tasks] max_tokens`, letto dal transcript a `SubagentStop`). Superato il budget, il task va in `blocked` con un `needs_you` che propone di dividerlo: niente «ancora un giro» automatico.
+- **Report a campi fissi.** Il messaggio finale dell'implementatore ha i campi di 18.5 (stato, fatto, test, file, dubbi, cosa resta, motivazione della dimensione). Un report senza i campi obbligatori vale come stato non riconosciuto (8.1). Serve a chi riprende il task: note strutturate riducono il costo della ripresa (arXiv 2606.02875).
 
 **Transizioni di `tasks.state`.**
 
@@ -661,10 +668,30 @@ Li registra `UserPromptExpansion` quando digiti il comando, con `source`, `actor
 ### 8.6 Revisori
 
 - **Brief del revisore**: lo scrive `review prepare`, con diff, piano, must-have, SHA e un codice di controllo casuale.
+- **Standard del revisore** (Google, standard della revisione): si approva se il cambiamento **migliora la salute del codice**, anche se non è perfetto. Solo i rilievi `blocker` e `major` chiedono modifiche; `moderate` e `minor` sono note che non fermano il task né la PR.
+- **Disaccordo istruito** (arXiv 2608.18167): il prompt del revisore gli chiede di cercare difetti, non di confermare il lavoro, e ogni rilievo deve citare una prova: file e riga, e la regola violata (`R-…` del profilo) o il passo del piano. Un rilievo senza prova viene scartato dal verificatore. Il verificatore fa da critico: conferma o scarta ogni rilievo, senza discutere con il revisore.
 - **Brief del verificatore**: lo genera dalla **tabella `findings`**, cioè da tutti i rilievi registrati.
 - **Validità del verdetto**: deve contenere SHA e codice, e deve aver superato il controllo di sola lettura.
 - **Formato**: quelli di 18.5, per il revisore e per il verificatore. Un JSON assente o malformato vale `needs_you`.
 - **`open-pr` rifiuta** se un rilievo registrato non ha esito, salvo quelli oltre `max_findings`.
+
+### 8.7 Definition of Done
+
+Il lavoro che non rispetta la Definition of Done non conta (Scrum Guide 2020; GitLab). Ogni voce è verificabile da un comando o da un dato del DB, mai da un giudizio.
+
+| Voce | L0 | L1 | L2 | Come si verifica |
+|---|---|---|---|---|
+| Ricevuta `green` sullo SHA (o `allow_no_tests`) | sì | sì | sì | `receipts` |
+| test-guard e scope senza violazioni non derogate | sì | sì | sì | hook e gate |
+| Ogni task `done` con verdetto `approved` del revisore del task | — | sì | sì | `tasks` |
+| Nessun rilievo `blocker` o `major` confermato senza `approve finding` | — | sì | sì | `findings` |
+| Ogni must-have del piano citato in almeno un report | — | sì | sì | report dei task |
+| Skill dei profili usate | — | sì | sì | `tasks.skills_used` |
+| Spec e piano approvati, report avversariali presenti | — | — | sì | file di approvazione (18.3) |
+| Specialisti finali passati | — | — | sì | `findings` per fonte |
+| Voci in più dei profili attivi (`dod = [...]`, nomi di comandi) | sì | sì | sì | ricevute dei comandi |
+
+`finish check` calcola la DoD e la stampa voce per voce; `open-pr` rifiuta se una voce manca. Il gate ricalcola le voci che può vedere (ricevute, test-guard, scope, file di approvazione); le altre arrivano dal blocco JSON come dichiarate (18.1, campo `dod`).
 
 ---
 
@@ -777,7 +804,7 @@ Il comando lo esegui tu. `start` prova a leggere la protezione e segnala i campi
 
 **Verificatore.** Uno per ciclo. Esamina i rilievi in ordine di gravità fino a `max_findings` (15); quelli oltre il limite restano «non verificati».
 
-**Cosa ferma la PR.** I rilievi confermati `blocker` o `major`, salvo un `approve finding`.
+**Cosa ferma la PR.** I rilievi confermati `blocker` o `major`, salvo un `approve finding`. `moderate` e `minor` vanno nel commento della PR come note (standard del revisore, 8.6).
 
 **Cicli di revisione.**
 - Tetto di 4, contando **solo i cicli con rilievi confermati**. Il `needs_you` si apre alla fine del quarto ciclo con rilievi confermati.
@@ -879,6 +906,13 @@ spec_rounds       = 4
 plan_rounds       = 2
 spec_audit_cycles = 30
 
+[tasks]
+task_lines_warn = 200
+task_lines_max  = 500
+task_files_warn = 8
+max_turns       = 60
+max_tokens      = { L0 = 0, L1 = 400000, L2 = 800000 }   # 0 = nessun tetto
+
 [review]
 readonly_agents = ["tollgate:task-reviewer", "tollgate:final-reviewer", "tollgate:finding-verifier", "tollgate:plan-adversary", "tollgate:spec-adversary", "tollgate:spec-auditor", "Explore"]
 output_dirs     = ["reports/", "coverage/"]
@@ -913,6 +947,7 @@ skip_markers   = []
 assert_markers = []
 plan_sections  = []
 min_level      = "L0"
+dod            = []   # nomi di comandi del profilo che entrano nella Definition of Done (8.7)
 checklist      = ""   # percorso di un file con la checklist per il revisore finale
 skills         = []   # skill che ogni implementatore deve usare sui task di questo profilo
 agent          = ""   # implementatore per area, "<plugin>:implementer-<area>" (6.3)
@@ -1188,6 +1223,9 @@ Ogni criterio è un'azione con un esito binario.
 36. **Piano registrato nel gate.** Piano modificato dopo la registrazione in modo da includere un file in più → quel file è fuori scope nel gate e `attenzione` mostra il diff del piano (gate).
 37. **Flusso dopo l'approvazione.** In `spec_audit` la scrittura di un piano → `deny`. In L2 il piano corretto da `plan-adversary` → `plan_sha` è quello di `approve plan`. Edit sulla spec in fase `plan` dopo `approve spec` → `deny`; `reopen spec` → fase `spec_audit` e nuova approvazione richiesta. `needs_fix` → `task start --from-findings` crea un task `fix` senza toccare il piano (hook, integrazione).
 38. **Profili verticali.** Con un profilo `web` (`paths = ["web/**"]`, `skills = ["ui-ux-pro-max"]`, `agent = "probe:implementer-frontend"`, `reviewer = "probe:reviewer-frontend"`): in L1 un task su `web/` → `task start` sceglie `probe:implementer-frontend` e `probe:reviewer-frontend`; `tollgate:implementer` su quel task → `deny`; DONE senza aver invocato `ui-ux-pro-max` → veto. Un task su `web/` e `api/` con due agenti diversi → `tollgate:implementer` con l'unione delle skill. In L2 un profilo con `final_specialist` attivo → lo specialista gira insieme a `final-reviewer`, e i suoi rilievi passano dal verificatore (hook, integrazione).
+39. **Task piccoli e budget.** Un task con 600 righe e senza `size_reason` → report non valido; con `size_reason` → `attenzione` lo riporta. Un implementatore oltre `max_tokens` → task `blocked` e `needs_you` (hook, integrazione).
+40. **Revisione.** Un rilievo `minor` non porta il task a `changes`; un rilievo senza `rule` né file e riga → scartato dal verificatore (integrazione).
+41. **Definition of Done.** `finish check` stampa la DoD voce per voce; con un task non `done` → `open-pr` rifiuta. Una spec L2 senza `## Cosa non fare` → rilievo dell'avversario (integrazione).
 
 ---
 
@@ -1279,6 +1317,7 @@ Va in un commento HTML `<!-- tollgate {...} -->`.
   "waivers_file": ".tollgate/waivers/42.toml",
   "blocks": [],
   "acts": [{"act_id": "a-17", "type": "approve", "object": "waiver", "target": "w-42-3", "at": "…"}],
+  "dod": {"L": "L1", "items": {"receipt": true, "tasks_approved": true, "must_have": true}},
   "verdict": {"outcome": "ok", "cycles": 1, "findings_confirmed": 0, "unverified": false},
   "findings": [{"id": "f-1-3", "severity": "major", "confidence": 0.8, "verification": "confirmed", "user_decision": null}],
   "fix_rounds": {"2": 1},
@@ -1341,7 +1380,9 @@ I file `spec-approval` e `plan-approval` li scrive solo `act apply`, con questi 
 
 **Revisore finale:** `{"sha", "code", "outcome": "ok" | "needs_fix" | "needs_you", "findings": [{"severity", "confidence": 0-1, "file", "line", "text"}]}`. L'identificativo lo assegna `SubagentStop`: `f-<ciclo>-<n>`.
 
-**Revisore del task:** `{"v": 1, "task": k, "sha", "code", "outcome": "approved" | "changes", "spec_compliance": ["missing" | "extra"] (vuoto se aderente), "findings": [{"severity", "file", "line", "text"}]}`. Vale solo con lo SHA e il codice del brief di `task review-prepare`.
+**Report dell'implementatore** (ultimo messaggio, un blocco JSON): `{"v": 1, "task": k, "status": "DONE" | "DONE_WITH_CONCERNS" | "BLOCKED" | "NEEDS_CONTEXT", "done": "…", "tests": "comando ed esito", "files": [...], "must_have": ["M1"], "concerns": "…", "left": "…", "size_reason": null}`. `size_reason` è obbligatorio oltre `task_lines_max`.
+
+**Revisore del task:** `{"v": 1, "task": k, "sha", "code", "outcome": "approved" | "changes", "spec_compliance": ["missing" | "extra"] (vuoto se aderente), "findings": [{"severity", "file", "line", "rule", "text"}]}`. Vale solo con lo SHA e il codice del brief di `task review-prepare`. `rule` è la regola violata (`R-…`) o il passo del piano: senza, il rilievo non vale.
 
 **`user_decision`:** `null`, `downgraded:<gravità>` o `dismissed`.
 
@@ -1390,3 +1431,4 @@ L'elenco completo è in `docs/COSA-TENERE.md`.
 | 15 | 08/10/2026 | Decisione dell'utente: specializzazione per area. Campi `skills` e `agent` nel contratto dei profili; skill nel brief e controllate da `SubagentStop` tramite `PostToolUse Skill`; in L2 implementatore per area scelto da `task start` quando il task tocca un solo profilo con `agent`; agenti concreti in B; criterio 38 |
 | 16 | 08/10/2026 | Decisione dell'utente: profili verticali. Implementatore e revisore del task per area a tutti i livelli (sostituiscono i generici); specialisti finali in L2 solo per i profili con `final_specialist` (sicurezza e database); tetto di 3 skill obbligatorie per agente; campi `reviewer`, `reviewer_skills`, `final_specialist`; catalogo in un documento a parte; criterio 38 riscritto |
 | 17 | 08/10/2026 | Decisioni dell'utente: profili `vertical` e `cross` con campo `cross`; precedenza al pattern più specifico; file di tollgate ristretti ai workflow `tollgate-*`, workflow del progetto controllati da `guard` (permessi ed eventi) e coperti dal profilo `ci`; verifica di `skills:` e `mcpServers` negli agenti di plugin |
+| 18 | 08/10/2026 | Decisione dell'utente, da `docs/RICERCA-ORGANIZZAZIONE.md`: dimensione e budget del task (`[tasks]`), report dell'implementatore a campi fissi, standard del revisore e disaccordo istruito con regola citata, Definition of Done per livello (8.7, campo `dod` dei profili e del JSON), spec L2 con «Tane di coniglio» e «Cosa non fare»; criteri 39-41 |
