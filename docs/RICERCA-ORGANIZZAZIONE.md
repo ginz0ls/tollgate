@@ -56,11 +56,13 @@ Le pratiche concrete con la loro fonte, in ordine di valore rispetto al costo:
 
 ---
 
-## 3. Proposta
+## 3. Decisioni (8 ottobre 2026)
+
+**Stato:** tutte approvate dall'utente. O1-O7 sono nella spec del nucleo, revisione 18, ognuna come componente spegnibile; C1-C4 e D1-D2 sono registrate nel piano principale (sezione 6). Le soglie vanno tarate con le misure del sotto-progetto D.
 
 ### Nel nucleo (piccoli, alto valore)
 
-| Id | Proposta | Da | Dove nella spec |
+| Id | Pratica | Da | Dove nella spec |
 |---|---|---|---|
 | O1 | **Dimensione del task**: alla chiusura del task, il diff oltre `task_lines_warn` (200) è segnalato al revisore; oltre `task_lines_max` (500) serve una motivazione nel report e `attenzione` lo mostra. `plan-adversary` segnala i task troppo grandi | Pratica 1 | 6.3, 11.4 |
 | O2 | **Standard del revisore**: «approva se migliora la salute del codice»; solo `blocker` e `major` chiedono modifiche, `moderate` e `minor` sono note | Pratica 2 | 10, 18.5 |
@@ -72,7 +74,7 @@ Le pratiche concrete con la loro fonte, in ordine di valore rispetto al costo:
 
 ### Nel sotto-progetto C (kanban, obiettivi)
 
-| Id | Proposta | Da |
+| Id | Pratica | Da |
 |---|---|---|
 | C1 | Limite al lavoro in corso con regola pull nella kanban | Pratica 5 |
 | C2 | Metriche di flusso calcolate dagli eventi (`events --after-seq`) | Pratica 6 |
@@ -81,7 +83,7 @@ Le pratiche concrete con la loro fonte, in ordine di valore rispetto al costo:
 
 ### Dopo la v1 (D e lezioni)
 
-| Id | Proposta | Da |
+| Id | Pratica | Da |
 |---|---|---|
 | D1 | Post-mortem automatici: scattano su PR respinta più volte, revert, interruttore; producono una proposta di regola per `rules-<area>` che l'utente approva | Pratica 8 |
 | D2 | Misura nel plugin: stesso task con agente singolo e con il team, a parità di token, con tempo, costo e qualità | Paper 2604.02460, 2610.03010 |

@@ -1,7 +1,7 @@
 # tollgate: catalogo dei profili verticali
 
 Data: 8 ottobre 2026. Stato: **bozza: le regole `rules-<area>` vanno scritte e riviste dall'utente**.
-Spec del nucleo: `2026-10-08-tollgate-nucleo-design.md` (revisione 17, sezioni 6.3, 10 e 11.4). Il nucleo dà il contratto e l'instradamento; questo documento dice **quali profili** esistono e cosa porta ciascuno. Li realizza il sotto-progetto B.
+Spec del nucleo: `2026-10-08-tollgate-nucleo-design.md` (revisione 18, sezioni 6.3, 8.6, 8.7, 10 e 11.4). Il nucleo dà il contratto e l'instradamento; questo documento dice **quali profili** esistono e cosa porta ciascuno. Li realizza il sotto-progetto B.
 
 Fonti: tre ricerche dell'8 ottobre 2026 (catalogo di 1.015 skill e 644 agenti su disco, ricerca web per area e ruolo, raccolte esistenti di subagenti). I riassunti sono nella sezione 7.
 
@@ -79,6 +79,25 @@ Le `description` restano brevi: con circa 26 agenti, la documentazione avvisa ol
 
 ---
 
+### 2.3 Regole, revisione e Definition of Done (revisione 18)
+
+- **Le regole sono la prova dei rilievi.** Con il disaccordo istruito (spec 8.6) ogni rilievo del revisore cita la regola violata: `R-FE-07`, `R-DB-03`… Un rilievo senza regola né file e riga viene scartato dal verificatore. Per questo ogni `rules-<area>` ha regole numerate e stabili: cambiare un numero rompe lo storico dei rilievi.
+- **Standard del revisore.** Il prompt di ogni `reviewer-<area>` dice: approva se il task migliora la salute del codice; solo le regole marcate `[blocca]` danno rilievi `blocker` o `major`, le altre sono note.
+- **Definition of Done per profilo** (campo `dod`, spec 8.7): i comandi del profilo che devono passare perché il lavoro conti. Proposte iniziali, da confermare quando si scrivono le regole:
+
+| Profilo | `dod` |
+|---|---|
+| `frontend` | lint, typecheck, test dei componenti |
+| `backend` | test delle API, typecheck |
+| `database` | migrazione applicata e annullata su un DB vuoto (up e down) |
+| `security` | test dei casi di accesso negato |
+| `infra` | `wrangler deploy --dry-run` o equivalente |
+| `ci` | validazione dei workflow (per esempio `actionlint`) |
+| `e2e` | suite e2e del percorso toccato |
+| altri | nessuna voce in più |
+
+- **Report dell'implementatore.** Gli `implementer-<area>` chiudono con il report a campi fissi (spec 18.5) e con l'elenco dei must-have soddisfatti.
+
 ## 3. Profili trasversali
 
 | Profilo | Regole | Usato da | Skill esterna consigliata |
@@ -143,7 +162,7 @@ Fonti: frontend-design (Anthropic, Apache-2.0), frontend-ui-engineering (Addy Os
 
 ## 6. Cosa cambia nella spec del nucleo
 
-Applicato nella revisione 17: campi `kind` e `cross` (11.4), precedenza per specificità (6.3), file di tollgate ristretti e controllo dei workflow in `guard` (0, 9.2), verifica di `skills:` e `mcpServers` (16, e P0 esperimento E5).
+Applicato nelle revisioni 17 e 18 (campo `dod`, regole come prova dei rilievi): campi `kind` e `cross` (11.4), precedenza per specificità (6.3), file di tollgate ristretti e controllo dei workflow in `guard` (0, 9.2), verifica di `skills:` e `mcpServers` (16, e P0 esperimento E5).
 
 ---
 
