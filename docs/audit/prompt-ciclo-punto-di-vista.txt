@@ -1,4 +1,4 @@
-Rispondi in italiano. Sei un auditor a contesto pulito. Leggi SOLO `/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 12, specifica del nucleo del plugin tollgate per Claude Code) e, per il metodo, `/home/crucco/.claude/skills/prd-audit/references/dimensioni.md`. NON leggere altri file in `docs/`.
+Rispondi in italiano. Sei un auditor a contesto pulito. Leggi SOLO `/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 13, specifica del nucleo del plugin tollgate per Claude Code) e, per il metodo, `/home/crucco/.claude/skills/prd-audit/references/dimensioni.md`. NON leggere altri file in `docs/`.
 
 Esegui UN ciclo di audit dal punto di vista indicato sotto, applicando a tutto il documento le lenti L1-L10 di dimensioni.md (L1 verso le decisioni dichiarate nella sezione 2; L8: verifica alla fonte i fatti su cui basi un rilievo grave o bloccante — code.claude.com/docs, docs.github.com, oppure Superpowers in ~/.claude/plugins/cache/claude-plugins-official/superpowers/6.4.1/).
 

@@ -513,4 +513,8 @@ Nessun bloccante. Quasi tutti i gravi nascono dal testo della revisione 12. Temi
 
 **Decisione dell'utente (domanda «dovremmo fare skill nostre?»):** ibrido. Superpowers per brainstorming, writing-plans, TDD e debugging; `tollgate:execute` con agenti propri al posto di subagent-driven-development. Elimina la radice di I7 e dei meccanismi fragili sul prompt (esenzione degli script, blocco della revisione finale di SDD, task ricavato dal prompt).
 
-**Revisione 13:** in scrittura.
+**Revisione 13** (commit 6405a68): `tollgate:execute` e 62 correzioni puntuali. Contenuto nella sezione 20 della spec.
+
+### Cicli 51-54 (revisione 13, giro ridotto): in corso
+
+51 Chi esegue, 52 Chi attacca, 53 Lo scettico, 54 Chi integra. Se non trovano gravi, si passa a writing-plans.
