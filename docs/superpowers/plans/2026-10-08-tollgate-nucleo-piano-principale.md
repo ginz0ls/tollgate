@@ -22,10 +22,10 @@ Stato: P0 scritto (`2026-10-08-tollgate-p0-verifiche.md`), P1-P5 da scrivere.
 
 | Piano | Obiettivo | Richiede | Consegna | Finito quando |
 |---|---|---|---|---|
-| **P0 Verifiche** | Provare i 13 fatti di piattaforma ancora aperti | Spec rev 18 | Rapporto `docs/verifiche/2026-10-08-p0-esiti.md`; spec rev 19 | Ogni voce di 16 ha esito `sì`, `no` o `non determinato`, e le conseguenze approvate sono nella spec |
+| **P0 Verifiche** | Provare i 14 fatti di piattaforma ancora aperti (13 della sezione 16, più `skills:` negli agenti di plugin) | Spec rev 18 | Rapporto `docs/verifiche/2026-10-08-p0-esiti.md`; spec rev 19 | Ogni voce di 16 ha esito `sì`, `no` o `non determinato`, e le conseguenze approvate sono nella spec |
 | **P1 Fondamenta** | La libreria su cui poggia tutto: configurazione, DB, eventi, fasi, task, atti | P0 chiuso | `bin/tollgate` con i sottocomandi di base; pacchetto `tollgate_core` | Test unitari verdi; criteri 25 e la parte DB del 17 |
 | **P2 Guardrail** | Gli hook locali e le analisi pure che userà anche il gate | P1 | Wrapper `hooks/run`, adattatore, registro dei controlli, `verify`, `waiver`, `block`; pacchetto `tollgate_analysis`; `plugin.json`, `hooks.json` | Ogni riga di 7.2 e 7.4 testata con input JSON reale di Claude Code; criteri della colonna P2 |
-| **P3 Flusso** | Il ciclo completo in locale: dall'issue alla PR | P2 | Skill, agenti, `start`, `execute` e `task`, `finish`, `open-pr`, `sync`, `adopt`, `cleanup`, `abandon`, `reopen`, audit della spec | Test di integrazione su repo git temporaneo con `TOLLGATE_GH` finto; criteri della colonna P3 |
+| **P3 Flusso** | Il ciclo completo in locale: dall'issue alla PR, con l'instradamento ai profili verticali, la Definition of Done e i budget dei task | P2 | Skill, agenti, `start`, `execute` e `task`, `finish`, `open-pr`, `sync`, `adopt`, `cleanup`, `abandon`, `reopen`, audit della spec | Test di integrazione su repo git temporaneo con `TOLLGATE_GH` finto; criteri della colonna P3 |
 | **P4 Gate** | Il controllo autorevole su GitHub | P2 (analisi), P3 (blocco JSON della PR) | `gate run/evaluate/guard/base-ids`, i cinque workflow, `init` con la misura della modalità | I casi del criterio 10 sui due repo di prova (`protected` e `detect`); criteri della colonna P4 |
 | **P5 Eval e CI** | La prova che tollgate migliora il risultato, e la CI del plugin | P3, P4 | I 9 casi di `claude plugin eval`, la Action di CI del repo di tollgate, documentazione d'uso | Eval con 3 esecuzioni per caso; CI verde |
 
@@ -81,7 +81,7 @@ Regola: `tollgate_analysis` non importa mai `tollgate_core`. Così il gate su Gi
 | 5 Livelli | P2 (calcolo), P3 (tetto con `approve level`, fette con `--spec`), P4 (minimo nel gate) | |
 | 6.1 Avvio | P3 | |
 | 6.2 Spec e piano, audit della spec | P3 | Skill `spec-audit`, agenti avversari e auditor, file di approvazione, `reopen` |
-| 6.3 Esecuzione | P1 (`tasks`), P3 (`execute`, `task`, agenti) | |
+| 6.3 Esecuzione | P1 (`tasks`), P2 (controllo delle skill usate, `PostToolUse Skill`), P3 (`execute`, `task`, agenti, instradamento ai profili, dimensione e budget del task, report a campi fissi) | |
 | 6.4 Chiusura | P3 | `finish check` usa `gate run` di P4: in P3 si usa una versione locale minima, sostituita in P4 |
 | 6.5 Dopo la PR | P3 | |
 | 6.6 Dove valgono le regole | P2 | |
@@ -95,7 +95,8 @@ Regola: `tollgate_analysis` non importa mai `tollgate_core`. Così il gate su Gi
 | 8.3 Deroghe e blocchi | P2 | |
 | 8.4 Atti | P1 (modello), P2 (registrazione via hook), P3 (skill e consumo) | Dipende dall'esito di P0 (E4, I2) |
 | 8.5 Effetti esterni | P2 | |
-| 8.6 Revisori | P3 | |
+| 8.6 Revisori | P3 | Standard del revisore e disaccordo istruito (rev 18) |
+| 8.7 Definition of Done | P1 (calcolo dai dati), P3 (`finish check`), P4 (voci ricalcolate nel gate) | |
 | 9.1-9.6 Gate su GitHub | P4 | |
 | 10 Revisione finale | P3 | |
 | 11.1 Dipendenze | P2 | Intervallo secondo l'esito di P0 (tag) |
@@ -137,10 +138,13 @@ Regola: `tollgate_analysis` non importa mai `tollgate_core`. Così il gate su Gi
 | 17 Adozione e ripristino | P1 (`db restore`), P3 (`adopt`) | | 36 Piano registrato nel gate | P4 |
 | 18 Componenti | P2 | | 37 Flusso dopo l'approvazione | P2 (hook), P3 |
 | 19 Budget | P2 | | 38 Profili verticali | P2 (hook), P3 (`task start`, revisione) |
+| | | | 39 Task piccoli e budget | P2 (`SubagentStop`), P3 |
+| | | | 40 Revisione | P3 |
+| | | | 41 Definition of Done | P3, P4 |
 
 Casi di eval (spec 14, 1-9): P5.
 
-**Controllo.** Ogni sezione da 0 a 18 e ogni criterio da 1 a 38 ha almeno un piano. Un criterio assegnato a più piani è chiuso solo quando l'ultimo di quei piani lo fa passare.
+**Controllo.** Ogni sezione da 0 a 18 e ogni criterio da 1 a 41 ha almeno un piano. Un criterio assegnato a più piani è chiuso solo quando l'ultimo di quei piani lo fa passare.
 
 ---
 
@@ -157,6 +161,10 @@ Casi di eval (spec 14, 1-9): P5.
 ---
 
 ## 6. Già decise per i sotto-progetti successivi
+
+**Profili verticali (sotto-progetto B).** Il catalogo è in `docs/superpowers/specs/2026-10-08-tollgate-profili-verticali.md`: 13 profili verticali e 2 trasversali, con le regole `tollgate:rules-<area>` distillate da fonti citate e **riviste dall'utente** prima di entrare nel plugin, e gli agenti `implementer-<area>`, `reviewer-<area>`, `final-<area>`. Il nucleo (P2, P3) consegna il contratto e l'instradamento; B scrive regole e agenti. Le bozze delle regole si possono preparare in parallelo a P1-P4, perché non toccano il codice del nucleo.
+
+**Pratiche delle software house rimandate:**
 
 Non sono nel nucleo perché richiedono la kanban (C) o dati accumulati nel tempo (D), ma sono **decise**, non scartate (`docs/RICERCA-ORGANIZZAZIONE.md`):
 
