@@ -1,0 +1,16 @@
+name: probe-verdict-noactions
+on:
+  workflow_run:
+    workflows: [probe-run]
+    types: [completed]
+permissions: { contents: read, statuses: write }
+jobs:
+  verdict:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: probe-result
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - run: cat result.txt

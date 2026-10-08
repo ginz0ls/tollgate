@@ -1,0 +1,10 @@
+name: probe-run
+on: pull_request
+permissions: { contents: read }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "head=${{ github.event.pull_request.head.sha }}" > result.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: probe-result, path: result.txt }
