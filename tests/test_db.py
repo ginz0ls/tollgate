@@ -1,9 +1,12 @@
 import os
 import sqlite3
+import subprocess
+import sys
+import textwrap
 import unittest
 from unittest import mock
 
-from tests.helpers import TempState
+from tests.helpers import BIN, TempState
 from tollgate_core import db
 
 TABLES = {"meta", "work_items", "scope", "receipts", "blocks", "subagents", "review_cycles",
@@ -33,6 +36,24 @@ class OpenTest(unittest.TestCase):
         self.assertTrue(TABLES <= names, TABLES - names)
         self.assertEqual(conn.execute(
             "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "1")
+
+    def test_concurrent_first_open(self):
+        code = textwrap.dedent(f"""
+            import sys
+            sys.path.insert(0, {str(BIN)!r})
+            from tollgate_core import db
+            from tollgate_core.paths import resolve_state
+            db.open_db(resolve_state()).close()
+        """)
+        procs = [subprocess.Popen([sys.executable, "-B", "-c", code], env=self.t.env(),
+                                  stderr=subprocess.PIPE, text=True) for _ in range(3)]
+        for p in procs:
+            _, err = p.communicate(timeout=120)
+            self.assertEqual(p.returncode, 0, err)
+        conn = db.open_db(self.t.state)
+        self.assertEqual(conn.execute(
+            "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "1")
+        conn.close()
 
     def test_fresh_db_makes_no_backup_and_reopen_is_idempotent(self):
         db.open_db(self.t.state).close()

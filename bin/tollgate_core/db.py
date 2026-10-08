@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 import shutil
 import sqlite3
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable
@@ -165,13 +166,28 @@ def _migrate(conn: sqlite3.Connection, state: State) -> None:
         current = target
 
 
+def _set_wal(conn: sqlite3.Connection) -> None:
+    """Il cambio di journal_mode non passa dal busy handler: si riprova a mano."""
+    deadline = time.monotonic() + BUSY_TIMEOUT_MS / 1000
+    while True:
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            return
+        except sqlite3.OperationalError as e:
+            code = (getattr(e, "sqlite_errorcode", None) or 0) & 0xFF
+            if code not in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED) \
+                    or time.monotonic() >= deadline:
+                raise
+            time.sleep(0.01)
+
+
 def open_db(state: State) -> sqlite3.Connection:
     ensure_dirs(state)
     conn = sqlite3.connect(state.db_path, timeout=BUSY_TIMEOUT_MS / 1000, isolation_level=None)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
-        conn.execute("PRAGMA journal_mode=WAL")
+        _set_wal(conn)
         conn.execute("PRAGMA synchronous=FULL")
         conn.execute("PRAGMA foreign_keys=ON")
         _migrate(conn, state)
