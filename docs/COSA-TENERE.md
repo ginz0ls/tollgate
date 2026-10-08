@@ -221,6 +221,16 @@ Fonte: `docs/RICERCA-PAPER.md`, sezione 3. Prevalgono sulle voci precedenti dove
 - **Il plugin `code-review` di Anthropic non si usa come gate.** Serve a commentare le PR e per scelta scarta copertura dei test e sicurezza; inoltre cambia nel tempo. Il `/code-review` integrato in Claude Code resta solo come passata extra opzionale.
 - **In L1 non ci sono revisori specializzati.** Non ci sono prove di beneficio e il costo è alto. La soglia sotto cui basta un revisore va misurata negli eval.
 
+## 10. Dove sta il controllo autorevole (deciso l'8 ottobre 2026)
+
+**Decisione: su GitHub.**
+- **Come funziona**: una GitHub Action, con il workflow letto dal ramo base, ricalcola in un ambiente pulito i comandi del gate, test-guard e scope sul diff della PR. La protezione del ramo richiede quel controllo verde e il merge lo fai tu.
+- **Il ruolo degli hook locali**: diventano **guardrail** contro scorciatoie ed errori onesti, cioè test modificati, «fatto» senza prove, file fuori scope. Fermano il problema subito, senza aspettare la PR.
+
+**Perché.** La seconda revisione avversariale ha mostrato che un agente con Bash sulla stessa macchina può alterare tutto quello che è locale: DB, variabili d'ambiente, un Claude figlio che si spaccia per te, la configurazione dei test. Sulla macchina dell'agente nessun controllo è inattaccabile.
+
+**Limite residuo, dichiarato.** Resta fuori dalla v1 il caso dell'agente che usa le tue credenziali GitHub per agire al posto tuo (merge, etichette). Lo limitano gli hook locali e la raccomandazione di dargli un token separato con permessi ridotti.
+
 ## Verifica sulla documentazione ufficiale (8 ottobre 2026)
 
 Fonti: [hooks](https://code.claude.com/docs/en/hooks.md), [sub-agents](https://code.claude.com/docs/en/sub-agents.md), [statusline](https://code.claude.com/docs/en/statusline.md), [plugin components](https://code.claude.com/docs/en/plugins/components.md), [dependencies](https://code.claude.com/docs/en/plugins/dependencies.md), [plugin evals](https://code.claude.com/docs/en/plugin-evals.md). Ho controllato anche il codice di Superpowers 6.4.1 installato.
