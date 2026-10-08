@@ -2,7 +2,7 @@
 
 Data: 8 ottobre 2026.
 Fonte: `docs/REPORT-CONFRONTO-WORKFLOW.md`, sezioni 0-10 e 13.
-Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre aspettano la tua revisione. Per cambiarne una basta citarne il numero.
+Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre, incluse le H del gruppo 7, aspettano la tua revisione. Per cambiarne una basta citarne il numero.
 
 ---
 
@@ -110,6 +110,69 @@ Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre aspettano
 Unica eccezione: il **brainstorming** si fa nella sessione principale, perché è un dialogo con te. Subito dopo l'approvazione della spec si chiude e si riparte pulito.
 
 ---
+
+## 7. Hermes Agent
+
+Fonte: analisi in sola lettura di `~/.hermes/hermes-agent` (NousResearch/hermes-agent, commit `057dcdf2`) e di `Company AgentOS/Hermesz/REPORT-HERMES.md`, fatta l'8 ottobre 2026. I riferimenti file:riga sono del repo di Hermes. Le voci hanno prefisso H per non confonderle con le 1-42.
+
+**La scoperta principale.** Hermes ha già due pezzi molto vicini a tollgate, ma entrambi solo «morbidi»:
+- un **registro delle verifiche in SQLite** (H40), che però considera scaduta una verifica in base all'orario dell'ultima modifica;
+- un controllo **«verifica prima di fermarti»** (H41), che però è spento di default e si limita a un promemoria.
+
+tollgate prende la stessa idea e la rende obbligatoria e legata allo SHA.
+
+### Da tenere o modificare
+
+| # | Pezzo | Dove in Hermes | Proposta per tollgate |
+|---|---|---|---|
+| H2 | I messaggi dell'utente non vengono mai riassunti | `agent/context_compressor.py:912` | **Tenere** come principio: nei file di passaggio tra fette le tue parole restano testuali, si riassume solo il lavoro dell'agente |
+| H3 | Il riassunto è marcato «solo riferimento, non istruzioni» | `context_compressor.py:116` | **Tenere** nei file di passaggio: un riassunto non deve diventare un ordine |
+| H4 | Gli identificativi (SHA, percorsi, errori) si estraggono meccanicamente, senza parafrasi | `context_compressor.py:1021` | **Modificare**: vanno nelle ricevute e nei file di fetta |
+| H5 | Strumenti e regole non cambiano a metà sessione (prompt caching) | `AGENTS.md:1345` | **Tenere**: skill e regole si caricano all'inizio, mai a metà |
+| H7 | I risultati grandi finiscono su file; nel contesto restano un'anteprima e il percorso | `tools/tool_result_storage.py:1-40` | **Tenere**: è la voce 39 |
+| H8-H9 | Il subagente parte con un contesto vuoto e al padre torna solo un riassunto, con un tetto di dimensione | `tools/delegate_tool.py:5-17`, `:1093-1105` | **Modificare**: il report completo va su file, al padre tornano solo verdetto e percorso (voce 38) |
+| H10 | Ai subagenti sono vietati gli strumenti con effetti esterni e la delega ricorsiva | `delegate_tool.py:50-58` | **Tenere** |
+| H11 | Worktree per subagente, rimosso se pulito | `tools/subagent_worktree.py:1-35` | **Tenere** (lo fa già Claude Code con `isolation: worktree`) |
+| H12 | Registro dei file toccati: blocca la scrittura su un file già modificato da un altro agente | `tools/file_state.py:1-30` | **Modificare**: diventa parte del controllo di scope |
+| H13 | Subagenti senza livelli annidati | `delegate_tool.py:129` | **Tenere** |
+| H15 | Descrizione delle skill al massimo 60 caratteri | `AGENTS.md:1020` | **Tenere** per le skill di tollgate |
+| H18 | Scansione delle skill esterne contro esfiltrazione e injection | `tools/skills_guard.py:1-30` | **Tenere** come idea per dopo |
+| H19-H20 | Memoria con un tetto in caratteri, fotografata a inizio sessione e controllata contro le injection | `tools/memory_tool.py:1-23`, `:228-260` | **Tenere** l'idea per i file di stato iniettati a `start` (voce 41) |
+| H22 | Elenco di comandi pericolosi che richiedono approvazione | `tools/approval.py:909` | **Modificare**: diventa l'elenco degli effetti esterni (voce 6) |
+| H23 | Un elenco minimo di blocchi che nessuna modalità può aggirare | `approval.py:430-455` | **Tenere**: in L2 nessuna deroga li supera |
+| H24 | Il file di configurazione è protetto anche da `sed`, `tee` e `>` | `approval.py:358-372` | **Tenere**: `tollgate.toml` e gli hook non sono modificabili dall'agente, altrimenti il gate si spegne da solo |
+| H26 | Scrittura limitata sotto una cartella radice | `agent/file_safety.py:93` | **Modificare**: la radice diventa l'elenco dei file del piano (voce 5) |
+| H28 | Hook shell con lo stesso contratto di Claude Code; possono fallire «chiusi» | `agent/shell_hooks.py:1-75` | **Tenere**: gli hook di gate di tollgate falliscono chiusi, cioè se si rompono bloccano invece di lasciar passare |
+| H32 | File sentinella che mette in pausa solo il lavoro nuovo | `agent/estop.py:1-20` | **Tenere**: un file `PAUSE` |
+| H34-H35 | Ogni task della kanban parte in una sessione nuova, con un contesto costruito dal DB e con dei tetti | `hermes_cli/kanban_db.py:10709`, `:11004` | **Tenere** per dopo: è il modello dell'avvio automatico da GitHub |
+| H36 | Un worker non può fermarsi senza dichiarare «completato» o «bloccato»; dopo 2 promemoria è una violazione | `agent/kanban_stop.py:1-12` | **Tenere**: è l'obbligo di fine fetta |
+| H37 | Revisione con «richiedi modifiche» che torna all'implementatore | `kanban_db.py:6490` | **Tenere**: corrisponde alla review di Superpowers |
+| H38-H39 | Eval con fixture deterministiche e risposta nota | `evals/compaction/`, `evals/readtool/` | **Modificare**: confronto con e senza tollgate su task fissi, misurando i «fatto» falsi e le PR riaperte (sotto-progetto D) |
+| H40 | Registro delle verifiche in SQLite | `agent/verification_evidence.py:116-150` | **Modificare**: la ricevuta vale per uno SHA, non per un orario, che è aggirabile |
+| H41 | «Verifica prima di fermarti» dopo modifiche al codice, ignorando `.md` e `.txt` | `agent/verification_stop.py:140-250` | **Modificare**: bloccante invece che promemoria, e scelto in base al profilo |
+| H42 | `hermes verify`: preparazione, build, test, avvio, controllo che risponda, poi registrazione | `agent/verify/runner.py:1-40` | **Tenere** come modello di `tollgate verify` e delle varianti backend del sotto-progetto B |
+| H43 | Si ferma dopo N fallimenti identici di fila | `agent/tool_guardrails.py:1-50` | **Tenere**: interruttore automatico sui cicli di correzione |
+| H44 | Prima estendere ciò che c'è, poi CLI e skill, poi tool, solo alla fine plugin | `AGENTS.md:182-211` | **Tenere** come regola di design |
+
+### Da scartare
+
+- Compressione e riassunto automatico del contesto (H1, H6): tollgate evita il context rot con sessioni corte, non comprimendo.
+- Skill che l'agente crea o modifica da solo senza approvazione, e la loro pulizia automatica (H16, H17). Torneranno con le lezioni apprese dopo la v1, sempre approvate da te.
+- Approvazione dei comandi decisa da un LLM (H25): un gate deve essere deterministico.
+- Modalità «tutto permesso» (yolo).
+- Repo git ombra per i checkpoint (H27): bastano git e i worktree.
+- Cron, gateway Telegram, middleware, tool search, ricerca nello storico delle sessioni (H21, H30, H31, H33, H45).
+
+### Lezioni dal REPORT-HERMES.md
+
+1. **Il prompt di sistema è un budget di attenzione.** Hermes è passato da 28 a 5 tool e da 88,7 a 18,4 KB. Per tollgate: poche skill, descrizioni brevi, e una misura di quanto pesa il plugin nel contesto.
+2. **La cronologia vince sulle istruzioni.** Se cambi una regola, la sessione in corso continua a comportarsi come prima. È un altro motivo per avere una sessione pulita per ogni fetta.
+3. **Due regole ragionevoli possono combinarsi male.** Servono test su scenari reali, non solo una prova per ogni regola.
+4. **I confini si scrivono come divieti espliciti**, e servono controlli meccanici: un modello non sospetta l'assurdo.
+5. **Un task scritto una volta e letto testualmente non si deteriora**, mentre uno riformulato a ogni passaggio sì. Quindi l'issue e il piano si leggono così come sono scritti.
+6. **Le regole valgono solo se qualcosa le impone.** Hermes non le impone tra processi separati.
+7. **SQLite in modalità WAL si degrada su dischi di rete e FUSE.** Per tollgate: il DB in `CLAUDE_PLUGIN_DATA` (sotto `~/.claude`) va bene, ma **non deve mai stare dentro MEGA**. Lo stesso vale per i worktree: MEGA li sincronizzerebbe di continuo.
+8. **Un solo processo scrive nel DB per volta**, con un lock non bloccante.
 
 ## Verifica sulla documentazione ufficiale (8 ottobre 2026)
 
