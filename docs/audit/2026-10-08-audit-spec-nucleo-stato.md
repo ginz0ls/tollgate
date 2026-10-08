@@ -23,7 +23,7 @@ Un rilievo rilevante o superiore azzera il contatore.
 
 ## Inventario (sezioni × esito)
 
-La specifica è alla **revisione 5** (sezioni 0-18), riscritta intorno al gate su GitHub. **Tutti i contatori ripartono da zero**: ogni sezione va riauditata da ogni punto di vista.
+La specifica è alla **revisione 6** (sezioni 0-18). Le sezioni 6.3, 8 e 9 sono state riscritte: vanno riauditate da tutti i punti di vista.
 
 | Sezione | Lenti applicate | Esito |
 |---|---|---|
@@ -211,6 +211,42 @@ Cicli 16 (chi integra) e 17 (lo scettico): **vuoti**.
   - `reviewer_reads_check` complesso: si può spegnere, scartato;
   - tabella `acts` contro `approvals`: sostituita, scartato;
   - `slices` necessaria a `start`, scartato.
+
+
+## Ciclo 19: terza revisione avversariale (sulla revisione 5)
+
+Il report è in `2026-10-08-revisione-avversariale-3-spec-nucleo.md` (X-1 … X-27: 4 bloccanti, 8 gravi, 13 rilevanti, 2 minori). Tutti i rilievi, insieme a C-01 … C-10, sono corretti nella **revisione 6**.
+
+- **X-1**: controllo omonimo creato da un workflow nuovo. Corretto con `guard` su tutti i workflow e la sorgente dei controlli fissata su GitHub Actions.
+- **X-2 e X-3**: deroghe e scope scritti dall'agente. Il gate li tratta come dichiarati e li verifica solo per coerenza; il controllo `attenzione` diventa rosso; il limite è dichiarato in 1.2.
+- **X-4**: codice della PR nello stesso job della valutazione. Il gate è ora diviso in tre workflow: `run` senza permessi, `verdict` fidato che legge gli artefatti come dati, identificativi della base calcolati da codice e dipendenze della base. Il limite residuo (report JUnit falsificato dal codice della PR) è dichiarato.
+- **X-5 … X-11**:
+  - 1.1 corretta;
+  - commento pubblicato dal job fidato;
+  - PR da rami che non sono `tg/*`;
+  - percorso `tollgate-config/*`;
+  - esenzioni dallo scope al commit e nel gate;
+  - transizione `pr_aperta → esecuzione` con `open-pr --update`;
+  - gate completo quando non ci sono test collegati, più `allow_no_tests`.
+- **X-12 … X-27**:
+  - cache dal ramo predefinito (`tollgate-base`);
+  - `guard` senza checkout della PR;
+  - confronto per contenuto con la punta attuale;
+  - protezione del ramo completa;
+  - `gh api` con scrittura negato ovunque nei repo attivi;
+  - L2 controllato tramite gli artefatti committati;
+  - marcatori per linguaggio;
+  - giri contati dai commit;
+  - `resolve` che concede un giro;
+  - `WorktreeCreate`;
+  - criteri 19-23;
+  - `/tollgate:finish` legato allo SHA;
+  - riapertura nel worktree come strada predefinita;
+  - numerazione.
+
+**Verificato in questo ciclo**: `workflow_run` usa la definizione del ramo predefinito, ha token con permessi di scrittura e può scaricare gli artefatti dell'esecuzione che l'ha avviato (docs.github.com, events-that-trigger-workflows).
+
+**Matrice.** La revisione 6 cambia di nuovo le sezioni 6.3, 8 e 9: i punti di vista che avevano già un ciclo vuoto (chi usa, chi integra, lo scettico) lo avevano sulla revisione 5, e per le sezioni riscritte va ripetuto.
 
 ## Fatti verificati
 
