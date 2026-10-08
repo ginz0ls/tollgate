@@ -48,14 +48,14 @@ La specifica è alla **revisione 5** (sezioni 0-18), riscritta intorno al gate s
 
 | Punto di vista | Cicli precedenti | Ultimo esito | Contatore vuoti sulla rev. 5 |
 |---|---|---|---|
-| Chi esegue | 1, 10 | rilievi | 0 |
+| Chi esegue | 1, 10, 12 | 12: 1 bloccante, 2 gravi → **da ripetere** | 0 |
 | Chi attacca | 2, 4, 10, 11 | rilievi (seconda avversariale: 10 bloccanti) | 0 |
-| Chi usa | 3 | rilievi | 0 |
-| Chi paga | 5 | rilievi | 0 |
-| Chi arriva dopo | 6 | rilievi | 0 |
-| Lo scettico | 7 | 1 minore | 0 |
-| Il caso limite | 8 | rilievi | 0 |
-| Chi integra | 9 | rilievi | 0 |
+| Chi usa | 3, 13 | 13: vuoto (controlli: numero di atti, `finish` digitato o invocato dal modello, sessioni senza tollgate nello stesso repo) | 1 |
+| Chi paga | 5, 15 | 15: 1 minore | 1 |
+| Chi arriva dopo | 6, 18 | 18: 1 minore | 1 |
+| Lo scettico | 7, 17 | 17: vuoto | 1 |
+| Il caso limite | 8, 14 | 14: 1 grave → **da ripetere** | 0 |
+| Chi integra | 9, 16 | 16: vuoto | 1 |
 
 ## Rilievi (cicli 1-3, corretti nella revisione 2 della specifica)
 
@@ -183,6 +183,34 @@ Il report è in `2026-10-08-revisione-avversariale-2-spec-nucleo.md` (W-1 … W-
 **Verificato in questo ciclo**:
 - `pull_request_target` gira nel contesto del ramo predefinito (docs.github.com);
 - in `dontAsk` le richieste di conferma vengono negate (code.claude.com/docs/en/permission-modes).
+
+
+## Rilievi dei cicli 12-18 (sulla revisione 5, da correggere nella revisione 6)
+
+| ID | Ciclo | Gravità | Stato | Sezione | Rilievo | Correzione prevista |
+|---|---|---|---|---|---|---|
+| C-01 | 12 chi esegue | Grave | [RAGIONATO] | 8.3, 9.2 | Le deroghe stanno nel ramo, ma lo stato «in attesa» o «approvata» vive negli atti locali: il gate non può distinguerle. 9.2 dice «bloccante per le modifiche senza deroga», quindi qualunque deroga scritta nel file sblocca il gate | Il gate tratta **ogni** deroga come dichiarata: non blocca, la elenca nella sezione «attenzione» con lo stato dichiarato. Bloccano solo le violazioni senza nessuna deroga |
+| C-02 | 12 chi esegue | Rilevante | [RAGIONATO] | 7.2, 7.4, 8.3 | `.tollgate/waivers.toml` non è tra i file sempre permessi né tra quelli protetti: lo scope lo bloccherebbe, oppure l'agente lo modifica a mano saltando la CLI | È sempre ammesso nello scope, scrivibile solo da `tollgate waiver add` (negato a Edit e Write) |
+| C-03 | 12 chi esegue | **Bloccante** | [RAGIONATO] | 9.2, 9.4 | Gli identificativi dei test della base, se messi in cache, si possono avvelenare da una PR (la cache creata da una PR si legge nelle sue esecuzioni successive). Se invece si calcolano nello stesso job **dopo** aver eseguito il codice della PR, quel codice li può alterare | Niente cache. Nel job del gate: (1) checkout della base, esecuzione e calcolo degli identificativi **prima** di qualunque codice della PR, con l'impronta salvata nell'output del passo; (2) checkout della testa ed esecuzione; (3) valutazione con il CLI ripreso dalla base in una cartella nuova, che confronta l'impronta. Il risultato dei test della testa resta prodotto da codice non fidato: limite dichiarato in 1.2 («codice che, eseguito dai test, ne falsifica l'esito»), visibile nel diff |
+| C-04 | 12 chi esegue | Rilevante | [RAGIONATO] | 9.2 | «Scope: bloccante, salvo L0» non dice cosa succede se non ci sono piani e il diff supera le soglie di L0 | Senza piano e oltre le soglie di L0 → bloccante |
+| C-05 | 12 chi esegue | **Grave** | [RAGIONATO] | 9.2, 9.3 | Con i controlli obbligatori su tutte le PR, una PR fatta a mano da un ramo che non è `tg/*` non ha piani: scope e livello la bloccano. L'utente non potrebbe più fare PR normali | Per i rami che non sono `tg/*` il gate esegue solo i comandi del gate e i controlli di `guard`, come una CI normale |
+| C-06 | 12 chi esegue | Rilevante | [RAGIONATO] | 6.3 | La copia locale del gate richiede l'esecuzione dei test della base: lenta | In locale `base_test_ids` è spento per impostazione predefinita; lo fa il gate |
+| C-07 | 14 caso limite | **Grave** | [RAGIONATO] | 9.2, 11.2 | Ogni PR che cambia `tollgate.toml`, i workflow o la copia del CLI fa fallire `guard`: dopo l'installazione l'utente non può più aggiornare la configurazione né la versione del CLI, perché la protezione del ramo vieta il push diretto | Un percorso dedicato: rami `tollgate-config/*` con PR che contengono **solo** file di tollgate. `guard` li accetta e il riepilogo lo dice in evidenza; il merge resta tuo |
+| C-08 | 14 caso limite | Rilevante | [RAGIONATO] | 9, 13 | Progetti i cui test richiedono servizi (DB locale, Supabase): senza servizi configurati nel workflow il gate è sempre rosso e nessuna PR si può unire | `/tollgate:init` chiede quali servizi servono e li mette nella proposta del workflow. Se il gate non può girare in CI, `start` lo segnala; la scelta di togliere l'obbligo resta tua |
+| C-09 | 15 chi paga | Minore | [RAGIONATO] | 9.4 | Senza cache, ogni PR prepara l'ambiente ed esegue la suite due volte | Dichiarato; `base_test_ids` si può spegnere |
+| C-10 | 18 chi arriva dopo | Minore | [RAGIONATO] | 8.4 | Il titolo «Il livello degli atti nel gate» non dice cosa contiene | «Gli atti nel gate» |
+
+Cicli 16 (chi integra) e 17 (lo scettico): **vuoti**.
+- **Chi integra, controlli fatti:**
+  - C legge il JSON nella PR e il *job summary*;
+  - D ha il repo di prova del gate e `TOLLGATE_STATE`;
+  - B ha `[profiles.*].gate` eseguito dal gate.
+  - Scartati: «il gate non conosce i profili» (falso, 9.2 usa i `gate` dei profili attivi); «la dashboard non ha dati» (ha `events`); «Codex senza contratto» (passa da `specialist-runner` e dal verificatore).
+- **Lo scettico, controlli fatti:**
+  - `finish check` locale duplicato: serve come riscontro rapido, scartato;
+  - `reviewer_reads_check` complesso: si può spegnere, scartato;
+  - tabella `acts` contro `approvals`: sostituita, scartato;
+  - `slices` necessaria a `start`, scartato.
 
 ## Fatti verificati
 
