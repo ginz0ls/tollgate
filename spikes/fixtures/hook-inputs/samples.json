@@ -431,5 +431,323 @@
     },
     "tool_use_id": "toolu_01LneCiaagpbSitqHoqJYAia",
     "duration_ms": 591
+  },
+  "PreToolUse-Agent-named": {
+    "session_id": "213a893e-004e-4be3-ada8-cfba43a0c654",
+    "transcript_path": "/home/USER/.claude/projects/-tmp/213a893e-004e-4be3-ada8-cfba43a0c654.jsonl",
+    "cwd": "/tmp",
+    "prompt_id": "fc2871ae-e233-430a-bf5a-ccfc2d051d89",
+    "permission_mode": "default",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Agent",
+    "tool_input": {
+      "description": "Risponde uno",
+      "prompt": "Rispondi solo 'uno'.",
+      "subagent_type": "general-purpose",
+      "run_in_background": true,
+      "name": "contatore"
+    },
+    "tool_use_id": "toolu_01QafzHrubSuHyFoNiFj3nKx"
+  },
+  "PostToolUse-Agent-background": {
+    "session_id": "213a893e-004e-4be3-ada8-cfba43a0c654",
+    "transcript_path": "/home/USER/.claude/projects/-tmp/213a893e-004e-4be3-ada8-cfba43a0c654.jsonl",
+    "cwd": "/tmp",
+    "prompt_id": "fc2871ae-e233-430a-bf5a-ccfc2d051d89",
+    "permission_mode": "default",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Agent",
+    "tool_input": {
+      "description": "Risponde uno",
+      "prompt": "Rispondi solo 'uno'.",
+      "subagent_type": "general-purpose",
+      "run_in_background": true,
+      "name": "contatore"
+    },
+    "tool_response": {
+      "isAsync": true,
+      "status": "async_launched",
+      "agentId": "ab08540583ba148ce",
+      "description": "Risponde uno",
+      "resolvedModel": "claude-opus-5-5",
+      "prompt": "Rispondi solo 'uno'.",
+      "outputFile": "/tmp/claude-1000/-tmp/213a893e-004e-4be3-ada8-cfba43a0c654/tasks/ab08540583ba148ce.output",
+      "canReadOutputFile": true,
+      "canContinueAgent": true
+    },
+    "tool_use_id": "toolu_01QafzHrubSuHyFoNiFj3nKx",
+    "duration_ms": 35
+  },
+  "PostToolUse-Agent-auto-handback": {
+    "session_id": "e7df962b-7042-4b49-b62a-32bc71bfef7a",
+    "transcript_path": "/home/USER/.claude/projects/-tmp/e7df962b-7042-4b49-b62a-32bc71bfef7a.jsonl",
+    "cwd": "/tmp",
+    "prompt_id": "d4613d45-7d84-41d7-8119-3f3a02e7188a",
+    "permission_mode": "auto",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Agent",
+    "tool_input": {
+      "description": "Risposta 'uno'",
+      "prompt": "Rispondi solo 'uno'.",
+      "subagent_type": "general-purpose",
+      "run_in_background": false
+    },
+    "tool_response": {
+      "status": "completed",
+      "prompt": "Rispondi solo 'uno'.",
+      "agentId": "aaf79e12a030de3c4",
+      "agentType": "general-purpose",
+      "handback": "send",
+      "handbackReport": {
+        "text": "uno"
+      },
+      "harnessNoteCount": 1,
+      "harnessTailCount": 0,
+      "harnessSectionHash": "01e5baf0406fc5b8",
+      "content": [
+        {
+          "type": "text",
+          "text": "This agent's report was delivered to you as a message from \"aaf79e12a030de3c4\" (its SubagentHandback call). Read it there; it is not repeated here.\n"
+        }
+      ],
+      "resolvedModel": "claude-opus-5-5",
+      "totalDurationMs": 2481,
+      "totalTokens": 33252,
+      "totalToolUseCount": 1,
+      "usage": {
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 33198,
+        "cache_read_input_tokens": 0,
+        "output_tokens": 52,
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 33198
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 52,
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 33198,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 33198,
+              "ephemeral_1h_input_tokens": 0
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "toolStats": {
+        "readCount": 0,
+        "searchCount": 0,
+        "bashCount": 0,
+        "editFileCount": 0,
+        "linesAdded": 0,
+        "linesRemoved": 0,
+        "otherToolCount": 1
+      },
+      "canContinueAgent": true
+    },
+    "tool_use_id": "toolu_01QdFs7qwVqZMguibcMpht8W",
+    "duration_ms": 2488
+  },
+  "PostToolUse-Agent-foreground-manual": {
+    "session_id": "61630af8-e242-4730-a2d3-f34fed5a45e9",
+    "transcript_path": "/home/USER/.claude/projects/-tmp/61630af8-e242-4730-a2d3-f34fed5a45e9.jsonl",
+    "cwd": "/tmp",
+    "prompt_id": "2644391d-b65d-4801-9063-30571640cde6",
+    "permission_mode": "default",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Agent",
+    "tool_input": {
+      "description": "Rispondi solo uno",
+      "prompt": "Rispondi solo 'uno'.",
+      "subagent_type": "general-purpose",
+      "run_in_background": false
+    },
+    "tool_response": {
+      "status": "completed",
+      "prompt": "Rispondi solo 'uno'.",
+      "agentId": "a12389c6955030e19",
+      "agentType": "general-purpose",
+      "harnessNoteCount": 0,
+      "harnessTailCount": 0,
+      "harnessSectionHash": "d1fbfe46fc5c248a",
+      "content": [
+        {
+          "type": "text",
+          "text": "uno"
+        }
+      ],
+      "resolvedModel": "claude-opus-5-5",
+      "totalDurationMs": 1643,
+      "totalTokens": 32923,
+      "totalToolUseCount": 0,
+      "usage": {
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 32917,
+        "cache_read_input_tokens": 0,
+        "output_tokens": 4,
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 32917
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 4,
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 32917,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 32917,
+              "ephemeral_1h_input_tokens": 0
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "canContinueAgent": true
+    },
+    "tool_use_id": "toolu_015UZSzksUHdRMnNiEYdkqye",
+    "duration_ms": 1645
+  },
+  "SubagentStop-manual-normal": {
+    "session_id": "61630af8-e242-4730-a2d3-f34fed5a45e9",
+    "transcript_path": "/home/USER/.claude/projects/-tmp/61630af8-e242-4730-a2d3-f34fed5a45e9.jsonl",
+    "cwd": "/tmp",
+    "prompt_id": "2644391d-b65d-4801-9063-30571640cde6",
+    "permission_mode": "default",
+    "agent_id": "a12389c6955030e19",
+    "agent_type": "general-purpose",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "SubagentStop",
+    "stop_hook_active": false,
+    "agent_transcript_path": "/home/USER/.claude/projects/-tmp/61630af8-e242-4730-a2d3-f34fed5a45e9/subagents/agent-a12389c6955030e19.jsonl",
+    "last_assistant_message": "uno",
+    "background_tasks": [],
+    "session_crons": []
+  },
+  "PostToolUse-Agent-maxturns-cut": {
+    "session_id": "1ddbf511-74af-416e-9027-03c2fae29b1d",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p0-turns/1ddbf511-74af-416e-9027-03c2fae29b1d.jsonl",
+    "cwd": "/tmp/tollgate-p0/turns",
+    "prompt_id": "c483c166-74f1-4cd7-bff3-5cebdbc0ea8b",
+    "permission_mode": "default",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Agent",
+    "tool_input": {
+      "description": "Esegui sonda probe-turns",
+      "prompt": "Esegui il compito descritto nelle tue istruzioni di sistema e restituisci la tua risposta finale.",
+      "subagent_type": "hookprobe:probe-turns",
+      "run_in_background": false
+    },
+    "tool_response": {
+      "status": "completed",
+      "prompt": "Esegui il compito descritto nelle tue istruzioni di sistema e restituisci la tua risposta finale.",
+      "agentId": "a6d9aa6ed9c2f0269",
+      "agentType": "hookprobe:probe-turns",
+      "harnessNoteCount": 1,
+      "harnessTailCount": 0,
+      "harnessSectionHash": "d5d7903db29fd097",
+      "content": [
+        {
+          "type": "text",
+          "text": "NOTE: this agent stopped at its 2-turn limit before finishing. The text below is PARTIAL output; treat it as incomplete. Send the agent a message (SendMessage) to let it continue from where it stopped.\n"
+        },
+        {
+          "type": "text",
+          "text": "letto 1"
+        }
+      ],
+      "resolvedModel": "claude-haiku-5-5",
+      "totalDurationMs": 4691,
+      "totalTokens": 15247,
+      "totalToolUseCount": 2,
+      "usage": {
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 853,
+        "cache_read_input_tokens": 14320,
+        "output_tokens": 72,
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 853
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 72,
+            "cache_read_input_tokens": 14320,
+            "cache_creation_input_tokens": 853,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 853,
+              "ephemeral_1h_input_tokens": 0
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "toolStats": {
+        "readCount": 2,
+        "searchCount": 0,
+        "bashCount": 0,
+        "editFileCount": 0,
+        "linesAdded": 0,
+        "linesRemoved": 0,
+        "otherToolCount": 0
+      },
+      "canContinueAgent": true
+    },
+    "tool_use_id": "toolu_012DSpPAz3xVKXfezJ8Buqrp",
+    "duration_ms": 4697
   }
 }

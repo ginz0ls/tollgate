@@ -86,7 +86,7 @@ Regola: `tollgate_analysis` non importa mai `tollgate_core`. Così il gate su Gi
 | 6.5 Dopo la PR | P3 | |
 | 6.6 Dove valgono le regole | P2 | |
 | 7.1 Wrapper | P2 | |
-| 7.2 Tabella degli hook | P2 | Righe di rev 20: `PostToolUse Agent` (nome → `agent_id`, token, taglio di `maxTurns`), `PreToolUse SendMessage` per nome, `SubagentHandback` unica fonte in auto mode, subagenti interni ignorati |
+| 7.2 Tabella degli hook | P2 | Righe di rev 20: `PostToolUse Agent` (nome → `agent_id`, taglio di `maxTurns` con chiusura del subagente), token a `SubagentStop`, `PreToolUse SendMessage` per nome, `SubagentHandback` unica fonte in auto mode, subagenti interni ignorati |
 | 7.3 Sola lettura | P2 | |
 | 7.4 Regole su Bash | P2 | |
 | 7.5 `plan-check` | P2 | |
@@ -107,7 +107,7 @@ Regola: `tollgate_analysis` non importa mai `tollgate_core`. Così il gate su Gi
 | 12.4 Ripresa, adozione, pulizia | P1 (migrazioni), P3 (ripresa, `adopt`, `cleanup`) | |
 | 13 Errori e casi limite | P2, P3, P4 | Ogni riga va nel piano che possiede il meccanismo |
 | 14 Test del plugin | tutti (test), P5 (eval e CI) | |
-| 16 Da verificare | P0 (chiuso) | Voci rimaste: prefisso `v` in `dependencies` (P2); taglio di `maxTurns` in background (P3, solo se `execute` lancia in background) |
+| 16 Da verificare | P0 (chiuso) | Voci rimaste, da verificare all'inizio di P2: prefisso `v` in `dependencies`; taglio di `maxTurns` in background e durante una ripresa con `SendMessage` (riguarda i giri di correzione 1-3) |
 | 17 Cosa resta aperto | P5 | Documentazione dei limiti |
 | 18.1 Blocco JSON | P3 (scrittura), P4 (lettura) | |
 | 18.2 Deroghe | P2 | |
@@ -158,7 +158,7 @@ Casi di eval (spec 14, 1-9): P5.
 | P0 smentisce un fatto portante (E1 ripresa, E4/I2 atti) | Cambia 6.3 o 8.4 | P1 non parte finché la spec non è aggiornata (regola 2) |
 | `finish check` in P3 senza il gate completo | Doppio lavoro tra P3 e P4 | In P3 una versione minima dietro la stessa interfaccia di `gate run`, sostituita in P4 |
 | Le interfacce di P1 si rivelano scomode in P2-P4 | Riscritture | P1 espone poche funzioni con test; le modifiche passano da una nuova revisione delle sue interfacce, non da scorciatoie |
-| Testare gli hook senza Claude Code vero | Test che passano su input finti | Gli input JSON dei test di P2 vengono dai log reali della sonda di P0, salvati come fixture in `spikes/fixtures/hook-inputs/samples.json` |
+| Testare gli hook senza Claude Code vero | Test che passano su input finti | Gli input JSON dei test di P2 vengono dai log reali della sonda di P0: campioni in `spikes/fixtures/hook-inputs/samples.json`, log completi anonimizzati in `docs/verifiche/evidenze/hook/` |
 | Costo degli eval in P5 | Token e tempo | 3 esecuzioni per caso, come da spec; il costo si misura e si riporta |
 
 ---
