@@ -439,9 +439,39 @@ Le note complete dei cicli sono state riassunte qui; l'output integrale degli au
 
 **Revisione 11** (commit 30969b5): 110 correzioni puntuali, nessuna riscrittura. Contenuto nella sezione 20 della spec.
 
-### Cicli 39-46 (revisione 11): in corso
+### Cicli 39-46 (revisione 11): conclusi
 
-39 Chi esegue, 40 Chi usa, 41 Chi attacca, 42 Chi paga, 43 Chi arriva dopo, 44 Lo scettico, 45 Il caso limite, 46 Chi integra. Se si interrompono senza risultati, vanno rilanciati tutti e otto.
+Interrotti una volta dal limite di sessione e ripresi dai transcript.
+
+| Ciclo | Punto di vista | Bloccanti | Gravi | Rilevanti | Rev 10 → rev 11 (totale) |
+|---|---|---|---|---|---|
+| 39 | Chi esegue | 0 | 3 | 2 | 5 → 5 |
+| 40 | Chi usa | 0 | 1 | 1 | 4 → 2 |
+| 41 | Chi attacca | 0 | 2 | 4 | 6 → 6 |
+| 42 | Chi paga | 0 | 0 | 4 | 5 → 4 |
+| 43 | Chi arriva dopo | 0 | 1 | 3 | 6 → 4 |
+| 44 | Lo scettico | 0 | 3 | 1 | 4 → 4 |
+| 45 | Il caso limite | 0 | 1 | 4 | 6 → 5 |
+| 46 | Chi integra | 0 | 4 | 3 | 7 → 7 |
+| | **Totale** | **0** | **15** | **22** | 43 → 37 |
+
+Andamento dei totali per giro: 65 (rev 9) → 43 (rev 10) → 37 (rev 11). Nessun bloccante da due giri. Nessun punto di vista vuoto. Le correzioni della revisione 11 reggono quasi tutte; i nuovi gravi nascono soprattutto dal testo aggiunto (permessi dei workflow, approvazione delle fette, modalità del gate) o da contratti per B e C ancora generici.
+
+**Temi gravi dopo la deduplicazione:**
+- H1 Permessi mancanti in `verdict`: `actions: read` per gli artefatti, `issues: read` per le etichette (39) [VERIFICATO].
+- H2 La lettura della protezione richiede Administration read, che il token dell'agente non ha: un repo Free privato finirebbe in `protected` (39, 45) [VERIFICATO].
+- H3 Il «report di `approve spec`» richiesto da `--spec` non esiste: l'atto vive solo nel DB locale (41, 43, 46).
+- H4 `db restore` non ha una strada percorribile: l'hook blocca, `OFF` impedisce l'atto, il terminale richiede l'atto (40) [VERIFICATO].
+- H5 Formato dei rilievi e degli esiti del verificatore non definito; `findings` senza `id` (46).
+- H6 Atti senza lavoro né oggetto: un atto può essere consumato da un altro lavoro (46; 41 come rilevante).
+- H7 Contratto dei profili ambiguo: comandi, report e `setup` per profilo (46).
+- H8 Componenti spenti che il gate e `approve` pretendono comunque (44).
+- H9 In `detect` il push sul ramo predefinito da una sessione non legata non è negato, contro 9.3 (44).
+- H10 Livello sotto il minimo: `attenzione` in 5 e nel criterio 22, `verdict` rosso in 9.2 (44).
+- H11 `@pytest.mark.skip` non riconosciuto; uno `skipped` nel JUnit non è definito come mancante (41).
+- H12 Deroghe di un'issue vecchia riusate con «Closes #vecchia» (41).
+
+Note integrali dei cicli riassunte qui; l'output degli auditor non è conservato nel repo.
 
 ## Nota storica: interruzione per limite di utilizzo (08/10/2026)
 
