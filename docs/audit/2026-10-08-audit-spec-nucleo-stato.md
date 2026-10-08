@@ -23,7 +23,7 @@ Un rilievo rilevante o superiore azzera il contatore.
 
 ## Inventario (sezioni × esito)
 
-La specifica è alla **revisione 8**. Le sezioni 6.1, 6.3, 8 e 9 sono state riscritte: vanno riauditate da tutti i punti di vista.
+La specifica è alla **revisione 9**. Le sezioni 6.1, 6.3, 8 e 9 sono state riscritte: vanno riauditate da tutti i punti di vista.
 
 | Sezione | Lenti applicate | Esito |
 |---|---|---|
@@ -267,6 +267,23 @@ Il report è in `2026-10-08-revisione-avversariale-4-spec-nucleo.md` (Y-1 … Y-
 - **Revisione 8**: aggiunto l'audit della spec al flusso L2 (decisione dell'utente).
 
 **Andamento dei bloccanti nelle revisioni avversariali**: 7 → 10 → 4 → 4. Gli ultimi otto sono tutti nel gate su GitHub, la parte nuova.
+
+
+## Ciclo 21: quinta revisione avversariale (sulla revisione 8)
+
+Il report è in `2026-10-08-revisione-avversariale-5-spec-nucleo.md` (Z-1 … Z-30: **1 bloccante**, 9 gravi, 15 rilevanti, 5 minori). È una revisione di convergenza sull'intero documento. Tutti i rilievi sono corretti nella **revisione 9**:
+- Z-1: transizione `revisione → esecuzione`;
+- Z-2 e Z-3: fasi per livello;
+- Z-4: condizione «Fette previste»;
+- Z-5: meccanica dell'audit della spec;
+- Z-6: l'agente non prepara le PR di configurazione;
+- Z-7: sorgente fissata «se possibile»;
+- Z-8: tolto `WorktreeCreate`;
+- Z-9: wrapper inerte nei repo non attivi;
+- Z-10: report committati con spec e piano;
+- Z-11 … Z-30: atti, job della base senza permessi, stato in attesa, `verification_globs` come `attenzione`, `gh api`, `abandon`, freschezza della configurazione, criteri 24-29, redazionali.
+
+**Andamento dei bloccanti**: 7 → 10 → 4 → 4 → **1**. L'ultimo bloccante è un buco di flusso, non una garanzia aggirabile. Le revisioni avversariali convergono.
 
 ## Fatti verificati
 
