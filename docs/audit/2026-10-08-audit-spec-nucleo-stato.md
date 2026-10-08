@@ -484,3 +484,11 @@ Note integrali dei cicli riassunte qui; l'output degli auditor non è conservato
 1. Rilanciare gli 8 auditor, uno per punto di vista, con il prompt in `docs/audit/prompt-ciclo-punto-di-vista.txt`. Al posto di {VP} va il punto di vista; le formulazioni sono nella skill prd-audit, sezione «Cambiare punto di vista».
 2. Correggere la spec con quello che trovano.
 3. Ciclo 30: chiusura. Con il tetto a 30, i due cicli vuoti per ogni punto di vista non sono raggiungibili, quindi l'esito atteso è «SOSPESO» con la matrice, a meno che tu non decida di continuare oltre il tetto.
+
+**Decisione dell'utente:** revisione 12, poi giro ridotto sui quattro punti di vista con più gravi; se non trovano gravi, si passa a writing-plans.
+
+**Revisione 12** (commit 855d38f): 69 correzioni puntuali. Contenuto nella sezione 20 della spec.
+
+### Cicli 47-50 (revisione 12, giro ridotto): in corso
+
+47 Chi esegue, 48 Chi attacca, 49 Lo scettico, 50 Chi integra. Se si interrompono, si riprendono dai transcript o si rilanciano.
