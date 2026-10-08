@@ -23,7 +23,7 @@ Un rilievo rilevante o superiore azzera il contatore.
 
 ## Inventario (sezioni × esito)
 
-La specifica è alla **revisione 6** (sezioni 0-18). Le sezioni 6.3, 8 e 9 sono state riscritte: vanno riauditate da tutti i punti di vista.
+La specifica è alla **revisione 8**. Le sezioni 6.1, 6.3, 8 e 9 sono state riscritte: vanno riauditate da tutti i punti di vista.
 
 | Sezione | Lenti applicate | Esito |
 |---|---|---|
@@ -247,6 +247,26 @@ Il report è in `2026-10-08-revisione-avversariale-3-spec-nucleo.md` (X-1 … X-
 **Verificato in questo ciclo**: `workflow_run` usa la definizione del ramo predefinito, ha token con permessi di scrittura e può scaricare gli artefatti dell'esecuzione che l'ha avviato (docs.github.com, events-that-trigger-workflows).
 
 **Matrice.** La revisione 6 cambia di nuovo le sezioni 6.3, 8 e 9: i punti di vista che avevano già un ciclo vuoto (chi usa, chi integra, lo scettico) lo avevano sulla revisione 5, e per le sezioni riscritte va ripetuto.
+
+
+## Ciclo 20: quarta revisione avversariale (sulla revisione 6)
+
+Il report è in `2026-10-08-revisione-avversariale-4-spec-nucleo.md` (Y-1 … Y-22: 4 bloccanti, 6 gravi, 10 rilevanti, 2 minori).
+
+- **Decisione dell'utente su Y-1** (stati falsificati da workflow aggiunti nella PR): la garanzia della v1 copre scorciatoie e manomissioni locali. Il sabotaggio deliberato della CI è un limite dichiarato (1.2); la modalità rinforzata con GitHub App viene dopo la v1.
+- Tutti gli altri rilievi sono corretti nella **revisione 7**:
+  - Y-2: diff calcolato da `verdict`;
+  - Y-3: `tollgate-config/*` esente da test-guard e scope;
+  - Y-4: `verdict` solo per le PR verso il ramo predefinito;
+  - Y-5: convalida di esecuzione, SHA e ramo;
+  - Y-6: più di 2 deroghe `scope` in `attenzione`;
+  - Y-8: chiavi che allentano il gate e impronta del CLI;
+  - Y-9: procedura d'emergenza;
+  - Y-10: limite dichiarato;
+  - Y-11 … Y-22.
+- **Revisione 8**: aggiunto l'audit della spec al flusso L2 (decisione dell'utente).
+
+**Andamento dei bloccanti nelle revisioni avversariali**: 7 → 10 → 4 → 4. Gli ultimi otto sono tutti nel gate su GitHub, la parte nuova.
 
 ## Fatti verificati
 
