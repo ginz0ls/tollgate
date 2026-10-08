@@ -40,7 +40,7 @@ Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre aspettano
 | 5 | Scope per task | Orchestratore | **Tenere** | Si ricava da `Create:` e `Modify:` dei piani Superpowers |
 | 6 | Nessuna autorizzazione concessa in automatico | Orchestratore | **Tenere** | Per gli effetti esterni Claude Code ti chiede conferma |
 | 7 | Skill obbligatorie lette e legate all'hash | Orchestratore | **Scartare** | Complesso, poco valore |
-| 8 | Blocco della chiusura senza prove, per sessione | ralph-loop | **Modificare** | Solo sui subagenti che implementano, non su ogni tua risposta. Il funzionamento dell'hook va verificato sulla documentazione |
+| 8 | Blocco della chiusura senza prove, per sessione | ralph-loop | **Modificare** | Hook `SubagentStop` che blocca **solo i subagenti che hanno prodotto commit senza una ricevuta verde su quel commit**. Il criterio è un fatto, non il nome: Superpowers lancia implementatore e revisore entrambi come `general-purpose`, quindi il tipo di agente non basta a distinguerli. Verificato sulla documentazione (vedi sotto) |
 | 9 | Blocco del codice se prima non c'è un test che fallisce | tdd-guard | **Modificare** | Solo per i bugfix: test di riproduzione rosso → verde, con ricevuta di entrambi. Ovunque costa circa 3 volte i token senza migliorare la qualità |
 | 10 | Blocco dei comandi distruttivi (force push, `reset --hard`, `--no-verify`, `rm -rf`) | cc-safety-net | **Tenere** | Coincide con le regole del CLAUDE.md globale |
 | 11 | CI del ramo base verde prima di partire | lezione di Perizie (notturna rossa) | **Tenere** | Si controlla a `start` |
@@ -105,11 +105,32 @@ Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre aspettano
 | 39 | L'output dei comandi va su file | Superpowers `task-done` | `tollgate verify` salva i log completi e mostra solo l'esito e le ultime righe |
 | 40 | Una fetta per sessione | Anthropic (sessioni lunghe), lezione di Perizie | A fine fetta `finish` salva lo stato e suggerisce `/clear`. Il `start` successivo riparte dal DB. Lo stesso vale tra spec approvata e piano |
 | 41 | Avvio con il minimo indispensabile | evidenze ICLR 2026 e Vercel | Nessuna meta-skill caricata a ogni sessione. All'avvio entrano solo poche righe: issue, fase, livello, prossimo passo |
-| 42 | Guardia sulla dimensione del contesto | nuova | Sopra una soglia, un hook impedisce di avviare nuovi task e chiede un checkpoint e `/clear`. **Da verificare**: se e come un hook può misurare il contesto (per esempio dalla dimensione del transcript) |
+| 42 | Guardia sulla dimensione del contesto | nuova | **Modificata dopo la verifica.** Nessun hook riceve la percentuale di contesto; la riceve solo la statusline (`context_window.used_percentage`). Si fa così: la statusline di tollgate scrive la percentuale su un file per sessione; un hook `PreToolUse` sullo strumento Agent la legge e, sopra soglia, nega l'avvio di nuovi task chiedendo checkpoint e `/clear`. Un hook non può lanciare `/clear` da solo. Se usi già una tua statusline, tollgate la richiama dentro la sua. Senza statusline la guardia si spegne con un avviso, perché le voci 37-41 tengono già piccola la sessione principale |
 
 Unica eccezione: il **brainstorming** si fa nella sessione principale, perché è un dialogo con te. Subito dopo l'approvazione della spec si chiude e si riparte pulito.
 
 ---
+
+## Verifica sulla documentazione ufficiale (8 ottobre 2026)
+
+Fonti: [hooks](https://code.claude.com/docs/en/hooks.md), [sub-agents](https://code.claude.com/docs/en/sub-agents.md), [statusline](https://code.claude.com/docs/en/statusline.md), [plugin components](https://code.claude.com/docs/en/plugins/components.md), [dependencies](https://code.claude.com/docs/en/plugins/dependencies.md), [plugin evals](https://code.claude.com/docs/en/plugin-evals.md). Ho controllato anche il codice di Superpowers 6.4.1 installato.
+
+| Domanda | Risposta | Effetto su tollgate |
+|---|---|---|
+| `SubagentStop` sa quale subagente si ferma? | Sì: riceve `agent_id`, `agent_type`, `agent_transcript_path`, `last_assistant_message`, `stop_hook_active`. Il matcher filtra su `agent_type`. `decision: "block"` tiene in vita il subagente e gli passa `reason` come istruzione successiva | Voce 8 fattibile. Superpowers però usa `general-purpose` sia per chi implementa sia per chi rivede (`implementer-prompt.md:6`, `task-reviewer-prompt.md:11`), quindi il criterio diventa «ha fatto commit senza ricevuta» |
+| Gli agenti di un plugin possono avere hook propri nel frontmatter? | **No**: per sicurezza gli agenti dei plugin ignorano `hooks`, `mcpServers` e `permissionMode` | Tutti gli hook vanno in `hooks/hooks.json` del plugin |
+| Rischio di loop con `Stop` | Esiste `stop_hook_active`. Dopo 8 blocchi di fila Claude Code chiude comunque il turno (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`) | Ogni hook di stop controlla `stop_hook_active` e blocca solo se la condizione è risolvibile |
+| Un hook conosce il riempimento del contesto? | **No.** Lo riceve solo la statusline (`used_percentage`, `context_window_size`). Il formato del transcript non è documentato. Un hook non può lanciare `/clear` o la compattazione: `PreCompact` può solo bloccarla | Voce 42 riscritta con il ponte statusline → file → hook |
+| `PreToolUse` | Decisioni `allow`, `deny`, `ask`, `defer`. Exit 2 blocca. Il filtro `if` accetta una regola come `Bash(git *)` o `Edit(*.ts)`, ma è «best effort» | Effetti esterni con `ask`, cioè con la conferma nativa (voce 6). Il filtro sui comandi Bash non è a prova di aggiramento: il controllo finale resta a `finish` e sulla PR |
+| `PostToolUse` può rimandare indietro un file appena scritto? | Sì, con `decision: "block"` e `reason`, oppure con exit 2 | Voce 13 fattibile: il piano salvato senza le sezioni obbligatorie torna indietro |
+| `SessionStart` | Matcher `startup`, `resume`, `clear`, `compact`. Il contesto aggiunto ha un limite di 10.000 caratteri | Voce 41: bastano poche righe di stato |
+| `TaskCompleted` | Esiste e con exit 2 impedisce di segnare una task come completata. Non è documentato se scatta alla fine di un subagente | Non ci appoggiamo: usiamo `SubagentStop` |
+| Un plugin può dipendere da Superpowers? | Sì: `dependencies` in `.claude-plugin/plugin.json`, anche con un vincolo di versione | Dichiariamo `superpowers` con un intervallo di versioni |
+| Dove salvare i dati del plugin | Gli hook ricevono `CLAUDE_PLUGIN_ROOT` e `CLAUDE_PLUGIN_DATA`; quest'ultima persiste tra gli aggiornamenti | Il DB SQLite va in `CLAUDE_PLUGIN_DATA` invece che in `~/.local/state/tollgate` |
+| Tipi di handler degli hook | `command`, `http`, `mcp_tool`, `prompt`, `agent` (quest'ultimo sperimentale) | Usiamo solo `command`. `http` servirà per la dashboard |
+| `claude plugin eval` | Esiste. Struttura `evals/<caso>/prompt.md` più `graders/`. 3 esecuzioni per caso, soglia predefinita 1.0 | Base per il sotto-progetto D |
+
+Ancora da rileggere sulla pagina completa prima di scrivere codice: `updatedInput` e la semantica di `defer` in `PreToolUse`, e i campi di input di `PreCompact`.
 
 ## Prossimi passi
 
