@@ -59,6 +59,9 @@ class RepoKeyTest(unittest.TestCase):
             "ssh://git@github.com/owner/name.git": "github.com/owner/name",
             "https://user@github.com/owner/name": "github.com/owner/name",
             "https://github.com:443/owner/name.git": "github.com/owner/name",
+            "git@github.com:1234/r.git": "github.com/1234/r",
+            "https://github.com/O/R.GIT": "github.com/o/r",
+            "ssh://git@github.com:22/o/r.git": "github.com/o/r",
         }
         for url, key in cases.items():
             with self.subTest(url=url):

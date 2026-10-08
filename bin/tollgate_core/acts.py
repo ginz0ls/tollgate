@@ -72,13 +72,17 @@ def find_usable(conn, *, type_: str, object_: str | None = None, target: str | N
     return conn.execute(sql + " ORDER BY n DESC LIMIT 1", params).fetchone()
 
 
-def consume(conn, act_id: str, *, now, work: int | None, session: str | None,
+def consume(conn, act_id: str, *, type_: str, object_: str | None = None,
+            target: str | None = None, now, work: int | None, session: str | None,
             head_sha: str | None = None) -> None:
-    """Consuma l'atto se vale per questo lavoro, sessione (o SHA per finish) e istante."""
+    """Consuma l'atto se e' del tipo, oggetto e target attesi e vale per questo lavoro,
+    sessione (o SHA per finish) e istante."""
     with db.tx(conn):
         row = conn.execute("SELECT * FROM acts WHERE act_id = ?", (act_id,)).fetchone()
         if row is None or row["state"] != "pending":
             raise ActError(f"atto {act_id} inesistente o non più valido")
+        if (row["type"], row["object"], row["target"]) != (type_, object_, target):
+            raise ActError(f"atto {act_id} non è del tipo, oggetto o target richiesto")
         if row["work"] != work:
             raise ActError(f"atto {act_id} non vale per questo lavoro")
         if row["type"] == "finish":

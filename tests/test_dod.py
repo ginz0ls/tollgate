@@ -39,7 +39,8 @@ class DodTest(unittest.TestCase):
             "VALUES (?, ?, ?, ?, ?)", (fid, w, severity, verification, decision))
 
     def items(self, w, **kw):
-        base = dict(head_sha="h1", allow_no_tests=False, external=EXT_OK)
+        base = dict(head_sha="h1", allow_no_tests=False, external=EXT_OK,
+                    required_commands=["verify"])
         base.update(kw)
         return {i.key: i for i in dod.compute_dod(self.conn, w, **base)}
 
@@ -91,7 +92,8 @@ class DodTest(unittest.TestCase):
     def test_external_missing_counts_as_failing(self):
         w = self.work("L0")
         self.receipt(w, "green")
-        items = dod.compute_dod(self.conn, w, head_sha="h1", allow_no_tests=False)
+        items = dod.compute_dod(self.conn, w, head_sha="h1", allow_no_tests=False,
+                                required_commands=["verify"])
         guard = [i for i in items if i.key == "guard_scope"][0]
         self.assertIsNone(guard.ok)
         self.assertFalse(dod.dod_passes(items))
@@ -101,9 +103,36 @@ class DodTest(unittest.TestCase):
         self.receipt(w, "green")
         self.done_task(w, 1)
         items = dod.compute_dod(self.conn, w, head_sha="h1", allow_no_tests=False,
-                                external=EXT_OK, profile_items={"profile:web.a11y": True})
+                                external=EXT_OK, required_commands=["verify"],
+                                profile_items={"profile:web.a11y": True})
         self.assertIn("profile:web.a11y", [i.key for i in items])
         self.assertTrue(dod.dod_passes(items))
         items = dod.compute_dod(self.conn, w, head_sha="h1", allow_no_tests=False,
-                                external=EXT_OK, profile_items={"profile:web.a11y": False})
+                                external=EXT_OK, required_commands=["verify"],
+                                profile_items={"profile:web.a11y": False})
         self.assertFalse(dod.dod_passes(items))
+
+    def test_receipt_requires_all_required_commands(self):
+        w = self.work("L0")
+        self.receipt(w, "green", command="test_related")
+        r = self.items(w, required_commands=["verify"])["receipt"]
+        self.assertFalse(r.ok)
+        self.assertIn("mancano", r.detail)
+        self.assertIn("verify", r.detail)
+        self.assertTrue(self.items(w, required_commands=["test_related"])["receipt"].ok)
+
+    def test_receipt_no_required_commands_is_not_dod(self):
+        w = self.work("L0")
+        self.receipt(w, "green")
+        r = self.items(w, required_commands=[])["receipt"]
+        self.assertFalse(r.ok)
+        self.assertIn("nessun comando richiesto", r.detail)
+
+    def test_receipt_last_one_counts(self):
+        w = self.work("L0")
+        self.receipt(w, "green")
+        self.receipt(w, "red")
+        self.assertFalse(self.items(w)["receipt"].ok)
+
+    def test_dod_passes_empty_is_false(self):
+        self.assertFalse(dod.dod_passes([]))

@@ -1,5 +1,6 @@
 import json
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -67,6 +68,18 @@ class CliTest(unittest.TestCase):
         r = self.run_cli("events", "--after-seq", "1")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual([json.loads(x)["seq"] for x in r.stdout.splitlines()], [2, 3])
+
+    def test_events_broken_pipe_is_silent(self):
+        conn = db.open_db(self.t.state)
+        for i in range(200):
+            events.record_event(conn, "commit", {"i": i, "pad": "x" * 500}, now=T0)
+        conn.close()
+        script = (f"{shlex.quote(sys.executable)} {shlex.quote(str(BIN / 'tollgate'))} "
+                  "events --after-seq 0 | head -1")
+        r = subprocess.run(["sh", "-c", script], env=self.t.env(), capture_output=True,
+                           text=True, stdin=subprocess.DEVNULL)
+        self.assertEqual(len(r.stdout.splitlines()), 1)
+        self.assertEqual(r.stderr, "")
 
     def test_stats_work(self):
         self.seed()

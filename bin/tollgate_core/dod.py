@@ -34,7 +34,10 @@ class DodItem:
     detail: str = ""
 
 
-def _receipt(conn, work: int, head_sha: str, allow_no_tests: bool) -> tuple[bool, str]:
+def _receipt(conn, work: int, head_sha: str, allow_no_tests: bool,
+             required_commands: list[str]) -> tuple[bool, str]:
+    if not required_commands:
+        return False, "nessun comando richiesto"
     rows = conn.execute(
         "SELECT r.command, r.state FROM receipts r WHERE r.work = ? AND r.sha = ? AND r.id = "
         "(SELECT max(id) FROM receipts x WHERE x.work = r.work AND x.sha = r.sha "
@@ -43,6 +46,10 @@ def _receipt(conn, work: int, head_sha: str, allow_no_tests: bool) -> tuple[bool
         return False, f"nessuna ricevuta su {head_sha}"
     bad = [f"{r['command']}={r['state']}" for r in rows
            if not (r["state"] == "green" or (r["state"] == "empty" and allow_no_tests))]
+    have = {r["command"] for r in rows}
+    missing = [c for c in required_commands if c not in have]
+    if missing:
+        bad.append("mancano: " + ", ".join(missing))
     return (not bad), ", ".join(bad)
 
 
@@ -75,12 +82,14 @@ def _skills(conn, work: int) -> tuple[bool, str]:
 
 
 def compute_dod(conn, work: int, *, head_sha: str, allow_no_tests: bool,
+                required_commands: list[str],
                 external: Mapping[str, bool | None] | None = None,
                 profile_items: Mapping[str, bool | None] | None = None) -> list[DodItem]:
     external = external or {}
     level = get_work(conn, work)["level"]
     computed = {
-        "receipt": lambda: _receipt(conn, work, head_sha, allow_no_tests),
+        "receipt": lambda: _receipt(conn, work, head_sha, allow_no_tests,
+                                           required_commands),
         "tasks_approved": lambda: _tasks(conn, work),
         "findings": lambda: _findings(conn, work),
         "skills": lambda: _skills(conn, work),
@@ -100,4 +109,4 @@ def compute_dod(conn, work: int, *, head_sha: str, allow_no_tests: bool,
 
 
 def dod_passes(items: list[DodItem]) -> bool:
-    return all(i.ok is True for i in items)
+    return bool(items) and all(i.ok is True for i in items)

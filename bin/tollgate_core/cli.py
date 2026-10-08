@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -128,7 +129,13 @@ def main(argv: list[str]) -> int:
             if args.cmd == "stats":
                 return _stats(conn, args)
             if args.cmd == "events":
-                sys.stdout.write(events.to_jsonl(events.export_events(conn, args.after_seq)))
+                try:
+                    sys.stdout.write(
+                        events.to_jsonl(events.export_events(conn, args.after_seq)))
+                    sys.stdout.flush()
+                except BrokenPipeError:
+                    # il lettore ha chiuso (| head): evita il traceback anche alla chiusura di stdout
+                    os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
                 return 0
         finally:
             conn.close()

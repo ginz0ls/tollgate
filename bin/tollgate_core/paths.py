@@ -60,17 +60,17 @@ _SCHEME = re.compile(r"^[a-z][a-z0-9+.-]*://", re.IGNORECASE)
 
 def repo_key(url: str) -> str:
     """URL di origin normalizzato: senza protocollo, utente, porta e `.git`, in minuscolo."""
-    u = _SCHEME.sub("", url.strip())
+    u = url.strip()
+    scheme = _SCHEME.match(u)
+    u = _SCHEME.sub("", u)
     if "@" in u.split("/")[0]:
         u = u.split("@", 1)[1]
     host, _, path = u.partition("/")
     if ":" in host:
         h, _, after = host.partition(":")
-        if after.isdigit():
+        if scheme and after.isdigit():
             host = h
         else:
             host, path = h, after + ("/" + path if path else "")
-    key = f"{host}/{path}".rstrip("/")
-    if key.endswith(".git"):
-        key = key[:-4]
-    return key.lower()
+    key = f"{host}/{path}".rstrip("/").lower()
+    return key[:-4] if key.endswith(".git") else key
