@@ -74,3 +74,40 @@ class StatsTest(unittest.TestCase):
         s = stats.compute_stats(self.conn, now=h(10), since=h(1.55))
         self.assertEqual(s["vetoes"], {"total": 1, "by_rule": {"effects": 1}})
         self.assertEqual(s["off_hours"], 4.0)
+
+    def test_off_hours_work_since_clips_to_window(self):
+        s = stats.compute_stats(self.conn, now=h(10), work=self.w, since=h(3.5))
+        self.assertEqual(s["off_hours"], 0.5)
+
+    def test_phase_hours_global_since_clips_intervals(self):
+        s = stats.compute_stats(self.conn, now=h(10), since=h(3))
+        self.assertEqual(s["phase_hours"], {"execution": 3.0})
+
+    def test_phase_hours_work_since_clips_intervals(self):
+        s = stats.compute_stats(self.conn, now=h(10), work=self.w, since=h(1.5))
+        self.assertEqual(s["phase_hours"], {"execution": 4.0, "blocked": 0.5})
+
+    def test_fix_rounds_since(self):
+        self.assertEqual(stats.compute_stats(self.conn, now=h(10), since=h(5))["fix_rounds"], 0)
+        self.assertEqual(stats.compute_stats(self.conn, now=h(10), since=h(4.65))["fix_rounds"], 2)
+
+
+class OffWindowTest(unittest.TestCase):
+    def setUp(self):
+        self.t = TempState()
+        self.conn = db.open_db(self.t.state)
+
+    def tearDown(self):
+        self.conn.close()
+        self.t.cleanup()
+
+    def test_open_off_clipped_to_since(self):
+        events.record_event(self.conn, "off", {}, now=h(3))
+        s = stats.compute_stats(self.conn, now=h(10), since=h(5))
+        self.assertEqual(s["off_hours"], 5.0)
+
+    def test_off_spanning_since_counts_only_window_part(self):
+        events.record_event(self.conn, "off", {}, now=h(3))
+        events.record_event(self.conn, "on", {}, now=h(6))
+        s = stats.compute_stats(self.conn, now=h(10), since=h(5))
+        self.assertEqual(s["off_hours"], 1.0)
