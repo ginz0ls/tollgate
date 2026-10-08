@@ -8,7 +8,7 @@ Stato: **le modifiche R1-R16 sono state accettate l'8 ottobre 2026**, come racco
 
 ## 1. Metodo e affidabilità
 
-Ci sono cinque filoni di ricerca, ciascuno con il suo report completo in `docs/ricerca/`. Ogni report ha una scheda per paper.
+Ci sono sei filoni di ricerca, ciascuno con il suo report completo in `docs/ricerca/`. Ogni report ha una scheda per paper.
 
 | # | Filone | File | Fonti |
 |---|---|---|---|
@@ -115,6 +115,7 @@ Ci sono cinque filoni di ricerca, ciascuno con il suo report completo in `docs/r
 - **MAST** [V, 2503.13657]:
   - il passo che conta di più è un **controllo dell'obiettivo**: +15,6%;
   - i fallimenti più comuni sono passi ripetuti, condizioni di stop ignorate e specifiche disattese.
+  - *Applicato in: revisore finale che confronta il lavoro con piano e must-have (spec 10) e Definition of Done con i must-have citati nei report (spec 8.7).*
 - **I subagenti costano.** Il sistema multi-agente di Anthropic usa circa 15 volte i token di una chat e per il codice è meno adatto [V, filone 3].
 - **Cognition** [V, blog]: funzionano la revisione a contesto pulito e i subagenti in sola lettura; non funzionano più agenti che scrivono in parallelo. Inoltre i subagenti senza storia prendono decisioni implicite incoerenti tra loro.
 
@@ -172,6 +173,8 @@ Ci sono cinque filoni di ricerca, ciascuno con il suo report completo in `docs/r
 
 **Conclusione per tollgate**: in L1 basta un revisore con la checklist dei profili attivi più un verificatore per ogni problema segnalato. In L2 gli specialisti si giustificano con **contesto e strumenti diversi** (schema e migrazioni per il database, flusso di autenticazione per la sicurezza), non con il ruolo.
 
+> **Rapporto con la spec revisioni 16-18 (decisione dell'utente).** Questa conclusione sconsiglia di **aggiungere** revisori che ripetono la stessa revisione con ruoli diversi. Il revisore del task per area **sostituisce** quello generico: per ogni task ce n'è sempre uno solo, con regole e skill della sua area, quindi nessun revisore in più e nessun costo in più. Gli specialisti della revisione finale si aggiungono solo in L2 e solo per security e database (e `ci`, che usa lo specialista di security), cioè dove portano contesto e strumenti diversi, come raccomandato qui. Tutti i rilievi passano dallo stesso verificatore, che resta il passo che conta. L'effetto va misurato negli eval del sotto-progetto D.
+
 ---
 
 ## 3. Cosa cambia nel design
@@ -201,21 +204,21 @@ Ogni voce cita le voci di `COSA-TENERE.md` che tocca. **Sono proposte: decidi tu
 | # | Modifica | Perché | Tocca |
 |---|---|---|---|
 | **R1** | **Via d'uscita «test e specifica in conflitto»**: un blocco con un tipo preciso, che ferma l'agente e lo manda da te, invece di costringerlo a scegliere tra barare e fallire | Riduce l'hacking dal 54% al 9% (ImpossibleBench) e dal 23,6% al 5,3% (Gomez) | Deroghe (voce 14), blocchi tipizzati (C), H36 |
-| **R2** | **Mappa codice → test nel brief dell'implementatore**: il brief elenca i test toccati dalla modifica, e `verify` esegue quelli più la suite completa a `finish` | Con il TDD generico le regressioni salgono; indicando i test giusti calano del 70% (TDAD). Il solo test del task lascia passare il 7,8% di patch sbagliate (Wang) | Voci 2, 13, profilo base |
+| **R2** | **Mappa codice → test nel brief dell'implementatore**: il brief elenca i test toccati dalla modifica, e `verify` esegue quelli più la suite completa a `finish` | Con il TDD generico le regressioni salgono; indicando i test giusti calano del 70% (TDAD). Il solo test del task lascia passare il 7,8% di patch sbagliate (Wang) | Voci 2, 13, profilo base *Ridimensionata: si usa il comando del progetto (`COSA-TENERE.md`, sezione 8); applicata in spec 6.3.* |
 | **R3** | **La ricevuta è necessaria ma non sufficiente**: la revisione finale cerca esplicitamente casi speciali scritti per i test, test resi più deboli e comportamenti diversi da quelli attesi | Sola lettura non basta contro i casi speciali (ImpossibleBench). Circa metà delle PR con test verdi non verrebbe unita (METR) | Voci 1, 20, 24 |
-| **R4** | **Tetto di 2 giri di correzione automatica per task**, poi si riparte con un contesto pulito o si passa a te | Molti giri di autocorrezione non convengono (Olausson) e dopo 3-4 rendono sempre meno (Mathews) | Voce 25, H43 |
+| **R4** | **Tetto di 2 giri di correzione automatica per task**, poi si riparte con un contesto pulito o si passa a te | Molti giri di autocorrezione non convengono (Olausson) e dopo 3-4 rendono sempre meno (Mathews) | Voce 25, H43 *Superata: i giri di correzione li gestisce `tollgate:execute` (tetto 5) con budget per task (spec 6.3, revisioni 13 e 18).* |
 | **R5** | **Promemoria del piano**: a ogni nuovo task un hook rimette nel contesto il passo corrente del piano e il suo scope, in poche righe | Il promemoria periodico riduce le violazioni (Liu) | Voci 5, 41 |
-| **R6** | **Revisione leggera del piano anche in L1**: in L1 un controllo automatico della struttura del piano più una lettura a contesto pulito; la revisione avversariale completa resta in L2 | Un piano scadente fa più danni di nessun piano (Liu) | Voci 13, 17 |
-| **R7** | **Soglie del contesto più basse.** Orchestratore: avviso al 40%, salvataggio e `/clear` al 50-60%, non all'85% della statusline. Subagente: lavorare sotto circa 30K token. Ritorno al padre: 1-2K token più il percorso del report | Il degrado è già forte intorno a 32K (NoLiMa, RULER, Du). Le soglie sono un'inferenza, da tarare con gli eval | Voci 38, 42 |
+| **R6** | **Revisione leggera del piano anche in L1**: in L1 un controllo automatico della struttura del piano più una lettura a contesto pulito; la revisione avversariale completa resta in L2 | Un piano scadente fa più danni di nessun piano (Liu) | Voci 13, 17 *Ridimensionata: in L1 solo `plan-check` automatico, la rilettura a contesto pulito resta in L2 (spec 7.5 e 6.2).* |
+| **R7** | **Soglie del contesto più basse.** Orchestratore: avviso al 40%, salvataggio e `/clear` al 50-60%, non all'85% della statusline. Subagente: lavorare sotto circa 30K token. Ritorno al padre: 1-2K token più il percorso del report | Il degrado è già forte intorno a 32K (NoLiMa, RULER, Du). Le soglie sono un'inferenza, da tarare con gli eval | Voci 38, 42 *Applicata con soglie arrotondate: avviso al 45% e stop al 55% (`[context]` della spec); subagente sotto circa 30K token (spec 4).* |
 | **R8** | **Le regole dei profili si caricano tramite hook, non affidandosi all'attivazione automatica delle skill** | Nel 56% dei casi la skill non parte (Vercel) | Sotto-progetto B, voce 41 |
 | **R9** | **Budget di istruzioni.** Pochi obblighi, i più importanti per primi, e una misura dei token che tollgate aggiunge a ogni sessione, con un tetto | Più regole significa meno regole rispettate (IFScale, Harada). Il testo in più costa circa il 20% (Gloaguen) | Voce 41, H44, lezione 1 di Hermes |
 | **R10** | **Ogni componente si può spegnere** da `tollgate.toml`, e gli eval misurano ciascun componente acceso e spento | L'impalcatura invecchia (Anthropic). Le fasi aggiunte possono peggiorare (Liu) | Tutti, sotto-progetto D |
 | **R11** | **Controllo dei pacchetti**: un hook su ogni installazione verifica che il pacchetto esista e quanto è vecchio | Il 5-22% dei pacchetti suggeriti non esiste, e i nomi inventati si ripetono (2406.10279) | Profilo base, voce 10 |
 | **R12** | **Il profilo sicurezza diventa più severo**: analisi statica (SAST) obbligatoria e test di sicurezza, non solo revisione | Il codice è corretto nel 57% dei casi ma sicuro nell'11,8% (SusVibes) | Profilo sicurezza |
 | **R13** | **Le osservazioni della revisione si registrano** come accettate o rifiutate da te, così la soglia di confidenza si tara sui dati reali | 80 è un numero arbitrario: i commenti degli LLM sono accettati nel 7-36% dei casi | Voce 26 |
-| **R14** | **Le domande di chiarimento dipendono dal livello e dall'ambiguità**: obbligatorie in L2 e con issue ambigue, non sempre | Chiedere sempre produce domande inutili (Vijayvargiya) | Flusso di `start` |
+| **R14** | **Le domande di chiarimento dipendono dal livello e dall'ambiguità**: obbligatorie in L2 e con issue ambigue, non sempre | Chiedere sempre produce domande inutili (Vijayvargiya) | Flusso di `start` *Ridimensionata: le domande le fa già Superpowers; non usata nel nucleo (spec 19).* |
 | **R15** | **Il costo dei subagenti va misurato**: negli eval si confronta «un subagente per task» con «task piccoli raggruppati» | Un sistema multi-agente costa circa 15 volte di più. Il `/clear` per fetta fa perdere la cache | Voci 38, 40 |
-| **R16** | **Il revisore Codex dà un parere, non modifica il codice** | Codex che rivede Claude lo ha peggiorato (Xiang) | Voce 28 |
+| **R16** | **Il revisore Codex dà un parere, non modifica il codice** | Codex che rivede Claude lo ha peggiorato (Xiang) | Voce 28 *Rinviata con Codex a dopo la v1 (spec rev. 10 e tabella 19).* |
 
 ### Da rimandare o lasciare come ipotesi
 
