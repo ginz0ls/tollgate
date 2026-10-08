@@ -23,7 +23,7 @@ Un rilievo rilevante o superiore azzera il contatore.
 
 ## Inventario (sezioni × esito)
 
-Le sezioni sono quelle della revisione 2: le correzioni dei cicli 1-3 vanno riauditate.
+Le sezioni sono quelle della **revisione 3** (0-17). Ogni sezione è stata riscritta o toccata: tutte vanno riauditate dai punti di vista successivi.
 
 | Sezione | Lenti applicate | Esito |
 |---|---|---|
@@ -49,7 +49,7 @@ Le sezioni sono quelle della revisione 2: le correzioni dei cicli 1-3 vanno riau
 | Punto di vista | Cicli | Ultimo esito | Contatore vuoti |
 |---|---|---|---|
 | Chi esegue | 1 | 13 rilievi → **da ripetere** | 0 |
-| Chi attacca | 2 | 6 rilievi → **da ripetere** | 0 |
+| Chi attacca | 2, 4 (revisione avversariale a contesto pulito, sulla revisione 1) | 36 rilievi (7 bloccanti) → **da ripetere sulla revisione 3** | 0 |
 | Chi usa | 3 | 4 rilievi → **da ripetere** | 0 |
 | Chi paga | — | mai applicato | 0 |
 | Chi arriva dopo | — | mai applicato | 0 |
@@ -87,6 +87,50 @@ Le sezioni sono quelle della revisione 2: le correzioni dei cicli 1-3 vanno riau
 
 (A-23 e A-24 sono stati scartati, vedi sotto.)
 
+
+## Rilievi del ciclo 4 (revisione avversariale, corretti nella revisione 3)
+
+Il report completo è in `2026-10-08-revisione-avversariale-spec-nucleo.md`, con 36 voci: 7 bloccanti, 17 gravi, 11 rilevanti e 1 minore. Era stato condotto sulla revisione 1: le voci già coperte dalla revisione 2 sono indicate.
+
+| V | Gravità | Esito nella revisione 3 |
+|---|---|---|
+| 1 CLI nel PATH, sottocomandi non separati | Bloccante | Già nella rev. 2 (sottocomandi per chiamante). Il resto (import del modulo Python) è dichiarato nella sezione 16 e coperto dal controllo autorevole |
+| 2 Gli hook non bloccano se si rompono | Bloccante | **Corretto**: wrapper `hooks/run` (7.1). [VERIFICATO] hooks.md: «exit code 2 is the only exit code that blocks through the code alone»; il timeout non blocca |
+| 3 Scope e file protetti aggirabili via Bash | Bloccante | Già nella rev. 2 (A-02) |
+| 4 Ricevute falsificabili cambiando `package.json` o la configurazione dei test | Bloccante | **Corretto**: comando risolto nella ricevuta, `command_files` sotto test-guard, deroga `comando` sempre approvata da te, controllo 8.4.5 |
+| 5 test-guard cieco con `git add -A && git commit` | Bloccante | **Corretto**: working tree più indice rispetto alla base (7.4) |
+| 6 Effetti esterni solo come lista nera di stringhe | Bloccante | **Corretto in parte**: MCP con `ask`, curl, gh api e shell annidate; il limite residuo è nella sezione 16 |
+| 7 Stallo tra deroga e divieto sul DB | Bloccante | Già nella rev. 2 (A-23) |
+| 8 Approvazioni non autenticate | Grave | **Corretto**: `UserPromptExpansion` [VERIFICATO] |
+| 9 `finish` come skill e divieto di push | Grave | Già nella rev. 2 (A-04) |
+| 10 Eval 1 in contraddizione con «Stop: nessun blocco» | Grave | **Corretto**: eval 1 riscritto |
+| 11 `/tollgate:off` passa dai componenti rotti | Grave | **Corretto**: file `OFF` scritto dal wrapper senza Python |
+| 12 Il plugin non può impostare la statusline | Grave | **Corretto**: `/tollgate:setup`; `null` non blocca. [VERIFICATO] components.md: «Only two keys take effect from a plugin, agent and subagentStatusLine» |
+| 13 Dipendenze tra marketplace e versioni | Grave | **Corretto**: `marketplace.json` con `allowCrossMarketplaceDependenciesOn`; specialisti opzionali |
+| 14 `PostToolUse` non annulla; matcher solo su Write | Grave | **Corretto**: il piano resta scritto ma non registrato; matcher anche su Edit [VERIFICATO] |
+| 15 Le sezioni del piano non le produce writing-plans; intervalli di righe | Grave | Già nella rev. 2 (start dà le sezioni); **corretto** il parser |
+| 16 Lo scope nega i file di servizio di Superpowers e i lockfile | Grave | **Corretto**: `.superpowers/**` sempre permessi, `[scope] always` |
+| 17 La sola lettura non è imponibile | Grave | **Corretto**: controllo di sola lettura (7.3) |
+| 18 Tetti dei giri incoerenti con Superpowers | Grave | **Corretto**: chiarito che R4 prevale su 5 e che i 4 giri sono di tollgate |
+| 19 L0→L1 senza hook; nega anche il piano | Grave | Rev. 2 per l'hook; **corretto**: la fase torna `piano` |
+| 20 `SubagentStop`: contatore e worktree sporco | Grave | **Corretto**: contatore nel DB; BLOCKED con worktree sporco ammesso |
+| 21 Worktree e `session_id` dopo `/clear` | Grave | Rev. 2 per il ramo; **corretto**: due sessioni rilevate dagli eventi, `git worktree add` doppio negato |
+| 22 Asserzioni indebolite non rilevate | Grave | **Corretto in parte**: conteggio delle asserzioni; il resto è dichiarato nella sezione 16 e affidato a R3 |
+| 23 Una deroga può coprire una cartella | Grave | **Corretto**: un file per deroga |
+| 24 Testo dell'issue e slug non ripuliti | Grave | **Corretto**: slug ripulito, issue come dato non fidato |
+| 25 Falsi positivi di test-guard | Rilevante | **Corretto**: parole intere, solo file di test, conteggio per nome, fixture escluse |
+| 26 Ricevuta verde con zero test | Rilevante | **Corretto**: ricevuta «vuota» |
+| 27 Effetti esterni ripetuti dopo una ripresa | Rilevante | **Corretto**: intenti idempotenti con conferma (8.5) |
+| 28 Livello solo in salita anche con falsi positivi | Rilevante | **Corretto**: abbassamento solo da te |
+| 29 Nessun bootstrap di `tollgate.toml` | Rilevante | **Corretto**: `/tollgate:init`, rifiuto senza file |
+| 30 Termini con due significati | Rilevante | **Corretto**: glossario, tabella `work_items` |
+| 31 Il coordinatore può scrivere codice | Rilevante | **Corretto**: niente codice senza `agent_id` in L1 e L2 (da verificare) |
+| 32 Chiave del repo e unicità indefinite | Rilevante | **Corretto**: glossario e vincoli |
+| 33 Criteri incompleti | Rilevante | **Corretto**: 17 criteri, ognuno con azione, osservazione e test |
+| 34 Attriti per B, C e D | Rilevante | **Corretto**: override, mappa aperta, presa in carico solo locale |
+| 35 `/security-review` non è un agente | Rilevante | **Corretto**: `specialist-runner` o `context: fork`, da verificare |
+| 36 Redazionali | Minore | **Corretto** |
+
 ## Fatti verificati
 
 | Fatto | Fonte | Data |
@@ -100,6 +144,11 @@ Le sezioni sono quelle della revisione 2: le correzioni dei cicli 1-3 vanno riau
 | `pr-review-toolkit`: licenza Apache 2.0, agenti `pr-test-analyzer` e `silent-failure-hunter` | `pr-review-toolkit/fbe07fb6ce7d/LICENSE`, `agents/` | 08/10/2026 |
 | `SubagentStop` riceve `agent_type`, `last_assistant_message` e `stop_hook_active`; `block` tiene in vita il subagente | code.claude.com/docs/en/hooks.md (verifica del 08/10, `COSA-TENERE.md`) | 08/10/2026 |
 | Gli agenti dei plugin ignorano `hooks` nel frontmatter | code.claude.com/docs/en/sub-agents.md | 08/10/2026 |
+| Solo l'uscita 2 blocca; con 1, crash o timeout l'azione prosegue; timeout predefinito 600 s | code.claude.com/docs/en/hooks.md (WebFetch, caratteri 0-100.000) | 08/10/2026 |
+| Il comando `/skill` digitato dall'utente fa scattare `UserPromptExpansion` con `prompt` e `command_name` | hooks.md (caratteri 100.000-200.000) | 08/10/2026 |
+| `PostToolUse` con `block` aggiunge il motivo, non annulla | hooks.md | 08/10/2026 |
+| Strumento dei subagenti: `Agent`; `agent_type` dei plugin: `plugin:nome` | hooks.md | 08/10/2026 |
+| Il `settings.json` di un plugin applica solo `agent` e `subagentStatusLine` | code.claude.com/docs/en/plugins/components.md:590, 901 | 08/10/2026 |
 
 ## Scartati
 
@@ -119,4 +168,6 @@ Le sezioni sono quelle della revisione 2: le correzioni dei cicli 1-3 vanno riau
 | 2 | Chi attacca | L1-L10 | A-02, A-03, A-04, A-05, A-19, A-25 |
 | 3 | Chi usa | L1-L10 (in particolare L9: errori, concorrenza, annullamento) | A-13, A-18, A-20, A-21 |
 
-Correzioni applicate nella revisione 2 della specifica. **Prossimo passo**: integrare la revisione avversariale, poi i cicli con i punti di vista mai applicati e la ripetizione di chi esegue, chi attacca e chi usa sulle correzioni.
+| 4 | Chi attacca (revisione avversariale a contesto pulito) | L1-L10 | V-1 … V-36 (vedi sopra) |
+
+Revisione 3 della specifica scritta. **Prossimo passo**: cicli 5 e successivi con i punti di vista mai applicati (chi paga, chi arriva dopo, lo scettico, il caso limite, chi integra), poi chi esegue, chi attacca e chi usa sulla revisione 3, fino a due cicli vuoti per ciascuno.
