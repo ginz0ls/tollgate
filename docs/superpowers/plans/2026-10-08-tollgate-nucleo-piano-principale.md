@@ -1,7 +1,7 @@
 # tollgate, nucleo: piano principale
 
 Data: 8 ottobre 2026.
-Spec: `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 16). La spec dice **cosa** fa tollgate e perché; questo documento dice **in che ordine** si costruisce e **quale piano** copre ogni parte della spec. Il codice e i passi stanno nei piani specifici P0-P5.
+Spec: `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 17). La spec dice **cosa** fa tollgate e perché; questo documento dice **in che ordine** si costruisce e **quale piano** copre ogni parte della spec. Il codice e i passi stanno nei piani specifici P0-P5.
 
 Stato: P0 scritto (`2026-10-08-tollgate-p0-verifiche.md`), P1-P5 da scrivere.
 
@@ -10,7 +10,7 @@ Stato: P0 scritto (`2026-10-08-tollgate-p0-verifiche.md`), P1-P5 da scrivere.
 ## 1. Regole
 
 1. **Un piano specifico alla volta.** P(n+1) si scrive solo quando P(n) è chiuso, partendo dal codice reale e dalle interfacce che P(n) ha davvero prodotto.
-2. **Dopo P0 questo documento si rivede.** Gli esiti delle verifiche possono cambiare il disegno (sezione 16 della spec): prima di scrivere P1 si aggiornano la spec (revisione 17) e, se serve, le sezioni 3 e 4 di questo documento.
+2. **Dopo P0 questo documento si rivede.** Gli esiti delle verifiche possono cambiare il disegno (sezione 16 della spec): prima di scrivere P1 si aggiornano la spec (revisione 18) e, se serve, le sezioni 3 e 4 di questo documento.
 3. **Ogni piano specifico chiude con i suoi criteri.** Un piano è chiuso quando i criteri di accettazione che la matrice (sezione 4) gli assegna passano come test, e la sua revisione finale non ha rilievi `blocker` o `major` aperti.
 4. **Si costruisce con Superpowers, non con tollgate.** `tollgate:execute` non esiste finché P3 non è chiuso: P1-P5 si eseguono con subagent-driven-development o executing-plans. Dal momento in cui il nucleo funziona si può usarlo su se stesso, in una cartella diversa da quella di sviluppo (spec, sezione 13).
 5. **Una correzione della spec scoperta durante un piano** si registra come nuova revisione della spec, non solo nel piano.
@@ -22,7 +22,7 @@ Stato: P0 scritto (`2026-10-08-tollgate-p0-verifiche.md`), P1-P5 da scrivere.
 
 | Piano | Obiettivo | Richiede | Consegna | Finito quando |
 |---|---|---|---|---|
-| **P0 Verifiche** | Provare i 13 fatti di piattaforma ancora aperti | Spec rev 16 | Rapporto `docs/verifiche/2026-10-08-p0-esiti.md`; spec rev 17 | Ogni voce di 16 ha esito `sì`, `no` o `non determinato`, e le conseguenze approvate sono nella spec |
+| **P0 Verifiche** | Provare i 13 fatti di piattaforma ancora aperti | Spec rev 17 | Rapporto `docs/verifiche/2026-10-08-p0-esiti.md`; spec rev 18 | Ogni voce di 16 ha esito `sì`, `no` o `non determinato`, e le conseguenze approvate sono nella spec |
 | **P1 Fondamenta** | La libreria su cui poggia tutto: configurazione, DB, eventi, fasi, task, atti | P0 chiuso | `bin/tollgate` con i sottocomandi di base; pacchetto `tollgate_core` | Test unitari verdi; criteri 25 e la parte DB del 17 |
 | **P2 Guardrail** | Gli hook locali e le analisi pure che userà anche il gate | P1 | Wrapper `hooks/run`, adattatore, registro dei controlli, `verify`, `waiver`, `block`; pacchetto `tollgate_analysis`; `plugin.json`, `hooks.json` | Ogni riga di 7.2 e 7.4 testata con input JSON reale di Claude Code; criteri della colonna P2 |
 | **P3 Flusso** | Il ciclo completo in locale: dall'issue alla PR | P2 | Skill, agenti, `start`, `execute` e `task`, `finish`, `open-pr`, `sync`, `adopt`, `cleanup`, `abandon`, `reopen`, audit della spec | Test di integrazione su repo git temporaneo con `TOLLGATE_GH` finto; criteri della colonna P3 |

@@ -1,7 +1,7 @@
 # tollgate: specifica del nucleo (sotto-progetto A)
 
 Data: 8 ottobre 2026.
-Revisione: **16**: profili verticali con implementatore e revisore del task propri a tutti i livelli, specialisti finali in L2 per sicurezza e database, tetto di 3 skill (decisione dell'utente). Il catalogo dei profili è in `2026-10-08-tollgate-profili-verticali.md`. La revisione 14 ha chiuso l'audit come «sospeso»; i residui sono nel file di stato. Le revisioni precedenti sono nella sezione 20.
+Revisione: **17**: profili verticali e trasversali, precedenza per specificità, CI del progetto non più protetta (decisioni dell'utente). Revisione 16: implementatori e revisori per area, specialisti finali in L2, tetto di 3 skill. Il catalogo dei profili è in `2026-10-08-tollgate-profili-verticali.md`. La revisione 14 ha chiuso l'audit come «sospeso»; i residui sono nel file di stato. Le revisioni precedenti sono nella sezione 20.
 Stato: **audit sospeso, pronta per il piano** (`docs/audit/2026-10-08-audit-spec-nucleo-stato.md`).
 Fonti: `docs/REPORT-CONFRONTO-WORKFLOW.md`, `docs/COSA-TENERE.md`, `docs/RICERCA-PAPER.md`. I codici R e H usati nel testo sono spiegati nella sezione 19.
 
@@ -28,7 +28,7 @@ Fonti: `docs/REPORT-CONFRONTO-WORKFLOW.md`, `docs/COSA-TENERE.md`, `docs/RICERCA
 | **chiave del repo** | L'URL di `origin` normalizzato: senza protocollo né `.git`, in minuscolo (`github.com/proprietario/nome`) |
 | **repo attivo** | Un repo con `tollgate.toml` sulla punta del ramo predefinito di `origin` (7.1). **Negli altri repo tollgate non fa niente** |
 | **cartella di stato** | `~/.local/state/tollgate`: contiene DB, log, file del contesto e interruttore. È una per macchina: `OFF` spegne tollgate in tutti i repo e in tutte le sessioni |
-| **file di tollgate** | `tollgate.toml`, `.github/workflows/**`, `.github/actions/**`, `.github/tollgate/**` |
+| **file di tollgate** | `tollgate.toml`, `.github/workflows/tollgate-*.yml`, `.github/actions/tollgate-*/**`, `.github/tollgate/**`. Gli altri workflow sono codice del progetto: profilo `ci` ad alto rischio e controlli di `guard` (9.2) |
 | **file protetti** | I file di tollgate, più `.tollgate/waivers/**`, `docs/superpowers/reviews/**` (li scrivono solo hook e CLI), le impostazioni di Claude Code, `.git/hooks/**`, `.git/config`, la cartella di stato e i plugin installati sotto `~/.claude/plugins/` (7.4) |
 
 **Flusso e controlli**
@@ -387,6 +387,8 @@ execution (sessione pulita)
 ```
 
 **Skill e implementatori per area.** I profili del task sono quelli il cui `paths` contiene almeno uno dei file `Create:`/`Modify:`/`Test:` del task (stessa regola di attivazione di 9.2, applicata al task).
+- **Verticali e trasversali:** un profilo `kind = "vertical"` è un'area di codice e può avere agenti; un profilo `kind = "cross"` (accessibilità, performance) non ha agenti e aggiunge i suoi `reviewer_skills` ai revisori dei verticali che lo elencano in `cross`.
+- **Un file, un profilo verticale.** Se un file corrisponde a più profili verticali vince il pattern **più specifico**: quello con più segmenti di percorso letterali (senza `*`); a parità, il primo dichiarato in `tollgate.toml`. `init` mostra le sovrapposizioni sui file reali del repo.
 - **Skill:** il brief dell'implementatore elenca l'unione dei campi `skills` di quei profili, al massimo 3; quello del revisore elenca l'unione dei `reviewer_skills`, al massimo 3. Se l'unione supera 3, `plan-check` lo segnala e `plan-adversary` chiede di dividere il task. Ogni implementatore usa in più le skill comuni di `tollgate:implementer` (TDD, debugging, verifica), che non contano nel tetto. `SubagentStop` controlla che l'implementatore abbia invocato ognuna (eventi `PostToolUse` dello strumento `Skill` con il suo `agent_id`); se ne manca una, veto con l'elenco, come per la ricevuta (8.1). Una skill non installata non blocca: il brief la segna come assente e `attenzione` lo riporta.
 - **Implementatore e revisore per area, a tutti i livelli:** se i profili del task dichiarano **un solo** `agent` non vuoto, `task start` sceglie quell'agente, e allo stesso modo `reviewer` per il revisore del task; con zero, o con agenti diversi (task a cavallo di più aree), sceglie `tollgate:implementer` e `tollgate:task-reviewer` con l'unione delle skill, e `plan-adversary` segnala il task come candidato a essere diviso. In L0 non ci sono subagenti: la sessione principale riceve nel promemoria le skill dei profili toccati.
 - **Cosa rende diverso un implementatore per area:** prompt con le regole dell'area, strumenti propri (per esempio un server MCP del database o gli strumenti del browser), modello proprio. Deriva dallo stesso testo di `tollgate:implementer` e ne mantiene gli obblighi (TDD, `verify`, stati, report). Un nome di ruolo senza contesto o strumenti diversi non giustifica un agente a sé (ricerca, filone 6).
@@ -697,6 +699,7 @@ Se qualcosa non torna pubblica `error`. Le PR verso altri rami ricevono «non ap
 | Controllo | Dove | Esito |
 |---|---|---|
 | File di tollgate uguali alla punta del predefinito | `guard` | Obbligatorio, salvo 9.4 |
+| Workflow del progetto nuovi o modificati: nessuno dichiara `statuses: write` o `checks: write`, usa `pull_request_target` o `workflow_run`, o manca del blocco `permissions` | `guard` | Rosso: così un workflow aggiunto in una PR non può pubblicare stati falsi. Le altre modifiche alla CI passano, con la deroga `ci` (8.3) e `attenzione` rosso |
 | Comandi del gate (globali e dei profili attivi), da zero | `run` → `verdict` | Rosso se `red` (compreso un report con `failure` o `error`), `empty` o `uncounted` senza `allow_no_tests`, `unverified` senza `approve unverified-tests` dichiarato |
 | **Issue della PR.** Per un ramo `tg/<N>-*`: N dal nome del ramo, uguale a «Closes #N» e a `issue` nel JSON, issue aperta. Per gli altri rami: da «Closes #N», issue aperta | `verdict` | Rosso se non torna: senza issue valida non si legge nessuna deroga |
 | Identificativi della base eseguiti sulla testa (uno `skipped` è mancante), salvo deroghe `test` | `verdict` | Rosso |
@@ -897,6 +900,8 @@ events_days    = 180
 active = []          # vuoto = attivazione per paths sul diff; nomi = sempre attivi
 
 [profiles.base]      # contratto di un profilo (B ne aggiunge altri)
+kind           = "vertical"   # vertical | cross (6.3)
+cross          = []   # profili trasversali le cui regole si aggiungono al revisore
 paths          = ["**"]
 setup          = ""   # gira dopo il setup globale; i profili in ordine di nome
 commands       = {}   # comandi propri del profilo: { nome = "comando" }
@@ -1129,7 +1134,8 @@ Ogni criterio è un'azione con un esito binario.
     - **`verdict` rosso**: test tolti, `skip`, file fuori scope, identificativo della base mancante, `"check": "vitest run || true"` con un test che fallisce, livello sotto il minimo senza tetto, report L2 mancante;
     - **deroghe**: una deroga nel file di un'altra issue non scioglie la violazione;
     - **`tollgate/sentinel` rosso e issue aperta**: push diretto sul predefinito; merge di una PR con `verdict` rosso (nel repo `detect`);
-    - **`guard` rosso**: `tollgate.toml` cambiato, workflow aggiunto fuori da `tollgate-config/*`;
+    - **`guard` rosso**: `tollgate.toml` cambiato, `tollgate-verdict.yml` modificato fuori da `tollgate-config/*`, workflow del progetto aggiunto con `statuses: write`;
+    - **verde con `attenzione`**: workflow del progetto modificato con `permissions: contents: read` e deroga `ci`;
     - **`attenzione` rosso**: deroga `test`, piano diverso dal primo, tetto di livello dichiarato, `allow_no_tests` con zero test;
     - **`error`**: `../` in un artefatto, XML con entità, SHA superato;
     - **«non applicabile»**: PR verso un ramo non predefinito.
@@ -1225,6 +1231,7 @@ Ogni criterio è un'azione con un esito binario.
 - i rulesets sui repo privati di un account Free e la risposta esatta della GET di protezione in quel caso;
 - se i comandi `!` digitati dall'utente passano dagli hook `PreToolUse`;
 - `deny` in `bypassPermissions`;
+- `skills:` nel frontmatter di un agente di plugin (precarica la skill?) e `mcpServers` ignorato nei subagenti di plugin;
 - `UserPromptExpansion` per le skill con `disable-model-invocation` e per la forma breve;
 - `EnterWorktree` dentro la skill `start`;
 - sorgente fissata per gli stati di commit e identificativo dell'app GitHub Actions;
@@ -1382,3 +1389,4 @@ L'elenco completo è in `docs/COSA-TENERE.md`.
 | 14 | 08/10/2026 | Correzioni dei cicli 51-54: `PreToolUse SendMessage` per le riprese; transizioni di `tasks` e precondizioni di `task start`/`task done`; `task review-prepare` con SHA e codice; task di correzione da rilievi e gate (`--from-findings`, `--from-gate`); `reopen spec|plan` e transizioni in 12.3; piano registrato solo in fase `plan`, in L2 ad `approve plan`; brainstorming fermato prima di writing-plans; spec bloccata da `approve spec`; brief e revisione dal piano a `plan_sha`; `finish` legato a HEAD e non alla sessione; `.tollgate-run/` in `info/exclude`; `events --after-seq` con `seq`; tipi `task_change` e `finding`; `ctx` con tutte le tabelle; `order` e moduli rifiutati; `confidence` nel JSON; criterio 37. Audit chiuso come sospeso |
 | 15 | 08/10/2026 | Decisione dell'utente: specializzazione per area. Campi `skills` e `agent` nel contratto dei profili; skill nel brief e controllate da `SubagentStop` tramite `PostToolUse Skill`; in L2 implementatore per area scelto da `task start` quando il task tocca un solo profilo con `agent`; agenti concreti in B; criterio 38 |
 | 16 | 08/10/2026 | Decisione dell'utente: profili verticali. Implementatore e revisore del task per area a tutti i livelli (sostituiscono i generici); specialisti finali in L2 solo per i profili con `final_specialist` (sicurezza e database); tetto di 3 skill obbligatorie per agente; campi `reviewer`, `reviewer_skills`, `final_specialist`; catalogo in un documento a parte; criterio 38 riscritto |
+| 17 | 08/10/2026 | Decisioni dell'utente: profili `vertical` e `cross` con campo `cross`; precedenza al pattern più specifico; file di tollgate ristretti ai workflow `tollgate-*`, workflow del progetto controllati da `guard` (permessi ed eventi) e coperti dal profilo `ci`; verifica di `skills:` e `mcpServers` negli agenti di plugin |

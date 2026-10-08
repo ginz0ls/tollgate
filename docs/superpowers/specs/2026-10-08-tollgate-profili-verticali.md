@@ -1,7 +1,7 @@
 # tollgate: catalogo dei profili verticali
 
-Data: 8 ottobre 2026. Stato: **bozza da approvare**.
-Spec del nucleo: `2026-10-08-tollgate-nucleo-design.md` (revisione 16, sezioni 6.3, 10 e 11.4). Il nucleo dà il contratto e l'instradamento; questo documento dice **quali profili** esistono e cosa porta ciascuno. Li realizza il sotto-progetto B.
+Data: 8 ottobre 2026. Stato: **bozza: le regole `rules-<area>` vanno scritte e riviste dall'utente**.
+Spec del nucleo: `2026-10-08-tollgate-nucleo-design.md` (revisione 17, sezioni 6.3, 10 e 11.4). Il nucleo dà il contratto e l'instradamento; questo documento dice **quali profili** esistono e cosa porta ciascuno. Li realizza il sotto-progetto B.
 
 Fonti: tre ricerche dell'8 ottobre 2026 (catalogo di 1.015 skill e 644 agenti su disco, ricerca web per area e ruolo, raccolte esistenti di subagenti). I riassunti sono nella sezione 7.
 
@@ -10,7 +10,7 @@ Fonti: tre ricerche dell'8 ottobre 2026 (catalogo di 1.015 skill e 644 agenti su
 ## 1. Principi
 
 1. **Due tipi di profilo.**
-   - **Verticale**: un'area di codice riconoscibile dai percorsi. Ha implementatore e revisore del task propri. I percorsi dei profili verticali **non si sovrappongono**: un file appartiene al massimo a un profilo verticale, altrimenti l'instradamento di `task start` diventerebbe ambiguo. `init` rifiuta una configurazione con sovrapposizioni.
+   - **Verticale**: un'area di codice riconoscibile dai percorsi. Ha implementatore e revisore del task propri. I percorsi dei profili verticali **non si sovrappongono**: un file appartiene al massimo a un profilo verticale, altrimenti l'instradamento di `task start` diventerebbe ambiguo. Se un file corrisponde a più profili verticali vince il pattern più specifico (più segmenti letterali), a parità il primo dichiarato (decisione dell'utente).
    - **Trasversale**: una qualità che attraversa le aree (accessibilità, performance). Non ha agenti: aggiunge regole e skill al revisore dei profili verticali che lo dichiarano.
 2. **Regole nostre prima, skill esterne poi.** Ogni profilo ha una skill di regole scritta da noi, `tollgate:rules-<area>`, che sta nel plugin e quindi c'è su ogni macchina. Le skill esterne sono un rinforzo: se mancano, il lavoro procede con le sole regole.
 3. **Stesse regole per chi scrive e per chi rivede.** Implementatore e revisore dello stesso profilo caricano la stessa `rules-<area>`: il primo la applica, il secondo la verifica regola per regola e cita l'identificativo nel rilievo (`R-FE-07`).
@@ -41,6 +41,7 @@ Percorsi predefiniti: `init` li propone e l'utente li adatta al progetto. Nomi d
 | `e2e` | `e2e/**`, `**/playwright.config.*`, `tests/e2e/**` | L1 | no |
 | `copy` | `**/locales/**`, `**/i18n/**`, `**/messages/**`, `content/**` | L0 | no |
 | `docs` | `docs/**` (escluso `docs/superpowers/**`), `README*`, `**/*.mdx` | L0 | no |
+| `ci` | `.github/workflows/**` (esclusi `tollgate-*`), `.gitlab-ci.yml`, `scripts/ci/**` | **L2** | sì, `final-security` |
 | `mobile` | `ios/**`, `android/**`, `capacitor.config.*` | L1 | no |
 | `analytics` | `**/analytics/**`, `**/tracking/**` | L1 | no |
 | *(generico)* | tutto il resto | — | — |
@@ -61,6 +62,7 @@ Colonna «Skill»: le 3 obbligatorie, la prima sempre la nostra. In corsivo le e
 | `e2e` | `rules-e2e`, `agent-skills:browser-testing-with-devtools` · *webapp-testing, playwright-cli* | `rules-e2e` | — |
 | `copy` | `rules-copy`, `humanizer`, `copy-editing` | `rules-copy`, `humanizer` | — |
 | `docs` | `rules-docs`, `agent-skills:documentation-and-adrs`, `humanizer` | `rules-docs`, `humanizer` | — |
+| `ci` | `rules-ci`, `agent-skills:ci-cd-and-automation` | `rules-ci`, `rules-security` | `final-security` (stesso agente di `security`) |
 | `mobile` | `rules-mobile` | `rules-mobile`, `rules-a11y` | — |
 | `analytics` | `rules-analytics`, `analytics-tracking` | `rules-analytics` | — |
 | *(generico)* | solo le comuni | solo le comuni | — |
@@ -124,6 +126,7 @@ Fonti: frontend-design (Anthropic, Apache-2.0), frontend-ui-engineering (Addy Os
 | `rules-copy`, `rules-docs` | `humanizer` (licenza da verificare), `documentation-and-adrs` (MIT). Idee: Vercel writing-guidelines (senza licenza) |
 | `rules-mobile`, `rules-analytics` | Da scrivere quasi da zero: nessuna fonte adatta trovata. Si scrivono solo quando un progetto reale le usa |
 | `rules-performance` | `performance-optimization` (MIT), `web-perf` (Cloudflare, Apache-2.0) |
+| `rules-ci` | `ci-cd-and-automation` (MIT), `gha-security-review` di getsentry (Apache-2.0, da leggere). Idee: Trail of Bits `agentic-actions-auditor` (CC-BY-SA). Regole minime: `permissions` esplicito e minimo, azioni fissate a uno SHA, nessun segreto in `pull_request` da fork, nessun `pull_request_target` con checkout del codice della PR |
 
 **Processo per ogni `rules-<area>`.** Bozza distillata dalle fonti, con la fonte di ogni regola → revisione dell'utente → versione 1 nel plugin. Le regole cambiano con una PR, come il resto del plugin.
 
@@ -131,8 +134,8 @@ Fonti: frontend-design (Anthropic, Apache-2.0), frontend-ui-engineering (Addy Os
 
 ## 5. Problemi aperti emersi scrivendo il catalogo
 
-1. **I workflow del progetto sono file protetti.** Nella spec, `.github/workflows/**` è tra i «file di tollgate»: nessun lavoro può modificare la CI del progetto, e `guard` diventa rosso. Per questo il catalogo **non ha un profilo CI/CD**. Serve una decisione: limitare i file protetti ai soli workflow di tollgate (`tollgate-*.yml`) e trattare gli altri workflow come codice ad alto rischio (profilo `ci`, livello minimo L2, deroga `ci` già prevista in 8.3), oppure lasciare la CI fuori dai lavori di tollgate.
-2. **Sovrapposizioni tra profili verticali.** I percorsi predefiniti si toccano, per esempio `**/auth/**` dentro `api/**`. Serve una regola di precedenza: il profilo con il pattern più specifico vince, oppure `init` chiede all'utente.
+1. ~~I workflow del progetto erano file protetti.~~ **Risolto (spec rev 17):** protetti solo i workflow `tollgate-*`; gli altri sono il profilo `ci` (L2), e `guard` rifiuta i workflow che potrebbero pubblicare stati falsi.
+2. ~~Sovrapposizioni tra profili verticali.~~ **Risolto (spec rev 17):** vince il pattern più specifico.
 3. **`mcpServers` ignorato nei subagenti di plugin.** Va confermato in P0 insieme a `skills:` nel frontmatter.
 4. **Profili per progetti non web** (Python di dati, CLI, librerie) non sono coperti: cadono nel generico. Si aggiungono quando servono.
 
@@ -140,10 +143,7 @@ Fonti: frontend-design (Anthropic, Apache-2.0), frontend-ui-engineering (Addy Os
 
 ## 6. Cosa cambia nella spec del nucleo
 
-- 11.4: campo `kind = "vertical" | "cross"` nel contratto del profilo; i profili `cross` non hanno `agent`, `reviewer` né `final_specialist`, e i loro `reviewer_skills` si aggiungono ai revisori dei verticali che li elencano in `cross = [...]`.
-- 6.3: i percorsi dei profili verticali non si sovrappongono; regola di precedenza (problema aperto 2).
-- 7.2 e 16: verifica di `mcpServers` e `skills:` nei subagenti di plugin.
-- Decisione sul problema aperto 1, file protetti e CI.
+Applicato nella revisione 17: campi `kind` e `cross` (11.4), precedenza per specificità (6.3), file di tollgate ristretti e controllo dei workflow in `guard` (0, 9.2), verifica di `skills:` e `mcpServers` (16, e P0 esperimento E5).
 
 ---
 
