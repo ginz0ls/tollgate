@@ -13,6 +13,7 @@ from .paths import State, ensure_dirs
 
 BIN_PATH = Path(__file__).resolve().parents[1] / "tollgate"
 KEEP_BACKUPS = 10
+BUSY_TIMEOUT_MS = 5000
 
 
 class DbError(Exception):
@@ -127,7 +128,8 @@ def tx(conn: sqlite3.Connection):
     try:
         yield conn
     except BaseException:
-        conn.execute("ROLLBACK")
+        if conn.in_transaction:
+            conn.execute("ROLLBACK")
         raise
     else:
         conn.execute("COMMIT")
@@ -165,16 +167,20 @@ def _migrate(conn: sqlite3.Connection, state: State) -> None:
 
 def open_db(state: State) -> sqlite3.Connection:
     ensure_dirs(state)
-    conn = sqlite3.connect(state.db_path, timeout=5.0, isolation_level=None)
+    conn = sqlite3.connect(state.db_path, timeout=BUSY_TIMEOUT_MS / 1000, isolation_level=None)
     conn.row_factory = sqlite3.Row
     try:
-        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=FULL")
         conn.execute("PRAGMA foreign_keys=ON")
         _migrate(conn, state)
     except sqlite3.DatabaseError as e:
         conn.close()
+        code = getattr(e, "sqlite_errorcode", None)
+        if code is None or (code & 0xFF) not in (sqlite3.SQLITE_CORRUPT, sqlite3.SQLITE_NOTADB):
+            raise DbError(f"DB di tollgate non disponibile ({state.db_path}): {e}. "
+                          f"Per spegnere tollgate: touch {state.root / 'OFF'}") from e
         raise DbCorrupt(f"DB di tollgate guasto ({state.db_path}): {e}. "
                         f"Ripristino dal terminale: {restore_hint()}. "
                         f"Per spegnere tollgate: touch {state.root / 'OFF'}") from e
@@ -194,24 +200,32 @@ def backup(conn: sqlite3.Connection, state: State, reason: str) -> Path:
     while dst_path.exists():
         dst_path = state.backup_dir / f"tollgate-{stamp}-{n}-{tag}.db"
         n += 1
-    dst = sqlite3.connect(dst_path)
+    tmp_path = dst_path.with_name(".tmp-" + dst_path.name)
+    dst = sqlite3.connect(tmp_path)
     try:
-        conn.backup(dst)
-    finally:
-        dst.close()
+        try:
+            conn.backup(dst)
+        finally:
+            dst.close()
+        tmp_path.replace(dst_path)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
     for old in sorted(state.backup_dir.glob("tollgate-*.db"))[:-KEEP_BACKUPS]:
-        old.unlink()
+        old.unlink(missing_ok=True)
     return dst_path
 
 
 def integrity_ok(path: Path) -> bool:
     try:
+        if path.stat().st_size == 0:
+            return False
         conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
         try:
             return conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         finally:
             conn.close()
-    except sqlite3.DatabaseError:
+    except (sqlite3.DatabaseError, OSError):
         return False
 
 

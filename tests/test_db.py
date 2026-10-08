@@ -66,6 +66,19 @@ class OpenTest(unittest.TestCase):
         self.assertIn(str(db.BIN_PATH) + " db restore", str(cm.exception))
         self.assertTrue(db.BIN_PATH.is_absolute())
 
+    def test_locked_db_is_not_reported_as_corrupt(self):
+        holder = sqlite3.connect(self.t.state.db_path, isolation_level=None)
+        holder.execute("BEGIN EXCLUSIVE")
+        try:
+            with mock.patch.object(db, "BUSY_TIMEOUT_MS", 100):
+                with self.assertRaises(db.DbError) as cm:
+                    db.open_db(self.t.state)
+        finally:
+            holder.close()
+        self.assertNotIsInstance(cm.exception, db.DbCorrupt)
+        self.assertNotIn("db restore", str(cm.exception))
+        self.assertIn("OFF", str(cm.exception))
+
     def test_unique_active_work(self):
         conn = db.open_db(self.t.state)
         insert_work(conn, phase="plan")
@@ -101,6 +114,20 @@ class TxTest(unittest.TestCase):
         self.assertEqual(self.conn.execute("SELECT count(*) FROM work_items").fetchone()[0], 0)
 
 
+class TxRollbackTest(unittest.TestCase):
+    def test_original_error_survives_manual_rollback(self):
+        t = TempState()
+        conn = db.open_db(t.state)
+        try:
+            with self.assertRaises(RuntimeError):
+                with db.tx(conn):
+                    conn.execute("ROLLBACK")
+                    raise RuntimeError("x")
+        finally:
+            conn.close()
+            t.cleanup()
+
+
 class BackupTest(unittest.TestCase):
     def setUp(self):
         self.t = TempState()
@@ -116,6 +143,26 @@ class BackupTest(unittest.TestCase):
         self.assertEqual(len(left), 10)
         self.assertEqual(left[-1], paths[-1].name)
         self.assertNotIn(paths[0].name, left)
+
+    def test_prune_tolerates_vanished_backup(self):
+        paths = [db.backup(self.conn, self.t.state, f"p-{i}") for i in range(10)]
+        paths[0].unlink()
+        db.backup(self.conn, self.t.state, "p-10")
+        db.backup(self.conn, self.t.state, "p-11")
+        self.assertEqual(len(list(self.t.state.backup_dir.glob("*.db"))), 10)
+
+    def test_failed_copy_leaves_nothing(self):
+        before = set(self.t.state.backup_dir.iterdir())
+        broken = mock.Mock()
+        broken.backup.side_effect = sqlite3.OperationalError("x")
+        with self.assertRaises(sqlite3.OperationalError):
+            db.backup(broken, self.t.state, "fallita")
+        self.assertEqual(set(self.t.state.backup_dir.iterdir()), before)
+
+    def test_integrity_false_for_empty_file(self):
+        p = self.t.state.backup_dir / "vuoto.db"
+        p.write_bytes(b"")
+        self.assertFalse(db.integrity_ok(p))
 
     def test_backup_is_consistent(self):
         insert_work(self.conn)
@@ -155,6 +202,8 @@ class RestoreTest(unittest.TestCase):
         self.corrupt()
         self.assertEqual(db.restore(self.t.state, interactive=True, confirm=lambda q: False),
                          "annullato")
+        self.assertTrue(self.t.state.db_path.exists())
+        self.assertFalse(self.t.state.broken_dir.exists() and any(self.t.state.broken_dir.iterdir()))
 
     def test_restores_last_good_copy(self):
         self.corrupt()
