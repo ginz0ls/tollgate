@@ -28,6 +28,7 @@ class OpenTest(unittest.TestCase):
 
     def test_pragmas_and_tables(self):
         conn = db.open_db(self.t.state)
+        self.addCleanup(conn.close)
         self.assertEqual(conn.execute("PRAGMA journal_mode").fetchone()[0], "wal")
         self.assertEqual(conn.execute("PRAGMA synchronous").fetchone()[0], 2)
         self.assertEqual(conn.execute("PRAGMA busy_timeout").fetchone()[0], 5000)
@@ -72,9 +73,11 @@ class OpenTest(unittest.TestCase):
         extra = db.MIGRATIONS + [(2, ["CREATE TABLE extra (x INTEGER)"])]
         with mock.patch.object(db, "MIGRATIONS", extra):
             conn = db.open_db(self.t.state)
+        self.addCleanup(conn.close)
         backups = list(self.t.state.backup_dir.glob("*migrazione-2*.db"))
         self.assertEqual(len(backups), 1)
         old = sqlite3.connect(backups[0])
+        self.addCleanup(old.close)
         self.assertIsNone(old.execute(
             "SELECT name FROM sqlite_master WHERE name='extra'").fetchone())
         self.assertIsNotNone(conn.execute(
@@ -102,6 +105,7 @@ class OpenTest(unittest.TestCase):
 
     def test_unique_active_work(self):
         conn = db.open_db(self.t.state)
+        self.addCleanup(conn.close)
         insert_work(conn, phase="plan")
         with self.assertRaises(sqlite3.IntegrityError):
             insert_work(conn, phase="execution")
@@ -189,7 +193,9 @@ class BackupTest(unittest.TestCase):
         insert_work(self.conn)
         p = db.backup(self.conn, self.t.state, "fase")
         self.assertTrue(db.integrity_ok(p))
-        self.assertEqual(sqlite3.connect(p).execute("SELECT count(*) FROM work_items").fetchone()[0], 1)
+        copy = sqlite3.connect(p)
+        self.addCleanup(copy.close)
+        self.assertEqual(copy.execute("SELECT count(*) FROM work_items").fetchone()[0], 1)
 
 
 class RestoreTest(unittest.TestCase):
@@ -231,6 +237,7 @@ class RestoreTest(unittest.TestCase):
         msg = db.restore(self.t.state, interactive=True, confirm=lambda q: True)
         self.assertIn("ripristinata", msg)
         conn = db.open_db(self.t.state)
+        self.addCleanup(conn.close)
         self.assertEqual(conn.execute("SELECT count(*) FROM work_items").fetchone()[0], 1)
         self.assertEqual(len(list(self.t.state.broken_dir.rglob("tollgate.db"))), 1)
 
@@ -241,4 +248,5 @@ class RestoreTest(unittest.TestCase):
         msg = db.restore(self.t.state, interactive=True, confirm=lambda q: True)
         self.assertIn("/tollgate:adopt", msg)
         conn = db.open_db(self.t.state)
+        self.addCleanup(conn.close)
         self.assertEqual(conn.execute("SELECT count(*) FROM work_items").fetchone()[0], 0)

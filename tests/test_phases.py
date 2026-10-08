@@ -168,6 +168,22 @@ class BlockTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             phases.open_block(self.conn, self.t.state, self.w, "boh", "r", now=T0)
 
+    def test_closing_work_closes_its_open_blocks(self):
+        b1 = phases.open_block(self.conn, self.t.state, self.w, "needs_you", "r1", now=T0)
+        b2 = phases.open_block(self.conn, self.t.state, self.w, "transient", "r2", now=T0)
+        before = len([e for e in events.export_events(self.conn, 0)
+                      if e["type"] == "block_closed"])
+        phases.set_phase(self.conn, self.t.state, self.w, "closed", "merged", now=T0)
+        rows = self.conn.execute("SELECT * FROM blocks WHERE work = ?", (self.w,)).fetchall()
+        self.assertEqual(len(rows), 2)
+        for r in rows:
+            self.assertIsNotNone(r["closed"])
+            self.assertEqual(r["resolution"], "lavoro chiuso: merged")
+        self.assertIsNone(phases.get_work(self.conn, self.w)["phase_before_block"])
+        closed = [e for e in events.export_events(self.conn, 0) if e["type"] == "block_closed"]
+        self.assertEqual(len(closed), before + 2)
+        self.assertEqual({e["data"]["id"] for e in closed[before:]}, {b1, b2})
+
     def test_set_phase_from_blocked_only_to_closed(self):
         phases.open_block(self.conn, self.t.state, self.w, "needs_you", "r", now=T0)
         with self.assertRaises(TransitionError):

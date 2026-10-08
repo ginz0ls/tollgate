@@ -102,6 +102,7 @@ class ConcurrencyTest(unittest.TestCase):
             _, err = p.communicate(timeout=120)
             self.assertEqual(p.returncode, 0, err)
         conn = db.open_db(self.t.state)
+        self.addCleanup(conn.close)
         got = events.export_events(conn, 0)
         self.assertEqual(len(got), 300)
         seqs = [e["seq"] for e in got]
