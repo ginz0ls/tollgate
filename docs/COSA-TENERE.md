@@ -197,6 +197,30 @@ Fonte: `docs/RICERCA-PAPER.md`, sezione 3. Prevalgono sulle voci precedenti dove
 | R13 | Le osservazioni della revisione si registrano come accettate o rifiutate, per tarare la soglia di confidenza | Sotto-progetto C | — |
 | R15 | Negli eval si misura il costo dei subagenti: uno per task contro task piccoli raggruppati | Sotto-progetto D | — |
 
+## 9. Ruoli e revisione (decisi l'8 ottobre 2026)
+
+**Ruoli.**
+- **Coordinatore.** È la sessione principale. Parla con te, fa il brainstorming, **scrive spec e piano** (non c'è un subagente pianificatore), lancia i subagenti e legge solo i verdetti. Non scrive codice, tranne in L0.
+- **Implementatore.** Un subagente nuovo per ogni task. È l'unico che scrive codice, un task alla volta.
+- **Revisore del task.** Quello di Superpowers, in sola lettura, dopo ogni task.
+- **Avversario del piano.** Solo in L2, in sola lettura, riceve piano e spec senza le motivazioni di chi li ha scritti.
+- **Script.** `verify`, `test-guard` e `state` producono i fatti; gli hook li fanno rispettare.
+
+**Revisione finale** (fonte: `docs/ricerca/06-revisori-specializzati.md`).
+
+| Livello | Chi rivede |
+|---|---|
+| L0 | Nessun agente: ricevute degli script e merge tuo |
+| L1 | **Revisore finale di tollgate** con la checklist dei profili attivi → **verificatore di tollgate per ogni problema segnalato** (conferma con prove o scarta) → verdetto JSON |
+| L2 | Revisore finale di tollgate + **specialisti di Anthropic** scelti in base ai profili attivi, al massimo 3, ognuno con il suo contesto: sicurezza → `/security-review`; test → `pr-review-toolkit:pr-test-analyzer`; backend → `pr-review-toolkit:silent-failure-hunter`. Più Codex come parere, se installato → stesso verificatore → verdetto JSON |
+
+**Decisioni.**
+- **Revisore finale e verificatore li scrive tollgate.** Sono gli unici che conoscono piano, scope, must-have e ricevute, cercano i trucchi sui test (R3) e restituiscono il verdetto JSON che il gate legge.
+- **Il verificatore per ogni problema sostituisce il filtro di confidenza ≥80** (voce 26). La ricerca indica che conta la verifica con prove, non il numero di revisori né il punteggio di confidenza.
+- **Gli specialisti sono di Anthropic** (`pr-review-toolkit`, licenza Apache 2.0, e `/security-review`), dichiarati come dipendenza con un intervallo di versioni. Il gate dipende solo dal verificatore di tollgate. Ogni specialista si può spegnere (R10). Sostituisce la voce 27.
+- **Il plugin `code-review` di Anthropic non si usa come gate.** Serve a commentare le PR e per scelta scarta copertura dei test e sicurezza; inoltre cambia nel tempo. Il `/code-review` integrato in Claude Code resta solo come passata extra opzionale.
+- **In L1 non ci sono revisori specializzati.** Non ci sono prove di beneficio e il costo è alto. La soglia sotto cui basta un revisore va misurata negli eval.
+
 ## Verifica sulla documentazione ufficiale (8 ottobre 2026)
 
 Fonti: [hooks](https://code.claude.com/docs/en/hooks.md), [sub-agents](https://code.claude.com/docs/en/sub-agents.md), [statusline](https://code.claude.com/docs/en/statusline.md), [plugin components](https://code.claude.com/docs/en/plugins/components.md), [dependencies](https://code.claude.com/docs/en/plugins/dependencies.md), [plugin evals](https://code.claude.com/docs/en/plugin-evals.md). Ho controllato anche il codice di Superpowers 6.4.1 installato.
