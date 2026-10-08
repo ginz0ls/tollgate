@@ -1,7 +1,7 @@
 # tollgate: specifica del nucleo (sotto-progetto A)
 
 Data: 8 ottobre 2026.
-Revisione: **6**. Il controllo autorevole è su GitHub (decisione dell'utente, 08/10/2026); la sezione 18 elenca le revisioni.
+Revisione: **7**. Il controllo autorevole è su GitHub (decisione dell'utente, 08/10/2026); la sezione 18 elenca le revisioni.
 Stato: **in audit** (`docs/audit/2026-10-08-audit-spec-nucleo-stato.md`).
 Fonti: `docs/REPORT-CONFRONTO-WORKFLOW.md`, `docs/COSA-TENERE.md` (voci 1-42, H1-H45, R1-R16, sezioni 9 e 10), `docs/RICERCA-PAPER.md`.
 
@@ -41,7 +41,7 @@ Il flusso di lavoro resta quello di **Superpowers**: brainstorming → writing-p
 | Livello | Dove gira | A cosa serve | Cosa garantisce |
 |---|---|---|---|
 | **Guardrail locali** | Hook di Claude Code sulla macchina dell'utente | Fermare **subito** le scorciatoie e gli errori onesti del modello: test modificati, «fatto» senza prove, file fuori scope, effetti esterni non confermati, scrittura di codice dal coordinatore | **Nessuna garanzia contro un agente che lavora per aggirarli.** Un agente con Bash sulla stessa macchina può alterare DB, configurazione e processi locali (verificato dalla seconda revisione avversariale) |
-| **Gate su GitHub** | Tre workflow (9.1): `guard` e `verdict` usano la definizione del ramo predefinito e non eseguono codice della PR; `run` esegue il codice della PR senza permessi di scrittura. Più la protezione del ramo | Ricalcolare **da zero** i fatti della PR: comandi del gate, identificativi dei test della base, test-guard, coerenza dello scope, file di tollgate invariati | Una PR non entra nel ramo predefinito senza `guard` e `verdict` verdi e senza il merge dell'utente |
+| **Gate su GitHub** | Tre workflow più `tollgate-base` (9.1): `guard` e `verdict` usano la definizione del ramo predefinito e non eseguono codice della PR; `run` esegue il codice della PR senza permessi di scrittura. Più la protezione del ramo | Ricalcolare **da zero** i fatti della PR: comandi del gate, identificativi dei test della base, test-guard, coerenza dello scope, file di tollgate invariati | Una PR non entra nel ramo predefinito senza `guard` e `verdict` verdi e senza il merge dell'utente |
 
 **Perché due livelli.** I guardrail evitano di arrivare alla PR con problemi che si potevano fermare subito, e la ricerca mostra che il comportamento più frequente è la scorciatoia, non l'attacco. Il gate dà la garanzia, perché gira dove l'agente non ha potere.
 
@@ -55,6 +55,12 @@ Il flusso di lavoro resta quello di **Superpowers**: brainstorming → writing-p
 - **Lo scope e le deroghe sono dichiarati dall'agente.** Il gate verifica che il diff sia **coerente** con piano e deroghe e li mostra; non può sapere se tu li avresti approvati. Gli atti locali (approvazioni) non sono verificabili da GitHub.
 - **Il conteggio delle asserzioni si può compensare** aggiungendo asserzioni banali.
 - **Una serie di PR L0** evita piano e revisione, una PR alla volta.
+- **Il sabotaggio deliberato della CI.** Comprende i workflow aggiunti nella PR per pubblicare stati `tollgate/*` falsi o per chiedere permessi di scrittura. Qualunque workflow del repo pubblica come «GitHub Actions», quindi nella v1 la sorgente fissata non basta a escluderlo. Lo rendono visibile:
+  - la protezione locale di `.github/workflows/**`;
+  - il diff;
+  - `guard`.
+
+  La **modalità rinforzata**, con stati pubblicati solo da una GitHub App la cui chiave sta in un environment riservato al ramo predefinito, viene dopo la v1 (decisione dell'utente, 08/10/2026).
 
 ### 1.3 Fuori dal nucleo
 
@@ -63,7 +69,7 @@ Il flusso di lavoro resta quello di **Superpowers**: brainstorming → writing-p
 | Profili per tipo di file con i loro controlli; caricamento delle regole tramite hook (R8); controllo dell'esistenza dei pacchetti (R11); analisi statica nel profilo sicurezza (R12) | Sotto-progetto **B** |
 | Sotto-issue e dipendenze su GitHub Projects, riconciliazione automatica, registrazione delle tue decisioni sui rilievi (R13) | Sotto-progetto **C** |
 | Suite di eval completa con confronti e prove a componenti spenti, costo dei subagenti (R15), misura del contesto dei subagenti | Sotto-progetto **D** |
-| Dashboard locale, avvio automatico da etichetta GitHub, portabilità verso altri harness, lezioni apprese, mutation testing | Dopo la v1 |
+| Dashboard locale, avvio automatico da etichetta GitHub, portabilità verso altri harness, lezioni apprese, mutation testing, **modalità rinforzata del gate con GitHub App** | Dopo la v1 |
 
 **Agganci già pronti per i sotto-progetti successivi.**
 - Nel DB: la colonna `decisione_utente` e le tabelle `slices` ed `events`.
@@ -209,7 +215,7 @@ Atti dell'utente, fasi, ricevute e verdetti non hanno un sottocomando: li scrivo
                     e, per configurazione e gate, l'invito a /tollgate:init
   1. controlli      repo pulito; CI del ramo predefinito verde (se è rossa: avviso e conferma);
                     issue chiusa → avviso e conferma
-  2. lavoro         lavoro esistente per (chiave del repo, issue, fetta)? → ripresa (10.3); altrimenti nuovo
+  2. lavoro         lavoro esistente per (chiave del repo, issue, fetta)? → ripresa (12.3); altrimenti nuovo
   3. livello        minimo calcolato dallo script; L1 o L2 se digitati da te
   4. worktree       ramo tg/<N>-<slug>, slug ripulito ([a-z0-9-], al massimo 40 caratteri);
                     riga in work_items (fase = piano, work_base_sha)
@@ -491,17 +497,30 @@ Il gate su GitHub **non si fida degli atti locali** né dello stato delle derogh
 
 ## 9. Gate su GitHub (controllo autorevole)
 
-### 9.1 Tre workflow
+### 9.1 Tre workflow più `tollgate-base`
 
 `/tollgate:init` propone di installare nel repo una copia del CLI in `.github/tollgate/` e tre workflow:
 
 | Workflow | Evento | Definizione | Esegue codice della PR? | Permessi | Cosa fa |
 |---|---|---|---|---|---|
-| `tollgate-guard` | `pull_request_target` | Ramo predefinito | **No**: checkout del solo ramo predefinito; gli oggetti della PR si scaricano con `git fetch` senza checkout | Sola lettura | Pubblica `tollgate/guard` |
-| `tollgate-run` | `pull_request` | Quella della PR, che però `guard` impone uguale alla base | Sì | Sola lettura, nessun segreto | Esegue `setup` e i comandi del gate sulla testa; carica come artefatti il report JUnit, il diff e l'esito |
-| `tollgate-verdict` | `workflow_run` (al termine di `tollgate-run`) | Ramo predefinito (verificato) | **No**: usa il CLI e la configurazione del ramo predefinito, legge gli artefatti come **dati** in una cartella temporanea e non li esegue mai | `statuses: write`, `pull-requests: write` | Pubblica `tollgate/verdict` e `tollgate/attenzione` sul commit della PR e il commento di riepilogo |
+| `tollgate-guard` | `pull_request_target` | Ramo predefinito | **No**: checkout del solo ramo predefinito; gli oggetti della PR si scaricano con `git fetch` senza checkout | `contents: read`, `statuses: write` | Pubblica lo stato `tollgate/guard` sul commit della PR |
+| `tollgate-run` | `pull_request` | Quella della PR, che però `guard` impone uguale alla base | Sì | Sola lettura, nessun segreto | Esegue `setup` e i comandi del gate sulla testa; carica come artefatti **solo** il report JUnit, il codice d'uscita e i conteggi. Nessun filtro `paths` o `branches`: gira per ogni PR |
+| `tollgate-verdict` | `workflow_run` (al termine di `tollgate-run`) | Ramo predefinito (verificato) | **No**: usa il CLI e la configurazione del ramo predefinito. **Calcola da sé il diff** scaricando gli oggetti della PR con `git fetch`, senza checkout. Legge gli artefatti come **dati** in una cartella temporanea e non li esegue mai | `contents: read`, `statuses: write`, `pull-requests: write` | Pubblica sempre uno stato esplicito, `tollgate/verdict` e `tollgate/attenzione` (mai «saltato»), e il commento di riepilogo |
 
-Più un quarto workflow di supporto, **`tollgate-base`**: evento `push` sul ramo predefinito, codice fidato. Esegue i comandi del gate sul ramo predefinito e salva gli identificativi dei test in una cache con chiave lo SHA. Le cache del ramo predefinito si leggono dai workflow che girano nel suo contesto, come `verdict`. Se per quello SHA la cache manca, `verdict` calcola gli identificativi facendo il checkout della base, cioè con codice e dipendenze della base.
+**Controlli di `verdict` prima di valutare:**
+- l'esecuzione che l'ha avviato viene dal file atteso (`workflow_run.path`), dall'evento `pull_request` e dallo SHA che è **ancora** la testa della PR;
+- la PR punta al ramo predefinito.
+
+Se qualcosa non torna, pubblica `error` con il motivo. Le PR verso altri rami ricevono `verdict` «non applicabile»: la protezione vale sul ramo predefinito, dove arriveranno comunque.
+
+**Artefatti** (dati non fidati):
+- tetto di dimensione per file e in totale;
+- estrazione in una cartella temporanea, rifiutando percorsi con `..` o assoluti;
+- XML con `DOCTYPE` o entità rifiutato prima della lettura.
+
+Un artefatto non valido produce lo stato `error` con il motivo, mai uno stato assente.
+
+Il workflow di supporto **`tollgate-base`**: evento `push` sul ramo predefinito, codice fidato. Esegue i comandi del gate sul ramo predefinito e salva gli identificativi dei test in una cache con chiave lo SHA. Le cache del ramo predefinito si leggono dai workflow che girano nel suo contesto, come `verdict`. Se per quello SHA la cache manca, `verdict` calcola gli identificativi facendo il checkout della base, cioè con codice e dipendenze della base.
 
 ### 9.2 Cosa controllano
 
@@ -511,13 +530,18 @@ Più un quarto workflow di supporto, **`tollgate-base`**: evento `push` sul ramo
 | Comandi del gate (`[commands] gate` e `gate` dei profili attivi) eseguiti da zero dopo `setup`: esito, test eseguiti | `run` → `verdict` | **Bloccante** se rossi, oppure «vuoti» senza `allow_no_tests` |
 | **Identificativi dei test della base presenti ed eseguiti sulla testa**, salvo quelli coperti da una deroga `test` | `verdict` | **Bloccante** |
 | test-guard sul diff della PR (8.2), per **tutte** le PR | `verdict` | **Bloccante** senza deroga dichiarata |
-| Coerenza dello scope: ogni file del diff è nei piani della PR, tra gli esenti o in una deroga (solo PR da rami `tg/*`) | `verdict` | **Bloccante**. Senza piano e oltre le soglie di L0 → bloccante |
+| Coerenza dello scope: ogni file del diff è nei piani della PR, tra gli esenti o in una deroga (solo PR da rami `tg/*`) | `verdict` | **Bloccante**. Senza piano e oltre le soglie di L0 → bloccante. Più di 2 deroghe `scope` → `attenzione` rosso |
 | Livello ricalcolato. In L2 devono esserci spec, piano e report dell'avversario sotto `docs/superpowers/` | `verdict` | Informativo in `attenzione` |
-| Deroghe `test`, `ci`, `soglia`, `comando`; modifiche al piano dopo il primo commit di codice; lockfile cambiati senza manifest; test della base che falliscono sulla testa; PR da un ramo che non è `tg/*`; periodi con tollgate spento | `verdict` | `tollgate/attenzione` **rosso**, ma **non obbligatorio**: lo vedi evidenziato, decidi tu |
+| Deroghe `test`, `ci`, `soglia`, `comando`; piano della testa diverso da quello del primo commit del ramo che lo contiene (la storia del ramo è riscrivibile: è un segnale, non una prova); lockfile cambiati senza manifest; test della base che falliscono sulla testa; PR da un ramo che non è `tg/*`; periodi con tollgate spento | `verdict` | `tollgate/attenzione` **rosso**, ma **non obbligatorio**: lo vedi evidenziato, decidi tu |
 
 **Il riepilogo.**
-- Il testo scritto dall'agente (corpo della PR, motivi delle deroghe, nomi dei file) entra nel riepilogo **neutralizzato**: in blocchi di codice, senza markdown attivo.
-- Le PR da rami che non sono `tg/*` (tue, di Dependabot, di manutenzione) ricevono comandi del gate, identificativi della base e test-guard, ma non il controllo dello scope.
+- Il testo scritto dall'agente (corpo della PR, motivi delle deroghe, nomi dei file) entra nel riepilogo **neutralizzato**:
+  - in blocchi di codice delimitati da una sequenza di backtick più lunga di qualunque sequenza contenuta;
+  - con le menzioni `@` disattivate;
+  - con una lunghezza massima.
+- Il commento riporta lo SHA. `verdict` non lo aggiorna se quello SHA non è più la testa della PR.
+- Le PR da rami che non sono `tg/*` (tue, di manutenzione) ricevono comandi del gate, identificativi della base e test-guard, ma non il controllo dello scope. `attenzione` lo segnala, perché il nome del ramo lo sceglie chi apre la PR.
+- Per le PR di Dependabot i permessi dei workflow sono ridotti (verificato per `pull_request`). Se `verdict` non può pubblicare, la PR resta in attesa e la gestisci tu (13).
 
 ### 9.3 Protezione del ramo
 
@@ -534,11 +558,23 @@ Più un quarto workflow di supporto, **`tollgate-base`**: evento `push` sul ramo
 
 ### 9.4 Aggiornare configurazione e gate
 
-Una PR da un ramo `tollgate-config/*` che contiene **solo** file di tollgate:
-- passa `guard`, che lo scrive in evidenza;
-- riceve il resto del gate come le altre PR.
+Una PR da un ramo `tollgate-config/*` che contiene **solo** file di tollgate (più `.tollgate/waivers.toml`):
+- passa `guard`, e `attenzione` è **sempre rosso**;
+- è esente da test-guard e scope;
+- riceve i comandi del gate come le altre PR.
+
+Il riepilogo mostra:
+- le chiavi di `tollgate.toml` cambiate, con quelle che **allentano** il gate in evidenza (componenti spenti, glob ridotti, `allow_no_tests`);
+- se la copia del CLI in `.github/tollgate/` coincide con l'impronta pubblicata per quella versione del plugin.
 
 Così aggiorni `tollgate.toml`, i workflow o la copia del CLI senza togliere la protezione. Il merge resta tuo. L'agente può preparare la PR, ma non unirla.
+
+**Se il gate stesso è guasto**, per esempio quando `verdict` va in errore su ogni PR, la PR di riparazione è giudicata dal gate guasto. Procedura d'emergenza, solo tua:
+1. disattivi temporaneamente i controlli obbligatori dalle impostazioni del repo;
+2. fai il merge della riparazione da `tollgate-config/*`;
+3. riattivi i controlli.
+
+`start` segnala la protezione incompleta finché non la riattivi.
 
 ### 9.5 Costo
 
@@ -559,6 +595,7 @@ Se i test richiedono servizi (un database, Supabase locale), `/tollgate:init` ch
 - **Specialisti esterni**: non sono dipendenze. Se mancano, la PR dice quali sono stati saltati.
 - **Verificatore**: uno solo per giro. Controlla ogni rilievo separatamente con le sue prove, in ordine di gravità, fino a `max_findings` (predefinito 15). Quelli oltre il tetto vengono elencati come «non verificati» e non fermano la PR.
 - **Rilievi che fermano la PR**: solo quelli confermati con gravità `bloccante` o `grave`, salvo un `approve finding`.
+- **Giri e rebase**: se dopo un rebase il diff della fetta è identico (stesso `patch-id`), il verdetto precedente vale ancora e non si consuma un giro.
 - **Tetto dei giri**: 4. Superato il tetto si apre un blocco `serve_te`, che chiudi con `approve rounds`, `approve finding` oppure `resolve`. `resolve` concede **un** giro in più. Massimo 8 giri per lavoro; oltre, `approve unverified`.
 - **Revisione finale di Superpowers**: la skill `start` indica di saltarla. Se il coordinatore la fa comunque, il costo raddoppia ma non si perde nessun controllo.
 
@@ -575,7 +612,7 @@ Se i test richiedono servizi (un database, Supabase locale), `/tollgate:init` ch
 
 Scrive una **proposta** in `docs/superpowers/tollgate-init/`:
 - `tollgate.toml`;
-- i quattro workflow e la copia del CLI, con i servizi richiesti dai test;
+- i tre workflow più `tollgate-base` e la copia del CLI, con i servizi richiesti dai test;
 - il comando per la protezione del ramo;
 - la configurazione consigliata per dare all'agente un **token GitHub separato**, con permessi su contenuti e PR ma senza amministrazione.
 
@@ -629,7 +666,7 @@ mcp_allow       = []
 test_globs         = []                       # in aggiunta ai predefiniti
 fixture_globs      = ["**/fixtures/**/*.json", "**/__snapshots__/**"]
 ci_globs           = [".github/workflows/**"]
-verification_globs = ["vitest.config.*", "vite.config.*", "jest.config.*", "vitest.setup.*", "conftest.py", "pytest.ini", "tox.ini", "setup.cfg", "scripts/check*"]
+verification_globs = ["vitest.config.*", "vite.config.*", "vitest.setup.*", "jest.config.*", "playwright.config.*", ".mocharc.*", "tsconfig*.json", "conftest.py", "pytest.ini", "tox.ini", "setup.cfg", "pyproject.toml", "Makefile", "scripts/check*"]   # in package.json: scripts, jest, vitest
 skip_markers       = []                       # in aggiunta ai predefiniti
 
 [review]
@@ -736,6 +773,9 @@ Le deroghe stanno nel ramo (`.tollgate/waivers.toml`), non nel DB.
 | Ramo predefinito andato avanti | Rebase fatto da te, poi `/tollgate:approve rebase`; `open-pr --update` fa il push forzato |
 | Verdetto del gate rosso dopo l'apertura della PR | `start #N` riporta il lavoro in `esecuzione`; poi `finish` aggiorna la stessa PR |
 | Aggiornare `tollgate.toml` o il gate | PR da `tollgate-config/*` (9.4) |
+| Gate guasto | Procedura d'emergenza (9.4), solo tua |
+| PR di Dependabot senza `verdict` | La gestisci tu: il gate non può pubblicare |
+| Artefatto non valido o enorme | `verdict` pubblica `error` con il motivo |
 | Test che richiedono servizi | Servizi nel workflow (9.6) |
 | Task senza test collegati | `verify` esegue il gate completo |
 | Lavoro impostato male | `/tollgate:abandon`, poi si ricomincia |
@@ -758,7 +798,7 @@ Le deroghe stanno nel ramo (`.tollgate/waivers.toml`), non nel DB.
 | Wrapper | Uscite 1, 127, eccezione e scadenza → 2 per i controlli e 0 per gli informativi; `OFF`; `on` e `off` senza Python | Test del wrapper con script finti |
 | Hook | Ogni riga di 7.2 e 7.4 | Input JSON uguale a quello di Claude Code |
 | Integrazione locale | `start → verify → finish`, ripresa, intenti, atti, rebase, abbandono | Repo git temporaneo, finto `gh`, `TOLLGATE_STATE` temporaneo |
-| Gate | Workflow su un repo di prova su GitHub. Verde: PR pulita, PR da `tollgate-config/*` con soli file di tollgate, PR fatta a mano da un ramo non `tg/*`. Rossa: test tolti, `skip`, config dei test cambiata, `tollgate.toml` cambiato, workflow nuovo con un job chiamato `tollgate/verdict`, report JUnit falsificato da un test (`attenzione` o `verdict` secondo il caso), file fuori scope, piano committato che allarga lo scope (`attenzione`) | Repo di prova privato e PR create dalla suite |
+| Gate | Workflow su un repo di prova su GitHub. Verde: PR pulita, PR da `tollgate-config/*` con soli file di tollgate, PR fatta a mano da un ramo non `tg/*`. `verdict` rosso: test tolti, `skip`, file fuori scope. `guard` rosso: `tollgate.toml` cambiato, workflow aggiunto o modificato fuori da `tollgate-config/*`. `attenzione` rosso: deroga `test`, piano diverso dal primo, PR da ramo non `tg/*`, ogni PR `tollgate-config/*`. `verdict` in `error`: artefatto con `../`, XML con entità, `workflow_run` con SHA non più in testa. `verdict` «non applicabile»: PR verso un ramo non predefinito | Repo di prova privato e PR create dalla suite |
 | Comportamento | L'agente con tollgate rispetta gli obblighi | `claude plugin eval`, 3 esecuzioni per caso |
 | CI | Tutto quanto sopra verde a ogni push | GitHub Action sul repo di tollgate |
 
@@ -829,6 +869,8 @@ Ogni criterio è un'azione con un esito binario, verificato dal test indicato.
 - se `EnterWorktree` si può usare dentro la skill `start` (lo strumento chiede un'istruzione esplicita); altrimenti resta la riapertura di Claude Code nel worktree;
 - se lo stato pubblicato da un job `workflow_run` con `GITHUB_TOKEN` risulta come sorgente «GitHub Actions» per la protezione del ramo;
 - l'identificativo dell'app GitHub Actions da fissare nei controlli obbligatori;
+- quale file di workflow usa `pull_request_target` per una PR verso un ramo non predefinito (base della PR o ramo predefinito);
+- i permessi di `workflow_run` e `statuses: write` per le PR di Dependabot;
 - se `WorktreeCreate` può bloccare la creazione di un worktree da parte di un subagente;
 - se Superpowers pubblica i tag di versione;
 - il formato dei report JUnit di vitest, jest e pytest e la stabilità degli identificativi dei test;
@@ -847,7 +889,8 @@ Ogni criterio è un'azione con un esito binario, verificato dal test indicato.
 - il codice della PR che falsifica l'esito dei propri test;
 - scope e deroghe dichiarati dall'agente;
 - la compensazione del conteggio delle asserzioni;
-- le serie di PR L0.
+- le serie di PR L0;
+- il sabotaggio deliberato della CI, fino alla modalità rinforzata.
 
 ---
 
@@ -861,3 +904,4 @@ Ogni criterio è un'azione con un esito binario, verificato dal test indicato.
 | 4 | 08/10/2026 | Cicli 5-10 (B-01 … B-17) |
 | 5 | 08/10/2026 | Seconda revisione avversariale (W-1 … W-40) e decisione dell'utente: **gate su GitHub** come controllo autorevole, guardrail locali dichiarati «best effort». Tolte la prova di presenza e le parti del «controllo autorevole locale» che leggevano dal DB. Effetti esterni: diniego più atto, perché funzioni in ogni modalità di permesso. R4 ridimensionata: in Superpowers 6.4.1 i giri 1-3 riprendono lo stesso implementatore, quindi tollgate li conta e li riporta invece di imporre un tetto. Atti nuovi per i casi di blocco: `finding`, `rounds`, `rebase`, `abandon`, `pr`. Brief dei revisori con codice di controllo e verifica delle letture. Identificativi dei test della base controllati sulla testa. Deroghe nel ramo, con granularità per test. File protetti elencati. Python ≥ 3.11 |
 | 6 | 08/10/2026 | Cicli 12-18 (C-01 … C-10) e terza revisione avversariale (X-1 … X-27): gate diviso in tre workflow (`guard` e `verdict` fidati e dal ramo predefinito, `run` senza permessi) più `tollgate-base` per la cache; sorgente dei controlli fissata su GitHub Actions; `guard` su tutti i workflow; deroghe come «dichiarate» con controllo `attenzione` non obbligatorio; scope dichiarato e controllo di coerenza; identificativi della base calcolati con codice e dipendenze della base; percorso `tollgate-config/*` per gli aggiornamenti; PR da rami non `tg/*`; transizione `pr_aperta → esecuzione` e `open-pr --update`; gate completo quando non ci sono test collegati e `allow_no_tests`; marcatori per Go, Java e Rust; giri contati dai commit; `resolve` che concede un giro e `approve unverified` oltre gli 8; `/tollgate:finish` legato allo SHA; `WorktreeCreate`; riapertura di Claude Code nel worktree come strada predefinita; protezione del ramo completa; servizi nel workflow; esenzioni dallo scope al commit; criteri 11 e 19-23 |
+| 7 | 08/10/2026 | Quarta revisione avversariale (Y-1 … Y-22) e decisione dell'utente: la garanzia del gate nella v1 copre scorciatoie e manomissioni locali; il sabotaggio deliberato della CI è un limite dichiarato e la modalità rinforzata con GitHub App viene dopo la v1. `verdict` calcola da sé il diff, convalida esecuzione, SHA e ramo, pubblica sempre uno stato esplicito e tratta gli artefatti con limiti. PR `tollgate-config/*` esenti da test-guard e scope, con `attenzione` sempre rosso, chiavi che allentano il gate e impronta del CLI. Procedura d'emergenza; deroghe `scope` oltre 2 in `attenzione`; commento legato allo SHA e neutralizzato; `verification_globs` ampliati; verdetto riusato dopo un rebase con lo stesso `patch-id`; Dependabot; riferimenti e conteggi corretti |
