@@ -489,6 +489,28 @@ Note integrali dei cicli riassunte qui; l'output degli auditor non è conservato
 
 **Revisione 12** (commit 855d38f): 69 correzioni puntuali. Contenuto nella sezione 20 della spec.
 
-### Cicli 47-50 (revisione 12, giro ridotto): in corso
+### Cicli 47-50 (revisione 12, giro ridotto): conclusi
 
-47 Chi esegue, 48 Chi attacca, 49 Lo scettico, 50 Chi integra. Se si interrompono, si riprendono dai transcript o si rilanciano.
+| Ciclo | Punto di vista | Gravi | Rilevanti | Rev 11 → rev 12 |
+|---|---|---|---|---|
+| 47 | Chi esegue | 3 | 3 | 5 → 6 |
+| 48 | Chi attacca | 3 | 2 | 6 → 5 |
+| 49 | Lo scettico | 2 | 1 | 4 → 3 |
+| 50 | Chi integra | 3 | 4 | 7 → 7 |
+| | **Totale** | **11** | **10** | 22 → 21 |
+
+Nessun bloccante. Quasi tutti i gravi nascono dal testo della revisione 12. Temi deduplicati:
+- I1 L'atto `finish` scade (10 minuti) prima che `open-pr` lo consumi (47, 48, 49).
+- I2 L'approvazione non è legata al contenuto: spec e piano modificabili dopo `approve`, `sha` mai confrontato nel gate (48, 49).
+- I3 Percorso della spec della prima fetta mai registrato; SHA blob o commit non definito (47, 50).
+- I4 `tollgate/base` non ha un modo per arrivare a `sentinel` (47).
+- I5 Identificativi della base: includono i test già `skipped`? (48).
+- I6 Registro dei controlli non implementabile: eventi d'ingresso e contesto (50).
+- I7 `fix_rounds` gonfiato dal revisore dei task di SDD, che è `general-purpose` (50) [VERIFICATO].
+- Rilevanti: `spec-lens-stato.md` senza autore (47, 48, 49); skill `db restore` impossibile; rifiuto del costo dell'audit a lenti senza uscita; scope del piano diverso tra locale e gate; casi gravi visibili solo nel JSON; colonne di `events`; lettura per C e D; `user_decision`; namespace dei comandi dei profili.
+
+**Esito rispetto alla regola:** il giro ridotto ha trovato gravi, quindi non si passa ancora al piano.
+
+**Decisione dell'utente (domanda «dovremmo fare skill nostre?»):** ibrido. Superpowers per brainstorming, writing-plans, TDD e debugging; `tollgate:execute` con agenti propri al posto di subagent-driven-development. Elimina la radice di I7 e dei meccanismi fragili sul prompt (esenzione degli script, blocco della revisione finale di SDD, task ricavato dal prompt).
+
+**Revisione 13:** in scrittura.
