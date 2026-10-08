@@ -174,6 +174,29 @@ tollgate prende la stessa idea e la rende obbligatoria e legata allo SHA.
 7. **SQLite in modalità WAL si degrada su dischi di rete e FUSE.** Per tollgate: il DB sta in `CLAUDE_PLUGIN_DATA` (sotto `~/.claude`), su disco locale. Le cartelle di MEGA oggi non sono sincronizzate (verificato con l'utente l'8 ottobre 2026), quindi i worktree restano nella posizione predefinita.
 8. **Un solo processo scrive nel DB per volta**, con un lock non bloccante.
 
+## 8. Modifiche dalla ricerca scientifica (accettate l'8 ottobre 2026)
+
+Fonte: `docs/RICERCA-PAPER.md`, sezione 3. Prevalgono sulle voci precedenti dove le contraddicono.
+
+| # | Modifica | Dove | Note |
+|---|---|---|---|
+| R1 | Via d'uscita «test e specifica in conflitto»: un blocco con un tipo preciso che ferma l'agente e lo manda da te | Nucleo | Integra le deroghe (voce 14) e H36 |
+| R2 | Test correlati alla modifica nel brief e in `verify`; suite completa a `finish` | Nucleo | **Ridimensionata**: niente grafo nostro, si usa il comando del progetto (`vitest related`, `jest --findRelatedTests`, `pytest-testmon`) dichiarato in `tollgate.toml` |
+| R3 | La ricevuta è necessaria ma non sufficiente: il revisore finale cerca casi speciali scritti per i test e test indeboliti | Nucleo | Integra le voci 1, 20, 24 |
+| R4 | Al massimo 2 giri di correzione automatica per task, poi contesto pulito o passaggio a te | Nucleo | Integra la voce 25 e H43 |
+| R5 | A ogni nuovo task un hook rimette nel contesto il passo corrente del piano e il suo scope | Nucleo | Poche righe |
+| R6 | In L1 controllo automatico della struttura del piano; la rilettura a contesto pulito resta in L2 | Nucleo | **Ridimensionata** |
+| R7 | Soglie del contesto della sessione principale: avviso al 45%, stop al 55%. Subagente sotto circa 30K token; ritorno al padre di 1-2K token più il percorso del report | Nucleo | Soglie configurabili, da tarare con gli eval. Sostituiscono l'85% della statusline nella voce 42 |
+| R9 | Budget di istruzioni: si misura quanti token aggiunge tollgate a ogni sessione, con un tetto | Nucleo | — |
+| R10 | Ogni componente si può spegnere da `tollgate.toml` | Nucleo | Base delle prove con un componente spento alla volta negli eval |
+| R14 | Le domande di chiarimento dipendono dal livello: L0 non passa dal brainstorming | Nucleo | **Ridimensionata**: le domande le fa già Superpowers |
+| R16 | Il revisore Codex dà solo un parere, non modifica il codice | Nucleo | Integra la voce 28 |
+| R8 | Le regole dei profili si caricano tramite hook, non con l'attivazione automatica delle skill | Sotto-progetto B | — |
+| R11 | Un hook su ogni installazione controlla che il pacchetto esista e quanto è vecchio | Sotto-progetto B | Profilo base |
+| R12 | Analisi statica (SAST) e test di sicurezza obbligatori nel profilo sicurezza | Sotto-progetto B | — |
+| R13 | Le osservazioni della revisione si registrano come accettate o rifiutate, per tarare la soglia di confidenza | Sotto-progetto C | — |
+| R15 | Negli eval si misura il costo dei subagenti: uno per task contro task piccoli raggruppati | Sotto-progetto D | — |
+
 ## Verifica sulla documentazione ufficiale (8 ottobre 2026)
 
 Fonti: [hooks](https://code.claude.com/docs/en/hooks.md), [sub-agents](https://code.claude.com/docs/en/sub-agents.md), [statusline](https://code.claude.com/docs/en/statusline.md), [plugin components](https://code.claude.com/docs/en/plugins/components.md), [dependencies](https://code.claude.com/docs/en/plugins/dependencies.md), [plugin evals](https://code.claude.com/docs/en/plugin-evals.md). Ho controllato anche il codice di Superpowers 6.4.1 installato.

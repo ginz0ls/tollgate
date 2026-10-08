@@ -2,7 +2,7 @@
 
 Data: 8 ottobre 2026.
 Scopo: confrontare le scelte di tollgate (`docs/COSA-TENERE.md`) con la ricerca scientifica su LLM, agenti di coding e metodologie di implementazione.
-Stato: **sintesi da rivedere**. Le modifiche al design proposte (sezione 3) aspettano la tua decisione.
+Stato: **le modifiche R1-R16 sono state accettate l'8 ottobre 2026**, come raccomandato. Sono riportate in `COSA-TENERE.md`, sezione 8.
 
 ---
 
