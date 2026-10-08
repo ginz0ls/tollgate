@@ -53,10 +53,76 @@ class ActsTest(unittest.TestCase):
 
     def test_consume_once(self):
         a = self.waiver()
-        acts.consume(self.conn, a, now=T0)
+        acts.consume(self.conn, a, now=T0, work=self.w, session="s1")
         self.assertIsNone(self.usable())
         with self.assertRaises(acts.ActError):
-            acts.consume(self.conn, a, now=T0)
+            acts.consume(self.conn, a, now=T0, work=self.w, session="s1")
+
+    def test_consume_checks_binding_and_expiry(self):
+        a = self.waiver()
+        for kw in (dict(work=self.w2, session="s1", now=T0),
+                   dict(work=self.w, session="s2", now=T0),
+                   dict(work=self.w, session="s1", now=T0 + timedelta(minutes=10))):
+            with self.assertRaises(acts.ActError):
+                acts.consume(self.conn, a, **kw)
+        state = self.conn.execute("SELECT state FROM acts WHERE act_id = ?", (a,)).fetchone()
+        self.assertEqual(state["state"], "pending")
+        acts.consume(self.conn, a, now=T0, work=self.w, session="s1")
+        state = self.conn.execute("SELECT state FROM acts WHERE act_id = ?", (a,)).fetchone()
+        self.assertEqual(state["state"], "consumed")
+
+    def test_consume_finish_checks_head(self):
+        a = acts.record_act(self.conn, type_="finish", typed_text="/tollgate:finish",
+                            session="s1", work=self.w, head_sha="abc", now=T0, ttl_minutes=10)
+        with self.assertRaises(acts.ActError):
+            acts.consume(self.conn, a, now=T0, work=self.w, session="s1", head_sha="def")
+        with self.assertRaises(acts.ActError):
+            acts.consume(self.conn, a, now=T0, work=self.w2, session="s1", head_sha="abc")
+        acts.consume(self.conn, a, now=T0, work=self.w, session="s9", head_sha="abc")
+        self.assertIsNone(acts.find_usable(self.conn, type_="finish", work=self.w,
+                                           session="s1", now=T0, head_sha="abc"))
+
+    def test_consume_finish_rejected_after_commit(self):
+        a = acts.record_act(self.conn, type_="finish", typed_text="/tollgate:finish",
+                            session="s1", work=self.w, head_sha="abc", now=T0, ttl_minutes=10)
+        events.record_event(self.conn, "commit", {"sha": "def"},
+                            now=T0 + timedelta(minutes=1), work=self.w)
+        with self.assertRaises(acts.ActError):
+            acts.consume(self.conn, a, now=T0 + timedelta(minutes=2), work=self.w,
+                         session="s1", head_sha="abc")
+
+    def test_finish_decays_on_commit(self):
+        acts.record_act(self.conn, type_="finish", typed_text="/tollgate:finish", session="s1",
+                        work=self.w, head_sha="abc", now=T0, ttl_minutes=10)
+        events.record_event(self.conn, "commit", {"sha": "def"},
+                            now=T0 + timedelta(minutes=1), work=self.w)
+        # abc -> def -> abc: HEAD e' di nuovo "abc", ma l'atto e' decaduto.
+        self.assertIsNone(acts.find_usable(self.conn, type_="finish", work=self.w,
+                                           session="s1", now=T0 + timedelta(minutes=2),
+                                           head_sha="abc"))
+
+    def test_commit_does_not_decay_other_acts(self):
+        self.waiver()
+        events.record_event(self.conn, "commit", {"sha": "def"},
+                            now=T0 + timedelta(minutes=1), work=self.w)
+        self.assertIsNotNone(self.usable(now=T0 + timedelta(minutes=2)))
+
+    def test_consumed_finish_not_found(self):
+        a = acts.record_act(self.conn, type_="finish", typed_text="/tollgate:finish",
+                            session="s1", work=self.w, head_sha="abc", now=T0, ttl_minutes=10)
+        acts.consume(self.conn, a, now=T0, work=self.w, session="s1", head_sha="abc")
+        self.assertIsNone(acts.find_usable(self.conn, type_="finish", work=self.w,
+                                           session="s1", now=T0, head_sha="abc"))
+
+    def test_session_none_rejected(self):
+        with self.assertRaises(ValueError):
+            self.waiver(session=None)
+        with self.assertRaises(ValueError):
+            self.usable(session=None)
+        acts.record_act(self.conn, type_="finish", typed_text="/tollgate:finish", session=None,
+                        work=self.w, head_sha="abc", now=T0, ttl_minutes=10)
+        self.assertIsNotNone(acts.find_usable(self.conn, type_="finish", work=self.w,
+                                              session=None, now=T0, head_sha="abc"))
 
     def test_finish_bound_to_head_not_session_or_time(self):
         acts.record_act(self.conn, type_="finish", typed_text="/tollgate:finish", session="s1",
@@ -80,7 +146,8 @@ class ActsTest(unittest.TestCase):
         types = [e["type"] for e in events.export_events(self.conn, 0)]
         self.assertIn("act_expired", types)
         self.assertIsNotNone(self.usable(target="w-1-4", now=T0 + timedelta(minutes=10)))
-        self.assertNotEqual(a, b)
+        state = self.conn.execute("SELECT state FROM acts WHERE act_id = ?", (b,)).fetchone()
+        self.assertEqual(state["state"], "pending")
 
     def test_without_work(self):
         acts.record_act(self.conn, type_="adopt", target="3", typed_text="/tollgate:adopt #3",
