@@ -14,7 +14,7 @@ Fonti: tre ricerche dell'8 ottobre 2026 (catalogo di 1.015 skill e 644 agenti su
    - **Trasversale**: una qualità che attraversa le aree (accessibilità, performance). Non ha agenti: aggiunge regole e skill al revisore dei profili verticali che lo dichiarano.
 2. **Regole nostre prima, skill esterne poi.** Ogni profilo ha una skill di regole scritta da noi, `tollgate:rules-<area>`, che sta nel plugin e quindi c'è su ogni macchina. Le skill esterne sono un rinforzo: se mancano, il lavoro procede con le sole regole.
 3. **Stesse regole per chi scrive e per chi rivede.** Implementatore e revisore dello stesso profilo caricano la stessa `rules-<area>`: il primo la applica, il secondo la verifica regola per regola e cita l'identificativo nel rilievo (`R-FE-07`).
-4. **Regole curate, non generate.** SkillsBench (arXiv 2602.12670) misura +16 punti con skill curate e −1,3 con skill scritte dal modello da solo; le skill corte e mirate battono la documentazione completa. Quindi ogni regola è **distillata da una fonte citata** e **rivista dall'utente** prima di entrare nel plugin. Una regola senza fonte e senza revisione non entra.
+4. **Regole curate, non generate.** SkillsBench (arXiv 2602.12670, preprint letto solo nell'abstract) misura +16 punti con skill curate e −1,3 con skill scritte dal modello da solo; le skill corte e mirate battono la documentazione completa. Quindi ogni regola è **distillata da una fonte citata** e **rivista dall'utente** prima di entrare nel plugin. Una regola senza fonte e senza revisione non entra.
 5. **Regole verificabili.** Una regola ha la forma «ogni pulsante con sola icona ha `aria-label`», non «cura l'accessibilità». Il revisore deve poter rispondere sì o no.
 6. **Al massimo 3 skill obbligatorie per agente** (spec 6.3), compresa `rules-<area>`. Le skill comuni (sotto) non contano.
 7. **Licenze.** Si distillano regole solo da fonti MIT o Apache-2.0, citandole. Da fonti CC-BY-SA (Trail of Bits, OWASP) o senza licenza (alcune skill Vercel) si prendono **idee**, scritte con parole nostre, oppure si consiglia la skill all'utente senza ridistribuirla.
@@ -75,13 +75,13 @@ Nei subagenti distribuiti da un plugin Claude Code **ignora `mcpServers`, `hooks
 - **modello**: per esempio `inherit` per `security` e `database`, `sonnet` per `copy` e `docs`;
 - **strumenti**: i revisori hanno solo `Read, Grep, Glob, Bash` e `disallowedTools: Edit, Write`; gli implementatori hanno `Write, Edit, Bash`.
 
-Le `description` restano brevi: con circa 26 agenti, la documentazione avvisa oltre circa 15.000 token di descrizioni. L'instradamento non dipende comunque dalle descrizioni ma da `task start`.
+Le `description` restano brevi: con circa 35 agenti (28 per area e 7 generici), la documentazione avvisa oltre circa 15.000 token di descrizioni. L'instradamento non dipende comunque dalle descrizioni ma da `task start`.
 
 ---
 
 ### 2.3 Regole, revisione e Definition of Done (revisione 18)
 
-- **Le regole sono la prova dei rilievi.** Con il disaccordo istruito (spec 8.6) ogni rilievo del revisore cita la regola violata: `R-FE-07`, `R-DB-03`… Un rilievo senza regola né file e riga viene scartato dal verificatore. Per questo ogni `rules-<area>` ha regole numerate e stabili: cambiare un numero rompe lo storico dei rilievi.
+- **Le regole sono la prova dei rilievi.** Con il disaccordo istruito (spec 8.6) ogni rilievo del revisore cita la regola violata: `R-FE-07`, `R-DB-03`… Un rilievo senza regola, oppure senza file e riga, viene scartato dal verificatore. Per questo ogni `rules-<area>` ha regole numerate e stabili: cambiare un numero rompe lo storico dei rilievi.
 - **Standard del revisore.** Il prompt di ogni `reviewer-<area>` dice: approva se il task migliora la salute del codice; solo le regole marcate `[blocca]` danno rilievi `blocker` o `major`, le altre sono note.
 - **Definition of Done per profilo** (campo `dod`, spec 8.7): i comandi del profilo che devono passare perché il lavoro conti. Proposte iniziali, da confermare quando si scrivono le regole:
 
@@ -119,7 +119,7 @@ description: Regole di tollgate per il codice frontend. Usala sempre sui task de
 # Regole frontend (versione 1)
 
 ## Struttura
-R-FE-01 Ogni componente gestisce i quattro stati: caricamento, vuoto, errore, pieno.
+R-FE-01 [blocca] Ogni componente gestisce i quattro stati: caricamento, vuoto, errore, pieno.
 R-FE-02 …
 
 ## Gusto e anti slop

@@ -22,7 +22,7 @@ Stato: P0 scritto (`2026-10-08-tollgate-p0-verifiche.md`), P1-P5 da scrivere.
 
 | Piano | Obiettivo | Richiede | Consegna | Finito quando |
 |---|---|---|---|---|
-| **P0 Verifiche** | Provare i 14 fatti di piattaforma ancora aperti (13 della sezione 16, più `skills:` negli agenti di plugin) | Spec rev 18 | Rapporto `docs/verifiche/2026-10-08-p0-esiti.md`; spec rev 19 | Ogni voce di 16 ha esito `sì`, `no` o `non determinato`, e le conseguenze approvate sono nella spec |
+| **P0 Verifiche** | Provare le 14 voci aperte della sezione 16 (compreso `skills:` negli agenti di plugin) | Spec rev 18 | Rapporto `docs/verifiche/2026-10-08-p0-esiti.md`; spec rev 19 | Ogni voce di 16 ha esito `sì`, `no` o `non determinato`, e le conseguenze approvate sono nella spec |
 | **P1 Fondamenta** | La libreria su cui poggia tutto: configurazione, DB, eventi, fasi, task, atti | P0 chiuso | `bin/tollgate` con i sottocomandi di base; pacchetto `tollgate_core` | Test unitari verdi; criteri 25 e la parte DB del 17 |
 | **P2 Guardrail** | Gli hook locali e le analisi pure che userà anche il gate | P1 | Wrapper `hooks/run`, adattatore, registro dei controlli, `verify`, `waiver`, `block`; pacchetto `tollgate_analysis`; `plugin.json`, `hooks.json` | Ogni riga di 7.2 e 7.4 testata con input JSON reale di Claude Code; criteri della colonna P2 |
 | **P3 Flusso** | Il ciclo completo in locale: dall'issue alla PR, con l'instradamento ai profili verticali, la Definition of Done e i budget dei task | P2 | Skill, agenti, `start`, `execute` e `task`, `finish`, `open-pr`, `sync`, `adopt`, `cleanup`, `abandon`, `reopen`, audit della spec | Test di integrazione su repo git temporaneo con `TOLLGATE_GH` finto; criteri della colonna P3 |
@@ -136,7 +136,7 @@ Regola: `tollgate_analysis` non importa mai `tollgate_core`. Così il gate su Gi
 | 15 Ricevute | P2 | | 34 Modalità | P2 (push negato), P4 |
 | 16 Sync | P3 | | 35 Componenti spenti | P3, P4 |
 | 17 Adozione e ripristino | P1 (`db restore`), P3 (`adopt`) | | 36 Piano registrato nel gate | P4 |
-| 18 Componenti | P2 | | 37 Flusso dopo l'approvazione | P2 (hook), P3 |
+| 18 Componenti | P2, P3, P4 | | 37 Flusso dopo l'approvazione | P2 (hook), P3 |
 | 19 Budget | P2 | | 38 Profili verticali | P2 (hook), P3 (`task start`, revisione) |
 | | | | 39 Task piccoli e budget | P2 (`SubagentStop`), P3 |
 | | | | 40 Revisione | P3 |

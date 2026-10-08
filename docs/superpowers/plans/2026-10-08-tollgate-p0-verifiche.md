@@ -4,7 +4,7 @@
 >
 > **Nota per questo piano.** P0 non produce codice di tollgate: produce **fatti**. Alcuni passi sono interattivi e li esegue l'utente (marcati **[UTENTE]**). I passi che creano repo su GitHub si fermano e chiedono conferma (marcati **[CONFERMA]**). Esecuzione consigliata: nella sessione principale (executing-plans), non con subagenti.
 
-**Goal:** Verificare le 13 voci «Ancora da verificare» della sezione 16 della spec, più il precaricamento delle skill negli agenti di plugin richiesto dal catalogo dei profili, prima di scrivere codice, e aggiornare la spec dove un esito cambia il disegno.
+**Goal:** Verificare le 14 voci «Ancora da verificare» della sezione 16 della spec, compreso il precaricamento delle skill negli agenti di plugin richiesto dal catalogo dei profili, prima di scrivere codice, e aggiornare la spec dove un esito cambia il disegno.
 
 **Architecture:** Un plugin sonda (`spikes/hookprobe/`) registra in un file JSONL l'input di ogni evento hook di Claude Code e, a richiesta, nega un comando. Gli esperimenti sugli hook girano con `claude -p --plugin-dir`; quelli interattivi li esegue l'utente. Gli esperimenti GitHub usano due repo di prova (uno privato, uno pubblico) con workflow minimi. Gli esperimenti JUnit usano tre progetti giocattolo in una cartella temporanea.
 
@@ -194,8 +194,8 @@ Esperimenti (ognuno azzera il log e salva la copia):
 | E1 | `SubagentStart`/`Stop` alla ripresa con `SendMessage`; campi di `SendMessage` | «Lancia con Agent un subagente general-purpose in background con il compito "rispondi uno". Quando ha finito, riprendilo con SendMessage chiedendo "rispondi due". Riporta entrambe le risposte.» | Numero di `SubagentStart` e `SubagentStop` (2 e 2 = scattano alla ripresa); `PreToolUse` con `tool_name == "SendMessage"` e le chiavi di `tool_input` |
 | E2 | `SubagentHandback` e `last_assistant_message` | Come E1 senza ripresa, con `--permission-mode auto` | `PostToolUse` con `tool_name == "SubagentHandback"`; confronto fra il suo `tool_input` e `last_assistant_message` di `SubagentStop` |
 | E3 | `deny` in `bypassPermissions` | «Esegui con Bash: echo PROBE_DENY > /tmp/tollgate-p0/e3-side.txt», con `--permission-mode bypassPermissions` | Il file `/tmp/tollgate-p0/e3-side.txt` **non** deve esistere |
-| E5 | `skills:` nel frontmatter di un agente di plugin (catalogo dei profili, 2.2) | «Lancia con Agent il subagente hookprobe:probe-agent e riporta la sua risposta esatta.» | `.out` contiene `PRELOAD-MARKER-42` → la skill è precaricata; `NESSUN-CODICE` → no. In più, per il budget dei task (spec 6.3): il file di `agent_transcript_path` di `SubagentStop` contiene i conteggi dei token (`usage`)? `maxTurns` nel frontmatter è accettato senza errori? Per `mcpServers` nei subagenti di plugin si cita la documentazione (non si sperimenta) |
 | E4 | `UserPromptExpansion` con `disable-model-invocation`, forma lunga e breve, in `-p` | Prompt `/hookprobe:probe-only-user`, poi in un'altra esecuzione `/probe-only-user` | Presenza di `UserPromptExpansion` e valore di `expansion_type` per ciascuna forma |
+| E5 | `skills:` nel frontmatter di un agente di plugin (catalogo dei profili, 2.2) | «Lancia con Agent il subagente hookprobe:probe-agent e riporta la sua risposta esatta.» | `.out` contiene `PRELOAD-MARKER-42` → la skill è precaricata; `NESSUN-CODICE` → no. In più, per il budget dei task (spec 6.3): il file di `agent_transcript_path` di `SubagentStop` contiene i conteggi dei token (`usage`)? `maxTurns` nel frontmatter è accettato senza errori? Per `mcpServers` nei subagenti di plugin si cita la documentazione (non si sperimenta) |
 
 - [ ] **Step 1: Scrivere lo script degli esperimenti**
 
