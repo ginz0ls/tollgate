@@ -431,6 +431,18 @@ Rilevanti: ripristino del DB guasto; ripresa senza rete bloccata dai passi 0-1; 
 
 Le note complete dei cicli sono state riassunte qui; l'output integrale degli auditor non è conservato nel repo.
 
+**Scartato dopo verifica:** il rilievo del ciclo 38 sulla collocazione di GitHub Projects. `docs/COSA-TENERE.md:27` assegna kanban e ponte GitHub a C, come già scritto in 1.3.
+
+**Verifiche alla fonte** (sezione 16 della spec): protezione del ramo solo con Pro o Team sui privati; nessun token con scoping per ramo; `SubagentHandback` solo in auto mode; `SubagentStart` senza prompt; revisione finale di SDD riconoscibile dal riferimento a `code-reviewer.md`.
+
+**Decisioni dell'utente:** repo privati senza Pro in **modalità `detect`** (rilevazione con `tollgate-sentinel`, non impedimento); dopo la revisione 11, **altro giro completo** degli otto auditor.
+
+**Revisione 11** (commit 30969b5): 110 correzioni puntuali, nessuna riscrittura. Contenuto nella sezione 20 della spec.
+
+### Cicli 39-46 (revisione 11): in corso
+
+39 Chi esegue, 40 Chi usa, 41 Chi attacca, 42 Chi paga, 43 Chi arriva dopo, 44 Lo scettico, 45 Il caso limite, 46 Chi integra. Se si interrompono senza risultati, vanno rilanciati tutti e otto.
+
 ## Nota storica: interruzione per limite di utilizzo (08/10/2026)
 
 **Stato: audit IN CORSO, non chiuso.**
