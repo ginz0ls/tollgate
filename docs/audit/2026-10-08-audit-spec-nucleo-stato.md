@@ -332,3 +332,15 @@ Il report è in `2026-10-08-revisione-avversariale-5-spec-nucleo.md` (Z-1 … Z-
 | 10 | Chi esegue e chi attacca, sulla rev. 3 | L1-L10 | B-13 … B-17 |
 
 Revisione 3 della specifica scritta. **Prossimo passo** (dopo la seconda revisione avversariale, in corso sulla rev. 3): revisione 4, poi cicli 5 e successivi con i punti di vista mai applicati (chi paga, chi arriva dopo, lo scettico, il caso limite, chi integra), poi chi esegue, chi attacca e chi usa sulla revisione 3, fino a due cicli vuoti per ciascuno.
+
+## Punto di ripresa (08/10/2026, limite di utilizzo raggiunto)
+
+**Stato: audit IN CORSO, non chiuso.**
+- 21 cicli fatti su un tetto di 30.
+- Specifica alla revisione 9.
+- I cicli 22-29 (un auditor per punto di vista sulla revisione 9) erano partiti e sono stati **fermati senza risultati** per il limite di utilizzo.
+
+**Per riprendere:**
+1. Rilanciare gli 8 auditor, uno per punto di vista, con il prompt in `docs/audit/prompt-ciclo-punto-di-vista.txt`. Al posto di {VP} va il punto di vista; le formulazioni sono nella skill prd-audit, sezione «Cambiare punto di vista».
+2. Correggere la spec con quello che trovano.
+3. Ciclo 30: chiusura. Con il tetto a 30, i due cicli vuoti per ogni punto di vista non sono raggiungibili, quindi l'esito atteso è «SOSPESO» con la matrice, a meno che tu non decida di continuare oltre il tetto.
