@@ -1,7 +1,7 @@
 # tollgate: specifica del nucleo (sotto-progetto A)
 
 Data: 8 ottobre 2026.
-Revisione: **15**: skill e implementatori per area nei profili (decisione dell'utente). La revisione 14 ha chiuso l'audit come «sospeso»; i residui sono nel file di stato. Le revisioni precedenti sono nella sezione 20.
+Revisione: **16**: profili verticali con implementatore e revisore del task propri a tutti i livelli, specialisti finali in L2 per sicurezza e database, tetto di 3 skill (decisione dell'utente). Il catalogo dei profili è in `2026-10-08-tollgate-profili-verticali.md`. La revisione 14 ha chiuso l'audit come «sospeso»; i residui sono nel file di stato. Le revisioni precedenti sono nella sezione 20.
 Stato: **audit sospeso, pronta per il piano** (`docs/audit/2026-10-08-audit-spec-nucleo-stato.md`).
 Fonti: `docs/REPORT-CONFRONTO-WORKFLOW.md`, `docs/COSA-TENERE.md`, `docs/RICERCA-PAPER.md`. I codici R e H usati nel testo sono spiegati nella sezione 19.
 
@@ -130,7 +130,7 @@ Questi limiti sono dichiarati:
 | Pianificatore | Il coordinatore |
 | Audit della spec | In L2: giri avversariali sempre; audit a lenti quando la spec prevede più fette (6.2) |
 | Revisione | Revisore finale e verificatore di tollgate (10) |
-| Specializzazione | Per contesto, non per ruolo: ogni profilo porta le sue skill a ogni implementatore; in L2 un profilo può portare anche un implementatore proprio, con prompt, strumenti e modello suoi (6.3). Decisione dell'utente, 08/10/2026 |
+| Specializzazione | **Profili verticali**: ogni area ha un implementatore e un revisore del task propri, con skill, prompt, strumenti e modello propri, a tutti i livelli; lo specialista **sostituisce** l'agente generico, quindi non aggiunge subagenti. Nella revisione finale gli specialisti si **aggiungono** al revisore generale solo in L2 e solo per i profili con `final_specialist = true` (sicurezza e database). Al massimo 3 skill obbligatorie per agente. Decisione dell'utente, 08/10/2026 |
 | Merge | Solo l'utente, su GitHub |
 | Livello | Lo script lo alza; lo abbassa solo l'utente, con un atto |
 | Effetti esterni | Negati finché non c'è un atto, oppure ammessi da un'eccezione in sola lettura (8.5) |
@@ -248,8 +248,9 @@ tollgate/
 |---|---|---|---|
 | Utente | — | Alza il livello, approva spec e piano in L2, approva gli atti, risolve i blocchi, fa il merge | Atti dell'utente; merge su GitHub |
 | Coordinatore | Sessione principale | Dialogo, brainstorming, spec, piano, avvio dei subagenti. **Non scrive codice**, tranne in L0 | In L1 e L2, fase `execution`: Edit e Write sul codice negati se manca `agent_id`, che c'è solo nei subagenti (verificato) |
-| Implementatore | `tollgate:implementer`, oppure in L2 l'implementatore per area del profilo del task (6.3); ogni altro subagente **non** elencato in `[review] readonly_agents` è trattato allo stesso modo | Un task del piano alla volta, con TDD e le skill dei profili del task | Brief scritto dalla CLI, scope, scrittore unico, skill usate, `SubagentStop` (8.1) |
-| Revisore del task | `tollgate:task-reviewer` | Controlla il task: aderenza al brief e qualità (rubrica derivata da subagent-driven-development) | Sola lettura (7.3); verdetto JSON (18.5) |
+| Implementatore | L'implementatore del profilo del task, oppure `tollgate:implementer` (6.3); ogni altro subagente **non** elencato in `[review] readonly_agents` è trattato allo stesso modo | Un task del piano alla volta, con TDD e le skill dei profili del task | Brief scritto dalla CLI, scope, scrittore unico, skill usate, `SubagentStop` (8.1) |
+| Revisore del task | Il revisore del profilo del task, oppure `tollgate:task-reviewer` (6.3) | Controlla il task: aderenza al brief e qualità (rubrica derivata da subagent-driven-development), più le regole dell'area | Sola lettura (7.3); verdetto JSON (18.5) |
+| Specialista finale | `final_specialist` dei profili attivi con `final_specialist = true`, solo in L2 | Revisione dell'intero ramo per la sua area, in aggiunta al revisore finale | Sola lettura; i suoi rilievi passano dal verificatore come gli altri (10) |
 | Avversario della spec, auditor della spec, avversario del piano | `tollgate:spec-adversary`, `tollgate:spec-auditor`, `tollgate:plan-adversary` | 6.2 | Niente scrittura, niente Bash |
 | Revisore finale | `tollgate:final-reviewer` | Confronta il lavoro con piano, must-have e scope; cerca casi speciali e asserzioni indebolite (R3) | Brief scritto dallo script; controllo di sola lettura (7.3) |
 | Verificatore | `tollgate:finding-verifier` | Conferma o scarta ogni rilievo registrato | Brief scritto dallo script dalla tabella `findings` (8.6) |
@@ -370,7 +371,7 @@ execution (sessione pulita)
       SubagentStop: 8.1; conflitto tra test e specifica → block open test_spec_conflict (R1)
       tollgate task review-prepare k → brief del revisore con l'intervallo di SHA del task
         (tasks.commits, riempito da PostToolUse Bash) e un codice
-      Agent tollgate:task-reviewer con il brief → verdetto (18.5) con SHA e codice;
+      Agent <revisore scelto da task start> con il brief → verdetto (18.5) con SHA e codice;
         SubagentStop lo associa al task in `review`
       approved → tollgate task done k (rifiuta senza verdetto approved sull'ultimo SHA del task)
       changes → giro di correzione: tollgate task start k --fix; giri 1-3 riprendono lo
@@ -386,10 +387,11 @@ execution (sessione pulita)
 ```
 
 **Skill e implementatori per area.** I profili del task sono quelli il cui `paths` contiene almeno uno dei file `Create:`/`Modify:`/`Test:` del task (stessa regola di attivazione di 9.2, applicata al task).
-- **Skill:** il brief elenca l'unione dei campi `skills` di quei profili. `SubagentStop` controlla che l'implementatore abbia invocato ognuna (eventi `PostToolUse` dello strumento `Skill` con il suo `agent_id`); se ne manca una, veto con l'elenco, come per la ricevuta (8.1). Una skill non installata non blocca: il brief la segna come assente e `attenzione` lo riporta.
-- **Implementatore per area, solo in L2:** se i profili del task dichiarano **un solo** `agent` non vuoto, `task start` sceglie quell'agente; con zero agenti, o con agenti diversi (task a cavallo di più aree), sceglie `tollgate:implementer` con l'unione delle skill, e `plan-adversary` segnala il task come candidato a essere diviso. In L1 l'implementatore è sempre `tollgate:implementer`, con le skill.
+- **Skill:** il brief dell'implementatore elenca l'unione dei campi `skills` di quei profili, al massimo 3; quello del revisore elenca l'unione dei `reviewer_skills`, al massimo 3. Se l'unione supera 3, `plan-check` lo segnala e `plan-adversary` chiede di dividere il task. Ogni implementatore usa in più le skill comuni di `tollgate:implementer` (TDD, debugging, verifica), che non contano nel tetto. `SubagentStop` controlla che l'implementatore abbia invocato ognuna (eventi `PostToolUse` dello strumento `Skill` con il suo `agent_id`); se ne manca una, veto con l'elenco, come per la ricevuta (8.1). Una skill non installata non blocca: il brief la segna come assente e `attenzione` lo riporta.
+- **Implementatore e revisore per area, a tutti i livelli:** se i profili del task dichiarano **un solo** `agent` non vuoto, `task start` sceglie quell'agente, e allo stesso modo `reviewer` per il revisore del task; con zero, o con agenti diversi (task a cavallo di più aree), sceglie `tollgate:implementer` e `tollgate:task-reviewer` con l'unione delle skill, e `plan-adversary` segnala il task come candidato a essere diviso. In L0 non ci sono subagenti: la sessione principale riceve nel promemoria le skill dei profili toccati.
 - **Cosa rende diverso un implementatore per area:** prompt con le regole dell'area, strumenti propri (per esempio un server MCP del database o gli strumenti del browser), modello proprio. Deriva dallo stesso testo di `tollgate:implementer` e ne mantiene gli obblighi (TDD, `verify`, stati, report). Un nome di ruolo senza contesto o strumenti diversi non giustifica un agente a sé (ricerca, filone 6).
-- **Vincoli per gli agenti dei profili:** il nome ha la forma `<plugin>:implementer-<area>`; non è mai in `readonly_agents`; vale per lui tutto ciò che vale per `tollgate:implementer` (scope, scrittore unico, ricevuta, sola scrittura dopo `task start`). Gli agenti concreti li fornisce B.
+- **Vincoli per gli agenti dei profili:** l'implementatore si chiama `<plugin>:implementer-<area>` e non è mai in `readonly_agents`; vale per lui tutto ciò che vale per `tollgate:implementer` (scope, scrittore unico, ricevuta, sola scrittura dopo `task start`). Il revisore si chiama `<plugin>:reviewer-<area>` e lo specialista finale `<plugin>:final-<area>`: entrambi entrano automaticamente in `readonly_agents`. Un agente per area funziona anche senza le sue skill (non installate su quella macchina): sono un rinforzo, non una dipendenza.
+- **Catalogo.** I profili verticali concreti (aree, percorsi, comandi, agenti, skill, checklist) sono definiti in `docs/superpowers/specs/2026-10-08-tollgate-profili-verticali.md` e realizzati dal sotto-progetto B.
 
 **Transizioni di `tasks.state`.**
 
@@ -767,7 +769,8 @@ Il comando lo esegui tu. `start` prova a leggere la protezione e segnala i campi
 | Livello | Revisori |
 |---|---|
 | L0 | Nessuno |
-| L1 e L2 | `final-reviewer` con la checklist dei profili attivi → `finding-verifier` sui rilievi registrati → verdetto |
+| L1 | `final-reviewer` con la checklist dei profili attivi → `finding-verifier` sui rilievi registrati → verdetto |
+| L2 | Come L1, più gli specialisti finali dei profili attivi che ne dichiarano uno (`final_specialist`), in parallelo al revisore generale; tutti i rilievi vanno allo stesso verificatore |
 
 **Verificatore.** Uno per ciclo. Esamina i rilievi in ordine di gravità fino a `max_findings` (15); quelli oltre il limite restano «non verificati».
 
@@ -907,7 +910,10 @@ plan_sections  = []
 min_level      = "L0"
 checklist      = ""   # percorso di un file con la checklist per il revisore finale
 skills         = []   # skill che ogni implementatore deve usare sui task di questo profilo
-agent          = ""   # solo L2: implementatore per area, "<plugin>:implementer-<area>" (6.3)
+agent          = ""   # implementatore per area, "<plugin>:implementer-<area>" (6.3)
+reviewer       = ""   # revisore del task per area, "<plugin>:reviewer-<area>"
+reviewer_skills = []  # skill del revisore del task, al massimo 3
+final_specialist = "" # solo L2: specialista della revisione finale, "<plugin>:final-<area>"; vuoto = nessuno
 
 [components]         # mappa aperta (R10)
 scope_check = true
@@ -950,7 +956,7 @@ sentinel = true
 | `spec_audit` | work, kind, number, viewpoint, counts, outcome, report_path | |
 | `acts` | act_id, type, object, at, typed_text, source, actor, session, work, state, expires_at, consumed_at | |
 | `intents` | work, action, idempotency_key, data, state, outcome, at | univoco (idempotency_key) |
-| `tasks` | work, number, kind (`plan`, `fix`), source (task del piano, ciclo dei rilievi o gate), state (`pending`, `running`, `review`, `done`, `blocked`), fix_rounds, implementer, agent_type, skills_required, skills_used, commits, verdict, review_code | univoco (work, number) |
+| `tasks` | work, number, kind (`plan`, `fix`), source (task del piano, ciclo dei rilievi o gate), state (`pending`, `running`, `review`, `done`, `blocked`), fix_rounds, implementer, agent_type, reviewer_type, skills_required, skills_used, commits, verdict, review_code | univoco (work, number) |
 | `events` | seq, v, at, host, session, work, repo_key, issue, type, data (18.4) | `seq` monotono per DB; sola aggiunta; l'unica cancellazione è la potatura oltre `events_days` |
 | `meta` | schema_version | |
 
@@ -1175,7 +1181,7 @@ Ogni criterio è un'azione con un esito binario.
 35. **Componenti spenti.** Con `spec_audit = false` e tre fette, `approve spec 3` è accettato senza audit a lenti e il gate dà `attenzione` rosso, non `verdict` rosso (integrazione, gate).
 36. **Piano registrato nel gate.** Piano modificato dopo la registrazione in modo da includere un file in più → quel file è fuori scope nel gate e `attenzione` mostra il diff del piano (gate).
 37. **Flusso dopo l'approvazione.** In `spec_audit` la scrittura di un piano → `deny`. In L2 il piano corretto da `plan-adversary` → `plan_sha` è quello di `approve plan`. Edit sulla spec in fase `plan` dopo `approve spec` → `deny`; `reopen spec` → fase `spec_audit` e nuova approvazione richiesta. `needs_fix` → `task start --from-findings` crea un task `fix` senza toccare il piano (hook, integrazione).
-38. **Skill e implementatori per area.** Con un profilo `web` (`paths = ["web/**"]`, `skills = ["ui-ux-pro-max"]`, `agent = "probe:implementer-frontend"`): in L1 un task su `web/` → `tollgate:implementer` con `ui-ux-pro-max` nel brief; DONE senza aver invocato la skill → veto. In L2 lo stesso task → `task start` sceglie `probe:implementer-frontend`, e `tollgate:implementer` su quel task → `deny`. Un task su `web/` e `api/` con due agenti diversi → `tollgate:implementer` con l'unione delle skill (hook, integrazione).
+38. **Profili verticali.** Con un profilo `web` (`paths = ["web/**"]`, `skills = ["ui-ux-pro-max"]`, `agent = "probe:implementer-frontend"`, `reviewer = "probe:reviewer-frontend"`): in L1 un task su `web/` → `task start` sceglie `probe:implementer-frontend` e `probe:reviewer-frontend`; `tollgate:implementer` su quel task → `deny`; DONE senza aver invocato `ui-ux-pro-max` → veto. Un task su `web/` e `api/` con due agenti diversi → `tollgate:implementer` con l'unione delle skill. In L2 un profilo con `final_specialist` attivo → lo specialista gira insieme a `final-reviewer`, e i suoi rilievi passano dal verificatore (hook, integrazione).
 
 ---
 
@@ -1375,3 +1381,4 @@ L'elenco completo è in `docs/COSA-TENERE.md`.
 | 13 | 08/10/2026 | Decisione dell'utente: `tollgate:execute` con `tollgate:implementer` e `tollgate:task-reviewer` al posto di subagent-driven-development (tolte esenzione degli script, estrazione del task dal prompt e blocco della revisione finale di SDD; tabella `tasks`; solo `tollgate:implementer` scrive in `execution`). Correzioni dei cicli 47-50: `finish` legato allo SHA e non al tempo; approvazioni legate al contenuto (SHA blob, spec e piano bloccati dopo l'approvazione, `plan_sha` nel gate); `spec_path` della prima fetta; identificativi della base solo eseguiti e non saltati; `tollgate-base` commenta l'issue; `spec-lens-stato.md` rigenerato dall'hook e `outcome` calcolato; `db restore` solo da terminale; uscita al rifiuto del costo dell'audit; registro con eventi d'ingresso e `ctx`; `events --json`; `user_decision`; namespace dei comandi dei profili e `min_level`; casi gravi in `attenzione`; regola comune di versione; criterio 36 |
 | 14 | 08/10/2026 | Correzioni dei cicli 51-54: `PreToolUse SendMessage` per le riprese; transizioni di `tasks` e precondizioni di `task start`/`task done`; `task review-prepare` con SHA e codice; task di correzione da rilievi e gate (`--from-findings`, `--from-gate`); `reopen spec|plan` e transizioni in 12.3; piano registrato solo in fase `plan`, in L2 ad `approve plan`; brainstorming fermato prima di writing-plans; spec bloccata da `approve spec`; brief e revisione dal piano a `plan_sha`; `finish` legato a HEAD e non alla sessione; `.tollgate-run/` in `info/exclude`; `events --after-seq` con `seq`; tipi `task_change` e `finding`; `ctx` con tutte le tabelle; `order` e moduli rifiutati; `confidence` nel JSON; criterio 37. Audit chiuso come sospeso |
 | 15 | 08/10/2026 | Decisione dell'utente: specializzazione per area. Campi `skills` e `agent` nel contratto dei profili; skill nel brief e controllate da `SubagentStop` tramite `PostToolUse Skill`; in L2 implementatore per area scelto da `task start` quando il task tocca un solo profilo con `agent`; agenti concreti in B; criterio 38 |
+| 16 | 08/10/2026 | Decisione dell'utente: profili verticali. Implementatore e revisore del task per area a tutti i livelli (sostituiscono i generici); specialisti finali in L2 solo per i profili con `final_specialist` (sicurezza e database); tetto di 3 skill obbligatorie per agente; campi `reviewer`, `reviewer_skills`, `final_specialist`; catalogo in un documento a parte; criterio 38 riscritto |
