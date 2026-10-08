@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Esegue la suite con Python 3.11 (minimo della spec) e con python3 di sistema.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+for py in ${PYTHONS:-python3.11 python3}; do
+  command -v "$py" >/dev/null || { echo "manca $py" >&2; exit 1; }
+  echo "== $("$py" --version)"
+  "$py" -B -m unittest discover -s tests -t . "$@"
+done
