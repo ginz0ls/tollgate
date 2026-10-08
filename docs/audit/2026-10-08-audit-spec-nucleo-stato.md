@@ -3,7 +3,7 @@
 Documento auditato: `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md`.
 Metodo: skill `prd-audit` (lenti L1-L10, otto punti di vista, due cicli vuoti per ciascuno, tetto di 30 cicli). In parallelo: revisione avversariale a contesto pulito, senza le motivazioni dell'autore (`2026-10-08-revisione-avversariale-spec-nucleo.md`).
 Giudice esterno (`/goal`): **non usato**, per scelta dell'utente l'08/10/2026. La chiusura la decide chi conduce l'audit.
-Stato: **in corso**.
+Stato: **SOSPESO al ciclo 30** (tetto raggiunto, non chiuso). Vedi «Esito» in fondo.
 
 ## Perimetro
 
@@ -23,7 +23,7 @@ Un rilievo rilevante o superiore azzera il contatore.
 
 ## Inventario (sezioni × esito)
 
-La specifica è alla **revisione 9**. Le sezioni 6.1, 6.3, 8 e 9 sono state riscritte: vanno riauditate da tutti i punti di vista.
+La specifica è alla **revisione 10**. Le sezioni 6.1, 6.3, 8 e 9 sono state riscritte: vanno riauditate da tutti i punti di vista.
 
 | Sezione | Lenti applicate | Esito |
 |---|---|---|
@@ -333,7 +333,63 @@ Il report è in `2026-10-08-revisione-avversariale-5-spec-nucleo.md` (Z-1 … Z-
 
 Revisione 3 della specifica scritta. **Prossimo passo** (dopo la seconda revisione avversariale, in corso sulla rev. 3): revisione 4, poi cicli 5 e successivi con i punti di vista mai applicati (chi paga, chi arriva dopo, lo scettico, il caso limite, chi integra), poi chi esegue, chi attacca e chi usa sulla revisione 3, fino a due cicli vuoti per ciascuno.
 
-## Punto di ripresa (08/10/2026, limite di utilizzo raggiunto)
+
+## Cicli 22-29: otto auditor indipendenti per punto di vista (sulla revisione 9)
+
+Ognuno a contesto pulito, con le lenti L1-L10 da un solo punto di vista.
+
+| Ciclo | Punto di vista | Bloccanti | Gravi | Rilevanti | Rilievi principali |
+|---|---|---|---|---|---|
+| 22 | Chi esegue | 0 | 2 | 8 | Il gate non sa che la PR è L2; fette non implementabili; formati non definiti (intestazioni, JSON, dialetto dei glob) |
+| 23 | Chi usa | 0 | 2 | 6 | Subagente «running» dopo un crash che blocca per sempre; nessuna corsia per l'hotfix; troppi passi dopo `strict` |
+| 24 | Chi attacca | **1** | 2 | 3 | **Regole legate al nome del ramo, che sceglie l'agente**; implementatore riconosciuto solo come `general-purpose`; verificatore alimentato dal coordinatore |
+| 25 | Chi paga | 0 | 0 | 7 | Nessun modello di costo; L2 con 2 fette = 50-70 subagenti; L1 obbligato a subagent-driven-development |
+| 26 | Chi arriva dopo | 0 | 1 | 8 | Condizione dell'audit a lenti scritta in tre modi; glossario incompleto; codici R e H; identificatori in italiano |
+| 27 | Lo scettico | 0 | 0 | 8 | Proposte di rinvio: audit a lenti, fette, verbi Bash, ID della base, letture, guardia del contesto, specialisti |
+| 28 | Il caso limite | 0 | 3 | 5 | DB perso senza ricostruzione; glob non ancorati; dieci fette |
+| 29 | Chi integra | 0 | 4 | 5 | Profili senza comandi propri e senza regola di attivazione; rami delle fette; atti legati a Claude Code |
+
+**Decisioni dell'utente sul perimetro**, dopo i cicli 25 e 27:
+- fette e piano principale rinviati a C (un'issue è un lavoro ed è una PR);
+- audit a lenti come già deciso;
+- rinviati a dopo la v1: specialisti L2, Codex e controllo delle letture.
+
+Restano guardia del contesto e identificativi della base.
+
+## Ciclo 30: revisione 10 e chiusura
+
+La revisione 10 è una **riscrittura** che integra tutti i rilievi dei cicli 22-29 e le decisioni sul perimetro. La sezione 20 della specifica ne elenca il contenuto.
+
+## Esito
+
+**Audit SOSPESO, non chiuso.** È stato raggiunto il tetto di 30 cicli.
+
+**Matrice finale.** Tutti i punti di vista hanno ancora il contatore dei cicli vuoti a 0 sulla revisione 10. Ognuno ha prodotto rilievi nel ciclo 22-29, e la revisione 10 li corregge ma non è ancora stata riauditata.
+
+| Punto di vista | Ultimo ciclo | Ultimo esito | Contatore vuoti |
+|---|---|---|---|
+| Chi esegue | 22 | 10 rilievi | 0 |
+| Chi usa | 23 | 8 rilievi | 0 |
+| Chi attacca | 24 | 6 rilievi (1 bloccante) | 0 |
+| Chi paga | 25 | 7 rilievi | 0 |
+| Chi arriva dopo | 26 | 9 rilievi | 0 |
+| Lo scettico | 27 | 8 rilievi | 0 |
+| Il caso limite | 28 | 8 rilievi | 0 |
+| Chi integra | 29 | 9 rilievi | 0 |
+
+**Andamento.**
+- Bloccanti nelle revisioni avversariali: 7 → 10 → 4 → 4 → 1.
+- Nei cicli per punto di vista: 1 bloccante, 14 gravi.
+- Le garanzie dichiarate reggono sempre di più, e i rilievi residui riguardano soprattutto completezza e formati.
+
+**Punto di ripresa.** Se si decide di proseguire oltre il tetto:
+1. rilanciare gli otto auditor sulla revisione 10 con `docs/audit/prompt-ciclo-punto-di-vista.txt`;
+2. correggere;
+3. ripetere solo i punti di vista che trovano qualcosa, fino a due cicli vuoti per ciascuno.
+
+**Decisione che spetta all'utente**: proseguire l'audit oltre il tetto, oppure passare al piano accettando la spec come «sospesa».
+
+## Nota storica: interruzione per limite di utilizzo (08/10/2026)
 
 **Stato: audit IN CORSO, non chiuso.**
 - 21 cicli fatti su un tetto di 30.
