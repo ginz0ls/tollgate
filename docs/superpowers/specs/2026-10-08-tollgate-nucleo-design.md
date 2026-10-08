@@ -1,7 +1,7 @@
 # tollgate: specifica del nucleo (sotto-progetto A)
 
 Data: 8 ottobre 2026.
-Revisione: **19**: must-have legati ai test, `tollgate stats`, `attenzione` diviso tra «da leggere» e «informative» (decisione dell'utente dopo l'analisi dei problemi d'uso). Revisione 18: pratiche delle software house (task piccoli, standard del revisore, disaccordo istruito, budget per task, Definition of Done, report a campi fissi, spec con «cosa non fare»), da `docs/RICERCA-ORGANIZZAZIONE.md` (decisione dell'utente). Revisione 17: profili verticali e trasversali, precedenza per specificità, CI del progetto non più protetta. Revisione 16: implementatori e revisori per area, specialisti finali in L2, tetto di 3 skill. Il catalogo dei profili è in `2026-10-08-tollgate-profili-verticali.md`. La revisione 14 ha chiuso l'audit come «sospeso»; i residui sono nel file di stato. Le revisioni precedenti sono nella sezione 20.
+Revisione: **20**: esiti delle verifiche P0 (`docs/verifiche/2026-10-08-p0-esiti.md`): ripresa degli implementatori per nome, taglio di `maxTurns` riconosciuto in `PostToolUse Agent`, modalità del gate riconosciuta dal messaggio della GET di protezione, forma degli identificativi JUnit per strumento, comandi `!` fuori dagli hook. Revisione 19: must-have legati ai test, `tollgate stats`, `attenzione` diviso tra «da leggere» e «informative» (decisione dell'utente dopo l'analisi dei problemi d'uso). Revisione 18: pratiche delle software house (task piccoli, standard del revisore, disaccordo istruito, budget per task, Definition of Done, report a campi fissi, spec con «cosa non fare»), da `docs/RICERCA-ORGANIZZAZIONE.md` (decisione dell'utente). Revisione 17: profili verticali e trasversali, precedenza per specificità, CI del progetto non più protetta. Revisione 16: implementatori e revisori per area, specialisti finali in L2, tetto di 3 skill. Il catalogo dei profili è in `2026-10-08-tollgate-profili-verticali.md`. La revisione 14 ha chiuso l'audit come «sospeso»; i residui sono nel file di stato. Le revisioni precedenti sono nella sezione 20.
 Stato: **audit sospeso, pronta per il piano** (`docs/audit/2026-10-08-audit-spec-nucleo-stato.md`).
 Fonti: `docs/REPORT-CONFRONTO-WORKFLOW.md`, `docs/COSA-TENERE.md`, `docs/RICERCA-PAPER.md`. I codici R e H usati nel testo sono spiegati nella sezione 19.
 
@@ -79,7 +79,8 @@ Il flusso usa **Superpowers** per brainstorming e writing-plans, e i suoi TDD e 
 ### 1.2 Cosa resta fuori dalla garanzia
 
 Questi limiti sono dichiarati:
-- **L'agente che usa le credenziali GitHub dell'utente.** Lo limitano i guardrail e il token separato consigliato (11.2).
+- **L'agente che usa le credenziali GitHub dell'utente.** Lo limitano i guardrail e il token separato consigliato (11.2). In modalità `protected` non può però soddisfare la protezione pubblicando lui `tollgate/verdict`: la sorgente è fissata su GitHub Actions, e uno stato pubblicato con un altro token non conta (verificato in P0, 9.3).
+- **I comandi `!` digitati dall'utente** nel prompt di Claude Code non passano da nessun hook (verificato in P0): possono cambiare file e ramo senza i guardrail locali. Il gate su GitHub ricalcola comunque i fatti della PR.
 - **Gli effetti esterni.** Hanno un solo livello di controllo: quando arriva la PR sono già avvenuti.
 - **Il codice scritto nel lavoro ed eseguito in locale** dai test o da `verify`, con l'ambiente ripulito (8.1).
 - **Asserzioni rese più deboli o compensate con asserzioni banali.** Le cerca il revisore finale (R3).
@@ -89,7 +90,7 @@ Questi limiti sono dichiarati:
 - **Le PR da rami che non sono `tg/*`** ricevono dal gate solo i controlli sui test, con `attenzione` rosso.
 - **Una serie di PR L0.**
 - **Il sabotaggio deliberato della CI**, per esempio workflow aggiunti per pubblicare stati falsi. La modalità rinforzata con GitHub App arriva dopo la v1.
-- **In modalità `detect` il merge non è impedito, solo rilevato.** Su un repo privato con GitHub Free la protezione del ramo non esiste (verificato su docs.github.com, «GitHub's plans»). L'agente con le credenziali dell'utente potrebbe anche coprire la segnalazione; la cronologia degli stati del commit resta comunque visibile.
+- **In modalità `detect` il merge non è impedito, solo rilevato.** Su un repo privato con GitHub Free la protezione del ramo non esiste, e nemmeno i rulesets (verificato su docs.github.com, «GitHub's plans», e in P0: entrambe le API rispondono 403). L'agente con le credenziali dell'utente potrebbe anche coprire la segnalazione; la cronologia degli stati del commit resta comunque visibile.
 
 ### 1.3 Fuori dal nucleo
 
@@ -311,9 +312,10 @@ Il collegamento tra le issue è compito di C.
   4. worktree       tg/<N>-<slug> (slug [a-z0-9-], ≤ 40, con -2… se esiste); poi la riga in
                     work_items, nella stessa transazione della fase iniziale:
                     L0 execution, L1 plan, L2 spec_audit (con --spec valido: plan)
-  5. entrata        stampa «cd <percorso> && claude» e chiude qui la sessione di avvio; se
-                    EnterWorktree accetta il percorso, la skill lo usa al posto (16). La nuova
-                    sessione si lega al lavoro al suo SessionStart (0)
+  5. entrata        la skill entra nel worktree con EnterWorktree (accetta un worktree
+                    esistente, 16); la sessione è già legata perché ha eseguito start (0).
+                    Se EnterWorktree non riesce, stampa «cd <percorso> && claude» e chiude qui
+                    la sessione di avvio: la nuova sessione si lega al suo SessionStart
 ```
 
 **In ripresa i passi 0 e 1 cambiano.** Restano rifiuti solo «repo attivo» e «Python». Rete assente, `gh` non raggiungibile, stati del ramo predefinito non verdi e checkout principale sporco diventano avvisi. Il checkout principale sporco è sempre e solo un avviso, anche al primo avvio: tollgate non lo usa.
@@ -366,20 +368,25 @@ execution (sessione pulita)
         test correlati R2, must-have collegati, skill da usare, istruzione «prima di DONE
         esegui tollgate verify»); sceglie anche il tipo di implementatore (sotto). Il piano è letto a `plan_sha`. Un task può indicare i must-have che
         soddisfa con una riga `Must-have: M1, M3`; senza, il brief li contiene tutti
-      Agent <tipo scelto da task start> con il percorso del brief → SubagentStart associa il
+      Agent <tipo scelto da task start> con il percorso del brief e il `name` scritto nel brief
+        (tg-<N>-t<k>; tg-<N>-t<k>-r<giro> per un implementatore nuovo dei giri 4-5)
+        → SubagentStart associa il
         subagente al task (lo scrittore unico rende l'associazione univoca) e inietta il
         promemoria del passo (R5), al massimo 2.000 caratteri (R9)
       implementatore: TDD → commit (hook: test-guard, scope, livello) → tollgate verify
         → report a campi fissi (18.5), entro il budget del task (sotto)
       SubagentStop: 8.1; conflitto tra test e specifica → block open test_spec_conflict (R1)
+      PostToolUse Agent, al ritorno: registra la coppia nome → agent_id per le riprese,
+        legge i token e riconosce il taglio di maxTurns (sotto)
       tollgate task review-prepare k → brief del revisore con l'intervallo di SHA del task
         (tasks.commits, riempito da PostToolUse Bash) e un codice
       Agent <revisore scelto da task start> con il brief → verdetto (18.5) con SHA e codice;
         SubagentStop lo associa al task in `review`
       approved → tollgate task done k (rifiuta senza verdetto approved sull'ultimo SHA del task)
       changes → giro di correzione: tollgate task start k --fix; giri 1-3 riprendono lo
-        stesso implementatore con SendMessage, 4-5 ne lanciano uno nuovo con model inherit;
-        al quinto senza approved → needs_you
+        stesso implementatore con SendMessage verso il suo nome (SubagentStart e SubagentStop
+        scattano di nuovo, con lo stesso agent_id), 4-5 ne lanciano uno nuovo con model
+        inherit; al quinto senza approved → needs_you
   guardia del contesto: avviso a warn_pct; a stop_pct nessun nuovo subagente → checkpoint + /clear;
     dopo il /clear execute riprende dal primo task non chiuso in `tasks`
   fine dei task → /tollgate:finish (finish check rifiuta se un task non è done)
@@ -394,13 +401,15 @@ execution (sessione pulita)
 - **Un file, un profilo verticale.** Se un file corrisponde a più profili verticali vince il pattern **più specifico**: quello con più segmenti di percorso letterali (senza `*`); a parità, il primo dichiarato in `tollgate.toml`. `init` mostra le sovrapposizioni sui file reali del repo.
 - **Skill:** il brief dell'implementatore elenca l'unione dei campi `skills` di quei profili, al massimo 3; quello del revisore elenca l'unione dei `reviewer_skills`, al massimo 3. Se l'unione supera 3, `plan-check` lo segnala e `plan-adversary` chiede di dividere il task. Ogni implementatore usa in più le skill comuni di `tollgate:implementer` (TDD, debugging, verifica), che non contano nel tetto. `SubagentStop` controlla che l'implementatore abbia invocato ognuna (eventi `PostToolUse` dello strumento `Skill` con il suo `agent_id`); se ne manca una, veto con l'elenco, come per la ricevuta (8.1). Una skill non installata non blocca: il brief la segna come assente e `attenzione` lo riporta.
 - **Implementatore e revisore per area, a tutti i livelli:** se i profili del task dichiarano **un solo** `agent` non vuoto, `task start` sceglie quell'agente, e allo stesso modo `reviewer` per il revisore del task; con zero, o con agenti diversi (task a cavallo di più aree), sceglie `tollgate:implementer` e `tollgate:task-reviewer` con l'unione delle skill, e `plan-adversary` segnala il task come candidato a essere diviso. In L0 non ci sono subagenti: la sessione principale riceve nel promemoria le skill dei profili toccati.
-- **Cosa rende diverso un implementatore per area:** prompt con le regole dell'area, strumenti propri (campo `tools`; un server MCP proprio solo se la verifica di 16 conferma `mcpServers` nei subagenti di plugin, altrimenti si dichiara a livello di progetto), modello proprio. Deriva dallo stesso testo di `tollgate:implementer` e ne mantiene gli obblighi (TDD, `verify`, stati, report). Un nome di ruolo senza contesto o strumenti diversi non giustifica un agente a sé (ricerca, filone 6).
+- **Cosa rende diverso un implementatore per area:** prompt con le regole dell'area, strumenti propri (campo `tools`; un server MCP si dichiara a livello di progetto, perché i subagenti di plugin ignorano `mcpServers`, 16), modello proprio. Deriva dallo stesso testo di `tollgate:implementer` e ne mantiene gli obblighi (TDD, `verify`, stati, report). Un nome di ruolo senza contesto o strumenti diversi non giustifica un agente a sé (ricerca, filone 6).
 - **Vincoli per gli agenti dei profili:** l'implementatore si chiama `<plugin>:implementer-<area>` e non è mai in `readonly_agents`; vale per lui tutto ciò che vale per `tollgate:implementer` (scope, scrittore unico, ricevuta, sola scrittura dopo `task start`). Il revisore si chiama `<plugin>:reviewer-<area>` e lo specialista finale `<plugin>:final-<area>`: entrambi entrano automaticamente in `readonly_agents`. Un agente per area funziona anche senza le sue skill (non installate su quella macchina): sono un rinforzo, non una dipendenza.
 - **Catalogo.** I profili verticali concreti (aree, percorsi, comandi, agenti, skill, checklist) sono definiti in `docs/superpowers/specs/2026-10-08-tollgate-profili-verticali.md` e realizzati dal sotto-progetto B.
 
 **Dimensione e budget del task** (task piccoli: Google small CLs, GitLab, DORA small batches; budget fisso: Shape Up).
 - **Dimensione.** A `task review-prepare` si misurano le righe aggiunte più rimosse del task, esclusi lockfile e file generati. Oltre `task_lines_warn` (200) il brief del revisore lo segnala; oltre `task_lines_max` (500) il report dell'implementatore deve contenere una motivazione, e `attenzione` lo riporta. Test e codice stanno nello stesso task; un refactoring va in un task a sé. `plan-adversary` segnala i task del piano che toccano più di `task_files_warn` (8) file.
-- **Budget.** Ogni implementatore ha `maxTurns` nel frontmatter (predefinito `[tasks] max_turns`, 60) e un tetto di token per livello (`[tasks] max_tokens`, letto dal transcript a `SubagentStop`). Superato il budget, il task va in `blocked` con un `needs_you` che propone di dividerlo: niente «ancora un giro» automatico.
+- **Budget.** Ogni implementatore ha `maxTurns` nel frontmatter (predefinito `[tasks] max_turns`, 60) e un tetto di token per livello (`[tasks] max_tokens`). Superato il budget, il task va in `blocked` con un `needs_you` che propone di dividerlo: niente «ancora un giro» automatico.
+  - **Taglio di `maxTurns`.** Claude Code interrompe il subagente **senza** `SubagentStop` (verificato in P0). Lo riconosce `PostToolUse Agent`: il risultato contiene «stopped at its N-turn limit». Senza questa regola il task resterebbe `running` per sempre. `tollgate:execute` lancia gli implementatori in primo piano, perché i task sono in sequenza; come appare il taglio per un subagente in background è ancora da verificare (16).
+  - **Token.** Per un subagente in primo piano si leggono da `tool_response.totalTokens` di `PostToolUse Agent`. Per uno in background e per le riprese, che lì riportano solo `agentId`, si sommano gli `usage` del transcript (`agent_transcript_path`) a `SubagentStop`.
 - **Report a campi fissi.** Il messaggio finale dell'implementatore ha i campi di 18.5 (stato, fatto, test, file, dubbi, cosa resta, motivazione della dimensione). Un report senza i campi obbligatori è **non valido**: veto con l'elenco dei campi mancanti, che conta tra i 2 veti di 8.1. Serve a chi riprende il task: note strutturate riducono il costo della ripresa (arXiv 2606.02875).
 
 **Transizioni di `tasks.state`.**
@@ -411,7 +420,7 @@ execution (sessione pulita)
 | `running` | `SubagentStop` con DONE o DONE_WITH_CONCERNS e ricevuta `green` | `review` (con DONE_WITH_CONCERNS i dubbi vanno nel brief del revisore) |
 | `running` | `SubagentStop` con BLOCKED | `blocked`, con un blocco del lavoro (`needs_you` o il tipo dichiarato) |
 | `running` | `SubagentStop` con NEEDS_CONTEXT | `running`: il coordinatore risponde riprendendo lo stesso implementatore; non consuma un giro |
-| `running` | budget superato (`maxTurns` o `max_tokens`) | `blocked`, con un blocco `needs_you` che propone di dividere il task |
+| `running` | budget superato: `PostToolUse Agent` con il taglio di `maxTurns`, oppure token oltre `max_tokens` a `PostToolUse Agent` o a `SubagentStop` | `blocked`, con un blocco `needs_you` che propone di dividere il task |
 | `running` | implementatore `interrupted` | `pending` di nuovo, senza consumare un giro |
 | `review` | verdetto `changes` e `task start k --fix` | `running`, `fix_rounds` + 1 |
 | `review` | verdetto `approved` e `task done k` | `done` |
@@ -421,7 +430,7 @@ execution (sessione pulita)
 
 `.tollgate-run/` è ignorata da git: `start` la scrive in `$(git rev-parse --git-common-dir)/info/exclude`, che non richiede commit. È fuori dallo scope. I giri di correzione (R4) sono `tasks.fix_rounds`: li conta la CLI a ogni `task start --fix`, non un'euristica sugli hook.
 
-**In `execution`, in L1 e L2, l'unico subagente che scrive è l'implementatore scelto da `task start` (`tollgate:implementer` o `<plugin>:implementer-<area>`) e lanciato dopo `task start`.** `PreToolUse Agent` nega gli altri tipi che non sono in `readonly_agents` e un implementatore senza un `task start` in sospeso. **`PreToolUse SendMessage`** applica le stesse regole alle riprese, che non passano da `Agent` (verificato, pagina sub-agents): verso un implementatore la ripresa è ammessa solo con un `task start --fix` in sospeso per il suo task, oppure per rispondere a NEEDS_CONTEXT; verso un subagente che scrive e non è l'implementatore del task è negata. Così subagent-driven-development, se il coordinatore lo invocasse per abitudine, non può lanciare né riprendere implementatori. writing-plans chiude i piani con un rimando a subagent-driven-development: la skill `start` dice di usare `/tollgate:execute`, e il veto lo ricorda.
+**In `execution`, in L1 e L2, l'unico subagente che scrive è l'implementatore scelto da `task start` (`tollgate:implementer` o `<plugin>:implementer-<area>`) e lanciato dopo `task start`.** `PreToolUse Agent` nega gli altri tipi che non sono in `readonly_agents` e un implementatore senza un `task start` in sospeso. **`PreToolUse SendMessage`** applica le stesse regole alle riprese, che non passano da `Agent` (verificato, pagina sub-agents). La ripresa indica il destinatario con il **nome** dato al lancio (`tool_input.to`, verificato in P0), per questo `PreToolUse Agent` nega il lancio di un implementatore senza il `name` del brief, e `PreToolUse SendMessage` risolve il nome con la tabella nome → `agent_id` che `PostToolUse Agent` registra per ogni subagente lanciato con un nome (`subagents.name`, 12.2). In `execution` un nome mai registrato vale come un implementatore senza `task start`: `deny`. Verso un implementatore la ripresa è ammessa solo con un `task start --fix` in sospeso per il suo task, oppure per rispondere a NEEDS_CONTEXT; verso un subagente che scrive e non è l'implementatore del task è negata. Così subagent-driven-development, se il coordinatore lo invocasse per abitudine, non può lanciare né riprendere implementatori. writing-plans chiude i piani con un rimando a subagent-driven-development: la skill `start` dice di usare `/tollgate:execute`, e il veto lo ricorda.
 
 ### 6.4 Chiusura
 
@@ -492,18 +501,19 @@ Ogni messaggio d'errore riporta il percorso assoluto di `bin/tollgate` e il coma
 | Evento | Filtro | Comportamento |
 |---|---|---|
 | `SessionStart` | `startup`, `resume`, `clear`, `compact`, `fork` | Se la directory è dentro il worktree di un lavoro attivo, lega la sessione al lavoro (0). Inietta lo stato e il checkpoint. Segna come `interrupted` i subagenti `running` **di sessioni non vive** (0); mai in base alla sola origine «precedente» |
-| `UserPromptExpansion` | comandi `tollgate:*`, forma lunga e breve | Registra l'atto (8.4) |
+| `UserPromptExpansion` | comandi `tollgate:*`, forma lunga e breve | Registra l'atto (8.4) da `command_name`, che è sempre nella forma lunga, e `command_args` |
 | `PreToolUse` | `Edit`, `Write`, `NotebookEdit`, `MultiEdit` | In `spec_audit`, `plan`, `approval`, `blocked`, `review` e `pr_open`: solo `.md` sotto `docs/superpowers/` (in `spec_audit` e `approval` non sotto `plans/`; mai spec e piano bloccati, 6.2); per correggere il codice dopo `finish` si torna in `execution` con `start`. In `execution`: fuori scope → `deny`; codice scritto dalla sessione principale in L1 o L2 → `deny`. In L0 non c'è scope: scrive la sessione principale, e il superamento delle soglie di 5 porta a L1. File protetti → `deny`, anche quando sono `.md` sotto `docs/superpowers/reviews/`. Sempre ammessi: gli altri `.md` sotto `docs/superpowers/` e `.superpowers/` |
 | `PostToolUse` | `Edit`, `Write`, `MultiEdit` | Ricalcola il livello; sui piani lancia `plan-check` (7.5) |
 | `PostToolUse` | `Skill` | Se lo invoca un implementatore (`agent_id`), registra la skill per il suo task (6.3) |
 | `PostToolUse` | `Bash` | In una sessione legata o nel worktree: se `HEAD` ha commit nuovi non registrati (anche da `merge`, `cherry-pick`, `revert`, `am`), li registra e fa girare test-guard e scope su di essi; una violazione apre un blocco `needs_you`. Se il ramo del worktree è cambiato, apre `needs_you`. È il controllo a valle che copre i comandi non riconosciuti da 7.4 |
 | `PreToolUse` | `Bash` | 7.4 |
 | `PreToolUse` | `mcp__.*` | Effetto esterno, se lo strumento non è in `mcp_allow` (8.5) |
-| `PreToolUse` | `Agent` | Guardia del contesto. **Scrittore unico**: nessun nuovo implementatore se un altro è `running` nel worktree. Un subagente senza eventi da più di `stale_minutes` (30) diventa `interrupted`, anche se la sua sessione è viva: è un subagente bloccato. In `execution` (L1, L2) ammette come scrittore solo il tipo scelto da `task start` per il task in sospeso (`tollgate:implementer` o l'implementatore per area, 6.3) |
-| `PreToolUse` | `SendMessage` | Ripresa di un subagente: stesse regole di `Agent` sullo scrittore (6.3). Verso un subagente di sola lettura o il coordinatore: ammessa |
+| `PreToolUse` | `Agent` | Guardia del contesto. **Scrittore unico**: nessun nuovo implementatore se un altro è `running` nel worktree. Un subagente senza eventi da più di `stale_minutes` (30) diventa `interrupted`, anche se la sua sessione è viva: è un subagente bloccato. In `execution` (L1, L2) ammette come scrittore solo il tipo scelto da `task start` per il task in sospeso (`tollgate:implementer` o l'implementatore per area, 6.3), con il `name` scritto nel brief |
+| `PostToolUse` | `Agent` | Registra il nome → `agent_id` (`tool_response.agentId`) del subagente lanciato con un nome. Legge i token da `tool_response.totalTokens` (solo in primo piano). Se il risultato contiene «stopped at its N-turn limit», il task dell'implementatore va in `blocked` con `needs_you` (budget superato, 6.3): al taglio di `maxTurns` non arriva `SubagentStop` |
+| `PreToolUse` | `SendMessage` | Ripresa di un subagente: risolve `tool_input.to` con la tabella dei nomi e applica le stesse regole di `Agent` sullo scrittore (6.3). Nome mai registrato, in `execution` → `deny`. Verso un subagente di sola lettura o il coordinatore: ammessa |
 | `SubagentStart` | tutti | Salva `agent_base_sha` (senza sovrascriverla alla ripresa), l'impronta dei file e il tipo; per l'implementatore del task (generico o per area) lo associa al task in sospeso; inietta il contesto (6.3) |
-| `SubagentStop` | tutti | Implementatori: 8.1. Sola lettura: 7.3. Revisore del task: verdetto in `tasks` (18.5). Revisori finali: 8.6. Avversari e auditor: salva il report. Legge anche i token dal `agent_transcript_path` |
-| `PostToolUse` | `SubagentHandback` | In auto mode il report del subagente arriva con questo strumento (verificato in tools-reference, dalla v2.1.271). L'adattatore ne salva `tool_input` come messaggio finale del subagente, e `SubagentStop` lo preferisce a `last_assistant_message` (16) |
+| `SubagentStop` | tutti | Implementatori: 8.1. Sola lettura: 7.3. Revisore del task: verdetto in `tasks` (18.5). Revisori finali: 8.6. Avversari e auditor: salva il report. Legge i token dal `agent_transcript_path` quando `PostToolUse Agent` non li ha (background, riprese). Ignora gli eventi con `agent_type` vuoto o con un `agent_id` mai visto a `SubagentStart`: sono subagenti interni di Claude Code (visti in P0) |
+| `PostToolUse` | `SubagentHandback` | In auto mode il report del subagente arriva con questo strumento (verificato in tools-reference, dalla v2.1.271). L'adattatore ne salva `tool_input.message` come messaggio finale del subagente. In auto mode è l'**unica** fonte: `SubagentStop` non ha `last_assistant_message` (verificato in P0) |
 
 `Stop` della sessione principale: nessun veto.
 
@@ -538,7 +548,15 @@ L'ambito è quello di 6.6. Le regole sono «best effort».
 
 Le intestazioni si cambiano in `[plan] required_sections`, e i profili possono aggiungerne altre.
 
-**Must-have legati ai test** (L1 e L2). Nella sezione `## Must-have` ogni voce ha la forma `M<n>. <proprietà> — test: <identificativo>` (uno o più identificativi, nella forma `classname::name` del report JUnit). `plan-check` rifiuta un must-have senza test. Così, quando approvi il piano, approvi anche **quali test dimostrano** che il lavoro fa ciò che volevi: il gate verifica una cosa decisa da te, non solo la coerenza del lavoro con se stesso. Un must-have che non si può verificare con un test (per esempio una proprietà visiva) porta `— test: manuale` e finisce tra le voci «da leggere» di `attenzione`.
+**Must-have legati ai test** (L1 e L2). Nella sezione `## Must-have` ogni voce ha la forma `M<n>. <proprietà> — test: <identificativo>` (uno o più identificativi, nella forma `classname::name` del report JUnit). La forma dipende dallo strumento (verificata in P0, stabile tra esecuzioni):
+
+| Strumento | `classname` | `name` | Esempio |
+|---|---|---|---|
+| vitest | percorso del file dalla radice del progetto | blocchi e test uniti da ` > ` | `src/date.test.ts::format > handles UTC` |
+| jest con jest-junit configurato da `init` (11.2) | percorso del file dalla radice del progetto | blocchi e test uniti da uno spazio | `src/date.test.js::format handles UTC` |
+| pytest | modulo con i punti, più la classe se c'è | nome della funzione | `tests.test_x::test_a`, `tests.test_x.TestGroup::test_a` |
+
+`plan-check` rifiuta un must-have senza test. Così, quando approvi il piano, approvi anche **quali test dimostrano** che il lavoro fa ciò che volevi: il gate verifica una cosa decisa da te, non solo la coerenza del lavoro con se stesso. Un must-have che non si può verificare con un test (per esempio una proprietà visiva) porta `— test: manuale` e finisce tra le voci «da leggere» di `attenzione`.
 
 **Lo scope del piano.**
 - Si ricava da `Create:`, `Modify:` e `Test:` di ogni task (formato verificato in writing-plans, righe 100-102).
@@ -578,7 +596,7 @@ Gira in locale al `git commit` e nel gate dentro `verdict`.
 
 **Nei file di test** (`test_globs` più quelli dei profili attivi):
 - file cancellati, riconoscendo le rinomine;
-- identificativi della base che mancano nella testa. In locale si ricavano per analisi statica: `describe`/`it`/`test` in JS e TS, `def test_*` e classi `Test*` in Python, `func Test*` in Go. Nel gate vengono dal report JUnit. Gli identificativi della base sono i soli test **eseguiti e non saltati** nella base; nella testa uno `skipped` conta come **mancante**;
+- identificativi della base che mancano nella testa. In locale si ricavano per analisi statica: `describe`/`it`/`test` in JS e TS, `def test_*` e classi `Test*` in Python, `func Test*` in Go. L'analisi statica produce la stessa forma del JUnit di ogni strumento (7.5), così i due insiemi si confrontano. Nel gate vengono dal report JUnit. Gli identificativi della base sono i soli test **eseguiti e non saltati** nella base; nella testa uno `skipped` conta come **mancante**;
 - asserzioni diminuite (`assert_markers` per linguaggio, contate senza commenti e stringhe);
 - marcatori di salto aggiunti, solo a parola intera:
   - JS e TS: `xit`, `xdescribe`, `xtest`, `.skip`, `.only`, `.todo`, `.fixme`, `.skipIf`, `.runIf(false)`, `.fails`;
@@ -617,7 +635,7 @@ Gira in locale al `git commit` e nel gate dentro `verdict`.
 
 ### 8.4 Atti dell'utente
 
-Li registra `UserPromptExpansion` quando digiti il comando, con `source`, `actor`, sessione, lavoro della sessione (se legata), oggetto e testo digitato. `source` è un elenco aperto: il nucleo usa `claude-code`, D aggiunge gli altri harness. Ogni atto ha uno `state` (`pending`, `consumed`, `expired`). Gli atti che autorizzano una volta sola (`finish`, `approve effect`, `approve pr`, `approve rebase`, `sync`, `adopt`, `cleanup`, `abandon`) diventano `consumed` quando la CLI li usa, e la CLI li accetta solo se sono dello stesso lavoro e dello stesso oggetto (issue, SHA o identificativo); per `adopt` e `cleanup`, che si danno da una sessione non legata, il lavoro è `null`. Tutti tranne `finish` vanno usati nella stessa sessione e scadono dopo `[acts] ttl_minutes` (10). **`finish` non scade a tempo e non è legato alla sessione:** è legato allo SHA di HEAD del lavoro e decade appena HEAD è diverso (nuovo commit, reset, rebase), così sopravvive anche al `/clear` della guardia del contesto, perché tra il comando e `open-pr` passano `finish check` e la revisione, che durano più di 10 minuti. Un secondo `/tollgate:finish` sullo stesso SHA riprende dal ciclo registrato, senza aprirne uno nuovo.
+Li registra `UserPromptExpansion` quando digiti il comando. Il tipo di atto viene da `command_name`, sempre nella forma lunga (`tollgate:approve`) anche quando digiti la breve, e gli argomenti da `command_args` (verificato in P0, anche per le skill con `disable-model-invocation`). L'atto registra `source`, `actor`, sessione, lavoro della sessione (se legata), oggetto e testo digitato. `source` è un elenco aperto: il nucleo usa `claude-code`, D aggiunge gli altri harness. Ogni atto ha uno `state` (`pending`, `consumed`, `expired`). Gli atti che autorizzano una volta sola (`finish`, `approve effect`, `approve pr`, `approve rebase`, `sync`, `adopt`, `cleanup`, `abandon`) diventano `consumed` quando la CLI li usa, e la CLI li accetta solo se sono dello stesso lavoro e dello stesso oggetto (issue, SHA o identificativo); per `adopt` e `cleanup`, che si danno da una sessione non legata, il lavoro è `null`. Tutti tranne `finish` vanno usati nella stessa sessione e scadono dopo `[acts] ttl_minutes` (10). **`finish` non scade a tempo e non è legato alla sessione:** è legato allo SHA di HEAD del lavoro e decade appena HEAD è diverso (nuovo commit, reset, rebase), così sopravvive anche al `/clear` della guardia del contesto, perché tra il comando e `open-pr` passano `finish check` e la revisione, che durano più di 10 minuti. Un secondo `/tollgate:finish` sullo stesso SHA riprende dal ciclo registrato, senza aprirne uno nuovo.
 
 | Atto | Effetto |
 |---|---|
@@ -707,7 +725,7 @@ Il lavoro che non rispetta la Definition of Done non conta (Scrum Guide 2020; Gi
 |---|---|---|---|---|---|
 | `tollgate-guard` | `pull_request_target` | Ramo predefinito | No: checkout solo del predefinito, oggetti della PR con `git fetch` | `contents: read`, `statuses: write`, `pull-requests: write` | Pubblica `tollgate/guard` e, se serve, un commento che spiega lo stato in attesa |
 | `tollgate-run` | `pull_request` | Quella della PR, che `guard` impone uguale | Sì | Sola lettura, nessun segreto | `setup` e comandi del gate sulla testa; carica come artefatti solo report, uscite e conteggi. Nessun filtro `paths` o `branches`, ma esce subito se la PR non punta al ramo predefinito. `concurrency` per PR con `cancel-in-progress` |
-| `tollgate-verdict` | `workflow_run` al termine di `run` | Ramo predefinito (verificato) | No: calcola da sé il diff con `git fetch` e legge gli artefatti come dati in una cartella temporanea | `contents: read`, `statuses: write`, `pull-requests: write`, `actions: read` (artefatti del run), `issues: read` (stato ed etichette dell'issue) | Pubblica `tollgate/verdict` e `tollgate/attention`, sempre espliciti, più il commento. Mette in cache, per albero, gli identificativi dei test della testa |
+| `tollgate-verdict` | `workflow_run` al termine di `run` | Ramo predefinito (verificato) | No: calcola da sé il diff con `git fetch` e legge gli artefatti come dati in una cartella temporanea | `contents: read`, `statuses: write`, `pull-requests: write`, `actions: read` (artefatti del run: necessario nei repo privati, verificato in P0), `issues: read` (stato ed etichette dell'issue) | Pubblica `tollgate/verdict` e `tollgate/attention`, sempre espliciti, più il commento. Mette in cache, per albero, gli identificativi dei test della testa |
 | `tollgate-base` | `push` sul predefinito | Ramo predefinito | No | `contents: read`, `statuses: write`, `issues: write` | Mette in cache, per SHA e per albero, gli identificativi dei test della base. Se l'albero è già in cache (merge squash di una testa verificata) non riesegue la suite. In `detect` pubblica `tollgate/base` sul commit; se la suite fallisce lo stato è rosso e `tollgate-base` stesso commenta l'issue di `sentinel` (permesso `issues: write` in più) |
 | `tollgate-sentinel` | `push` sul predefinito | Ramo predefinito | No | `contents: read`, `statuses: write`, `issues: write`, `pull-requests: read` | Per ogni commit nuovo (l'intervallo `before...after` del push) chiede `GET /repos/{o}/{r}/commits/{sha}/pulls`. Se il commit non viene da una PR mergiata, o se la testa di quella PR non aveva `tollgate/guard` e `tollgate/verdict` verdi: stato `tollgate/sentinel` rosso sul commit e un commento sull'**unica** issue aperta «tollgate: merge non verificato» (la crea se non c'è). Ignora il commit che introduce per la prima volta il proprio workflow. Gira in entrambe le modalità; in `protected` intercetta le forzature degli amministratori |
 
@@ -718,6 +736,8 @@ Il lavoro che non rispetta la Definition of Done non conta (Scrum Guide 2020; Gi
 - La PR punta al ramo predefinito.
 
 Se qualcosa non torna pubblica `error`. Le PR verso altri rami ricevono «non applicabile».
+
+**PR di Dependabot.** Il `workflow_run` che segue il `run` di una PR di Dependabot riceve i permessi dichiarati e i segreti normali del repo, non quelli di Dependabot (verificato in P0). `verdict` funziona quindi senza casi speciali. Per lo stesso motivo un `workflow_run` del progetto vedrebbe i segreti anche per le PR di Dependabot: è un motivo in più per cui `guard` lo vieta (9.2).
 
 **Base senza cache.** Un job senza permessi di scrittura (`persist-credentials: false`) calcola gli identificativi con il codice della base.
 
@@ -749,9 +769,12 @@ Se qualcosa non torna pubblica `error`. Le PR verso altri rami ricevono «non ap
 ### 9.3 Protezione del ramo e modalità del gate
 
 **Come si sceglie la modalità.** La lettura della protezione (`GET /repos/{o}/{r}/branches/{b}/protection`) richiede il permesso di amministrazione in lettura, che il token consigliato per l'agente non ha (verificato su docs.github.com). Per questo la misura **solo `init`**, eseguito con le credenziali dell'utente:
-- risposta che dice che la funzione non è disponibile per il piano → `detect`;
-- protezione leggibile → `protected`;
-- 403 per permessi o qualunque altra risposta → «non determinata»: `init` lo dice e chiede all'utente di rilanciarlo con le sue credenziali. Mai `protected` per esclusione.
+- HTTP 403 con il messaggio «Upgrade to GitHub Pro or make this repository public to enable this feature.» → `detect`;
+- HTTP 200 → `protected`, con la protezione già presente: `init` segnala i campi mancanti;
+- HTTP 404 con il messaggio «Branch not protected» → `protected`: il repo può avere la protezione ma non ce l'ha ancora, e `init` propone il comando;
+- ogni altro 403 (per esempio permessi mancanti, con lo stesso codice del primo caso) o qualunque altra risposta → «non determinata»: `init` lo dice e chiede all'utente di rilanciarlo con le sue credenziali. Mai `protected` per esclusione.
+
+Le risposte sono quelle osservate in P0. Il piano dell'account non si usa: `GET /user` restituisce `plan: null` senza lo scope `user`. I rulesets non sono un'alternativa su un repo privato con Free: la loro API risponde con lo stesso 403.
 
 La modalità va in `[gate] mode` di `tollgate.toml`, quindi cambia solo con una PR `tollgate-config/*`. `start`, il blocco JSON della PR e `/tollgate:status` la leggono da lì; `work_items.gate_mode` ne è una copia presa all'avvio. Se il piano GitHub cambia, si rilancia `init --update`.
 
@@ -759,7 +782,7 @@ La modalità va in `[gate] mode` di `tollgate.toml`, quindi cambia solo con una 
 
 **In `protected`,** `/tollgate:init` propone il comando `gh api` completo:
 - PR obbligatoria;
-- controlli obbligatori `tollgate/guard` e `tollgate/verdict`, con la sorgente fissata su GitHub Actions se la protezione lo permette per gli stati di commit (16);
+- controlli obbligatori `tollgate/guard` e `tollgate/verdict`, con la sorgente fissata su GitHub Actions (`app_id`). Funziona anche per gli stati di commit: uno stato pubblicato con un token personale lascia la PR bloccata (verificato in P0). Il comando proposto da `init` non scrive `app_id` a mano: lo legge, quando lo lanci, dal check-run di `tollgate-base` sul commit che installa i workflow (15368 per GitHub Actions su github.com), e si ferma se non lo trova. Per questo si lancia dopo quel commit (11.2). Omettere `app_id` non toglie la sorgente: GitHub tiene l'ultima vista. «Qualunque sorgente» si ottiene solo con `-1`, che `init` non propone mai;
 - `strict`;
 - regole valide anche per gli amministratori;
 - niente push forzato né cancellazione.
@@ -827,7 +850,7 @@ C'è una sola revisione finale: `tollgate:execute` non ne ha una propria.
 
 ### 11.1 Dipendenze
 
-- **Superpowers** con l'intervallo `>=6.4.1 <7.0.0`, per brainstorming, writing-plans, TDD e debugging. Di Superpowers tollgate usa solo il formato del piano (`### Task N`, `Create:`/`Modify:`/`Test:`), che `plan-check` verifica. Se mancano i tag di versione, la dipendenza va senza intervallo e la versione la controlla `start` leggendo il `plugin.json` di Superpowers.
+- **Superpowers** con l'intervallo `>=6.4.1 <7.0.0`, per brainstorming, writing-plans, TDD e debugging. Di Superpowers tollgate usa solo il formato del piano (`### Task N`, `Create:`/`Modify:`/`Test:`), che `plan-check` verifica. I tag di versione esistono, con il prefisso `v` (`v6.4.1`, `v6.4.2`; verificato in P0). Se il risolutore delle `dependencies` non accetta il prefisso (da verificare in P2, 16), la dipendenza va senza intervallo e la versione la controlla `start` leggendo il `plugin.json` di Superpowers.
 - **`marketplace.json`** con l'allowlist tra marketplace.
 
 ### 11.2 `/tollgate:init`
@@ -838,9 +861,10 @@ C'è una sola revisione finale: `tollgate:execute` non ne ha una propria.
 - il CLI e la sua impronta;
 - la modalità del gate misurata (9.3) e, in `protected`, il comando per la protezione del ramo;
 - la stima dei minuti di Actions (9.5);
+- per i progetti con jest, la configurazione di jest-junit che mette il file nell'identificativo: `classNameTemplate = "{filepath}"` e `titleTemplate = "{classname} {title}"`. Con quella predefinita due test omonimi in file diversi hanno lo stesso identificativo, e un test cancellato in un file sarebbe coperto dall'omonimo di un altro (7.5, verificato in P0);
 - la configurazione consigliata di un **token GitHub separato per l'agente**: contenuti, PR e issue, senza amministrazione né `project`. Il token per C lo definirà C.
 
-**I tuoi passi:** copi i file, li committi sul predefinito **prima** di attivare la protezione, poi lanci il comando.
+**I tuoi passi:** copi i file, li committi sul predefinito **prima** di attivare la protezione, poi lanci il comando. Il commit fa partire `tollgate-base`, dal cui check-run il comando legge `app_id` (9.3).
 
 ### 11.3 `/tollgate:setup`
 
@@ -1005,7 +1029,7 @@ Le soglie della revisione 18 vengono da pratiche pensate per le persone (Google,
 | `scope` | work, path, origin, registered_at | |
 | `receipts` | work, sha, command, resolved_command, exit, tests_run, tests_skipped, duration, log, produced_by, state | |
 | `blocks` | work, type, reason, opened, closed, resolution | |
-| `subagents` | id, type, work, task, agent_base_sha, fingerprint, started, ended, resumes, declared_status, state, tokens, duration | |
+| `subagents` | id, name, type, work, task, agent_base_sha, fingerprint, started, ended, resumes, declared_status, state, tokens, duration | |
 | `review_cycles` | work, number, sha, patch_id, outcome, findings_confirmed, counted | |
 | `findings` | id, work, cycle, source, severity, confidence, file, line, text, verification, verification_reason, user_decision | univoco (work, id) |
 | `spec_audit` | work, kind, number, viewpoint, counts, outcome, report_path | |
@@ -1152,7 +1176,7 @@ Ogni criterio è un'azione con un esito binario.
    - Completo → scope registrato.
    - Riscritto con un file in più → scope invariato (hook).
 3. **Scope.** In `execution` un file fuori scope → `deny`, e dopo la deroga passa. In `plan` sono ammessi solo i `.md` sotto `docs/superpowers/`. In L1 il codice scritto dalla sessione principale → `deny` (hook).
-4. **Implementatore.** In `execution` (L1): `general-purpose` → `deny`; `tollgate:implementer` senza `task start` → `deny`; `SendMessage` a un implementatore senza `task start --fix` in sospeso → `deny`; `task done` senza verdetto `approved` → rifiuto; dopo `task start 2 --fix` per tre volte → `tasks.fix_rounds = 3`. Un subagente di qualunque tipo fuori da `readonly_agents`, con DONE e senza ricevuta `green` → veto; al terzo tentativo `needs_you`. Con DONE, file modificati e nessun commit → veto. Con BLOCKED e ricevuta rossa → chiude (hook).
+4. **Implementatore.** In `execution` (L1): `general-purpose` → `deny`; `tollgate:implementer` senza `task start` → `deny`; `SendMessage` a un implementatore senza `task start --fix` in sospeso → `deny`; `tollgate:implementer` lanciato senza il `name` del brief → `deny`; `SendMessage` verso un nome mai registrato → `deny`; `SendMessage` verso il nome dell'implementatore con `task start --fix` in sospeso → ammesso, e `SubagentStart` non sovrascrive `agent_base_sha`; `task done` senza verdetto `approved` → rifiuto; dopo `task start 2 --fix` per tre volte → `tasks.fix_rounds = 3`. Un subagente di qualunque tipo fuori da `readonly_agents`, con DONE e senza ricevuta `green` → veto; al terzo tentativo `needs_you`. Con DONE, file modificati e nessun commit → veto. Con BLOCKED e ricevuta rossa → chiude (hook).
 5. **Commit.** Con `git add -A && git commit`, questi casi → `deny`:
    - test cancellato;
    - `xdescribe` o `pytest.skip(` aggiunti;
@@ -1190,8 +1214,8 @@ Ogni criterio è un'azione con un esito binario.
     - **`error`**: `../` in un artefatto, XML con entità, SHA superato;
     - **«non applicabile»**: PR verso un ramo non predefinito.
 
-    Se la verifica di 16 conferma la sorgente per gli stati di commit: uno stato pubblicato con un token personale non soddisfa la protezione (gate).
-11. **Protezione e modalità.** Su un repo privato con GitHub Free `init` sceglie `detect` e `start` lo mostra; su un repo pubblico sceglie `protected` e `start` segnala i campi mancanti di 9.3 (integrazione, gate).
+    In `protected`, uno stato `tollgate/verdict` pubblicato con un token personale non soddisfa la protezione (gate).
+11. **Protezione e modalità.** Su un repo privato con GitHub Free `init` sceglie `detect` e `start` lo mostra; su un repo pubblico non ancora protetto (404 «Branch not protected») sceglie `protected` e propone il comando; su un repo pubblico protetto sceglie `protected` e `start` segnala i campi mancanti di 9.3 (integrazione, gate).
 12. **PR.** Senza un atto `finish` successivo all'ultimo commit e senza `approve pr` → rifiuto. Un `finish` seguito da una revisione di più di 10 minuti → PR aperta; un commit dopo `finish` → l'atto decade. Un atto `finish` di un altro lavoro → rifiuto; dopo `/clear` lo stesso `finish` vale ancora. Interruzione tra push e PR → nessuna PR doppia (integrazione).
 13. **Atti.** Solo da `UserPromptExpansion`; lo strumento Skill non produce atti (hook).
 14. **Wrapper.**
@@ -1238,10 +1262,10 @@ Ogni criterio è un'azione con un esito binario.
 36. **Piano registrato nel gate.** Piano modificato dopo la registrazione in modo da includere un file in più → quel file è fuori scope nel gate e `attenzione` mostra il diff del piano (gate).
 37. **Flusso dopo l'approvazione.** In `spec_audit` la scrittura di un piano → `deny`. In L2 il piano corretto da `plan-adversary` → `plan_sha` è quello di `approve plan`. Edit sulla spec in fase `plan` dopo `approve spec` → `deny`; `reopen spec` → fase `spec_audit` e nuova approvazione richiesta. `needs_fix` → `task start --from-findings` crea un task `fix` senza toccare il piano (hook, integrazione).
 38. **Profili verticali.** Con un profilo `web` (`paths = ["web/**"]`, `skills = ["ui-ux-pro-max"]`, `agent = "probe:implementer-frontend"`, `reviewer = "probe:reviewer-frontend"`): in L1 un task su `web/` → `task start` sceglie `probe:implementer-frontend` e `probe:reviewer-frontend`; `tollgate:implementer` su quel task → `deny`; DONE senza aver invocato `ui-ux-pro-max` → veto. Un task su `web/` e `api/` con due agenti diversi → `tollgate:implementer` con l'unione delle skill. In L2 un profilo con `final_specialist` attivo → lo specialista gira insieme a `final-reviewer`, e i suoi rilievi passano dal verificatore. Due profili verticali che coprono lo stesso file: vince quello con più segmenti letterali, a parità il primo dichiarato. Un profilo `cross` aggiunge i suoi `reviewer_skills` al revisore dei verticali che lo elencano. Un task con più di 3 skill nell'unione → `plan-check` lo segnala. `reviewer-<area>` e `final-<area>` sono in `readonly_agents`, `implementer-<area>` no (hook, integrazione).
-39. **Task piccoli e budget.** Un task con 600 righe e senza `size_reason` → report non valido; con `size_reason` → `attenzione` lo riporta. Un implementatore oltre `max_tokens` o che esaurisce `maxTurns` → task `blocked` e `needs_you`; `status` dice quale tetto ha fermato il lavoro. Un report senza i campi obbligatori → veto (hook, integrazione).
+39. **Task piccoli e budget.** Un task con 600 righe e senza `size_reason` → report non valido; con `size_reason` → `attenzione` lo riporta. Un implementatore oltre `max_tokens` o che esaurisce `maxTurns` → task `blocked` e `needs_you`, anche se al taglio di `maxTurns` non arriva `SubagentStop`; `status` dice quale tetto ha fermato il lavoro. Un report senza i campi obbligatori → veto (hook, integrazione).
 40. **Revisione.** Un rilievo `minor` non porta il task a `changes`; un rilievo senza `rule`, oppure senza file e riga → scartato dal verificatore (integrazione).
 41. **Definition of Done.** `finish check` stampa la DoD voce per voce; con un task non `done` → `open-pr` rifiuta. Una spec L2 senza `## Cosa non fare` → rilievo dell'avversario (integrazione).
-42. **Must-have legati ai test.** Un piano L1 con un must-have senza `— test:` → `plan-check` rifiuta. Con `M1 — test: tests/test_x.py::test_a` e quel test assente o rosso nella ricevuta finale → la DoD non passa e `open-pr` rifiuta; il gate ricalcola la stessa voce dal JUnit (script, gate).
+42. **Must-have legati ai test.** Un piano L1 con un must-have senza `— test:` → `plan-check` rifiuta. Con `M1 — test: tests.test_x::test_a` (forma JUnit di pytest, 7.5) e quel test assente o rosso nella ricevuta finale → la DoD non passa e `open-pr` rifiuta; il gate ricalcola la stessa voce dal JUnit (script, gate).
 43. **Statistiche.** Dopo un lavoro con due veti, un `needs_you` e un'ora di `OFF`, `tollgate stats --work N` riporta esattamente quei numeri, più tempo per fase e token (script).
 44. **`attenzione` a due gruppi.** Una PR con sola deroga `scope` entro la seconda → `tollgate/attention` verde con nota; con una deroga `test` → rosso, e la deroga `test` compare in cima nel gruppo «da leggere» (gate).
 
@@ -1280,21 +1304,31 @@ Ogni criterio è un'azione con un esito binario.
 | `SubagentStart` | Riceve solo `agent_id` e `agent_type`, non il prompt |
 | `PreToolUse` su `Agent` | `tool_input` contiene `prompt`, `description`, `subagent_type`, `model` |
 
+**Verificato in P0, l'08/10/2026** (rapporto in `docs/verifiche/2026-10-08-p0-esiti.md`; Claude Code 2.1.294, sessioni `-p` e interattive, repo di prova su GitHub Free).
+
+| Cosa | Esito | Dove incide |
+|---|---|---|
+| Ripresa con `SendMessage` | `SubagentStart` e `SubagentStop` scattano di nuovo, con lo stesso `agent_id`. `tool_input` ha `to` (il **nome** dato al lancio), `message`, `summary`; `tool_response` ha `resumedAgentId` | 6.3, 7.2 |
+| `SubagentHandback` e `last_assistant_message` | In auto mode il report arriva solo in `tool_input.message` di `SubagentHandback`; `SubagentStop` non ha `last_assistant_message`. In modalità manuale c'è | 7.2 |
+| Taglio di `maxTurns` (primo piano) | Nessun `SubagentStop`; `PostToolUse Agent` con stato `completed` e il testo «stopped at its N-turn limit» | 6.3, 7.2 |
+| Token dei subagenti | `usage` nel transcript; `PostToolUse Agent` in primo piano ha `totalTokens`, in background solo `agentId` | 6.3 |
+| `deny` in `bypassPermissions` | Rispettato | — |
+| `UserPromptExpansion` | Scatta anche con `disable-model-invocation` e con la forma breve; `command_name` è sempre la forma lunga | 8.4 |
+| Comandi `!` | Non passano da nessun hook | 1.2 |
+| `skills:` e `mcpServers` negli agenti di plugin | `skills:` precarica la skill; `mcpServers`, `hooks`, `permissionMode` e `initialPrompt` sono ignorati (documentazione) | 6.3, catalogo dei profili |
+| `EnterWorktree` | Accetta un worktree esistente; `tool_response` ha `worktreePath` e `worktreeBranch`; da lì il `cwd` degli hook è il worktree | 6.1 |
+| Subagenti interni | `SubagentStop` con `agent_type` vuoto e senza `SubagentStart`: da ignorare | 7.2 |
+| Protezione e rulesets su un repo privato Free | 403 «Upgrade to GitHub Pro or make this repository public to enable this feature.» per entrambi. Repo che si può proteggere ma non protetto: 404 «Branch not protected». `plan` illeggibile senza lo scope `user` | 9.3 |
+| `actions: read` in `workflow_run` | Necessario per gli artefatti nei repo privati, non nei pubblici | 9.1 |
+| `pull_request_target` verso un ramo non predefinito | Scatta e usa sempre la definizione del ramo predefinito | 9.2 |
+| Sorgente fissata per gli stati di commit | Funziona: con `app_id` 15368 uno stato pubblicato con un token personale lascia la PR bloccata, uno di `github-actions[bot]` la sblocca | 1.2, 9.3 |
+| Dependabot e `workflow_run` | Il `workflow_run` riceve i permessi dichiarati e i segreti normali | 9.1 |
+| Tag di Superpowers | `v6.4.1` e `v6.4.2`, con il prefisso `v` | 11.1 |
+| JUnit di vitest, jest e pytest | Identificativi stabili; forma diversa per strumento; jest-junit senza il file con la configurazione predefinita | 7.5, 8.2, 11.2 |
+
 **Ancora da verificare:**
-- se `SubagentStart` e `SubagentStop` scattano alla ripresa di un subagente con `SendMessage`, e quali campi ha `tool_input` di `SendMessage` in `PreToolUse`;
-- i permessi di `GITHUB_TOKEN` in `workflow_run` per scaricare gli artefatti di un altro run (`actions: read`);
-- se il report consegnato con `SubagentHandback` compare anche in `last_assistant_message` di `SubagentStop`;
-- i rulesets sui repo privati di un account Free e la risposta esatta della GET di protezione in quel caso;
-- se i comandi `!` digitati dall'utente passano dagli hook `PreToolUse`;
-- `deny` in `bypassPermissions`;
-- `skills:` nel frontmatter di un agente di plugin (precarica la skill?) e `mcpServers` ignorato nei subagenti di plugin;
-- `UserPromptExpansion` per le skill con `disable-model-invocation` e per la forma breve;
-- `EnterWorktree` dentro la skill `start`;
-- sorgente fissata per gli stati di commit e identificativo dell'app GitHub Actions;
-- `pull_request_target` verso un ramo non predefinito;
-- permessi di Dependabot per `workflow_run`;
-- tag di versione di Superpowers;
-- report JUnit di vitest, jest e pytest, e stabilità degli identificativi.
+- come appare il taglio di `maxTurns` per un subagente in background (`tollgate:execute` lancia gli implementatori in primo piano, 6.3);
+- se il risolutore delle `dependencies` dei plugin accetta i tag con il prefisso `v` (P2, 11.1).
 
 ---
 
@@ -1452,3 +1486,4 @@ L'elenco completo è in `docs/COSA-TENERE.md`.
 | 17 | 08/10/2026 | Decisioni dell'utente: profili `vertical` e `cross` con campo `cross`; precedenza al pattern più specifico; file di tollgate ristretti ai workflow `tollgate-*`, workflow del progetto controllati da `guard` (permessi ed eventi) e coperti dal profilo `ci`; verifica di `skills:` e `mcpServers` negli agenti di plugin |
 | 18 | 08/10/2026 | Decisione dell'utente, da `docs/RICERCA-ORGANIZZAZIONE.md`: dimensione e budget del task (`[tasks]`), report dell'implementatore a campi fissi, standard del revisore e disaccordo istruito con regola citata, Definition of Done per livello (8.7, campo `dod` dei profili e del JSON), spec L2 con «Tane di coniglio» e «Cosa non fare»; criteri 39-41; ogni pratica è un componente spegnibile in `[components]`, e `status` indica quale tetto ha fermato il lavoro |
 | 19 | 08/10/2026 | Decisione dell'utente dopo l'analisi dei problemi d'uso: must-have legati ai test (7.5, 8.7, componente `must_have_tests`); `tollgate stats` dagli eventi (3.1); voci di `attenzione` divise in «da leggere» e «informative», con lo stato rosso solo per le prime (9.2); criteri 42-44 |
+| 20 | 08/10/2026 | Esiti delle verifiche P0, approvati dall'utente (`docs/verifiche/2026-10-08-p0-esiti.md`, conseguenze K1-K12): implementatori lanciati con un nome fisso e ripresi per nome, tabella nome → `agent_id` (`subagents.name`); `PostToolUse Agent` per il taglio di `maxTurns` e per i token in primo piano; `SubagentHandback` unica fonte in auto mode; subagenti interni ignorati; atti da `command_name`; comandi `!` tra i limiti di 1.2; forma JUnit degli identificativi per strumento e configurazione di jest-junit in `init`; modalità riconosciuta da codice e messaggio della GET di protezione (404 «Branch not protected» → `protected`); sorgente fissata con `app_id` letto dal check-run di `tollgate-base`; ingresso nel worktree con `EnterWorktree`, con il ripiego «cd && claude»; PR di Dependabot in 9.1; `mcpServers` ignorato; sezione 16 aggiornata; criteri 4, 10, 11, 39 e 42 |
