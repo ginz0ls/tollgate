@@ -515,6 +515,24 @@ Nessun bloccante. Quasi tutti i gravi nascono dal testo della revisione 12. Temi
 
 **Revisione 13** (commit 6405a68): `tollgate:execute` e 62 correzioni puntuali. Contenuto nella sezione 20 della spec.
 
-### Cicli 51-54 (revisione 13, giro ridotto): in corso
+### Cicli 51-54 (revisione 13, giro ridotto): conclusi
 
-51 Chi esegue, 52 Chi attacca, 53 Lo scettico, 54 Chi integra. Se non trovano gravi, si passa a writing-plans.
+| Ciclo | Punto di vista | Gravi | Rilevanti | Rev 12 → rev 13 |
+|---|---|---|---|---|
+| 51 | Chi esegue | 1 | 4 | 6 → 5 |
+| 52 | Chi attacca | 4 | 3 | 5 → 7 |
+| 53 | Lo scettico | 3 | 2 | 3 → 5 |
+| 54 | Chi integra | 3 | 2 | 7 → 5 |
+| | **Totale** | **11** | **11** | 21 → 22 |
+
+Nessun bloccante. Gravi stabili a 11 nel giro ridotto: quasi tutti nascono dal testo nuovo della revisione 13 (`tollgate:execute`, blocco di spec e piano). Temi deduplicati:
+- J1 La ripresa di un implementatore con `SendMessage` non passa da `PreToolUse Agent`: scrittore unico e `task start --fix` aggirabili (51, 52, 53) [VERIFICATO code.claude.com/docs sub-agents].
+- J2 `needs_fix` e verdetto rosso dopo la PR non hanno un task da avviare, perché il piano è bloccato (53, 54).
+- J3 Tornare a `spec_audit` o `plan` dopo un'approvazione non è una transizione ammessa in 12.3 (53).
+- J4 brainstorming passa da solo a writing-plans prima dell'audit: il primo piano verrebbe registrato in `spec_audit` (54) [VERIFICATO brainstorming/SKILL.md 6.4.1].
+- J5 `events --json` non ha tipi per task e rilievi; mancano `confidence` e gravità scelta (54).
+- J6 In L2 scope e `plan_sha` sono registrati prima di `plan-adversary` (52).
+- J7 La spec resta modificabile in fase `plan` dopo `approve spec`, contro il criterio 24 (52).
+- J8 `finish` senza vincolo di sessione in 8.4, con vincolo nel criterio 12 (52).
+
+Andamento complessivo: giri completi 65 → 43 → 37; giri ridotti 21 → 22 (gravi 11 → 11). I bloccanti sono a zero da quattro giri. I gravi si concentrano sul testo appena scritto: è il regime in cui ogni correzione apre superficie nuova.
