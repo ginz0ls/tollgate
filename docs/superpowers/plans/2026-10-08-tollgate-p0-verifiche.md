@@ -4,7 +4,7 @@
 >
 > **Nota per questo piano.** P0 non produce codice di tollgate: produce **fatti**. Alcuni passi sono interattivi e li esegue l'utente (marcati **[UTENTE]**). I passi che creano repo su GitHub si fermano e chiedono conferma (marcati **[CONFERMA]**). Esecuzione consigliata: nella sessione principale (executing-plans), non con subagenti.
 
-**Goal:** Verificare le 13 voci «Ancora da verificare» della sezione 16 della spec, prima di scrivere codice, e aggiornare la spec dove un esito cambia il disegno.
+**Goal:** Verificare le 13 voci «Ancora da verificare» della sezione 16 della spec, più il precaricamento delle skill negli agenti di plugin richiesto dal catalogo dei profili, prima di scrivere codice, e aggiornare la spec dove un esito cambia il disegno.
 
 **Architecture:** Un plugin sonda (`spikes/hookprobe/`) registra in un file JSONL l'input di ogni evento hook di Claude Code e, a richiesta, nega un comando. Gli esperimenti sugli hook girano con `claude -p --plugin-dir`; quelli interattivi li esegue l'utente. Gli esperimenti GitHub usano due repo di prova (uno privato, uno pubblico) con workflow minimi. Gli esperimenti JUnit usano tre progetti giocattolo in una cartella temporanea.
 
@@ -39,6 +39,8 @@
 - Create: `spikes/hookprobe/probe.sh`
 - Create: `spikes/hookprobe/skills/probe-only-user/SKILL.md`
 - Create: `spikes/hookprobe/skills/probe-worktree/SKILL.md`
+- Create: `spikes/hookprobe/skills/probe-preload/SKILL.md`
+- Create: `spikes/hookprobe/agents/probe-agent.md`
 - Test: `spikes/hookprobe/test-probe.sh`
 
 **Interfaces:**
@@ -132,6 +134,29 @@ disable-model-invocation: true
 Usa lo strumento EnterWorktree per entrare nel worktree il cui percorso è scritto nel file /tmp/tollgate-p0/worktree-path.txt. Poi esegui `git rev-parse --abbrev-ref HEAD` e `pwd` con Bash e riporta l'output esatto. Se EnterWorktree rifiuta il percorso, riporta il messaggio d'errore esatto.
 ```
 
+`skills/probe-preload/SKILL.md` (serve a E5: verificare che `skills:` nel frontmatter di un agente di plugin precarichi la skill):
+
+```markdown
+---
+name: probe-preload
+description: Sonda P0 per il precaricamento delle skill negli agenti.
+---
+Il codice segreto di questa skill è PRELOAD-MARKER-42.
+```
+
+`agents/probe-agent.md`:
+
+```markdown
+---
+name: probe-agent
+description: Sonda P0. Da usare solo quando richiesto esplicitamente.
+tools: Read
+skills: [probe-preload]
+model: haiku
+---
+Rispondi solo con il codice segreto che trovi nel tuo contesto, oppure NESSUN-CODICE se non ne trovi.
+```
+
 - [ ] **Step 4: Eseguire il test e vederlo passare**
 
 Run: `chmod +x spikes/hookprobe/probe.sh && spikes/hookprobe/test-probe.sh`
@@ -168,6 +193,7 @@ Esperimenti (ognuno azzera il log e salva la copia):
 | E1 | `SubagentStart`/`Stop` alla ripresa con `SendMessage`; campi di `SendMessage` | «Lancia con Agent un subagente general-purpose in background con il compito "rispondi uno". Quando ha finito, riprendilo con SendMessage chiedendo "rispondi due". Riporta entrambe le risposte.» | Numero di `SubagentStart` e `SubagentStop` (2 e 2 = scattano alla ripresa); `PreToolUse` con `tool_name == "SendMessage"` e le chiavi di `tool_input` |
 | E2 | `SubagentHandback` e `last_assistant_message` | Come E1 senza ripresa, con `--permission-mode auto` | `PostToolUse` con `tool_name == "SubagentHandback"`; confronto fra il suo `tool_input` e `last_assistant_message` di `SubagentStop` |
 | E3 | `deny` in `bypassPermissions` | «Esegui con Bash: echo PROBE_DENY > /tmp/tollgate-p0/e3-side.txt», con `--permission-mode bypassPermissions` | Il file `/tmp/tollgate-p0/e3-side.txt` **non** deve esistere |
+| E5 | `skills:` nel frontmatter di un agente di plugin (catalogo dei profili, 2.2) | «Lancia con Agent il subagente hookprobe:probe-agent e riporta la sua risposta esatta.» | `.out` contiene `PRELOAD-MARKER-42` → la skill è precaricata; `NESSUN-CODICE` → no. Per `mcpServers` nei subagenti di plugin si cita la documentazione (non si sperimenta) |
 | E4 | `UserPromptExpansion` con `disable-model-invocation`, forma lunga e breve, in `-p` | Prompt `/hookprobe:probe-only-user`, poi in un'altra esecuzione `/probe-only-user` | Presenza di `UserPromptExpansion` e valore di `expansion_type` per ciascuna forma |
 
 - [ ] **Step 1: Scrivere lo script degli esperimenti**
@@ -190,6 +216,7 @@ rm -f "$P0/e3-side.txt"
 run e3 bypassPermissions "Esegui con Bash esattamente: echo PROBE_DENY > /tmp/tollgate-p0/e3-side.txt"
 run e4-long manual "/hookprobe:probe-only-user"
 run e4-short manual "/probe-only-user"
+run e5 manual "Lancia con lo strumento Agent il subagente hookprobe:probe-agent e riporta la sua risposta esatta."
 echo "fatto: $(ls "$P0")"
 ```
 
@@ -208,6 +235,7 @@ jq -c 'select(.event=="PreToolUse" and .input.tool_name=="SendMessage") | .input
 echo "E2:"; jq -c 'select(.input.tool_name=="SubagentHandback") | {event, ti: .input.tool_input}' $P0/e2.jsonl
 jq -c 'select(.event=="SubagentStop") | .input.last_assistant_message' $P0/e2.jsonl
 echo "E3:"; test -e $P0/e3-side.txt && echo "ESEGUITO (deny NON rispettato)" || echo "non eseguito (deny rispettato)"
+echo "E5:"; grep -o "PRELOAD-MARKER-42\|NESSUN-CODICE" $P0/e5.out | head -1
 echo "E4:"; for f in e4-long e4-short; do echo $f; jq -c 'select(.event=="UserPromptExpansion") | .input | {expansion_type, prompt: (.prompt // .command_name // null)}' $P0/$f.jsonl; done
 ```
 Expected: un output per ogni esperimento. Un output vuoto per E2 o E4 è un esito («l'evento non scatta»), da distinguere da un errore di esecuzione: controllare in `$P0/<id>.out` che Claude abbia davvero eseguito il compito.
@@ -229,6 +257,7 @@ Versioni: Claude Code 2.1.294, gh 2.46.0, Python 3.13.5, Node 26.7.0. Data: <dat
 | E2 | SubagentHandback e last_assistant_message | … | … | … |
 | E3 | deny in bypassPermissions | … | … | … |
 | E4 | UserPromptExpansion, disable-model-invocation, forma lunga e breve (-p) | … | … | … |
+| E5 | skills: nel frontmatter di un agente di plugin; mcpServers ignorato (documentazione) | … | … | … |
 ```
 
 - [ ] **Step 5: Commit**
