@@ -3,7 +3,7 @@
 Data: 8 ottobre 2026.
 Spec: `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 20). La spec dice **cosa** fa tollgate e perché; questo documento dice **in che ordine** si costruisce e **quale piano** copre ogni parte della spec. Il codice e i passi stanno nei piani specifici P0-P5.
 
-Stato: P0 chiuso l'8 ottobre 2026 (`2026-10-08-tollgate-p0-verifiche.md`; esiti in `docs/verifiche/2026-10-08-p0-esiti.md`, applicati nella revisione 20 della spec). Nessun esito ha smentito un fatto portante: le sezioni 3 e 4 restano valide, con le note della matrice aggiornate. P1-P5 da scrivere.
+Stato: P0 chiuso l'8 ottobre 2026 (`2026-10-08-tollgate-p0-verifiche.md`; esiti in `docs/verifiche/2026-10-08-p0-esiti.md`, applicati nella revisione 20 della spec). Nessun esito ha smentito un fatto portante: le sezioni 3 e 4 restano valide, con le note della matrice aggiornate. P1 chiuso il 9 ottobre 2026 sul ramo `p1-fondamenta` (merge su `main` in attesa dell'OK dell'utente; piano `2026-10-08-tollgate-p1-fondamenta.md`; 118 test verdi su Python 3.11 e 3.13). P2-P5 da scrivere.
 
 ---
 
@@ -35,13 +35,13 @@ P3 e P4 dipendono entrambi da P2 e sono in parte indipendenti: P4 può partire q
 
 ## 3. Interfacce tra i piani
 
-Sono i punti in cui un piano consegna e un altro si appoggia. **I nomi sono indicativi: li fissa il piano che li produce**, e il piano successivo li copia dal codice, non da qui. Dopo la chiusura di ogni piano questa sezione si aggiorna con i nomi reali.
+Sono i punti in cui un piano consegna e un altro si appoggia. **I nomi li fissa il piano che li produce**, e il piano successivo li copia dal codice, non da qui. Dopo la chiusura di ogni piano questa sezione si aggiorna con i nomi reali: per P1 sono sotto; quelli di P2-P5 restano indicativi.
 
 ### Pacchetti
 
 | Pacchetto | Piano | Responsabilità |
 |---|---|---|
-| `tollgate_core` | P1 | Configurazione, DB e migrazioni, eventi, fasi, `tasks`, atti, cartella di stato |
+| `tollgate_core` | P1 | Moduli `paths` (cartella di stato), `clock`, `config`, `db` (DB e migrazioni), `events`, `phases`, `tasks`, `acts`, `dod`, `stats`, `cli` (entrata `bin/tollgate`) |
 | `tollgate_analysis` | P2 | Funzioni pure, senza DB né rete: piano e scope, livello, test-guard, JUnit, deroghe, regole sui comandi Bash |
 | `tollgate_checks` | P2 | I moduli del registro (spec 3.2): `CHECK` e `decide(event, ctx)` |
 | `tollgate_flow` | P3 | Operazioni con git e `gh`: avvio, ripresa, task, finish, open-pr, sync, adopt |
@@ -53,11 +53,15 @@ Regola: `tollgate_analysis` non importa mai `tollgate_core`. Così il gate su Gi
 
 | Produce | Consuma | Contratto |
 |---|---|---|
-| P1 | P2, P3, P4 | Caricamento di `tollgate.toml` da un riferimento git (base del lavoro o punta del predefinito), con `schema_version`, chiavi sconosciute ignorate con avviso, errore sui tipi sbagliati (spec 11.4) |
-| P1 | P2, P3 | Apertura del DB nella cartella di stato, con WAL, `busy_timeout`, migrazioni solo in avanti, backup con la API di SQLite (spec 12.1) |
-| P1 | P2, P3, P5 | Registrazione di un evento con la busta di 18.4 e `seq` monotono; esportazione `events --after-seq` in JSONL |
-| P1 | P2, P3 | Transizioni di fase (12.3) e di `tasks.state` (6.3) che rifiutano tutto ciò che non è in tabella |
-| P1 | P2, P3 | Atti: registrazione, legame a sessione/lavoro/oggetto, scadenza, consumo; `finish` legato allo SHA di HEAD (8.4) |
+| P1 | P2, P3, P4 | Caricamento di `tollgate.toml` da un riferimento git (base del lavoro o punta del predefinito), con `schema_version`, chiavi sconosciute ignorate con avviso, errore sui tipi sbagliati (spec 11.4). `config.load_config(state, repo, ref, env=None) -> Config`; senza git: `load_config_text(text, source)` e `load_config_at(repo, ref)`. Errori: `ConfigError`, `ConfigNotFound` |
+| P1 | P2, P3 | Apertura del DB nella cartella di stato, con WAL, `busy_timeout`, migrazioni solo in avanti, backup con la API di SQLite (spec 12.1). `paths.resolve_state(env=None) -> State`; `db.open_db(state) -> Connection`; `db.tx(conn)` (context manager); `db.backup(conn, state, reason) -> Path`. Errori: `DbError` (blocchi, I/O), `DbCorrupt` (solo file corrotto: SQLITE_CORRUPT/NOTADB), `DbTooNew`. Il passaggio a WAL è ritentato sotto contesa |
+| P1 | P2, P3, P5 | Registrazione di un evento con la busta di 18.4 e `seq` monotono; esportazione in JSONL (`tollgate events --after-seq N`). `events.record_event(conn, type_, data=None, *, now, session=None, work=None, host=None) -> int` (il `seq`); `events.export_events(conn, after_seq) -> list[dict]`; `events.to_jsonl(items)` |
+| P1 | P2, P3 | Transizioni di fase (12.3) e di `tasks.state` (6.3) che rifiutano tutto ciò che non è in tabella. `phases.set_phase(conn, state, work, to, cause, *, now, session=None)`; `open_block(conn, state, work, type_, reason, *, now, session=None) -> int`; `close_block(conn, state, block_id, resolution, *, now, session=None) -> str`; `tasks.task_event(conn, work, number, event, *, now, session=None) -> str`. Chiudere un lavoro (`set_phase(..., "closed", ...)`) chiude anche i suoi blocchi aperti. Errori: `TransitionError`, `TaskTransitionError` |
+| P1 | P2, P3 | Atti: registrazione, legame a sessione/lavoro/oggetto, scadenza, consumo; `finish` legato allo SHA di HEAD (8.4). `acts.record_act(conn, *, type_, object_=None, target=None, args=None, typed_text, source="claude-code", actor=None, session, work=None, head_sha=None, now, ttl_minutes) -> str`; `find_usable(conn, *, type_, object_=None, target=None, work, session, now, head_sha=None)`; `consume(conn, act_id, *, now, work, session, head_sha=None)` controlla lavoro, sessione, scadenza e, per `finish`, l'HEAD; `invalidate_finish(conn, work, head_sha, *, now, session=None) -> list[str]`. `session` è obbligatoria per ogni atto tranne `finish`. Un `finish` decade se esiste un evento `commit` dello stesso lavoro più recente dell'atto. Errore: `ActError` |
+| P1 | P2, P3, P4 | Definition of Done dai dati (8.7): `dod.compute_dod(conn, work, *, head_sha, allow_no_tests, external=None, profile_items=None) -> list[DodItem]`; `dod.dod_passes(items) -> bool` |
+| P1 | P2, P3 | Statistiche dagli eventi (criterio 43): `stats.compute_stats(conn, *, now, work=None, since=None) -> dict`. Gli intervalli di fase si costruiscono da tutti gli eventi e si tagliano sulla finestra; i conteggi puntuali sono filtrati da `since` |
+| P1 | P2, P3 | Sottocomandi di `bin/tollgate`: `status [--json]`, `stats [--since AAAA-MM-GG] [--work N]`, `events [--after-seq N]`, `db restore` (solo da terminale) |
+| P1 | P2, P3 | **Vincoli per chi scrive nel DB.** (1) Scrivere solo con le funzioni di `tollgate_core`, dentro `db.tx`. (2) `set_phase`, `open_block` e `close_block` vanno chiamati fuori da una transazione, perché fanno la copia del DB dopo il commit. (3) Ogni commit visto dagli hook va registrato come evento `commit`: l'atto `finish` ne dipende. (4) Passare sempre `profile_items` a `compute_dod`: un comando mai eseguito altrimenti non compare. (5) Negli hook gestire `db.DbError`, non solo `DbCorrupt` |
 | P2 | P3, P4 | Parsing del piano e scope (7.5), livello (5), test-guard (8.2), JUnit (forma degli identificativi per strumento, spec 7.5), deroghe (18.2) |
 | P2 | P3 | Hook installati e registro dei controlli; `verify` produce ricevute (8.1) |
 | P3 | P4 | Blocco JSON della PR (18.1), report e file di approvazione (18.3), verdetti (18.5) |
