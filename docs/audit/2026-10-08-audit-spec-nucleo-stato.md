@@ -391,9 +391,45 @@ La revisione 10 è una **riscrittura** che integra tutti i rilievi dei cicli 22-
 
 ## Prosecuzione oltre il tetto (decisione dell'utente, 08/10/2026)
 
-L'utente ha scelto di proseguire con un giro di verifica sulla revisione 10. **Cicli 31-38 in corso**: un auditor per punto di vista, in parallelo, con `docs/audit/prompt-ciclo-punto-di-vista.txt`.
+L'utente ha scelto di proseguire con un giro di verifica sulla revisione 10. **Cicli 31-38 conclusi**: un auditor per punto di vista, in parallelo, con `docs/audit/prompt-ciclo-punto-di-vista.txt`.
 - 31 Chi esegue, 32 Chi usa, 33 Chi attacca, 34 Chi paga, 35 Chi arriva dopo, 36 Lo scettico, 37 Il caso limite, 38 Chi integra.
 - Se si interrompono senza risultati, vanno rilanciati tutti e otto.
+
+### Esito dei cicli 31-38 (revisione 10)
+
+| Ciclo | Punto di vista | Bloccanti | Gravi | Rilevanti |
+|---|---|---|---|---|
+| 31 | Chi esegue | 0 | 3 | 2 |
+| 32 | Chi usa | 0 | 1 | 3 |
+| 33 | Chi attacca | 0 | 4 | 2 |
+| 34 | Chi paga | 0 | 1 | 4 |
+| 35 | Chi arriva dopo | 0 | 3 | 3 |
+| 36 | Lo scettico | 0 | 1 | 3 |
+| 37 | Il caso limite | 0 | 4 | 2 |
+| 38 | Chi integra | 0 | 4 | 3 |
+| | **Totale** | **0** | **21** | **22** |
+
+Rispetto ai cicli 22-29 (65 rilievi, 1 bloccante, 14 gravi): i bloccanti scendono a zero e il totale cala, ma i gravi non convergono. Nessun punto di vista ha prodotto un ciclo vuoto.
+
+**Temi gravi dopo la deduplicazione** (tra parentesi i cicli che li hanno trovati):
+- G1 La sessione che lavora nel worktree non è legata al lavoro: con un `cd` fuori le regole cadono (31, 33).
+- G2 Regole di scrittura assenti nelle fasi `review` e `pr_open` (31, 33, 35).
+- G3 Gli script di Superpowers (`sdd-workspace`, `task-brief`, `review-package`) diventano effetti esterni e bloccano SDD (31, 38) [VERIFICATO].
+- G4 L'audit a lenti non è una condizione di `approve spec`; «sospeso» ambiguo (35, 36).
+- G5 Repo privati con GitHub Free: la protezione del ramo non c'è, quindi il gate autorevole cade (34, 37) [VERIFICATO]. **Decisione dell'utente.**
+- G6 `sync`: conflitto di rebase non gestito, ed è eseguito dall'hook con scadenza di 20 s e senza rete (32, 37).
+- G7 `SessionStart` segna `interrupted` i subagenti di sessioni ancora vive (37).
+- G8 `allow_no_tests`: nessuna ricevuta `green`, veti ripetuti; `unverified` non classificato nel gate (37).
+- G9 `|| true` nel comando di check: il JUnit con fallimenti viene ignorato dal gate (33).
+- G10 Le deroghe passano al ramo predefinito e valgono per le PR successive; gli identificativi collidono (33).
+- G11 6.6 e 7.4 danno regole diverse per «repo attivo senza lavoro» (35).
+- G12 Il task del subagente e `fix_rounds` non hanno fonte; `SubagentStart` non riceve il prompt (36, 38) [VERIFICATO].
+- G13 In auto mode il report del subagente arriva con `SubagentHandback`, non nell'ultimo messaggio (38) [da riverificare].
+- G14 Il contratto delle fette contraddice il rinvio a C (38).
+
+Rilevanti: ripristino del DB guasto; ripresa senza rete bloccata dai passi 0-1; uscita d'emergenza documentata solo via `/tollgate:off`; da `plan` ad `approval` in L2; quale file è il piano; atti in sospeso senza colonna; R13 con due significati; base di conteggio dei cicli; `attention` rosso come norma; `flaky` indefinito; costo in minuti di Actions; doppia revisione finale con SDD; modello degli agenti e costo minimo dell'audit; `guard` senza `issues: write`; repo senza `origin/HEAD`; crash tra riga e worktree; DONE senza commit; cambio di ramo riconosciuto per nome del comando; campi mancanti nel JSON della PR; schema degli eventi; collocazione di GitHub Projects.
+
+Le note complete dei cicli sono state riassunte qui; l'output integrale degli auditor non è conservato nel repo.
 
 ## Nota storica: interruzione per limite di utilizzo (08/10/2026)
 
