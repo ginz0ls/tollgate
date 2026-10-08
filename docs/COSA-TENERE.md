@@ -183,7 +183,7 @@ Fonte: `docs/RICERCA-PAPER.md`, sezione 3. Prevalgono sulle voci precedenti dove
 | R1 | Via d'uscita «test e specifica in conflitto»: un blocco con un tipo preciso che ferma l'agente e lo manda da te | Nucleo | Integra le deroghe (voce 14) e H36 |
 | R2 | Test correlati alla modifica nel brief e in `verify`; suite completa a `finish` | Nucleo | **Ridimensionata**: niente grafo nostro, si usa il comando del progetto (`vitest related`, `jest --findRelatedTests`, `pytest-testmon`) dichiarato in `tollgate.toml` |
 | R3 | La ricevuta è necessaria ma non sufficiente: il revisore finale cerca casi speciali scritti per i test e test indeboliti | Nucleo | Integra le voci 1, 20, 24 |
-| R4 | Al massimo 2 giri di correzione automatica per task, poi contesto pulito o passaggio a te | Nucleo | Integra la voce 25 e H43 |
+| R4 | Al massimo 2 giri di correzione automatica per task, poi contesto pulito o passaggio a te | Nucleo | **Ridimensionata (rev. 5 della spec)**: in Superpowers 6.4.1 i giri 1-3 riprendono lo stesso implementatore, che un hook non può fermare. Vale il tetto di Superpowers; tollgate conta i giri e li riporta nella PR |
 | R5 | A ogni nuovo task un hook rimette nel contesto il passo corrente del piano e il suo scope | Nucleo | Poche righe |
 | R6 | In L1 controllo automatico della struttura del piano; la rilettura a contesto pulito resta in L2 | Nucleo | **Ridimensionata** |
 | R7 | Soglie del contesto della sessione principale: avviso al 45%, stop al 55%. Subagente sotto circa 30K token; ritorno al padre di 1-2K token più il percorso del report | Nucleo | Soglie configurabili, da tarare con gli eval. Sostituiscono l'85% della statusline nella voce 42 |

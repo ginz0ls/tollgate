@@ -23,7 +23,7 @@ Un rilievo rilevante o superiore azzera il contatore.
 
 ## Inventario (sezioni × esito)
 
-Le sezioni sono quelle della **revisione 3** (0-17). Ogni sezione è stata riscritta o toccata: tutte vanno riauditate dai punti di vista successivi.
+La specifica è alla **revisione 5** (sezioni 0-18), riscritta intorno al gate su GitHub. **Tutti i contatori ripartono da zero**: ogni sezione va riauditata da ogni punto di vista.
 
 | Sezione | Lenti applicate | Esito |
 |---|---|---|
@@ -44,18 +44,18 @@ Le sezioni sono quelle della **revisione 3** (0-17). Ogni sezione è stata riscr
 | 15 Da verificare | L8, L10 | ampliato, da riauditare |
 | 16 Revisioni (nuova) | — | da auditare |
 
-## Matrice dei punti di vista
+## Matrice dei punti di vista (sulla revisione 5: tutti i contatori ripartono)
 
-| Punto di vista | Cicli | Ultimo esito | Contatore vuoti |
+| Punto di vista | Cicli precedenti | Ultimo esito | Contatore vuoti sulla rev. 5 |
 |---|---|---|---|
-| Chi esegue | 1, 10 | 10: 1 grave → **da ripetere** | 0 |
-| Chi attacca | 2, 4 (revisione avversariale a contesto pulito, sulla revisione 1) | 36 rilievi (7 bloccanti) → **da ripetere sulla revisione 3** | 0 |
-| Chi usa | 3 | 4 rilievi → **da ripetere** | 0 |
-| Chi paga | 5 | 3 rilievi → **da ripetere** | 0 |
-| Chi arriva dopo | 6 | 1 rilievo → **da ripetere** | 0 |
-| Lo scettico | 7 | 1 minore (non azzera) | 1 |
-| Il caso limite | 8 | 4 rilievi → **da ripetere** | 0 |
-| Chi integra | 9 | 3 rilievi → **da ripetere** | 0 |
+| Chi esegue | 1, 10 | rilievi | 0 |
+| Chi attacca | 2, 4, 10, 11 | rilievi (seconda avversariale: 10 bloccanti) | 0 |
+| Chi usa | 3 | rilievi | 0 |
+| Chi paga | 5 | rilievi | 0 |
+| Chi arriva dopo | 6 | rilievi | 0 |
+| Lo scettico | 7 | 1 minore | 0 |
+| Il caso limite | 8 | rilievi | 0 |
+| Chi integra | 9 | rilievi | 0 |
 
 ## Rilievi (cicli 1-3, corretti nella revisione 2 della specifica)
 
@@ -153,6 +153,36 @@ Il report completo è in `2026-10-08-revisione-avversariale-spec-nucleo.md`, con
 | B-15 | 10 chi attacca (sulla rev. 3) | Rilevante | [RAGIONATO] | 7.2, 8.4 | `docs/superpowers/**` sempre scrivibile in ogni fase: ci si può nascondere codice eseguibile importato da altri file | Sempre permessi solo i `.md` sotto `docs/superpowers/`; gli altri file lì valgono come codice |
 | B-16 | 10 chi attacca | Rilevante | [RAGIONATO] | 7.2, 8.4 | `.superpowers/**` sempre scrivibile: se finisce in un commit nasconde codice | Scrivibile, ma un file sotto `.superpowers/` nel diff a `finish` è fuori scope |
 | B-17 | 10 chi attacca | Rilevante | [RAGIONATO] | 11 | I lockfile sempre ammessi permettono di aggiungere una dipendenza senza toccare il manifest | Un lockfile è ammesso solo se il suo manifest è nello scope; altrimenti serve una deroga |
+
+
+## Ciclo 11: seconda revisione avversariale (sulla revisione 3)
+
+Il report è in `2026-10-08-revisione-avversariale-2-spec-nucleo.md` (W-1 … W-40: 10 bloccanti, 10 gravi, 16 rilevanti, 4 minori).
+
+**Esito strutturale.** I bloccanti W-1, W-2, W-3, W-5, W-12, W-19 e W-20 hanno la stessa radice: un agente con Bash sulla stessa macchina può alterare tutto ciò che è locale. Correggerli uno per uno non converge. Ho portato la decisione all'utente, che ha scelto il **gate su GitHub** (`COSA-TENERE.md`, sezione 10). La revisione 5 della specifica:
+- fa ricalcolare al gate i fatti in un ambiente pulito;
+- dichiara i guardrail locali «best effort»;
+- elenca i limiti residui nelle sezioni 1.2 e 17.
+
+**Rilievi corretti nella revisione 5**, senza dipendere dalla decisione sul gate:
+- W-4: scope senza glob e immutabile;
+- W-6: marcatori e percorsi di test estesi; asserzioni contate escludendo i commenti; identificativi dei test della base controllati sulla testa;
+- W-7: atti `finding` e `rounds`;
+- W-8: atti `rebase` e `abandon`;
+- W-9: esenzione solo per i `.md` sotto `docs/superpowers/`; `.superpowers/` ignorato da git;
+- W-10: effetti esterni con un elenco predefinito ampio e gli script non tracciati, dichiarati come livello unico;
+- W-11: `open-pr` solo dopo il tuo `/tollgate:finish` o un `approve pr`;
+- W-13: deroghe `test` per identificativo e sempre in attesa;
+- W-14: brief con codice di controllo e verifica delle letture;
+- W-15: R4 ridimensionata;
+- W-16: tabella completa dei sottocomandi e livello alzabile solo con un atto;
+- W-17: `EnterWorktree`, ramo dal `file_path` e da `git -C`, `isolation: worktree` negato;
+- W-18: configurazione fuori dai `tg/*` letta dal ramo predefinito di `origin`;
+- W-21 … W-40: wrapper con on/off prima di `OFF`; guardia del contesto solo su `Agent`; report dell'avversario salvato dall'hook; cartelle di output; `SubagentStop` che esce con 0 in caso di errore; L0 misurato anche in byte; issue di un autore esterno portata in L2; Python ≥ 3.11; fase `bloccato`; scritture via Bash della sessione principale; criteri binari; dipendenze; effetti esterni con diniego più atto; tabella `acts`; glossario; formulazioni.
+
+**Verificato in questo ciclo**:
+- `pull_request_target` gira nel contesto del ramo predefinito (docs.github.com);
+- in `dontAsk` le richieste di conferma vengono negate (code.claude.com/docs/en/permission-modes).
 
 ## Fatti verificati
 
