@@ -389,6 +389,12 @@ La revisione 10 è una **riscrittura** che integra tutti i rilievi dei cicli 22-
 
 **Decisione che spetta all'utente**: proseguire l'audit oltre il tetto, oppure passare al piano accettando la spec come «sospesa».
 
+## Prosecuzione oltre il tetto (decisione dell'utente, 08/10/2026)
+
+L'utente ha scelto di proseguire con un giro di verifica sulla revisione 10. **Cicli 31-38 in corso**: un auditor per punto di vista, in parallelo, con `docs/audit/prompt-ciclo-punto-di-vista.txt`.
+- 31 Chi esegue, 32 Chi usa, 33 Chi attacca, 34 Chi paga, 35 Chi arriva dopo, 36 Lo scettico, 37 Il caso limite, 38 Chi integra.
+- Se si interrompono senza risultati, vanno rilanciati tutti e otto.
+
 ## Nota storica: interruzione per limite di utilizzo (08/10/2026)
 
 **Stato: audit IN CORSO, non chiuso.**
