@@ -1,7 +1,7 @@
 # tollgate: specifica del nucleo (sotto-progetto A)
 
 Data: 8 ottobre 2026.
-Revisione: **14**: correzioni dei cicli 51-54. L'audit si chiude «sospeso» con questa revisione (decisione dell'utente); i residui sono nel file di stato. Le revisioni precedenti sono nella sezione 20.
+Revisione: **15**: skill e implementatori per area nei profili (decisione dell'utente). La revisione 14 ha chiuso l'audit come «sospeso»; i residui sono nel file di stato. Le revisioni precedenti sono nella sezione 20.
 Stato: **audit sospeso, pronta per il piano** (`docs/audit/2026-10-08-audit-spec-nucleo-stato.md`).
 Fonti: `docs/REPORT-CONFRONTO-WORKFLOW.md`, `docs/COSA-TENERE.md`, `docs/RICERCA-PAPER.md`. I codici R e H usati nel testo sono spiegati nella sezione 19.
 
@@ -98,7 +98,8 @@ Questi limiti sono dichiarati:
 | Profili per tipo di file con i loro controlli (R8, R11, R12) | Sotto-progetto **B**. Il contratto è già nel nucleo (11.4) |
 | **Piano principale e fette**, sotto-issue, kanban con GitHub Projects, riconciliazione, decisioni dell'utente sui rilievi (R13) | Sotto-progetto **C**. Nel nucleo si usa un'issue per fetta, con il contratto minimo di 5 |
 | Eval completi, prove a componenti spenti, costo e contesto dei subagenti (R15) | Sotto-progetto **D** |
-| Specialisti esterni in L2, Codex come revisore, controllo delle letture dei revisori | Dopo la v1 |
+| Gli agenti concreti per area (frontend, sicurezza, database…) e i loro profili | Sotto-progetto **B**. Il nucleo dà il contratto (`skills`, `agent`) e l'instradamento (6.3) |
+| Revisori specialisti esterni in L2, Codex come revisore, controllo delle letture dei revisori | Dopo la v1 |
 | Modalità rinforzata con GitHub App, dashboard, avvio da etichetta, portabilità, lezioni apprese, mutation testing | Dopo la v1 |
 
 **Agganci già pronti per i sotto-progetti:**
@@ -129,6 +130,7 @@ Questi limiti sono dichiarati:
 | Pianificatore | Il coordinatore |
 | Audit della spec | In L2: giri avversariali sempre; audit a lenti quando la spec prevede più fette (6.2) |
 | Revisione | Revisore finale e verificatore di tollgate (10) |
+| Specializzazione | Per contesto, non per ruolo: ogni profilo porta le sue skill a ogni implementatore; in L2 un profilo può portare anche un implementatore proprio, con prompt, strumenti e modello suoi (6.3). Decisione dell'utente, 08/10/2026 |
 | Merge | Solo l'utente, su GitHub |
 | Livello | Lo script lo alza; lo abbassa solo l'utente, con un atto |
 | Effetti esterni | Negati finché non c'è un atto, oppure ammessi da un'eccezione in sola lettura (8.5) |
@@ -246,7 +248,7 @@ tollgate/
 |---|---|---|---|
 | Utente | — | Alza il livello, approva spec e piano in L2, approva gli atti, risolve i blocchi, fa il merge | Atti dell'utente; merge su GitHub |
 | Coordinatore | Sessione principale | Dialogo, brainstorming, spec, piano, avvio dei subagenti. **Non scrive codice**, tranne in L0 | In L1 e L2, fase `execution`: Edit e Write sul codice negati se manca `agent_id`, che c'è solo nei subagenti (verificato) |
-| Implementatore | `tollgate:implementer`; ogni altro subagente **non** elencato in `[review] readonly_agents` è trattato allo stesso modo | Un task del piano alla volta, con TDD | Brief scritto dalla CLI, scope, scrittore unico, `SubagentStop` (8.1) |
+| Implementatore | `tollgate:implementer`, oppure in L2 l'implementatore per area del profilo del task (6.3); ogni altro subagente **non** elencato in `[review] readonly_agents` è trattato allo stesso modo | Un task del piano alla volta, con TDD e le skill dei profili del task | Brief scritto dalla CLI, scope, scrittore unico, skill usate, `SubagentStop` (8.1) |
 | Revisore del task | `tollgate:task-reviewer` | Controlla il task: aderenza al brief e qualità (rubrica derivata da subagent-driven-development) | Sola lettura (7.3); verdetto JSON (18.5) |
 | Avversario della spec, auditor della spec, avversario del piano | `tollgate:spec-adversary`, `tollgate:spec-auditor`, `tollgate:plan-adversary` | 6.2 | Niente scrittura, niente Bash |
 | Revisore finale | `tollgate:final-reviewer` | Confronta il lavoro con piano, must-have e scope; cerca casi speciali e asserzioni indebolite (R3) | Brief scritto dallo script; controllo di sola lettura (7.3) |
@@ -358,10 +360,10 @@ execution (sessione pulita)
        con le decisioni, in `status --checkpoint --note`
     per ogni task k in `tasks` (popolata dal piano alla registrazione dello scope), in ordine:
       tollgate task start k → brief in .tollgate-run/<N>/task-k.md (testo del task, scope,
-        test correlati R2, must-have collegati, istruzione «prima di DONE esegui
-        tollgate verify»). Il piano è letto a `plan_sha`. Un task può indicare i must-have che
+        test correlati R2, must-have collegati, skill da usare, istruzione «prima di DONE
+        esegui tollgate verify»); sceglie anche il tipo di implementatore (sotto). Il piano è letto a `plan_sha`. Un task può indicare i must-have che
         soddisfa con una riga `Must-have: M1, M3`; senza, il brief li contiene tutti
-      Agent tollgate:implementer con il percorso del brief → SubagentStart associa il
+      Agent <tipo scelto da task start> con il percorso del brief → SubagentStart associa il
         subagente al task (lo scrittore unico rende l'associazione univoca) e inietta il
         promemoria del passo (R5), al massimo 2.000 caratteri (R9)
       implementatore: TDD → commit (hook: test-guard, scope, livello) → tollgate verify
@@ -382,6 +384,12 @@ execution (sessione pulita)
     senza toccare il piano. Dopo una PR con verdict rosso: task start --from-gate, con il
     commento del gate passato come dato
 ```
+
+**Skill e implementatori per area.** I profili del task sono quelli il cui `paths` contiene almeno uno dei file `Create:`/`Modify:`/`Test:` del task (stessa regola di attivazione di 9.2, applicata al task).
+- **Skill:** il brief elenca l'unione dei campi `skills` di quei profili. `SubagentStop` controlla che l'implementatore abbia invocato ognuna (eventi `PostToolUse` dello strumento `Skill` con il suo `agent_id`); se ne manca una, veto con l'elenco, come per la ricevuta (8.1). Una skill non installata non blocca: il brief la segna come assente e `attenzione` lo riporta.
+- **Implementatore per area, solo in L2:** se i profili del task dichiarano **un solo** `agent` non vuoto, `task start` sceglie quell'agente; con zero agenti, o con agenti diversi (task a cavallo di più aree), sceglie `tollgate:implementer` con l'unione delle skill, e `plan-adversary` segnala il task come candidato a essere diviso. In L1 l'implementatore è sempre `tollgate:implementer`, con le skill.
+- **Cosa rende diverso un implementatore per area:** prompt con le regole dell'area, strumenti propri (per esempio un server MCP del database o gli strumenti del browser), modello proprio. Deriva dallo stesso testo di `tollgate:implementer` e ne mantiene gli obblighi (TDD, `verify`, stati, report). Un nome di ruolo senza contesto o strumenti diversi non giustifica un agente a sé (ricerca, filone 6).
+- **Vincoli per gli agenti dei profili:** il nome ha la forma `<plugin>:implementer-<area>`; non è mai in `readonly_agents`; vale per lui tutto ciò che vale per `tollgate:implementer` (scope, scrittore unico, ricevuta, sola scrittura dopo `task start`). Gli agenti concreti li fornisce B.
 
 **Transizioni di `tasks.state`.**
 
@@ -474,10 +482,11 @@ Ogni messaggio d'errore riporta il percorso assoluto di `bin/tollgate` e il coma
 | `UserPromptExpansion` | comandi `tollgate:*`, forma lunga e breve | Registra l'atto (8.4) |
 | `PreToolUse` | `Edit`, `Write`, `NotebookEdit`, `MultiEdit` | In `spec_audit`, `plan`, `approval`, `blocked`, `review` e `pr_open`: solo `.md` sotto `docs/superpowers/` (in `spec_audit` e `approval` non sotto `plans/`; mai spec e piano bloccati, 6.2); per correggere il codice dopo `finish` si torna in `execution` con `start`. In `execution`: fuori scope → `deny`; codice scritto dalla sessione principale in L1 o L2 → `deny`. In L0 non c'è scope: scrive la sessione principale, e il superamento delle soglie di 5 porta a L1. File protetti → `deny`, anche quando sono `.md` sotto `docs/superpowers/reviews/`. Sempre ammessi: gli altri `.md` sotto `docs/superpowers/` e `.superpowers/` |
 | `PostToolUse` | `Edit`, `Write`, `MultiEdit` | Ricalcola il livello; sui piani lancia `plan-check` (7.5) |
+| `PostToolUse` | `Skill` | Se lo invoca un implementatore (`agent_id`), registra la skill per il suo task (6.3) |
 | `PostToolUse` | `Bash` | In una sessione legata o nel worktree: se `HEAD` ha commit nuovi non registrati (anche da `merge`, `cherry-pick`, `revert`, `am`), li registra e fa girare test-guard e scope su di essi; una violazione apre un blocco `needs_you`. Se il ramo del worktree è cambiato, apre `needs_you`. È il controllo a valle che copre i comandi non riconosciuti da 7.4 |
 | `PreToolUse` | `Bash` | 7.4 |
 | `PreToolUse` | `mcp__.*` | Effetto esterno, se lo strumento non è in `mcp_allow` (8.5) |
-| `PreToolUse` | `Agent` | Guardia del contesto. **Scrittore unico**: nessun nuovo implementatore se un altro è `running` nel worktree. Un subagente senza eventi da più di `stale_minutes` (30) diventa `interrupted`, anche se la sua sessione è viva: è un subagente bloccato. In `execution` (L1, L2) ammette come scrittore solo `tollgate:implementer` dopo `task start` (6.3) |
+| `PreToolUse` | `Agent` | Guardia del contesto. **Scrittore unico**: nessun nuovo implementatore se un altro è `running` nel worktree. Un subagente senza eventi da più di `stale_minutes` (30) diventa `interrupted`, anche se la sua sessione è viva: è un subagente bloccato. In `execution` (L1, L2) ammette come scrittore solo il tipo scelto da `task start` per il task in sospeso (`tollgate:implementer` o l'implementatore per area, 6.3) |
 | `PreToolUse` | `SendMessage` | Ripresa di un subagente: stesse regole di `Agent` sullo scrittore (6.3). Verso un subagente di sola lettura o il coordinatore: ammessa |
 | `SubagentStart` | tutti | Salva `agent_base_sha` (senza sovrascriverla alla ripresa), l'impronta dei file e il tipo; per `tollgate:implementer` lo associa al task in sospeso; inietta il contesto (6.3) |
 | `SubagentStop` | tutti | Implementatori: 8.1. Sola lettura: 7.3. Revisore del task: verdetto in `tasks` (18.5). Revisori finali: 8.6. Avversari e auditor: salva il report. Legge anche i token dal `agent_transcript_path` |
@@ -897,6 +906,8 @@ assert_markers = []
 plan_sections  = []
 min_level      = "L0"
 checklist      = ""   # percorso di un file con la checklist per il revisore finale
+skills         = []   # skill che ogni implementatore deve usare sui task di questo profilo
+agent          = ""   # solo L2: implementatore per area, "<plugin>:implementer-<area>" (6.3)
 
 [components]         # mappa aperta (R10)
 scope_check = true
@@ -939,7 +950,7 @@ sentinel = true
 | `spec_audit` | work, kind, number, viewpoint, counts, outcome, report_path | |
 | `acts` | act_id, type, object, at, typed_text, source, actor, session, work, state, expires_at, consumed_at | |
 | `intents` | work, action, idempotency_key, data, state, outcome, at | univoco (idempotency_key) |
-| `tasks` | work, number, kind (`plan`, `fix`), source (task del piano, ciclo dei rilievi o gate), state (`pending`, `running`, `review`, `done`, `blocked`), fix_rounds, implementer, commits, verdict, review_code | univoco (work, number) |
+| `tasks` | work, number, kind (`plan`, `fix`), source (task del piano, ciclo dei rilievi o gate), state (`pending`, `running`, `review`, `done`, `blocked`), fix_rounds, implementer, agent_type, skills_required, skills_used, commits, verdict, review_code | univoco (work, number) |
 | `events` | seq, v, at, host, session, work, repo_key, issue, type, data (18.4) | `seq` monotono per DB; sola aggiunta; l'unica cancellazione è la potatura oltre `events_days` |
 | `meta` | schema_version | |
 
@@ -1164,6 +1175,7 @@ Ogni criterio è un'azione con un esito binario.
 35. **Componenti spenti.** Con `spec_audit = false` e tre fette, `approve spec 3` è accettato senza audit a lenti e il gate dà `attenzione` rosso, non `verdict` rosso (integrazione, gate).
 36. **Piano registrato nel gate.** Piano modificato dopo la registrazione in modo da includere un file in più → quel file è fuori scope nel gate e `attenzione` mostra il diff del piano (gate).
 37. **Flusso dopo l'approvazione.** In `spec_audit` la scrittura di un piano → `deny`. In L2 il piano corretto da `plan-adversary` → `plan_sha` è quello di `approve plan`. Edit sulla spec in fase `plan` dopo `approve spec` → `deny`; `reopen spec` → fase `spec_audit` e nuova approvazione richiesta. `needs_fix` → `task start --from-findings` crea un task `fix` senza toccare il piano (hook, integrazione).
+38. **Skill e implementatori per area.** Con un profilo `web` (`paths = ["web/**"]`, `skills = ["ui-ux-pro-max"]`, `agent = "probe:implementer-frontend"`): in L1 un task su `web/` → `tollgate:implementer` con `ui-ux-pro-max` nel brief; DONE senza aver invocato la skill → veto. In L2 lo stesso task → `task start` sceglie `probe:implementer-frontend`, e `tollgate:implementer` su quel task → `deny`. Un task su `web/` e `api/` con due agenti diversi → `tollgate:implementer` con l'unione delle skill (hook, integrazione).
 
 ---
 
@@ -1362,3 +1374,4 @@ L'elenco completo è in `docs/COSA-TENERE.md`.
 | 12 | 08/10/2026 | Correzioni puntuali dai cicli 39-46: permessi di `verdict` (`actions`, `issues`); modalità misurata solo da `init` e scritta in `[gate] mode`; file `spec-approval` e `plan-approval` scritti dalla CLI; `docs/superpowers/reviews/**` protetto; `approve spec <fette>`; atti legati a sessione, lavoro e oggetto, con scadenza; atto `finish`; `approve rebase` monouso; `resolve writer`; `db restore` dal terminale senza atto; `UserPromptExpansion` non blocca mai; push sul predefinito negato in tutto il repo attivo; livello sotto il minimo coerente (`verdict` rosso); componenti spenti → `attenzione`; `pytest.mark.skip` e `skipped` come mancante; issue della PR verificata e deroghe legate al ramo; formato di rilievi e verdetti (18.5); contratto dei profili; registro dei controlli; busta con `repo_key` e `issue`; cache per albero; `tollgate/base` in `detect`; `sentinel` con un'issue sola; tabella di `adopt`; modelli predefiniti degli agenti; `schema_version` di deroghe e report; chiavi sconosciute; criteri 32-35 |
 | 13 | 08/10/2026 | Decisione dell'utente: `tollgate:execute` con `tollgate:implementer` e `tollgate:task-reviewer` al posto di subagent-driven-development (tolte esenzione degli script, estrazione del task dal prompt e blocco della revisione finale di SDD; tabella `tasks`; solo `tollgate:implementer` scrive in `execution`). Correzioni dei cicli 47-50: `finish` legato allo SHA e non al tempo; approvazioni legate al contenuto (SHA blob, spec e piano bloccati dopo l'approvazione, `plan_sha` nel gate); `spec_path` della prima fetta; identificativi della base solo eseguiti e non saltati; `tollgate-base` commenta l'issue; `spec-lens-stato.md` rigenerato dall'hook e `outcome` calcolato; `db restore` solo da terminale; uscita al rifiuto del costo dell'audit; registro con eventi d'ingresso e `ctx`; `events --json`; `user_decision`; namespace dei comandi dei profili e `min_level`; casi gravi in `attenzione`; regola comune di versione; criterio 36 |
 | 14 | 08/10/2026 | Correzioni dei cicli 51-54: `PreToolUse SendMessage` per le riprese; transizioni di `tasks` e precondizioni di `task start`/`task done`; `task review-prepare` con SHA e codice; task di correzione da rilievi e gate (`--from-findings`, `--from-gate`); `reopen spec|plan` e transizioni in 12.3; piano registrato solo in fase `plan`, in L2 ad `approve plan`; brainstorming fermato prima di writing-plans; spec bloccata da `approve spec`; brief e revisione dal piano a `plan_sha`; `finish` legato a HEAD e non alla sessione; `.tollgate-run/` in `info/exclude`; `events --after-seq` con `seq`; tipi `task_change` e `finding`; `ctx` con tutte le tabelle; `order` e moduli rifiutati; `confidence` nel JSON; criterio 37. Audit chiuso come sospeso |
+| 15 | 08/10/2026 | Decisione dell'utente: specializzazione per area. Campi `skills` e `agent` nel contratto dei profili; skill nel brief e controllate da `SubagentStop` tramite `PostToolUse Skill`; in L2 implementatore per area scelto da `task start` quando il task tocca un solo profilo con `agent`; agenti concreti in B; criterio 38 |
