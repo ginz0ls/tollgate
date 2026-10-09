@@ -29,7 +29,7 @@ def language(path: str) -> str | None:
 
 
 def _js(text: str, rel: str, joiner: str):
-    toks = list(js_tokens(text))
+    toks = list(js_tokens(text, jsx=rel.endswith((".jsx", ".tsx"))))
     active: dict[str, str] = {}
     skipped: set[str] = set()
     frames: list[tuple[str, int, bool]] = []

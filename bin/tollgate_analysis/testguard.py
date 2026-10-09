@@ -11,6 +11,10 @@ from .testids import language, test_ids
 DEFAULT_TEST_GLOBS = ("**/__tests__/**", "**/test/**", "**/tests/**", "**/e2e/**",
                       "**/*_test.py", "**/test_*.py", "**/*.test.*", "**/*.spec.*",
                       "**/*_test.go", "**/src/test/**")
+# File di configurazione di copertura noti: le soglie vi si controllano ovunque nel repo (8.2).
+COVERAGE_CONFIG_GLOBS = ("**/.nycrc", "**/.nycrc.json", "**/.nycrc.yml", "**/.coveragerc",
+                         "**/jest.config.*", "**/vitest.config.*", "**/pyproject.toml",
+                         "**/setup.cfg", "**/package.json")
 _ASSERTS = {
     "js": [r"\bexpect\s*\(", r"\bassert\w*\b", r"\.\s*should\b"],
     "py": [r"\bassert\w*", r"\bpytest\s*\.\s*raises\b"],
@@ -22,7 +26,8 @@ _SKIPS = {
            r"\.\s*todo\b", r"\.\s*fixme\b", r"\.\s*skipIf\b", r"\.\s*runIf\s*\(\s*false\s*\)",
            r"\.\s*fails\b"],
     "py": [r"\bpytest\s*\.\s*skip\s*\(", r"\bpytest\s*\.\s*mark\s*\.\s*skip\w*", r"\bxfail\b",
-           r"\bunittest\s*\.\s*skip\w*", r"\bskipIf\b", r"\bskipUnless\b"],
+           r"\bunittest\s*\.\s*skip\w*", r"\bskipIf\b", r"\bskipUnless\b",
+           r"\.\s*skipTest\s*\(", r"\bSkipTest\b", r"\bpytest\s*\.\s*importorskip\s*\("],
     "go": [r"\bt\s*\.\s*Skip\w*"],
     "java": [r"@\s*Disabled\b", r"@\s*Ignore\b"],
     "rust": [r"#\s*\[\s*ignore\s*\]"],
@@ -69,10 +74,13 @@ class GuardResult:
     watched: list[str] = field(default_factory=list)
 
 
-def _code(text: str | None, lang: str) -> str | None:
+def _code(text: str | None, lang: str, rel: str) -> str | None:
+    """Codice senza commenti né stringhe; None se lo scanner non lo legge."""
     if text is None:
         return ""
-    return py_code(text) if lang == "py" else js_code(text)
+    if lang == "py":
+        return py_code(text)
+    return js_code(text, jsx=rel.endswith((".jsx", ".tsx")))
 
 
 def _literal(marker: str) -> str:
@@ -88,12 +96,54 @@ def _count(code: str, patterns) -> int:
     return sum(len(re.findall(p, code)) for p in patterns)
 
 
+def _strip_comments(text: str) -> str:
+    """Toglie i commenti (//, /* */, #, ; a inizio riga) rispettando le stringhe, che non
+    attraversano le righe."""
+    out, i, n, quote, line_start = [], 0, len(text), None, True
+    while i < n:
+        c = text[i]
+        if quote:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if c == quote or c == "\n":
+                quote = None
+            i += 1
+            continue
+        if c in "'\"`":
+            quote = c
+            out.append(c)
+            i += 1
+            line_start = False
+            continue
+        if text.startswith("//", i) or c == "#" or (c == ";" and line_start):
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+            continue
+        if text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+            continue
+        out.append(c)
+        line_start = c == "\n" or (line_start and c in " \t")
+        i += 1
+    return "".join(out)
+
+
 def _thresholds(text: str | None) -> dict[str, float]:
     out: dict[str, float] = {}
-    for key, val in _THRESH.findall(text or ""):
+    for key, val in _THRESH.findall(_strip_comments(text or "")):
         k = key.lower().replace("-", "_")
         out[k] = min(out.get(k, float("inf")), float(val))
     return out
+
+
+def _lowered(base_text: str, head_text: str | None) -> list[str]:
+    """Soglie della base abbassate o rimosse nella testa (una chiave assente vale 0)."""
+    base_t, head_t = _thresholds(base_text), _thresholds(head_text)
+    return sorted(k for k, v in base_t.items() if k not in head_t or head_t[k] < v)
 
 
 def _test_file(c: Change, cfg: GuardConfig, out: list[Violation]) -> None:
@@ -119,14 +169,24 @@ def _test_file(c: Change, cfg: GuardConfig, out: list[Violation]) -> None:
                 out.append(Violation("test_id_missing", c.path,
                                      "test della base assenti o saltati: " + ", ".join(missing),
                                      "test", missing))
-    base_code, head_code = _code(c.base_text, lang), _code(c.head_text, lang)
-    if base_code is None or head_code is None:
-        return
+    base_code = _code(c.base_text, lang, old)
+    head_code = _code(c.head_text, lang, c.path)
+    if head_code is None:
+        out.append(Violation("unparsable", c.path, "file di test non analizzabile", "test"))
+    # Rete di sicurezza fail-closed: ogni conteggio vale sia sul codice ripulito sia sul testo
+    # grezzo; si tiene il caso peggiore (diminuzione massima per le asserzioni, aumento
+    # massimo per i salti). Un errore dello scanner non nasconde mai un indebolimento.
     asserts = _ASSERTS[lang] + [_literal(m) for m in cfg.assert_markers]
-    if c.status != "A" and _count(head_code, asserts) < _count(base_code, asserts):
-        out.append(Violation("asserts_decreased", c.path, "asserzioni diminuite", "test"))
     skips = _SKIPS[lang] + [_literal(m) for m in cfg.skip_markers]
-    if _count(head_code, skips) > _count(base_code, skips):
+    b_raw, h_raw = c.base_text or "", c.head_text or ""
+    drops = [_count(b_raw, asserts) - _count(h_raw, asserts)]
+    rises = [_count(h_raw, skips) - _count(b_raw, skips)]
+    if base_code is not None and head_code is not None:
+        drops.append(_count(base_code, asserts) - _count(head_code, asserts))
+        rises.append(_count(head_code, skips) - _count(base_code, skips))
+    if max(drops) > 0:
+        out.append(Violation("asserts_decreased", c.path, "asserzioni diminuite", "test"))
+    if max(rises) > 0:
         out.append(Violation("skip_added", c.path, "marcatori di salto aggiunti", "test"))
 
 
@@ -154,11 +214,11 @@ def check(changes, cfg: GuardConfig) -> GuardResult:
                                           "command"))
         if watched:
             r.watched.append(c.path)
-        if (verification or watched) and not c.binary and c.base_text and c.head_text:
-            base_t, head_t = _thresholds(c.base_text), _thresholds(c.head_text)
-            lowered = [k for k in base_t if k in head_t and head_t[k] < base_t[k]]
+        coverage = any(globs.match_any(COVERAGE_CONFIG_GLOBS, p) for p in paths)
+        if (verification or watched or coverage) and not c.binary and c.base_text is not None:
+            lowered = _lowered(c.base_text, c.head_text)
             if lowered:
                 r.violations.append(Violation("threshold_lowered", c.path,
-                                              "soglie abbassate: " + ", ".join(sorted(lowered)),
-                                              "threshold"))
+                                              "soglie abbassate o rimosse: "
+                                              + ", ".join(lowered), "threshold"))
     return r

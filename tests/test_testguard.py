@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 from tollgate_analysis.testguard import (DEFAULT_TEST_GLOBS, Change, GuardConfig, check)
 
@@ -85,6 +86,71 @@ class TestGuardTest(unittest.TestCase):
                    Change("M", "tests/test_l.py", None, latin1, latin1)],
                   CFG)
         self.assertEqual(r.violations, [])
+
+
+PREFIX_RE_QUOTE = "const s = 'a'.replace(/\"/g, '')\n"
+PREFIX_RE_SLASH = "const r = /[//]/; const q = 'x'\n"
+PREFIX_RE_RETURN = "function f(x) { return /\"/.test(x) }\n"
+PREFIX_TPL = "const t = `a ${ `it's ${ 'x' }` }`\n"
+PREFIX_JSX = "const v = <p>don't</p>\n"
+
+
+class TestScannerRobustness(unittest.TestCase):
+    CASES = [(PREFIX_RE_QUOTE, "src/a.test.ts"), (PREFIX_RE_SLASH, "src/a.test.ts"),
+             (PREFIX_RE_RETURN, "src/a.test.ts"), (PREFIX_TPL, "src/a.test.ts"),
+             (PREFIX_JSX, "src/a.test.tsx")]
+
+    def _diff(self, prefix, path, edit):
+        return kinds([Change("M", path, None, prefix + JS_BASE, prefix + edit(JS_BASE))])
+
+    def test_skip_added_after_tricky_lexing(self):
+        for prefix, path in self.CASES:
+            with self.subTest(prefix=prefix):
+                self.assertIn("skip_added", self._diff(
+                    prefix, path, lambda t: t.replace("it('y'", "it.skip('y'")))
+                self.assertIn("skip_added", self._diff(
+                    prefix, path, lambda t: t.replace("it('y'", "xit('y'")))
+
+    def test_expect_removed_after_tricky_lexing(self):
+        for prefix, path in self.CASES:
+            with self.subTest(prefix=prefix):
+                self.assertIn("asserts_decreased", self._diff(
+                    prefix, path, lambda t: t.replace("expect(1).toBe(1)", "1")))
+
+    def test_python_skip_markers(self):
+        for line in ("self.skipTest('no')", "raise SkipTest('no')",
+                     "raise unittest.SkipTest('no')", "pytest.importorskip('x')"):
+            with self.subTest(line=line):
+                head = PY_BASE.replace("    assert 1", f"    {line}\n    assert 1")
+                self.assertIn("skip_added",
+                              kinds([Change("M", "tests/test_x.py", None, PY_BASE, head)]))
+
+    def test_skip_still_flagged_when_python_scanner_fails(self):
+        head = PY_BASE.replace("    assert 1", "    pytest.skip('no')\n    assert 1")
+        with mock.patch("tollgate_analysis.testguard.py_code", return_value=None):
+            self.assertEqual(kinds([Change("M", "tests/test_x.py", None, PY_BASE, head)]),
+                             ["skip_added", "unparsable"])
+
+    def test_binary_deleted_test(self):
+        self.assertEqual(kinds([Change("D", "tests/a.test.ts", None, None, None, binary=True)]),
+                         ["test_deleted"])
+
+    def test_threshold_removed_from_package_json(self):
+        base = '{"jest": {"coverageThreshold": {"global": {"lines": 90}}}}'
+        self.assertEqual(kinds([Change("M", "package.json", None, base, '{"jest": {}}')]),
+                         ["threshold_lowered"])
+
+    def test_commented_threshold_counts_as_removed(self):
+        self.assertEqual(kinds([Change("M", "packages/web/.nycrc", None, '{"lines": 90}',
+                                       '{\n  // "lines": 90\n}\n')]), ["threshold_lowered"])
+
+    def test_nycrc_lowered(self):
+        self.assertEqual(kinds([Change("M", ".nycrc", None, '{"lines": 90}', '{"lines": 10}')]),
+                         ["threshold_lowered"])
+
+    def test_coverage_config_deleted(self):
+        self.assertEqual(kinds([Change("D", ".coveragerc", None, "fail_under = 90\n", None)]),
+                         ["threshold_lowered"])
 
 
 if __name__ == "__main__":

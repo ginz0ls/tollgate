@@ -67,5 +67,21 @@ class TestIdsTest(unittest.TestCase):
         self.assertIsNone(scan.py_code("x = '\n"))
 
 
+class ScanRobustnessTest(unittest.TestCase):
+    def test_regex_literal_is_not_a_string(self):
+        self.assertEqual(scan.js_code("x = /'/g; y"), "x = S ; y")
+
+    def test_division_is_not_a_regex(self):
+        self.assertEqual(scan.js_code("a = b / c / d"), "a = b / c / d")
+
+    def test_template_nested_quotes_do_not_shift_state(self):
+        out = scan.js_code("x = `a ${ `it's ${ 'q' }` }`; y")
+        self.assertEqual(out.split()[-2:], [";", "y"])
+        self.assertNotIn("it", out.split())
+
+    def test_fstring_expression_not_counted(self):
+        self.assertNotIn("assert_x", scan.py_code('x = f"{assert_x}"\n').split())
+
+
 if __name__ == "__main__":
     unittest.main()
