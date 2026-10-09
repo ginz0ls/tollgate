@@ -653,6 +653,27 @@ def _target_dir(args: list[str]) -> str | None:
     return None
 
 
+def _git_restore_targets(cmd: Cmd) -> list[str]:
+    """File che `git checkout <albero> -- <file>` e `git restore <file>` riscrivono."""
+    sub, args, _ = git_call(cmd)
+    if sub not in ("checkout", "restore"):
+        return []
+    if "--" in args:
+        return args[args.index("--") + 1:]
+    if sub == "checkout":
+        return []
+    out, i = [], 0
+    while i < len(args):
+        if args[i] in ("-s", "--source"):
+            i += 2
+        elif args[i].startswith("-"):
+            i += 1
+        else:
+            out.append(args[i])
+            i += 1
+    return out
+
+
 def write_targets(cmd: Cmd) -> list[str]:
     a = cmd.argv
     out = list(cmd.redirects)
@@ -687,6 +708,8 @@ def write_targets(cmd: Cmd) -> list[str]:
         out += pos[1:]
     elif base == "dd":
         out += [x[3:] for x in args if x.startswith("of=")]
+    elif base == "git":
+        out += _git_restore_targets(cmd)
     return out
 
 

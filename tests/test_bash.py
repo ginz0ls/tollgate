@@ -470,6 +470,24 @@ class AbbreviationAndAliasTest(unittest.TestCase):
         self.assertEqual(bash.git_call(one("git -c alias.p=push status"))[0], "status")
 
 
+class GitRestoreTargetsTest(unittest.TestCase):
+    """M2: checkout e restore riscrivono i file indicati."""
+
+    def test_checkout_paths_after_double_dash(self):
+        self.assertEqual(bash.write_targets(one("git checkout origin/main -- tollgate.toml a/b")),
+                         ["tollgate.toml", "a/b"])
+        self.assertEqual(bash.write_targets(one("git checkout -- src/a.py")), ["src/a.py"])
+        self.assertEqual(bash.write_targets(one("git checkout altro")), [])
+
+    def test_restore_positionals(self):
+        self.assertEqual(bash.write_targets(one("git restore .tollgate/waivers/7.toml")),
+                         [".tollgate/waivers/7.toml"])
+        self.assertEqual(bash.write_targets(one("git restore --staged --source=HEAD~1 f g")),
+                         ["f", "g"])
+        self.assertEqual(bash.write_targets(one("git restore -s HEAD~1 -- f")), ["f"])
+        self.assertEqual(bash.write_targets(one("git restore --source HEAD~1 f")), ["f"])
+
+
 class TextDangerFallbackTest(unittest.TestCase):
     def test_new_patterns(self):
         for text, label in (("bash <<EOF\nrm -rf /tmp/x\n", "rm -r"),

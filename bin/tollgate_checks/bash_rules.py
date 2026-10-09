@@ -238,6 +238,7 @@ def _work_rules(ctx, event, c: bash.Cmd, edir: Path, work,
                                          f"lavoro #{work['issue']}: {raw} (6.6)")
             continue
         if (event.agent_id is None and work["level"] in ("L1", "L2") and not is_docs_md(rel)
+                and bash.git_call(c)[0] not in ("checkout", "restore")
                 and not rel.startswith(".superpowers/")
                 and not git.excluded(rel, output_excludes(ctx))):
             return "coordinator", (f"in {work['level']} il codice lo scrivono gli "

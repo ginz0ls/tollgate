@@ -85,6 +85,16 @@ class BoundSessionTest(unittest.TestCase):
                 self.assertEqual(self.code(cmd, agent_id="a1"), 2)
         self.assertEqual(self.code("git -c user.name=x status", agent_id="a1"), 0)
 
+    def test_git_checkout_and_restore_of_protected_files_are_denied(self):
+        for cmd in ("git checkout origin/main -- tollgate.toml",
+                    "git restore .tollgate/waivers/7.toml",
+                    "git restore --source=HEAD~1 -- docs/superpowers/reviews/7/r.md"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.code(cmd, agent_id="a1"), 2)
+        self.assertEqual(self.code("git restore src/app.py", agent_id="a1"), 0)
+        self.assertEqual(self.code("git checkout -- src/app.py"), 0)
+        self.assertEqual(self.code("git restore src/app.py"), 0)
+
     def test_unparsable_text_covers_more_dangers(self):
         for body in ("rm -rf /tmp/x", "git -c core.hooksPath=/x commit -m y",
                      "echo x > tollgate.toml", "echo x > .tollgate/waivers/7.toml",
