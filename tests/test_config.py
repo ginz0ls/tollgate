@@ -104,6 +104,12 @@ class LoadTextTest(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "profiles.web"):
             load_config_text(MIN + "[profiles]\nweb = 3\n")
 
+    def test_active_profile_not_declared_warns(self):
+        cfg = load_config_text(
+            'schema_version = 1\n[gate]\nmode = "protected"\n'
+            '[profiles]\nactive = ["web"]\n')
+        self.assertIn("profilo attivo non dichiarato: web", cfg.warnings)
+
 
 class LoadFromGitTest(unittest.TestCase):
     def setUp(self):

@@ -218,6 +218,10 @@ def load_config_text(text: str, source: str = "tollgate.toml") -> Config:
                 _set_key(data[section], key, value, sample, path, path)
             else:
                 warnings.append(f"chiave sconosciuta: {path}")
+    declared = {k for k in data["profiles"] if k != "active"}
+    for name in data["profiles"]["active"]:
+        if name not in declared:
+            warnings.append(f"profilo attivo non dichiarato: {name}")
     if not data["gate"]["mode"]:
         raise ConfigError(f"{source}: manca gate.mode (lo scrive /tollgate:init)")
     return Config(data, warnings)
