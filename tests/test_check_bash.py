@@ -186,7 +186,91 @@ class RemovalTest(unittest.TestCase):
             lab.close()
 
 
+class GlobRemovalTest(unittest.TestCase):
+    """I glob non espansi non aggirano la protezione (fix round 2)."""
+
+    def setUp(self):
+        self.lab = Lab()
+        (self.lab.wt / ".tollgate/waivers").mkdir(parents=True)
+        (self.lab.wt / ".tollgate/waivers/7.toml").write_text("x\n")
+        (self.lab.wt / "build").mkdir()
+        (self.lab.wt / "build/out.txt").write_text("x\n")
+
+    def tearDown(self):
+        self.lab.close()
+
+    def code(self, cmd):
+        return self.lab.bash(cmd, agent_id="a1").exit
+
+    def test_globs_reaching_protected_files(self):
+        for cmd in ("rm -rf .tollgate/*", "rm -rf .toll*", "rm -rf .t?llgate",
+                    "rm -rf .[a-z]*", "rm -rf ./*", "rm -rf *", "mv .tollgate/* /tmp/zz",
+                    "rm -rf {.tollgate,x}", "rm -rf .tollgate/{waivers,x}",
+                    "rm .tollgate/waivers/*", "mv tollgate.t* /tmp/zz", "touch .tollgate/waivers/*",
+                    "rm -rf **/waivers", "rm -rf .tollgate/waiv[e]rs"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.code(cmd), 2)
+
+    def test_ancestor_of_the_glob_without_matches(self):
+        shutil.rmtree(self.lab.wt / ".tollgate")
+        (self.lab.wt / ".tollgate").mkdir()
+        self.assertEqual(self.code("rm -rf .tollgate/*"), 2)
+        self.assertEqual(self.code("rm -rf docs/superpowers/reviews/*"), 2)
+
+    def test_harmless_globs_pass(self):
+        for cmd in ("rm -rf build/*", "rm -f *.pyc", "rm -rf src/*", "mv build/* /tmp/zz",
+                    "rm -rf build/{a,b}", "rm -rf build/out.t?t", "ls .tollgate/*"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.code(cmd), 0)
+
+    def test_brace_expansion(self):
+        from tollgate_checks.bash_rules import _braces
+        self.assertEqual(_braces("{a,b}"), ["a", "b"])
+        self.assertEqual(_braces("x/{a,b}/y"), ["x/a/y", "x/b/y"])
+        self.assertEqual(_braces("{a,b{c,d}}"), ["a", "bc", "bd"])
+        self.assertEqual(_braces("a{b}"), ["a{b}"])
+        self.assertEqual(_braces("plain"), ["plain"])
+
+
+class OtherRemovalTest(unittest.TestCase):
+    def setUp(self):
+        self.lab = Lab()
+        (self.lab.wt / ".tollgate/waivers").mkdir(parents=True)
+        (self.lab.wt / ".tollgate/waivers/7.toml").write_text("x\n")
+        (self.lab.wt / "build").mkdir()
+
+    def tearDown(self):
+        self.lab.close()
+
+    def code(self, cmd):
+        return self.lab.bash(cmd, agent_id="a1").exit
+
+    def test_denied(self):
+        for cmd in ("git rm -r .tollgate", "git rm tollgate.toml", "git rm -rf "
+                    "docs/superpowers/reviews", "git rm .tollgate/*", "unlink tollgate.toml",
+                    "unlink .tollgate/waivers/7.toml", "find . -delete", "find .tollgate -delete",
+                    "find .tollgate -exec rm -rf {} +", "find docs -type f -exec rm {} \\;",
+                    "find . -name '*.toml' -delete", "find . -execdir mv {} /tmp \\;"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.code(cmd), 2)
+
+    def test_allowed(self):
+        for cmd in ("git rm src/app.py", "git rm -r build", "unlink src/app.py",
+                    "find build -delete", "find . -name x", "find .tollgate -name x",
+                    "find build -exec rm {} \\;", "find . -exec cat {} \\;"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.code(cmd), 0)
+
+
 class GitHooksPathTest(unittest.TestCase):
+    def test_compact_c_option(self):
+        lab = Lab()
+        try:
+            self.assertEqual(lab.bash("git -ccore.hooksPath=/tmp status", agent_id="a1").exit, 2)
+            self.assertEqual(lab.bash("git -cuser.name=x status", agent_id="a1").exit, 0)
+        finally:
+            lab.close()
+
     def test_denied_at_every_level(self):
         lab = Lab()
         try:

@@ -5,6 +5,8 @@ radice pertinente, una sessione legata non scrive nel worktree di un altro lavor
 worktree non si possono elencare si nega con un messaggio, i percorsi fuori dai repo passano."""
 from __future__ import annotations
 
+import glob
+import itertools
 import os
 import re
 from pathlib import Path
@@ -34,9 +36,61 @@ def _abs(c: bash.Cmd, target: str) -> Path | None:
     return Path(os.path.normpath(os.path.join(c.cwd, os.path.expanduser(target)))).resolve()
 
 
+_GLOB_CHARS = "*?["
+_GLOB_CAP = 5000
+_BRACE_CAP = 1000
+
+
+def _braces(t: str) -> list[str]:
+    """`{a,b}` -> due bersagli (annidate comprese). Senza virgola o sbilanciate restano come sono."""
+    i = t.find("{")
+    while i >= 0:
+        depth, parts, start, end = 0, [], i + 1, -1
+        for j in range(i, len(t)):
+            ch = t[j]
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    parts.append(t[start:j])
+                    end = j
+                    break
+            elif ch == "," and depth == 1:
+                parts.append(t[start:j])
+                start = j + 1
+        if end < 0:
+            return [t]
+        if len(parts) > 1:
+            out = [x for part in parts for x in _braces(t[:i] + part + t[end + 1:])]
+            return out[:_BRACE_CAP]
+        i = t.find("{", i + 1)
+    return [t]
+
+
+def _expand(c: bash.Cmd, raw: str) -> tuple[list[Path], list[Path]]:
+    """Percorsi che un bersaglio può toccare: il testo stesso, le graffe e i glob espansi (anche
+    i file nascosti). In più la cartella che precede il primo carattere glob: serve quando il
+    glob non trova nulla o i file nascono dopo."""
+    paths, ancestors = [], []
+    for t in _braces(raw):
+        p = _abs(c, t)
+        if p is None:
+            continue
+        paths.append(p)
+        if not any(ch in t for ch in _GLOB_CHARS):
+            continue
+        pattern = os.path.join(glob.escape(c.cwd), os.path.expanduser(t))
+        found = glob.iglob(pattern, recursive=True, include_hidden=True)
+        paths += [Path(m).resolve() for m in itertools.islice(found, _GLOB_CAP)]
+        first = min(i for i, ch in enumerate(t) if ch in _GLOB_CHARS)
+        ancestors.append(_abs(c, t[:first][:t[:first].rfind("/") + 1] or "."))
+    return paths, ancestors
+
+
 def _write_paths(c: bash.Cmd, edir: Path, repo: Path | None) -> list[tuple[str, Path]]:
     """Ciò che il comando scrive: redirect e comandi di file, e il file di `git config`."""
-    out = [(t, p) for t in bash.write_targets(c) if (p := _abs(c, t)) is not None]
+    out = [(t, p) for t in bash.write_targets(c) for p in _expand(c, t)[0]]
     cfg = bash.git_config_write(c)
     if cfg == "local" and repo is not None:
         try:
@@ -49,7 +103,9 @@ def _write_paths(c: bash.Cmd, edir: Path, repo: Path | None) -> list[tuple[str, 
 
 
 def _removes_protected(ctx, p: Path, repo: Path | None, work) -> bool:
-    """`p` (tolto con rm, rmdir o mv) è, o contiene, un file protetto o la radice del lavoro."""
+    """`p` (tolto con rm, rmdir, mv...) è, o contiene, un file protetto o la radice del lavoro."""
+    if is_protected_path(ctx, p, repo, work):
+        return True
     wt = Path(work["worktree"]).resolve() if work is not None and work["worktree"] else None
     roots = [r for r in (wt, Path(ctx.repo).resolve() if ctx.repo is not None else None) if r]
     if any(_inside(r, p) for r in roots):
@@ -212,8 +268,10 @@ def _check(event, ctx, c: bash.Cmd, raw: str) -> tuple[str, str] | None:
             return "protected", (f"{raw_target}: {p} è un file protetto: lo scrivono solo la CLI "
                                  f"e gli hook di tollgate (7.4)")
     for raw_target in bash.removal_targets(c):
-        p = _abs(c, raw_target)
-        if p is not None and _removes_protected(ctx, p, git.toplevel(p), governing_work(ctx, p)):
+        found, ancestors = _expand(c, raw_target)
+        candidates = found + (ancestors if bash.removal_recursive(c) else [])
+        if any(_removes_protected(ctx, p, git.toplevel(p), governing_work(ctx, p))
+               for p in candidates):
             return "protected", (f"{raw_target} è, o contiene, un file protetto o la radice del "
                                  f"lavoro: lo tolgono solo la CLI e gli hook di tollgate (7.4)")
     if ctx.bound and ctx.work is not None:

@@ -70,6 +70,21 @@ class EffectsTest(unittest.TestCase):
         self.assertEqual(r.exit, 2)
         self.assertIn("già eseguito alle", r.stderr)
 
+    def intent_state(self):
+        return [r["state"] for r in self.lab.conn.execute(
+            "SELECT state FROM intents WHERE action = 'effect'")]
+
+    def test_pre_does_not_reopen_an_executed_effect(self):
+        eid = self.veto_id("ssh a")
+        approve(self.lab, eid)
+        run(self.lab, "ssh a")
+        self.assertEqual(self.intent_state(), ["executed"])
+        self.assertEqual(self.lab.bash("ssh a").exit, 2)
+        self.assertEqual(self.intent_state(), ["executed"])
+        approve(self.lab, eid)
+        self.assertEqual(self.lab.bash("ssh a").exit, 0)
+        self.assertEqual(self.intent_state(), ["executed"])
+
     def test_post_without_act_consumes_nothing(self):
         self.lab.bash("ssh a", post=True)
         self.assertEqual(self.lab.events("effect_executed"), [])

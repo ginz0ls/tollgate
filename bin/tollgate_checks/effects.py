@@ -78,10 +78,10 @@ def _gate(intents: list[Intent], *, consume: bool):
                 denied = _veto_text(i) if i.act is None else (
                     "la riga ripete lo stesso effetto: un atto vale una esecuzione, lancia i "
                     "comandi separatamente")
-            requests.append(_request(i))
+            requests += [] if i.row is not None else [_request(i)]
             continue
         warn = f" (attenzione: già eseguito alle {i.prev} su questo SHA)" if i.prev else ""
-        allowed += _execute(i) if consume else [_request(i)]
+        allowed += _execute(i) if consume else ([] if i.row is not None else [_request(i)])
         allowed.append(inject(f"tollgate: effetto {i.eid} permesso una volta dall'atto "
                               f"{i.act['act_id']}{warn}"))
     if denied is not None:

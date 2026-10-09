@@ -396,6 +396,10 @@ def hooks_path_override(cmd: Cmd) -> bool:
             if a[i + 1].split("=", 1)[0].lower() == key:
                 return True
             i += 2
+        elif a[i].startswith("-c") and not a[i].startswith("--") and len(a[i]) > 2:
+            if a[i][2:].split("=", 1)[0].lower() == key:
+                return True
+            i += 1
         elif a[i].startswith("--config-env="):
             if a[i].split("=", 2)[1].lower() == key:
                 return True
@@ -607,13 +611,32 @@ def write_targets(cmd: Cmd) -> list[str]:
     return out
 
 
+_REMOVERS = {"rm", "rmdir", "unlink", "mv", "shred"}
+
+
+def _find_parts(args: list[str]) -> tuple[list[str], list[str]]:
+    """Radici di `find` (prima della prima espressione) e resto dell'espressione."""
+    i = 0
+    while i < len(args) and not (args[i].startswith("-") or args[i] in ("(", "!")):
+        i += 1
+    return (args[:i] or ["."]), args[i:]
+
+
+def _find_removes(expr: list[str]) -> bool:
+    if "-delete" in expr:
+        return True
+    return any(x in ("-exec", "-execdir", "-ok", "-okdir") and i + 1 < len(expr)
+               and os.path.basename(expr[i + 1]) in _REMOVERS for i, x in enumerate(expr))
+
+
 def removal_targets(cmd: Cmd) -> list[str]:
-    """Ciò che `rm`, `rmdir` e `mv` (le sorgenti) tolgono dal loro posto."""
+    """Ciò che `rm`, `rmdir`, `unlink`, `git rm`, `mv` (le sorgenti) e `find -delete/-exec rm`
+    (la radice di `find`) tolgono dal loro posto."""
     a = cmd.argv
     if not a:
         return []
     base = os.path.basename(a[0])
-    if base in ("rm", "rmdir"):
+    if base in ("rm", "rmdir", "unlink"):
         return _positional(a[1:])
     if base == "mv":
         pos = _positional(a[1:])
@@ -623,7 +646,30 @@ def removal_targets(cmd: Cmd) -> list[str]:
         if target in pos:
             pos.remove(target)
         return pos
+    if base == "find":
+        roots, expr = _find_parts(a[1:])
+        return roots if _find_removes(expr) else []
+    sub, args, _ = git_call(cmd)
+    if sub == "rm":
+        return _positional(args)
     return []
+
+
+def removal_recursive(cmd: Cmd) -> bool:
+    """La rimozione può portare via intere cartelle (e quindi file protetti sotto di esse)."""
+    a = cmd.argv
+    if not a:
+        return False
+    base = os.path.basename(a[0])
+    flags = "".join(x[1:] for x in a[1:] if x.startswith("-") and not x.startswith("--"))
+    recursive = "r" in flags or "R" in flags or "--recursive" in a
+    if base == "rm":
+        return recursive
+    if base in ("rmdir", "find"):
+        return bool(removal_targets(cmd))
+    sub, args, _ = git_call(cmd)
+    return sub == "rm" and (any(x == "-r" or (x.startswith("-") and not x.startswith("--")
+                                              and "r" in x[1:]) for x in args))
 
 
 def writes(cmd: Cmd) -> bool:

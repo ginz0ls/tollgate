@@ -284,6 +284,32 @@ class FixRound1Test(unittest.TestCase):
         self.assertEqual(bash.removal_targets(one("cp a b")), [])
         self.assertEqual(bash.removal_targets(one("touch a")), [])
 
+    def test_other_removal_commands(self):
+        self.assertEqual(bash.removal_targets(one("git rm -r a b")), ["a", "b"])
+        self.assertEqual(bash.removal_targets(one("git rm --cached -- a")), ["a"])
+        self.assertEqual(bash.removal_targets(one("unlink f")), ["f"])
+        self.assertEqual(bash.removal_targets(one("find . -name '*.pyc' -delete")), ["."])
+        self.assertEqual(bash.removal_targets(one("find a b -type f -delete")), ["a", "b"])
+        self.assertEqual(bash.removal_targets(one("find -delete")), ["."])
+        self.assertEqual(bash.removal_targets(one("find a -exec rm -rf {} +")), ["a"])
+        self.assertEqual(bash.removal_targets(one("find a -execdir mv {} /t \\;")), ["a"])
+        self.assertEqual(bash.removal_targets(one("find a -name x")), [])
+        self.assertEqual(bash.removal_targets(one("find a -exec cat {} \\;")), [])
+        self.assertEqual(bash.removal_targets(one("git status")), [])
+
+    def test_removal_recursive(self):
+        for text in ("rm -rf a", "rm -r a", "rm -R a", "rm --recursive a", "rmdir a",
+                     "find a -delete", "git rm -r a"):
+            with self.subTest(text=text):
+                self.assertTrue(bash.removal_recursive(one(text)))
+        for text in ("rm a", "rm -f a", "mv a b", "unlink a", "git rm a"):
+            with self.subTest(text=text):
+                self.assertFalse(bash.removal_recursive(one(text)))
+
+    def test_compact_c_option_sets_hooks_path(self):
+        self.assertTrue(bash.hooks_path_override(one("git -ccore.hooksPath=/tmp status")))
+        self.assertFalse(bash.hooks_path_override(one("git -cuser.name=x status")))
+
     def test_force_if_includes_alone_is_not_force(self):
         self.assertFalse(bash.push_is_force(one("git push --force-if-includes origin x")))
         self.assertTrue(bash.push_is_force(one("git push --force --force-if-includes origin x")))
