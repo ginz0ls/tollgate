@@ -20,6 +20,11 @@ class BoundSessionTest(unittest.TestCase):
     def code(self, command, **kw):
         return self.lab.bash(command, **kw).exit
 
+    def test_push_other_branch_denied_from_bound_session(self):
+        # Criterio 7: push di un ramo non tg/* da una sessione legata, nel worktree
+        self.assertEqual(self.code("git push origin feature-x"), 2)
+        self.assertEqual(self.code("git push origin HEAD:feature-x"), 2)
+
     def test_push_and_pr_denied(self):
         self.assertEqual(self.code("git push origin tg/7-demo"), 2)
         self.assertEqual(self.code("gh pr create --fill"), 2)

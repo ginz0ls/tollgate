@@ -122,6 +122,10 @@ class BudgetAndSizeTest(Base):
         self.assertEqual(self.stop(text=report(), transcript=str(tr)).exit, 0)
         self.assertEqual(self.task_state(), "blocked")
         self.assertEqual(subagents.get(self.lab.conn, "a1")["state"], "budget")
+        open_blocks = self.lab.conn.execute(
+            "SELECT type FROM blocks WHERE work = ? AND closed IS NULL",
+            (self.lab.work,)).fetchall()
+        self.assertEqual([r[0] for r in open_blocks], ["needs_you"])
 
     def test_size_reason_required_over_max(self):
         sha = self.commit("".join(f"x{i} = {i}\n" for i in range(600)), path="src/big.py")
