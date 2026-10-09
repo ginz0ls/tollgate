@@ -20,14 +20,19 @@ def _work(conn, cwd):
     return work
 
 
-def _root_relative(cwd, file: str, worktree: str) -> str:
-    """Il file si risolve dalla cartella di lancio (come ogni percorso da riga di comando) e
-    si salva relativo alla radice del worktree, con '/' come separatore."""
+def _root_relative(file: str, worktree: str) -> str:
+    """Un percorso relativo si intende relativo alla radice del worktree (come nelle violazioni);
+    uno assoluto si converte. Il risultato, con '/' come separatore, non può uscire dal worktree."""
     root = Path(worktree).resolve()
+    p = Path(file)
+    p = p if p.is_absolute() else root / p
     try:
-        return (Path(cwd) / file).resolve().relative_to(root).as_posix()
+        rel = p.resolve().relative_to(root).as_posix()
     except ValueError as e:
         raise UsageError(f"il file è fuori dal worktree: {file}") from e
+    if rel == ".":
+        raise UsageError(f"indica un file, non la radice del worktree: {file}")
+    return rel
 
 
 def add_waiver(state: State, cwd, *, type_: str, file: str | None = None,
@@ -45,7 +50,7 @@ def add_waiver(state: State, cwd, *, type_: str, file: str | None = None,
     try:
         work = _work(conn, cwd)
         if file is not None:
-            file = _root_relative(cwd, file, work["worktree"])
+            file = _root_relative(file, work["worktree"])
         path = Path(work["worktree"]) / waivers.path_for(work["issue"])
         if path.exists():
             try:

@@ -41,6 +41,7 @@ class WaiverCliTest(unittest.TestCase):
         wf = waivers.parse((self.wt / ".tollgate/waivers/7.toml").read_text())
         self.assertEqual((wf.issue, wf.branch, [w.id for w in wf.waivers]),
                          (7, "tg/7-x", ["w-7-1", "w-7-2"]))
+        self.assertEqual([w.file for w in wf.waivers], ["src/x.py", "tests/t.py"])
         conn = db.open_db(self.ts.state)
         try:
             self.assertEqual(conn.execute("SELECT count(*) FROM events WHERE type="
@@ -59,19 +60,27 @@ class WaiverCliTest(unittest.TestCase):
             waiver_cli.add_waiver(self.ts.state, self.tmp, type_="scope", file="a", choice="c",
                                   why="w", cost="k", now=T0)
 
-    def test_file_is_normalized_relative_to_worktree_root(self):
+    def test_relative_file_is_relative_to_worktree_root(self):
         sub = self.wt / "sub"
         sub.mkdir()
         waiver_cli.add_waiver(self.ts.state, sub, type_="scope", file="x.py", choice="c",
                               why="w", cost="k", now=T0)
         waiver_cli.add_waiver(self.ts.state, self.wt, type_="scope", file="./a", choice="c",
                               why="w", cost="k", now=T0)
-        self.assertEqual([w.file for w in self.stored().waivers], ["sub/x.py", "a"])
+        self.assertEqual([w.file for w in self.stored().waivers], ["x.py", "a"])
+
+    def test_absolute_file_inside_worktree_is_made_relative(self):
+        waiver_cli.add_waiver(self.ts.state, self.wt, type_="scope",
+                              file=str(self.wt / "src" / "y.py"), choice="c", why="w",
+                              cost="k", now=T0)
+        self.assertEqual(self.stored().waivers[0].file, "src/y.py")
 
     def test_file_outside_worktree_is_rejected(self):
-        with self.assertRaises(UsageError):
-            waiver_cli.add_waiver(self.ts.state, self.wt, type_="scope", file="../fuori.py",
-                                  choice="c", why="w", cost="k", now=T0)
+        for bad in ("../fuori.py", str(self.tmp / "fuori.py")):
+            with self.subTest(file=bad), self.assertRaises(UsageError) as cm:
+                waiver_cli.add_waiver(self.ts.state, self.wt, type_="scope", file=bad,
+                                      choice="c", why="w", cost="k", now=T0)
+            self.assertIn("fuori dal worktree", str(cm.exception))
         self.assertFalse((self.wt / ".tollgate/waivers/7.toml").exists())
 
     def test_type_test_requires_test_ids(self):
