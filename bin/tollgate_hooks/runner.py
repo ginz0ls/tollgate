@@ -35,7 +35,7 @@ class HookResult:
     stderr: str = ""
 
 
-class _Timeout(Exception):
+class _Timeout(BaseException):
     pass
 
 
@@ -106,12 +106,14 @@ def run_hook(hook_event: str, stdin_text: str, *, env=None, now=None, plugin_roo
         _set_alarm(20)
     conn = None
     try:
+        if _off_active(state.root, now):
+            return HookResult(0)
         try:
             raw = json.loads(stdin_text)
             event = adapter.to_event(hook_event, raw)
         except (ValueError, TypeError) as e:
             return _fail(control, f"input dell'hook non valido ({e})", state.root)
-        if event is None or _off_active(state.root, now):
+        if event is None:
             return HookResult(0)
         control = event.kind in CONTROL_EVENTS
         if event.kind == "pre_edit" and adapter.edit_path(event) is None:
@@ -161,8 +163,12 @@ def run_hook(hook_event: str, stdin_text: str, *, env=None, now=None, plugin_roo
         denial, rule, injects, records = None, "", [], []
         for b in broken:
             if (b.events is None and control) or (b.events and event.kind in b.events):
-                if denial is None:
-                    denial, rule = f"controllo «{b.name}» non caricato: {b.reason}", b.name
+                msg = f"controllo «{b.name}» non caricato: {b.reason}"
+                if control:
+                    if denial is None:
+                        denial, rule = f"{msg}\n{_footer(state.root)}", b.name
+                else:
+                    injects.append(f"(tollgate: {msg})")
         for m in loaded:
             if event.kind not in m.check["events"]:
                 continue
@@ -174,9 +180,11 @@ def run_hook(hook_event: str, stdin_text: str, *, env=None, now=None, plugin_roo
             except (_Timeout, sqlite3.Error):
                 raise
             except Exception as e:
-                if control and denial is None:
-                    denial, rule = f"controllo «{m.name}» in errore: {e}", m.name
-                elif not control:
+                if control:
+                    if denial is None:
+                        denial, rule = (f"controllo «{m.name}» in errore: {e}\n"
+                                        f"{_footer(state.root)}"), m.name
+                else:
                     injects.append(f"(tollgate: controllo «{m.name}» in errore: {e})")
                 continue
             for d in decisions:

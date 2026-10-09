@@ -9,10 +9,34 @@ from pathlib import Path
 
 from tests.hookkit import DEFAULT_TOML, SESSION, Lab, sample
 from tests.helpers import ROOT, TempState
+from tollgate_core import db
 from tollgate_hooks import adapter, registry, runner
 from tollgate_hooks.model import Event, deny, inject, record
 
 FAKE = {
+    "rotto.py": '''
+CHECK = {"api": 2, "events": ["post_bash", "subagent_start"], "component": None, "order": 3}
+def decide(event, ctx):
+    return []
+''',
+    "ev.py": '''
+CHECK = {"api": 1, "events": [["x"]], "component": None, "order": 3}
+def decide(event, ctx):
+    return []
+''',
+    "boom.py": '''
+CHECK = {"api": 1, "events": ["pre_agent", "post_agent"], "component": None, "order": 2}
+def decide(event, ctx):
+    if event.tool_input.get("boom"):
+        raise ValueError("scoppiato")
+    if event.tool_input.get("ingoia"):
+        import time
+        try:
+            time.sleep(5)
+        except Exception:
+            pass
+    return []
+''',
     "sub.py": '''
 CHECK = {"api": 1, "events": ["subagent_stop", "subagent_handback", "prompt_submit"],
          "component": None, "order": 1}
@@ -146,6 +170,49 @@ class RunnerTest(unittest.TestCase):
                                          tool_input={"file_path": str(self.lab.wt / "x")}))
         self.assertEqual(r.exit, 2)
         self.assertIn("due", r.stderr)
+        self.assertIn(str(db.BIN_PATH), r.stderr)
+        self.assertIn(str(self.lab.ts.dir / "OFF"), r.stderr)
+
+    def test_broken_module_on_informative_events_warns_and_exits_0(self):
+        for name in ("PostToolUse-Bash", "SubagentStart-none"):
+            with self.subTest(name=name):
+                r = self.run_with(self.lab._base(name, None, None, tool_input={"command": "ls"},
+                                                 tool_response={}))
+                self.assertEqual((r.exit, r.stderr), (0, ""))
+                ctx = json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"]
+                self.assertIn("rotto", ctx)
+        self.assertEqual(self.lab.events("veto"), [])
+
+    def test_module_error_control_denies_with_footer_informative_warns(self):
+        p = self.lab._base("PreToolUse-Agent", None, None, tool_input={"boom": 1})
+        r = self.run_with(p)
+        self.assertEqual(r.exit, 2)
+        self.assertIn("scoppiato", r.stderr)
+        self.assertIn(str(db.BIN_PATH), r.stderr)
+        self.assertIn(str(self.lab.ts.dir / "OFF"), r.stderr)
+        p = self.lab._base("PostToolUse-Agent", None, None, tool_input={"boom": 1},
+                           tool_response={})
+        r = self.run_with(p)
+        self.assertEqual((r.exit, r.stderr), (0, ""))
+        self.assertIn("scoppiato", r.stdout)
+
+    def test_registry_isolates_non_string_events(self):
+        loaded, broken = self.checks
+        self.assertIn("ev", [b.name for b in broken])
+        self.assertIn("uno", [m.name for m in loaded])
+
+    def test_timeout_is_not_swallowed_by_module(self):
+        lab = Lab(toml=DEFAULT_TOML + "[hooks]\ntimeout_s = 1\n")
+        try:
+            p = lab._base("PreToolUse-Agent", None, None, tool_input={"ingoia": 1})
+            t0 = time.monotonic()
+            r = runner.run_hook("PreToolUse", json.dumps(p), env=lab.ts.env(), now=lab.now,
+                                plugin_root=ROOT, checks=self.checks, alarm=True)
+            self.assertEqual(r.exit, 2)
+            self.assertIn("scadenza", r.stderr)
+            self.assertLess(time.monotonic() - t0, 4)
+        finally:
+            lab.close()
 
     def test_component_off_skips_module(self):
         toml = DEFAULT_TOML + "[components]\nscope_check = false\n"
@@ -170,6 +237,7 @@ class RunnerTest(unittest.TestCase):
         r = runner.run_hook("PreToolUse", "{rotto", env=self.lab.ts.env(), plugin_root=ROOT)
         self.assertEqual(r.exit, 2)
         self.assertIn("touch", r.stderr)
+        self.assertIn(str(db.BIN_PATH), r.stderr)
         r = runner.run_hook("PostToolUse", "{rotto", env=self.lab.ts.env(), plugin_root=ROOT)
         self.assertEqual(r.exit, 0)
 
@@ -201,6 +269,11 @@ class RunnerTest(unittest.TestCase):
         r = self.run_with(self.lab._base("PreToolUse-Bash", None, None,
                                          tool_input={"command": "echo vietato"}))
         self.assertEqual((r.exit, self.lab.events("veto")), (0, before))
+
+    def test_off_wins_over_malformed_input(self):
+        (self.lab.ts.dir / "OFF").write_text("")
+        r = runner.run_hook("PreToolUse", "{rotto", env=self.lab.ts.env(), plugin_root=ROOT)
+        self.assertEqual((r.exit, r.stderr), (0, ""))
 
     def test_off_does_not_open_db(self):
         ts = TempState()
@@ -236,6 +309,7 @@ class RunnerTest(unittest.TestCase):
             r = runner.run_hook("PreToolUse", json.dumps(p), env=lab.ts.env(), now=lab.now,
                                 plugin_root=ROOT, checks=self.checks, alarm=True)
             self.assertEqual(r.exit, 2)
+            self.assertIn("scadenza", r.stderr)
             self.assertLess(time.monotonic() - t0, 4)
         finally:
             lab.close()

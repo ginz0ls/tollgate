@@ -30,7 +30,8 @@ def _validate(check) -> str | None:
     if check.get("api") != API:
         return f"api {check.get('api')!r}, questa versione di tollgate carica api {API}"
     events = check.get("events")
-    if not isinstance(events, list) or not events or not set(events) <= set(INPUT_EVENTS):
+    if not isinstance(events, list) or not events or not all(isinstance(e, str) for e in events) \
+            or not set(events) <= set(INPUT_EVENTS):
         return f"eventi non validi: {events!r}"
     if not isinstance(check.get("order"), int):
         return "order mancante"
