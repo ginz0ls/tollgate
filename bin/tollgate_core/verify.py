@@ -1,12 +1,15 @@
 """tollgate verify (spec 8.1): comandi del gate su HEAD, ambiente ripulito, ricevute."""
 from __future__ import annotations
 
+import contextlib
 import os
 import shlex
+import signal
+import sqlite3
 import subprocess
 import time
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from tollgate_analysis import profiles as prof
 from tollgate_analysis.junit import Junit, JunitError, parse_junit
@@ -32,7 +35,15 @@ def _report_for(report, name: str) -> str:
 
 
 def _report_path(spec: str) -> str | None:
-    return spec.split(":", 1)[1] if spec.startswith("junit:") else (spec or None)
+    """Percorso del report relativo al worktree. Assoluto o con `..` è rifiutato, prima di ogni unlink."""
+    rel = spec.split(":", 1)[1] if spec.startswith("junit:") else spec
+    if not rel:
+        return None
+    path = PurePosixPath(rel)
+    if path.is_absolute() or ".." in path.parts:
+        raise ConfigError(f"report {rel!r} non valido: deve essere un percorso relativo al "
+                          f"worktree, senza '..'")
+    return rel
 
 
 def gate_commands(cfg: Config, files) -> list[CommandSpec]:
@@ -62,7 +73,9 @@ def receipt_state(*, exit_code: int, report_configured: bool, junit: Junit | Non
 
 
 def clean_env(env_allow, environ) -> dict:
-    return {k: environ[k] for k in env_allow if k in environ}
+    # le variabili di test TOLLGATE_* non arrivano mai al comando, nemmeno se in env_allow
+    return {k: environ[k] for k in env_allow
+            if k in environ and not k.startswith("TOLLGATE_")}
 
 
 def counts_green(state: str, exit_code: int, allow_no_tests: bool) -> bool:
@@ -79,14 +92,25 @@ def _run_one(spec: CommandSpec, *, root: Path, files: list[str], env: dict, time
         report.unlink(missing_ok=True)
     log = log_dir / f"{tag}-{spec.name.replace(':', '_')}.log"
     t0 = time.monotonic()
-    try:
-        with open(log, "wb") as fh:
-            exit_code = subprocess.run(["/bin/sh", "-c", resolved], cwd=root, env=env,
-                                       stdout=fh, stderr=subprocess.STDOUT,
-                                       timeout=timeout_s).returncode
-    except subprocess.TimeoutExpired:
-        exit_code = TIMEOUT_EXIT
+    timed_out = False
+    with open(log, "wb") as fh:
+        # sessione propria: al timeout si uccide l'intero gruppo, figli in background compresi
+        proc = subprocess.Popen(["/bin/sh", "-c", resolved], cwd=root, env=env,
+                                stdin=subprocess.DEVNULL, stdout=fh, stderr=subprocess.STDOUT,
+                                start_new_session=True)
+        try:
+            proc.communicate(timeout=timeout_s)
+            exit_code = proc.returncode
+        except subprocess.TimeoutExpired:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(proc.pid, signal.SIGKILL)
+            proc.wait()
+            exit_code = TIMEOUT_EXIT
+            timed_out = True
     duration = time.monotonic() - t0
+    if timed_out:
+        with open(log, "a", encoding="utf-8") as fh:
+            fh.write(f"\n[tollgate] timeout dopo {timeout_s} s\n")
     junit = None
     if report is not None and report.is_file():
         try:
@@ -101,12 +125,14 @@ def _run_one(spec: CommandSpec, *, root: Path, files: list[str], env: dict, time
 
 def run_verify(state: State, cwd, *, related: bool = False, now=None,
                environ=None) -> tuple[int, list[str]]:
-    """Esegue i comandi e registra le ricevute. Un errore di git diventa uscita 1, mai un'eccezione."""
+    """Esegue i comandi e registra le ricevute. Errori di git o del DB diventano uscita 1."""
     environ = os.environ if environ is None else environ
     try:
         return _verify(state, cwd, related=related, now=now, environ=environ)
     except git.GitError as e:
         return 1, [f"tollgate verify: {e}"]
+    except sqlite3.Error as e:
+        return 1, [f"tollgate verify: errore del database: {e}"]
 
 
 def _verify(state, cwd, *, related: bool, now, environ) -> tuple[int, list[str]]:
@@ -134,6 +160,17 @@ def _verify(state, cwd, *, related: bool, now, environ) -> tuple[int, list[str]]
         files = [c.path for c in git.changes(root, base, head=sha) if c.status != "D"]
         allow = cfg.get("project.allow_no_tests")
         cmds = cfg.get("commands")
+        # decisione 12: --related esegue test_related sui file cambiati; se non trova test
+        # ripiega sul gate completo (8.1)
+        use_related = related and bool(files) and bool(cmds["test_related"])
+        related_spec = CommandSpec("related", cmds["test_related"], cmds["report_related"])
+        gate = gate_commands(cfg, files)
+        # i percorsi dei report si validano prima di eseguire o cancellare alcunché
+        try:
+            for spec in ([related_spec] if use_related else []) + gate:
+                _report_path(spec.report)
+        except ConfigError as e:
+            return 1, [f"tollgate verify: {e}"]
         env = clean_env(cfg.get("commands.env_allow"), environ)
         timeout_s = cfg.get("commands.timeout_s")
         now = now or clock.now()
@@ -160,20 +197,21 @@ def _verify(state, cwd, *, related: bool, now, environ) -> tuple[int, list[str]]
                          log=str(log), produced_by="verify", state=st, now=now)
             good = counts_green(st, exit_code, allow)
             run = f", {junit.total - junit.skipped} test" if junit else ""
-            return st, good, f"{spec.name}: {st} (uscita {exit_code}{run}; log {log})"
+            line = f"{spec.name}: {st} (uscita {exit_code}{run}; log {log})"
+            if st == "uncounted" and not good:
+                line += ("; uncounted: il comando è uscito 0 senza report, quindi non conta i test;"
+                         " con allow_no_tests = false il verdetto è rosso")
+            return st, good, line
 
         lines: list[str] = []
-        # decisione 12: --related esegue test_related sui file cambiati; se non trova test
-        # ripiega sul gate completo (8.1). Un esito diverso da «nessun test» è il verdetto.
-        if related and files and cmds["test_related"]:
-            st, good, line = execute(CommandSpec("related", cmds["test_related"],
-                                                 cmds["report_related"]))
+        if use_related:
+            st, good, line = execute(related_spec)
             lines.append(line)
             if st != "empty":
                 return (0 if good else 1), lines
             lines.append("nessun test correlato: si esegue il gate completo")
         all_ok = True
-        for spec in gate_commands(cfg, files):
+        for spec in gate:
             st, good, line = execute(spec)
             all_ok = all_ok and good
             lines.append(line)

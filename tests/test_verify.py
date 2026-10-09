@@ -1,6 +1,11 @@
+import contextlib
+import io
+import os
 import shutil
+import sqlite3
 import tempfile
 import textwrap
+import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -188,6 +193,158 @@ class VerifyRunTest(unittest.TestCase):
                                             environ={"PATH": "/usr/bin:/bin"})
         self.assertEqual(code, 1)
         self.assertIn("timeout", " ".join(lines))
+
+    # --- Fix round 1 ---
+
+    def _env(self, text):
+        """Ambiente con una configurazione di prova (TOLLGATE_TEST_CONFIG, solo con la sentinella)."""
+        p = self.tmp / "cfg.toml"
+        p.write_text(text)
+        return {"PATH": "/usr/bin:/bin", "TOLLGATE_TEST_CONFIG": str(p)}
+
+    def _cfg(self, verify_cmd, timeout_s=5, extra=""):
+        return textwrap.dedent(f'''
+            schema_version = 1
+            [gate]
+            mode = "protected"
+            [commands]
+            verify = {verify_cmd!r}
+            gate = ["verify"]
+            report = "junit:reports/junit.xml"
+            env_allow = ["PATH"]
+            timeout_s = {timeout_s}
+            {extra}
+        ''')
+
+    def test_timeout_kills_the_whole_process_group(self):
+        # un figlio in background non deve sopravvivere al timeout (SIGKILL al gruppo)
+        sentinel = self.tmp / "sentinella"
+        env = self._env(self._cfg(f'(sleep 2; touch "{sentinel}") & sleep 7', timeout_s=1))
+        code, lines = verify.run_verify(self.ts.state, self.wt, now=T0, environ=env)
+        time.sleep(3)
+        self.assertEqual(code, 1, lines)
+        self.assertFalse(sentinel.exists(), "il figlio è sopravvissuto al timeout")
+        r = self._receipts()[0]
+        self.assertEqual((r["state"], r["exit"]), ("red", 124))
+
+    def test_timeout_is_written_to_log(self):
+        env = self._env(self._cfg("sleep 7", timeout_s=1))
+        verify.run_verify(self.ts.state, self.wt, now=T0, environ=env)
+        log = Path(self._receipts()[0]["log"]).read_text()
+        self.assertIn("[tollgate] timeout dopo 1 s", log)
+
+    def test_stdin_is_devnull(self):
+        # con stdin chiuso `read` fallisce subito (uscita 7) invece di attendere
+        # stdin del processo: una pipe aperta senza dati, come un terminale che non risponde
+        env = self._env(self._cfg("if read x; then exit 0; else exit 7; fi", timeout_s=5))
+        r, w = os.pipe()
+        saved = os.dup(0)
+        try:
+            os.dup2(r, 0)
+            code, _ = verify.run_verify(self.ts.state, self.wt, now=T0, environ=env)
+        finally:
+            os.dup2(saved, 0)
+            for fd in (saved, r, w):
+                os.close(fd)
+        self.assertEqual(code, 1)
+        self.assertEqual(self._receipts()[0]["exit"], 7)
+
+    def test_clean_env_never_passes_tollgate_vars(self):
+        self.assertEqual(
+            verify.clean_env(["PATH", "TOLLGATE_STATE", "TOLLGATE_TEST_CONFIG"],
+                             {"PATH": "/bin", "TOLLGATE_STATE": "x",
+                              "TOLLGATE_TEST_CONFIG": "y"}),
+            {"PATH": "/bin"})
+
+    def test_report_outside_worktree_is_refused(self):
+        outside = self.tmp / "fuori.xml"
+        outside.write_text("<testsuite><testcase name='a'/></testsuite>")
+        for rel in (str(outside), "../fuori.xml"):
+            with self.subTest(report=rel):
+                env = self._env(textwrap.dedent(f'''
+                    schema_version = 1
+                    [gate]
+                    mode = "protected"
+                    [commands]
+                    verify = "true"
+                    gate = ["verify"]
+                    report = "junit:{rel}"
+                '''))
+                code, lines = verify.run_verify(self.ts.state, self.wt, now=T0, environ=env)
+                self.assertEqual(code, 1)
+                self.assertIn("report", " ".join(lines))
+                self.assertTrue(outside.exists(), "un file fuori dal worktree è stato cancellato")
+                self.assertEqual(self._receipts(), [])
+
+    def test_uncounted_related_explains_the_red_verdict(self):
+        self._commit_src()
+        env = self._env(textwrap.dedent('''
+            schema_version = 1
+            [gate]
+            mode = "protected"
+            [commands]
+            verify = "sh check.sh"
+            test_related = "true {files}"
+            gate = ["verify"]
+            report = "junit:reports/junit.xml"
+            env_allow = ["PATH"]
+        '''))
+        code, lines = verify.run_verify(self.ts.state, self.wt, related=True, now=T0,
+                                        environ=env)
+        self.assertEqual(code, 1)
+        text = " ".join(lines)
+        self.assertIn("uncounted", text)
+        self.assertIn("allow_no_tests", text)
+        self.assertIn("rosso", text)
+
+    def test_failing_command_without_report_is_red(self):
+        env = self._env(self._cfg("exit 3"))
+        code, _ = verify.run_verify(self.ts.state, self.wt, now=T0, environ=env)
+        self.assertEqual(code, 1)
+        r = self._receipts()[0]
+        self.assertEqual((r["state"], r["exit"]), ("red", 3))
+
+    def test_work_none_leaves_work_null(self):
+        # esecuzione dal checkout principale, fuori dal worktree di un lavoro
+        code, lines = verify.run_verify(self.ts.state, self.main, now=T0,
+                                        environ={"PATH": "/usr/bin:/bin"})
+        self.assertEqual(code, 0, lines)
+        r = self._receipts()[0]
+        self.assertIsNone(r["work"])
+        self.assertEqual(r["state"], "green")
+
+    def test_config_error_is_exit_1(self):
+        env = self._env("schema_version = 99\n")
+        code, lines = verify.run_verify(self.ts.state, self.wt, now=T0, environ=env)
+        self.assertEqual(code, 1)
+        self.assertIn("schema_version", " ".join(lines))
+        self.assertEqual(self._receipts(), [])
+
+    def test_sqlite_error_is_reported_not_raised(self):
+        with mock.patch("tollgate_core.receipts.add",
+                        side_effect=sqlite3.OperationalError("disk I/O error")):
+            code, lines = verify.run_verify(self.ts.state, self.wt, now=T0,
+                                            environ={"PATH": "/usr/bin:/bin"})
+        self.assertEqual(code, 1)
+        self.assertIn("database", " ".join(lines))
+
+
+class VerifyCliTest(unittest.TestCase):
+    def test_sqlite_error_in_cli_is_exit_1_without_traceback(self):
+        from tollgate_core import cli
+        ts = TempState()
+        try:
+            err = io.StringIO()
+            with mock.patch.dict(os.environ, {"TOLLGATE_STATE": str(ts.dir)}), \
+                    mock.patch("tollgate_core.verify.run_verify",
+                               side_effect=sqlite3.OperationalError("disk I/O error")), \
+                    contextlib.redirect_stderr(err):
+                code = cli.main(["verify"])
+            self.assertEqual(code, 1)
+            self.assertIn("tollgate:", err.getvalue())
+            self.assertNotIn("Traceback", err.getvalue())
+        finally:
+            ts.cleanup()
 
 
 if __name__ == "__main__":

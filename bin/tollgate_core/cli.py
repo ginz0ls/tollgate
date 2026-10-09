@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -148,5 +149,8 @@ def main(argv: list[str]) -> int:
             conn.close()
     except (db.DbError, UsageError) as e:
         print(f"tollgate: {e}", file=sys.stderr)
+        return 1
+    except sqlite3.Error as e:
+        print(f"tollgate: errore del database: {e}", file=sys.stderr)
         return 1
     return 0
