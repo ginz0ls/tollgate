@@ -112,6 +112,8 @@ class Ctx:
         home = Path(os.path.expanduser("~"))
         roots = [self.state.root.resolve(), (home / ".claude" / "plugins").resolve(),
                  home / ".claude" / "settings.json", home / ".claude" / "settings.local.json"]
+        # Anche con la cartella personale raggiunta da un collegamento (forma risolta).
+        roots += [home.resolve() / ".claude" / n for n in ("settings.json", "settings.local.json")]
         if repo is not None:
             try:
                 common = git.common_dir(repo)

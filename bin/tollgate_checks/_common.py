@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import posixpath
 import re
 from pathlib import Path
@@ -24,14 +25,45 @@ def _inside(p, root) -> bool:
     return p == root or root in p.parents
 
 
-def edit_target(event) -> Path | None:
-    """Percorso assoluto e risolto (collegamenti compresi) che Edit o Write toccherebbe.
-    Si decide sul percorso vero: un collegamento nel worktree non aggira scope né protezioni."""
+def edit_lexical(event) -> Path | None:
+    """Il percorso di Edit o Write come scritto, normalizzato ma senza risolvere i collegamenti."""
     raw = edit_path(event)
     if not raw:
         return None
-    p = Path(raw)
-    return (p if p.is_absolute() else event.cwd / p).resolve()
+    return Path(os.path.normpath(os.path.join(event.cwd, raw)))
+
+
+def edit_target(event) -> Path | None:
+    """Percorso assoluto e risolto (collegamenti compresi) che Edit o Write toccherebbe.
+    Si decide sul percorso vero: un collegamento nel worktree non aggira scope né protezioni;
+    i file protetti si valutano anche sul percorso non risolto (`is_protected_path`)."""
+    p = edit_lexical(event)
+    return p.resolve() if p is not None else None
+
+
+def path_forms(p) -> list[Path]:
+    """Le forme in cui un percorso può raggiungere un file: quella lessicale, quella risolta e
+    le intermedie (i primi i componenti risolti, il resto come scritto). Una protezione per
+    nome (`.claude/settings.json`) vale su una qualunque di esse: collegamenti a file, a
+    cartelle o a monte della radice del repo non la aggirano."""
+    lex = Path(os.path.normpath(p))
+    parts = lex.parts
+    forms = [lex]
+    for i in range(1, len(parts) + 1):
+        f = Path(*parts[:i]).resolve().joinpath(*parts[i:])
+        if f not in forms:
+            forms.append(f)
+    return forms
+
+
+def _repo_roots_along(forms) -> list[Path]:
+    """Cartelle con un `.git` lungo il percorso (senza lanciare git): radici candidate."""
+    out = []
+    for f in forms:
+        for a in f.parents:
+            if (a / ".git").exists() and a not in out:
+                out.append(a)
+    return out
 
 
 def output_excludes(ctx) -> list[str]:
@@ -76,17 +108,23 @@ def in_main_checkout(p: Path, wt: Path) -> bool:
 def is_protected_path(ctx, p: Path, repo, work) -> bool:
     """Protetto se lo dice una qualunque radice pertinente: il repo più vicino (può essere
     annidato), il worktree del lavoro e il repo del contesto. Così un `git init` in una
-    cartella protetta non sposta la radice e non aggira la regola."""
+    cartella protetta non sposta la radice e non aggira la regola. `p` si valuta in tutte le
+    sue forme (`path_forms`): va passato il percorso lessicale, non solo quello risolto."""
+    forms = path_forms(p)
     roots = []
     for r in (repo, Path(work["worktree"]) if work is not None and work["worktree"] else None,
-              ctx.repo):
+              ctx.repo, *_repo_roots_along(forms)):
         r = Path(r).resolve() if r is not None else None
         if r is not None and r not in roots:
             roots.append(r)
     if not roots:
         roots = [None]
-    return any(is_protected(ctx.rel(p, r) if r else None, p, abs_roots=ctx.protected_roots(r))
-               for r in roots)
+    for f in forms:
+        for r in roots:
+            rel = f.relative_to(r).as_posix() if r is not None and _inside(f, r) else None
+            if is_protected(rel, f, abs_roots=ctx.protected_roots(r)):
+                return True
+    return False
 
 
 def is_docs_md(rel: str | None) -> bool:

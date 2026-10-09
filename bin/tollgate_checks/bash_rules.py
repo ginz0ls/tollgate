@@ -17,7 +17,7 @@ from tollgate_core import git
 from tollgate_hooks.model import deny
 
 from ._common import (_inside, governing_work, in_main_checkout, is_docs_md, is_protected_path,
-                      orphan_tg, output_excludes, repo_key_of)
+                      orphan_tg, output_excludes, path_forms, repo_key_of)
 
 CHECK = {"api": 1, "events": ["pre_bash"], "component": None, "order": 20}
 _SUBST = "_TG_SUBST_"
@@ -30,10 +30,12 @@ _PROBES = [pat.replace("**", "x").replace("*", "x").lstrip("/") for pat in REPO_
 
 
 def _abs(c: bash.Cmd, target: str) -> Path | None:
-    """Percorso assoluto e risolto di un bersaglio (None per il segnaposto delle sostituzioni)."""
+    """Percorso assoluto e normalizzato di un bersaglio, con i collegamenti NON risolti: la
+    protezione per nome li valuta tutti (`path_forms`). None per il segnaposto delle
+    sostituzioni."""
     if _SUBST in target:
         return None
-    return Path(os.path.normpath(os.path.join(c.cwd, os.path.expanduser(target)))).resolve()
+    return Path(os.path.normpath(os.path.join(c.cwd, os.path.expanduser(target))))
 
 
 _GLOB_CHARS = "*?["
@@ -82,7 +84,7 @@ def _expand(c: bash.Cmd, raw: str) -> tuple[list[Path], list[Path]]:
             continue
         pattern = os.path.join(glob.escape(c.cwd), os.path.expanduser(t))
         found = glob.iglob(pattern, recursive=True, include_hidden=True)
-        paths += [Path(m).resolve() for m in itertools.islice(found, _GLOB_CAP)]
+        paths += [Path(os.path.normpath(m)) for m in itertools.islice(found, _GLOB_CAP)]
         first = min(i for i, ch in enumerate(t) if ch in _GLOB_CHARS)
         ancestors.append(_abs(c, t[:first][:t[:first].rfind("/") + 1] or "."))
     return paths, ancestors
@@ -102,8 +104,14 @@ def _write_paths(c: bash.Cmd, edir: Path, repo: Path | None) -> list[tuple[str, 
     return out
 
 
-def _removes_protected(ctx, p: Path, repo: Path | None, work) -> bool:
-    """`p` (tolto con rm, rmdir, mv...) è, o contiene, un file protetto o la radice del lavoro."""
+def _removes_protected(ctx, p: Path) -> bool:
+    """`p` (tolto con rm, rmdir, mv...) è, o contiene, un file protetto o la radice del lavoro,
+    in una qualunque delle sue forme (collegamenti compresi)."""
+    return any(_removes_protected_form(ctx, f, git.toplevel(f), governing_work(ctx, f))
+               for f in path_forms(p))
+
+
+def _removes_protected_form(ctx, p: Path, repo: Path | None, work) -> bool:
     if is_protected_path(ctx, p, repo, work):
         return True
     wt = Path(work["worktree"]).resolve() if work is not None and work["worktree"] else None
@@ -267,11 +275,11 @@ def _check(event, ctx, c: bash.Cmd, raw: str) -> tuple[str, str] | None:
         if is_protected_path(ctx, p, git.toplevel(p), governing_work(ctx, p)):
             return "protected", (f"{raw_target}: {p} è un file protetto: lo scrivono solo la CLI "
                                  f"e gli hook di tollgate (7.4)")
+    paths = [(r, p.resolve()) for r, p in paths]
     for raw_target in bash.removal_targets(c):
         found, ancestors = _expand(c, raw_target)
         candidates = found + (ancestors if bash.removal_recursive(c) else [])
-        if any(_removes_protected(ctx, p, git.toplevel(p), governing_work(ctx, p))
-               for p in candidates):
+        if any(_removes_protected(ctx, p) for p in candidates):
             return "protected", (f"{raw_target} è, o contiene, un file protetto o la radice del "
                                  f"lavoro: lo tolgono solo la CLI e gli hook di tollgate (7.4)")
     if ctx.bound and ctx.work is not None:

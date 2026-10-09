@@ -8,7 +8,7 @@ from tollgate_analysis.waivers import unresolved
 from tollgate_core import git
 from tollgate_hooks.model import deny
 
-from ._common import (edit_target, explain, governing_work, in_main_checkout, is_docs_md,
+from ._common import (edit_lexical, edit_target, explain, governing_work, in_main_checkout, is_docs_md,
                       is_protected_path, locked_docs, orphan_tg, scope_exempt)
 
 CHECK = {"api": 1, "events": ["pre_edit"], "component": None, "order": 20}
@@ -23,7 +23,7 @@ def decide(event, ctx):
     repo = git.toplevel(p)
     rel = ctx.rel(p, repo) if repo else None
     work = governing_work(ctx, p)
-    if is_protected_path(ctx, p, repo, work):
+    if is_protected_path(ctx, edit_lexical(event), repo, work):
         return [deny(f"{p} è un file protetto: lo scrivono solo la CLI e gli hook di tollgate "
                      f"(7.4)", rule="protected")]
     if ctx.bound and ctx.work is not None:
