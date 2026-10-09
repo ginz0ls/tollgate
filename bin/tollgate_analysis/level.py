@@ -28,6 +28,14 @@ def sensitive_in(paths, sensitive_paths) -> list[str]:
 
 def diff_level(changes, *, diff_bytes: int, sensitive_paths, l0_max_files: int,
                l0_max_lines: int, l0_max_bytes: int) -> str:
+    """Livello dal diff. Contratto (decisione 18):
+    - `changes`: una voce per file, inclusi i file non tracciati (untracked), che il diff
+      della base non mostra;
+    - `diff_bytes`: lunghezza del diff unificato dalla base più la dimensione dei file nuovi
+      non tracciati, in byte.
+    Un percorso sensibile dà sempre L2; sopra una soglia L0 (file, righe o byte) o un file
+    binario dà L1.
+    """
     changes = list(changes)
     paths = [c.path for c in changes] + [c.old_path for c in changes if c.old_path]
     if sensitive_in(paths, sensitive_paths):
