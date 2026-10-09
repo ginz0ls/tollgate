@@ -1,7 +1,9 @@
 """DB SQLite nella cartella di stato (spec 12.1, 12.2, 12.4)."""
 from __future__ import annotations
 
+import os
 import re
+import secrets
 import shutil
 import sqlite3
 import time
@@ -225,22 +227,26 @@ def backup(conn: sqlite3.Connection, state: State, reason: str) -> Path:
     ensure_dirs(state)
     tag = re.sub(r"[^a-z0-9-]+", "-", reason.lower()).strip("-") or "copia"
     stamp = clock.now().strftime("%Y%m%dT%H%M%S%fZ")
-    dst_path = state.backup_dir / f"tollgate-{stamp}-{tag}.db"
-    n = 1
-    while dst_path.exists():
-        dst_path = state.backup_dir / f"tollgate-{stamp}-{n}-{tag}.db"
-        n += 1
-    tmp_path = dst_path.with_name(".tmp-" + dst_path.name)
+    # Il nome temporaneo è unico per processo: due copie nello stesso istante non condividono il
+    # file. La pubblicazione con os.link non sovrascrive mai la copia di un altro processo.
+    tmp_path = state.backup_dir / f".tmp-{os.getpid()}-{secrets.token_hex(4)}-{tag}.db"
     dst = sqlite3.connect(tmp_path)
     try:
         try:
             conn.backup(dst)
         finally:
             dst.close()
-        tmp_path.replace(dst_path)
-    except BaseException:
+        dst_path = state.backup_dir / f"tollgate-{stamp}-{tag}.db"
+        n = 0
+        while True:
+            try:
+                os.link(tmp_path, dst_path)
+                break
+            except FileExistsError:
+                n += 1
+                dst_path = state.backup_dir / f"tollgate-{stamp}-{n}-{tag}.db"
+    finally:
         tmp_path.unlink(missing_ok=True)
-        raise
     for old in sorted(state.backup_dir.glob("tollgate-*.db"))[:-KEEP_BACKUPS]:
         old.unlink(missing_ok=True)
     return dst_path
