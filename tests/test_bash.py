@@ -170,5 +170,99 @@ class EffectsTest(unittest.TestCase):
         self.assertIsNone(bash.script_path(one("ls -la")))
 
 
+def pushes_forced(text):
+    return [c for c in cmds(text) if bash.push_is_force(c)]
+
+
+class FixRound1Test(unittest.TestCase):
+    """Giro di correzione 1 del controller."""
+
+    COMMIT_HEREDOC = "git commit -m \"$(cat <<'EOF'\nmsg\nEOF\n)\""
+
+    def test_commit_with_heredoc_in_substitution_parses(self):
+        out = cmds(self.COMMIT_HEREDOC)
+        self.assertTrue(any(bash.is_commit(c) for c in out))
+
+    def test_commit_heredoc_then_forced_push_is_seen(self):
+        out = cmds(self.COMMIT_HEREDOC + " && git push --force")
+        pushes = [c for c in out if bash.push_is_force(c)]
+        self.assertTrue(pushes)
+        self.assertFalse(pushes[0].nested)
+        self.assertTrue(any(bash.is_commit(c) for c in out))
+
+    def test_quoted_heredoc_body_is_data_not_command(self):
+        out = cmds("cat <<'EOF'\n$(git push -f origin x)\nEOF\necho ok")
+        self.assertFalse(any(bash.push_is_force(c) for c in out))
+        self.assertEqual([c.argv[0] for c in out], ["cat", "echo"])
+
+    def test_punctuation_tokens_are_split(self):
+        for text in ["(true);git push -f", "true&&(git push -f)", "true;(git push -f)",
+                     "(git status)&&git push -f", "echo $(date); git push -f",
+                     "echo $(date)&& git push -f", "echo $(( 1 + 2 )); git push -f"]:
+            with self.subTest(text=text):
+                self.assertTrue(pushes_forced(text))
+
+    def test_wrapper_options_with_argument(self):
+        for text in ["sudo -u bob git push -f", "env -u X git push -f", "env -C /d git push -f"]:
+            with self.subTest(text=text):
+                c = one(text)
+                self.assertEqual(c.argv[:2], ["git", "push"])
+                self.assertTrue(bash.push_is_force(c))
+
+    def test_leading_keywords_are_dropped(self):
+        for text in ["if true; then git push -f; fi", "for i in a; do git push -f; done",
+                     "{ git push -f; }", "! git push -f"]:
+            with self.subTest(text=text):
+                self.assertTrue(pushes_forced(text))
+
+    def test_short_flag_cluster_contains_f(self):
+        self.assertTrue(bash.push_is_force(one("git push -fu origin x")))
+        self.assertTrue(bash.push_is_force(one("git push -uf origin x")))
+        self.assertFalse(bash.push_is_force(one("git push -u origin x")))
+
+    def test_gh_and_curl_flags(self):
+        for text in ["gh api -XPOST x", "gh api x -XDELETE", "curl --request=POST u",
+                     "gh -R o/r pr create", "gh --repo o/r pr merge"]:
+            with self.subTest(text=text):
+                self.assertIsNotNone(bash.effect_reason(one(text), bash.EffectsCfg()))
+        self.assertIsNone(bash.effect_reason(one("gh -R o/r pr view 3"), bash.EffectsCfg()))
+
+    def test_shell_receiving_heredoc_falls_back(self):
+        for text in ["bash <<EOF\ngit push -f\nEOF", "cat <<EOF | bash\ngit push -f\nEOF"]:
+            with self.subTest(text=text):
+                with self.assertRaises(bash.BashParseError):
+                    cmds(text)
+                self.assertEqual(bash.text_danger(text), "git push")
+
+    def test_text_danger_options_between(self):
+        self.assertEqual(bash.text_danger("git reset -q --hard"), "reset --hard")
+        self.assertIsNotNone(bash.text_danger("git commit -an -m x"))
+        self.assertIsNotNone(bash.text_danger("git commit -n -m x"))
+
+    def test_write_targets_perl_and_cp_target_dir(self):
+        self.assertEqual(bash.write_targets(one("perl -pi -e 's/a/b/' f")), ["f"])
+        self.assertEqual(bash.write_targets(one("sed -i -e 's/a/b/' f")), ["f"])
+        self.assertEqual(bash.write_targets(one("cp -t dir a b")), ["dir"])
+
+    def test_extra_mutating_git_subcommands(self):
+        for text in ["git update-ref refs/x abc", "git config user.name x", "git remote add o u",
+                     "git filter-branch --all", "git symbolic-ref HEAD refs/heads/x",
+                     "git submodule update", "git gc"]:
+            with self.subTest(text=text):
+                self.assertTrue(bash.writes(one(text)))
+        for text in ["git config --get user.name", "git config --list", "git status"]:
+            with self.subTest(text=text):
+                self.assertFalse(bash.writes(one(text)))
+
+    def test_command_patterns_cross_slash_and_allow_applies(self):
+        cfg = bash.EffectsCfg(commands=["./scripts/deploy.sh *"])
+        self.assertIsNotNone(bash.effect_reason(one("./scripts/deploy.sh a"), cfg))
+        cfg = bash.EffectsCfg(commands=["deploy https://h/*"], allow=["deploy https://h/ok*"])
+        self.assertIsNone(bash.effect_reason(one("deploy https://h/ok1"), cfg))
+        self.assertIsNotNone(bash.effect_reason(one("deploy https://h/x"), cfg))
+        cfg = bash.EffectsCfg(allow=["kubectl get *"])
+        self.assertIsNone(bash.effect_reason(one("kubectl get pods/x"), cfg))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -2,12 +2,11 @@
 Best effort: ciò che sfugge lo prende PostToolUse Bash (spec 7.2)."""
 from __future__ import annotations
 
+import fnmatch
 import os
 import re
 import shlex
 from dataclasses import dataclass, field
-
-from . import globs
 
 
 class BashParseError(ValueError):
@@ -24,32 +23,153 @@ class Cmd:
 
 
 _OPS = {";", "&&", "||", "|", "&", "|&", ";;", "(", ")"}
+_OPS_RE = re.compile(r"&&|\|\||\|&|;;|[;&|()]")
 _REDIR_OUT = {">", ">>", ">|", "&>", "&>>"}
 _REDIR_SKIP = {"<", "<<<", "<&", ">&", "<>"}
+_KEYWORDS = {"if", "then", "else", "elif", "do", "while", "until", "{", "!", "time"}
 _WRAPPERS = {"sudo", "nohup", "time", "command", "exec", "nice", "env", "xargs", "timeout",
              "stdbuf", "builtin"}
+# Opzioni che prendono un argomento separato, per ciascun wrapper (`sudo -u bob git ...`).
+_WRAP_ARGS = {
+    "sudo": {"-u", "-g", "-C", "-h", "-p", "-r", "-t", "-U", "-T", "--user", "--group",
+             "--chdir", "--host", "--prompt", "--role", "--type", "--other-user"},
+    "env": {"-u", "-C", "-S", "--unset", "--chdir", "--split-string"},
+    "nice": {"-n", "--adjustment"},
+    "timeout": {"-k", "-s", "--kill-after", "--signal"},
+    "xargs": {"-I", "-n", "-P", "-L", "-d", "-E", "-s", "-a", "--max-args", "--max-procs",
+              "--delimiter", "--arg-file", "--max-lines"},
+    "stdbuf": {"-i", "-o", "-e"},
+    "time": {"-f", "-o"},
+    "exec": {"-a"},
+}
 _SHELLS = {"bash", "sh", "zsh", "dash", "ksh"}
 _ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-# `<<` di heredoc, non `<<<` (here-string) né `<<<` dentro altri operatori.
-_HEREDOC = re.compile(r"(?<!<)<<(?!<)-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
-_SUBST = re.compile(r"\$\(([^()]*)\)|`([^`]*)`")
+# `<<` di heredoc, non `<<<` (here-string).
+_HEREDOC_AT = re.compile(r"(?<!<)<<(?!<)-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
+_SHELL_LINE = re.compile(r"(?:^|[\s;&|(])(?:bash|sh|zsh|dash|ksh)(?=[\s;&|)]|$)")
 
 
-def _strip_heredocs(text: str) -> str:
-    lines = text.split("\n")
-    out, i = [], 0
-    while i < len(lines):
-        line = lines[i]
-        out.append(line)
-        i += 1
-        for m in _HEREDOC.finditer(line):
-            delim = m.group(2)
-            while i < len(lines) and lines[i].strip() != delim:
-                i += 1
-            if i >= len(lines):
+def _skip_heredoc_bodies(text: str, start: int, delims: list[str]) -> int:
+    """Indice dopo le righe di corpo di ogni heredoc in attesa, a partire da `start`."""
+    i = start
+    for delim in delims:
+        while True:
+            nl = text.find("\n", i)
+            end = nl if nl >= 0 else len(text)
+            line = text[i:end]
+            i = end + 1
+            if line.strip() == delim:
+                break
+            if nl < 0:
                 raise BashParseError(f"heredoc senza delimitatore '{delim}'")
+    return i
+
+
+def _balanced(text: str, i: int) -> tuple[str, int]:
+    """Contenuto di `$(` che inizia prima di `i`, e indice dopo la `)` di chiusura.
+    Salta virgolette e corpi di heredoc, così le parentesi dentro di loro non contano."""
+    depth, pending, n, start = 1, [], len(text), i
+    while i < n:
+        c = text[i]
+        if c == "\\":
+            i += 2
+            continue
+        if c == "'":
+            j = text.find("'", i + 1)
+            if j < 0:
+                raise BashParseError("virgolette non chiuse")
+            i = j + 1
+            continue
+        if c == '"':
+            j = i + 1
+            while j < n and text[j] != '"':
+                j += 2 if text[j] == "\\" else 1
+            if j >= n:
+                raise BashParseError("virgolette non chiuse")
+            i = j + 1
+            continue
+        if c == "<" and not text.startswith("<<<", i):
+            m = _HEREDOC_AT.match(text, i)
+            if m:
+                pending.append(m.group(2))
+                i = m.end()
+                continue
+        if c == "\n":
+            i = _skip_heredoc_bodies(text, i + 1, pending) if pending else i + 1
+            pending = []
+            continue
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return text[start:i], i + 1
+        i += 1
+    raise BashParseError("sostituzione $(...) non chiusa")
+
+
+def _split(text: str) -> tuple[str, list[str]]:
+    """Testo esterno (con `$(...)` sostituito da SUBST e corpi di heredoc tolti) e
+    contenuti delle sostituzioni, da analizzare a parte."""
+    out: list[str] = []
+    inners: list[str] = []
+    pending: list[str] = []
+    in_dq = False
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == "\\":
+            out.append(text[i:i + 2])
+            i += 2
+            continue
+        if c == "'" and not in_dq:
+            j = text.find("'", i + 1)
+            if j < 0:
+                raise BashParseError("virgolette non chiuse")
+            out.append(text[i:j + 1])
+            i = j + 1
+            continue
+        if c == '"':
+            in_dq = not in_dq
+            out.append(c)
             i += 1
-    return "\n".join(out)
+            continue
+        if c == "`":
+            j = text.find("`", i + 1)
+            if j < 0:
+                raise BashParseError("backtick non chiuso")
+            inners.append(text[i + 1:j])
+            out.append(" SUBST ")
+            i = j + 1
+            continue
+        if text.startswith("$(", i):
+            inner, end = _balanced(text, i + 2)
+            inners.append(inner)
+            out.append(" SUBST ")
+            i = end
+            continue
+        if c == "<" and not in_dq and not text.startswith("<<<", i):
+            m = _HEREDOC_AT.match(text, i)
+            if m:
+                line_start = text.rfind("\n", 0, i) + 1
+                line_end = text.find("\n", i)
+                line = text[line_start:line_end if line_end >= 0 else n]
+                if _SHELL_LINE.search(line):
+                    raise BashParseError("heredoc verso una shell: il corpo non si legge")
+                pending.append(m.group(2))
+                out.append(m.group(0))
+                i = m.end()
+                continue
+        if c == "\n":
+            out.append("\n")
+            i = _skip_heredoc_bodies(text, i + 1, pending) if pending else i + 1
+            pending = []
+            continue
+        out.append(c)
+        i += 1
+    if in_dq:
+        raise BashParseError("virgolette non chiuse")
+    return "".join(out), inners
 
 
 def _norm(cwd: str, path: str) -> str:
@@ -58,13 +178,28 @@ def _norm(cwd: str, path: str) -> str:
 
 def _unwrap(argv: list[str], env: dict) -> list[str]:
     while argv and os.path.basename(argv[0]) in _WRAPPERS:
+        name = os.path.basename(argv[0])
+        takes = _WRAP_ARGS.get(name, set())
         argv = argv[1:]
-        while argv and (argv[0].startswith("-") or _ASSIGN.match(argv[0])
-                        or argv[0].replace(".", "", 1).isdigit()):
-            if _ASSIGN.match(argv[0]):
-                k, _, v = argv[0].partition("=")
+        while argv:
+            x = argv[0]
+            if x == "--":
+                argv = argv[1:]
+                break
+            if _ASSIGN.match(x):
+                k, _, v = x.partition("=")
                 env[k] = v
-            argv = argv[1:]
+                argv = argv[1:]
+                continue
+            if x.startswith("-") and len(x) > 1:
+                argv = argv[1:]
+                if x in takes and argv:
+                    argv = argv[1:]
+                continue
+            if name == "timeout" and x.replace(".", "", 1).isdigit():
+                argv = argv[1:]
+                continue
+            break
     return argv
 
 
@@ -85,19 +220,28 @@ def _shell_command(argv: list[str]) -> str | None:
     return None
 
 
+def _ops(tokens):
+    """shlex fonde la punteggiatura (`);`, `)&&`, `&&(`): la spezza negli operatori noti.
+    I token con redirezioni (`>&`, `&>`) restano interi."""
+    for t in tokens:
+        if t and set(t) <= set(";&|()<>") and not any(ch in "<>" for ch in t):
+            yield from _OPS_RE.findall(t)
+        else:
+            yield t
+
+
 def parse(command: str, cwd: str) -> list[Cmd]:
-    text = _strip_heredocs(command.replace("\\\n", " "))
+    outer, inners = _split(command.replace("\\\n", " "))
     extra: list[Cmd] = []
-    for m in _SUBST.finditer(text):
-        inner = m.group(1) if m.group(1) is not None else m.group(2)
+    for inner in inners:
         for c in parse(inner, cwd):
             c.nested = True
             extra.append(c)
-    lex = shlex.shlex(text.replace("\n", " ; "), posix=True, punctuation_chars=True)
+    lex = shlex.shlex(outer.replace("\n", " ; "), posix=True, punctuation_chars=True)
     lex.whitespace_split = True
     lex.commenters = ""
     try:
-        tokens = list(lex)
+        tokens = list(_ops(lex))
     except ValueError as e:
         raise BashParseError(str(e)) from e
     out: list[Cmd] = []
@@ -131,6 +275,8 @@ def parse(command: str, cwd: str) -> list[Cmd]:
             else:
                 argv.append(t)
             i += 1
+        while argv and argv[0] in _KEYWORDS:
+            argv = argv[1:]
         argv = _unwrap(argv, env)
         seg = []
         if not argv and not redirects:
@@ -164,7 +310,12 @@ def parse(command: str, cwd: str) -> list[Cmd]:
 _GIT_OPT_ARG = {"-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
 _GIT_MUTATING = {"add", "commit", "checkout", "switch", "reset", "restore", "rm", "mv", "merge",
                  "rebase", "cherry-pick", "revert", "am", "stash", "apply", "pull", "clean",
-                 "tag", "branch", "worktree", "push"}
+                 "tag", "branch", "worktree", "push", "update-ref", "remote", "filter-branch",
+                 "symbolic-ref", "submodule", "gc"}
+_CONFIG_WRITE = {"--unset", "--unset-all", "--add", "--replace-all", "--rename-section",
+                 "--remove-section"}
+_CONFIG_READ = {"--get", "--get-all", "--get-regexp", "--get-urlmatch", "--list", "-l",
+                "--show-origin", "--show-scope", "--name-only"}
 
 
 def git_call(cmd: Cmd):
@@ -181,6 +332,16 @@ def git_call(cmd: Cmd):
         else:
             i += 1
     return (a[i] if i < len(a) else None), a[i + 1:], c_dir
+
+
+def _is_mutating(sub: str | None, args: list[str]) -> bool:
+    if sub == "config":
+        if any(x in _CONFIG_WRITE for x in args):
+            return True
+        if any(x in _CONFIG_READ for x in args):
+            return False
+        return len(_positional(args)) >= 2  # `git config chiave valore`
+    return sub in _GIT_MUTATING
 
 
 def effective_dir(cmd: Cmd) -> str:
@@ -200,7 +361,10 @@ def push_is_force(cmd: Cmd) -> bool:
     sub, args, _ = git_call(cmd)
     if sub != "push":
         return False
-    if any(x in ("-f", "--mirror") or x.startswith("--force") for x in args):
+    if any(x == "--mirror" or x.startswith("--force") for x in args):
+        return True
+    # `-f` anche nei gruppi corti (`-fu`, `-uf`).
+    if any(x.startswith("-") and not x.startswith("--") and "f" in x[1:] for x in args):
         return True
     return any(x.startswith("+") for x in _positional(args)[1:])
 
@@ -276,30 +440,79 @@ def destructive(cmd: Cmd) -> str | None:
     return None
 
 
+def _inplace(args: list[str]) -> bool:
+    return any(x == "--in-place" or x.startswith("--in-place=")
+               or (x.startswith("-") and not x.startswith("--") and "i" in x[1:])
+               for x in args)
+
+
+def _inplace_files(args: list[str]) -> list[str]:
+    """File modificati da sed/perl -i: le posizionali, senza il programma se non è dato con -e/-f."""
+    files: list[str] = []
+    code = False
+    i = 0
+    while i < len(args):
+        x = args[i]
+        if x in ("-e", "--expression", "-f", "--file"):
+            code = True
+            i += 2
+            continue
+        if x.startswith(("--expression=", "--file=")):
+            code = True
+            i += 1
+            continue
+        if x.startswith("-") and x != "-":
+            i += 1
+            continue
+        files.append(x)
+        i += 1
+    if not code and files:
+        files = files[1:]
+    return files
+
+
+def _target_dir(args: list[str]) -> str | None:
+    """Directory di `cp/mv/install -t dir` (anche `-tdir` e `--target-directory=dir`)."""
+    for i, x in enumerate(args):
+        if x in ("-t", "--target-directory") and i + 1 < len(args):
+            return args[i + 1]
+        if x.startswith("--target-directory="):
+            return x.split("=", 1)[1]
+        if x.startswith("-t") and not x.startswith("--") and len(x) > 2:
+            return x[2:]
+    return None
+
+
 def write_targets(cmd: Cmd) -> list[str]:
     a = cmd.argv
     out = list(cmd.redirects)
     if not a:
         return out
     base = os.path.basename(a[0])
-    pos = _positional(a[1:])
+    args = a[1:]
+    pos = _positional(args)
     if base == "tee":
         out += pos
-    elif base in ("sed", "perl") and any(x == "-i" or x.startswith("-i") or x == "--in-place"
-                                          for x in a[1:]):
-        has_e = any(x in ("-e", "--expression") for x in a[1:])
-        out += pos if has_e else pos[1:]
-    elif base in ("cp", "mv", "install", "ln") and len(pos) >= 2:
-        out.append(pos[-1])
-    elif base in ("rm", "touch", "mkdir", "rmdir", "truncate", "chmod", "chown"):
-        out += pos[1:] if base in ("chmod", "chown") else pos
+    elif base in ("sed", "perl") and _inplace(args):
+        out += _inplace_files(args)
+    elif base in ("cp", "mv", "install", "ln"):
+        target = _target_dir(args)
+        if target is not None:
+            out.append(target)
+        elif len(pos) >= 2:
+            out.append(pos[-1])
+    elif base in ("rm", "touch", "mkdir", "rmdir", "truncate"):
+        out += pos
+    elif base in ("chmod", "chown"):
+        out += pos[1:]
     elif base == "dd":
-        out += [x[3:] for x in a[1:] if x.startswith("of=")]
+        out += [x[3:] for x in args if x.startswith("of=")]
     return out
 
 
 def writes(cmd: Cmd) -> bool:
-    return bool(write_targets(cmd)) or git_call(cmd)[0] in _GIT_MUTATING
+    sub, args, _ = git_call(cmd)
+    return bool(write_targets(cmd)) or _is_mutating(sub, args)
 
 
 def is_claude(cmd: Cmd) -> bool:
@@ -379,6 +592,7 @@ _GH_WRITE = {("pr", "create"), ("pr", "edit"), ("pr", "review"), ("pr", "close")
              ("pr", "merge"), ("workflow", "run"), ("issue", "edit"), ("issue", "close"),
              ("issue", "create")}
 _GH_WRITE_ANY = {"release", "secret", "project"}
+_GH_GLOBAL_ARG = {"-R", "--repo", "--hostname"}
 
 
 def normalized(cmd: Cmd) -> str:
@@ -386,7 +600,8 @@ def normalized(cmd: Cmd) -> str:
 
 
 def _matches(patterns, text: str) -> bool:
-    return any(text == p or text.startswith(p + " ") or globs.match(p, text)
+    # Per i comandi `*` attraversa `/` (fnmatch), come da decisione del controller.
+    return any(text == p or text.startswith(p + " ") or fnmatch.fnmatchcase(text, p)
                for p in patterns)
 
 
@@ -395,6 +610,8 @@ def _curl_write(a: list[str]) -> bool:
         if x in ("-X", "--request") and i + 1 < len(a) and a[i + 1].upper() != "GET":
             return True
         if x.startswith("-X") and len(x) > 2 and x[2:].upper() != "GET":
+            return True
+        if x.startswith("--request=") and x.split("=", 1)[1].upper() != "GET":
             return True
         if x in ("-d", "-F", "-T", "--json", "--form", "--upload-file") or \
                 x.startswith(("--data", "--form", "-d")):
@@ -411,6 +628,24 @@ def _wget_write(a: list[str]) -> bool:
     return False
 
 
+def _gh_args(a: list[str]) -> list[str]:
+    """`gh` senza i flag globali (`-R o/r`, `--repo=o/r`) che precedono o seguono il sottocomando."""
+    out: list[str] = []
+    i = 1
+    while i < len(a):
+        x = a[i]
+        if x in _GH_GLOBAL_ARG:
+            i += 2
+            continue
+        if x.startswith(("--repo=", "--hostname=")) or (
+                x.startswith("-R") and len(x) > 2 and not x.startswith("--")):
+            i += 1
+            continue
+        out.append(x)
+        i += 1
+    return ["gh"] + out
+
+
 def _gh_write(a: list[str]) -> bool:
     if len(a) < 2:
         return False
@@ -422,6 +657,8 @@ def _gh_write(a: list[str]) -> bool:
         rest = a[2:]
         for i, x in enumerate(rest):
             if x in ("-X", "--method") and i + 1 < len(rest) and rest[i + 1].upper() != "GET":
+                return True
+            if x.startswith("-X") and len(x) > 2 and x[2:].upper() != "GET":
                 return True
             if x.startswith("--method=") and x.split("=", 1)[1].upper() != "GET":
                 return True
@@ -460,7 +697,7 @@ def effect_reason(cmd: Cmd, cfg: EffectsCfg) -> str | None:
         return "curl con metodo diverso da GET o con dati"
     if base == "wget" and _wget_write(a[1:]):
         return "wget con metodo diverso da GET o con dati"
-    if base == "gh" and _gh_write(a):
+    if base == "gh" and _gh_write(_gh_args(a)):
         return "gh in scrittura"
     return None
 
@@ -488,8 +725,9 @@ def script_path(cmd: Cmd) -> str | None:
 _TEXT_DANGER = [
     (re.compile(r"\bgit\b[^;&|]*\bpush\b"), "git push"),
     (re.compile(r"--force\b"), "--force"),
-    (re.compile(r"\breset\s+--hard\b"), "reset --hard"),
+    (re.compile(r"\breset\b[^;&|]*--hard\b"), "reset --hard"),
     (re.compile(r"--no-verify\b"), "--no-verify"),
+    (re.compile(r"\bcommit\b[^;&|]*\s-[a-zA-Z]*n[a-zA-Z]*\b"), "--no-verify"),
     (re.compile(r"TOLLGATE_"), "TOLLGATE_"),
     (re.compile(r"(^|[\s;&|(])claude(\s|$)"), "claude"),
 ]
