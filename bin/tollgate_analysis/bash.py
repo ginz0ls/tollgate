@@ -317,6 +317,9 @@ _GIT_MUTATING = {"add", "commit", "checkout", "switch", "reset", "restore", "rm"
                  "rebase", "cherry-pick", "revert", "am", "stash", "apply", "pull", "clean",
                  "tag", "branch", "worktree", "push", "update-ref", "remote", "filter-branch",
                  "symbolic-ref", "submodule", "gc"}
+# Git ignora un alias che ha il nome di un comando integrato: non si espande mai.
+_GIT_BUILTIN = _GIT_MUTATING | {"status", "log", "diff", "show", "config", "rev-parse",
+                                          "ls-files"}
 _CONFIG_WRITE = {"--unset", "--unset-all", "--add", "--replace-all", "--rename-section",
                  "--remove-section"}
 _CONFIG_READ = {"--get", "--get-all", "--get-regexp", "--get-urlmatch", "--list", "-l",
@@ -358,7 +361,7 @@ def _git_split(a: list[str]):
 
     def note(kv: str):
         key, _, value = kv.partition("=")
-        if key.lower().startswith("alias."):
+        if key.lower().startswith("alias.") and key[6:].lower() not in _GIT_BUILTIN:
             aliases[key[6:].lower()] = value
 
     while i < len(a) and a[i].startswith("-"):

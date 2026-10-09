@@ -459,6 +459,20 @@ class AbbreviationAndAliasTest(unittest.TestCase):
                          "git reset --hard")
         self.assertTrue(bash.is_push(one("git -c alias.a=b -c alias.b=push a origin x")))
 
+    def test_alias_shadowing_a_builtin_is_ignored(self):
+        # Git ignora gli alias che coprono un comando integrato: il push parte davvero.
+        c = one("git -c alias.push=status push origin main")
+        self.assertTrue(bash.is_push(c))
+        self.assertEqual(bash.push_targets(c), ["main"])
+        c = one("git -c alias.commit=status commit --no-verify -m x")
+        self.assertEqual(bash.destructive(c), "--no-verify")
+        c = one("git -c alias.reset=status reset --hard")
+        self.assertEqual(bash.destructive(c), "git reset --hard")
+        c = one("git -c alias.PUSH=status push origin main")
+        self.assertTrue(bash.is_push(c))
+        self.assertIsNone(bash.shell_alias_command(one("git -c 'alias.push=!echo' push")))
+        self.assertTrue(bash.is_push(one("git -c alias.p=push p origin main")))
+
     def test_shell_alias_is_parsed_as_shell(self):
         out = cmds("git -c 'alias.p=!git push -f' p origin x")
         self.assertTrue(any(bash.push_is_force(c) and c.nested for c in out))

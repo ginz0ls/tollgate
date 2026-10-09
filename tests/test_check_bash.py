@@ -83,6 +83,11 @@ class BoundSessionTest(unittest.TestCase):
                     "git -c alias.x='commit --no-verify' x -m y"):
             with self.subTest(cmd=cmd):
                 self.assertEqual(self.code(cmd, agent_id="a1"), 2)
+        for cmd in ("git -c alias.push=status push origin main",
+                    "git -c alias.commit=status commit --no-verify -m x",
+                    "git -c alias.reset=status reset --hard"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.code(cmd, agent_id="a1"), 2)
         self.assertEqual(self.code("git -c user.name=x status", agent_id="a1"), 0)
 
     def test_git_checkout_and_restore_of_protected_files_are_denied(self):
