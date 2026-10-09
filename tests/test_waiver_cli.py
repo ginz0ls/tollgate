@@ -1,10 +1,14 @@
 import shutil
+import subprocess
+import sys
 import tempfile
+import textwrap
+import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-from tests.helpers import TempState, git, make_repo
+from tests.helpers import BIN, TempState, git, make_repo
 from tollgate_analysis import waivers
 from tollgate_core import db, phases, waiver_cli
 from tollgate_core.cli import UsageError
@@ -48,6 +52,34 @@ class WaiverCliTest(unittest.TestCase):
                                           "'waiver_added'").fetchone()[0], 2)
         finally:
             conn.close()
+
+    def test_concurrent_adds_keep_every_waiver(self):
+        # M6: lettura, assegnazione dell'id e scrittura sono una sezione critica.
+        start = time.time() + 1.5
+        code = textwrap.dedent(f"""
+            import sys, time
+            sys.path.insert(0, {str(BIN)!r})
+            from pathlib import Path
+            from tollgate_core import waiver_cli
+            from tollgate_core.paths import resolve_state
+            while time.time() < {start!r}:
+                pass
+            for i in range(6):
+                waiver_cli.add_waiver(resolve_state(), Path({str(self.wt)!r}), type_="scope",
+                                      file=f"src/{{sys.argv[1]}}{{i}}.py", choice="c", why="w",
+                                      cost="k")
+        """)
+        procs = [subprocess.Popen([sys.executable, "-B", "-c", code, tag], env=self.ts.env(),
+                                  stderr=subprocess.PIPE, text=True) for tag in "ab"]
+        for p in procs:
+            _, err = p.communicate(timeout=120)
+            self.assertEqual(p.returncode, 0, err)
+        ids = [w.id for w in self.stored().waivers]
+        self.assertEqual(len(ids), 12)
+        self.assertEqual(len(set(ids)), 12)
+        self.assertEqual(sorted(w.file for w in self.stored().waivers),
+                         sorted(f"src/{t}{i}.py" for t in "ab" for i in range(6)))
+        self.assertEqual([p.name for p in (self.wt / ".tollgate/waivers").glob("*.tmp*")], [])
 
     def test_errors(self):
         with self.assertRaises(UsageError):
