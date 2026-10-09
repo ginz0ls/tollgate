@@ -28,7 +28,7 @@ FAKE_BIN = textwrap.dedent('''\
 ''')
 TOML = 'schema_version = 1\n[gate]\nmode = "protected"\n[hooks]\ntimeout_s = 1\n'
 TOOLS = ["bash", "git", "sed", "tr", "head", "cat", "date", "mkdir", "rm", "mktemp", "sleep",
-         "awk", "dirname", "kill", "env"]
+         "awk", "dirname", "kill", "env", "grep"]
 
 
 class WrapperTest(unittest.TestCase):
@@ -125,6 +125,40 @@ class WrapperTest(unittest.TestCase):
         (self.ts.dir / "bound" / "s1").touch()
         r, _ = self.run_wrapper("PreToolUse", cwd=self.plain, mode="2")
         self.assertEqual(r.returncode, 2)
+
+    def register_active(self, *paths):
+        d = self.ts.dir / "active"
+        d.mkdir(exist_ok=True)
+        (d / "0123456789abcdef").write_text("\n".join(str(p) for p in paths) + "\n")
+
+    def test_active_root_named_in_input_starts_python(self):
+        self.register_active(self.repo)
+        payload = {"hook_event_name": "PreToolUse", "session_id": "s9", "cwd": str(self.plain),
+                   "tool_name": "Bash",
+                   "tool_input": {"command": f"git -C '{self.repo}' push origin main"}}
+        r, _ = self.run_wrapper("PreToolUse", payload, cwd=self.plain, mode="2")
+        self.assertEqual(r.returncode, 2)
+
+    def test_active_root_not_named_never_starts_python(self):
+        self.register_active(self.repo)
+        payload = {"hook_event_name": "PreToolUse", "session_id": "s9", "cwd": str(self.plain),
+                   "tool_name": "Bash", "tool_input": {"command": "ls /tmp"}}
+        r, _ = self.run_wrapper("PreToolUse", payload, cwd=self.plain, mode="2")
+        self.assertEqual((r.returncode, r.stdout), (0, ""))
+
+    def test_active_root_only_matters_for_pre_tool_use(self):
+        self.register_active(self.repo)
+        payload = {"hook_event_name": "PostToolUse", "session_id": "s9", "cwd": str(self.plain),
+                   "tool_name": "Bash", "tool_input": {"command": f"ls '{self.repo}'"}}
+        r, _ = self.run_wrapper("PostToolUse", payload, cwd=self.plain, mode="2")
+        self.assertEqual((r.returncode, r.stdout), (0, ""))
+
+    def test_empty_registry_line_matches_nothing(self):
+        self.register_active("")
+        payload = {"hook_event_name": "PreToolUse", "session_id": "s9", "cwd": str(self.plain),
+                   "tool_name": "Bash", "tool_input": {"command": "ls"}}
+        r, _ = self.run_wrapper("PreToolUse", payload, cwd=self.plain, mode="2")
+        self.assertEqual((r.returncode, r.stdout), (0, ""))
 
     def test_json_str_takes_first_occurrence(self):
         # cwd di primo livello non attivo; un `cwd` annidato in tool_input punterebbe al repo.

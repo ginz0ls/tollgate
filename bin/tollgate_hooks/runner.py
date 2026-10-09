@@ -9,7 +9,8 @@ import traceback
 from dataclasses import dataclass
 from pathlib import Path
 
-from tollgate_core import clock, db, git, offlog, sessions, subagents
+from tollgate_analysis import bash
+from tollgate_core import active, clock, db, git, offlog, sessions, subagents
 from tollgate_core.acts import ActError
 from tollgate_core.config import ConfigError, ConfigNotFound, load_config
 from tollgate_core.phases import TransitionError
@@ -26,6 +27,8 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[2]
 BUDGET = {"session_start": (10, 1500), "subagent_start": (None, 2000)}
 DEFAULT_BUDGET = (None, 1500)
 _CONTROL_HOOKS = {"PreToolUse"}
+# Eventi la cui protezione segue il bersaglio (I1): file per Edit/Write, `-C` o `cd` per Bash.
+_TARGET_KINDS = {"pre_edit", "pre_bash"}
 
 
 @dataclass(frozen=True)
@@ -96,6 +99,36 @@ def _corrupt(e: BaseException) -> bool:
     return code is not None and (code & 0xFF) in (sqlite3.SQLITE_CORRUPT, sqlite3.SQLITE_NOTADB)
 
 
+def _repo_active(repo) -> bool:
+    """`tollgate.toml` sul riferimento predefinito del repo (7.1 punto 3), senza rete."""
+    if repo is None:
+        return False
+    try:
+        ref = git.default_ref(repo)
+        return bool(ref) and git.exists_at(repo, ref, "tollgate.toml")
+    except git.GitError:
+        return False
+
+
+def _target(event) -> tuple[Path, Path] | None:
+    """Repo attivo (e percorso) che l'azione di controllo nomina, dove si ricava: il file di
+    Edit/Write, la directory effettiva (`-C`, `cd`) di ogni comando Bash."""
+    if event.kind == "pre_edit":
+        raw = adapter.edit_path(event)
+        paths = [Path(os.path.normpath(os.path.join(event.cwd, raw)))] if raw else []
+    else:
+        try:
+            cmds = bash.parse(str(event.tool_input.get("command") or ""), str(event.cwd))
+        except bash.BashParseError:
+            return None
+        paths = [Path(bash.effective_dir(c)) for c in cmds if c.argv]
+    for p in paths:
+        repo = git.toplevel(p)
+        if _repo_active(repo):
+            return repo, p
+    return None
+
+
 def run_hook(hook_event: str, stdin_text: str, *, env=None, now=None, plugin_root=None,
              checks=None, alarm: bool = False) -> HookResult:
     env = os.environ if env is None else env
@@ -121,6 +154,13 @@ def run_hook(hook_event: str, stdin_text: str, *, env=None, now=None, plugin_roo
                          state.root)
         cwd_ok = event.cwd.is_dir()
         root = git.toplevel(event.cwd) if cwd_ok else None
+        anchor = event.cwd if cwd_ok else None
+        if event.kind in _TARGET_KINDS and not _repo_active(root):
+            # Il cwd non è in un repo attivo (o non esiste): repo e configurazione vengono dal
+            # bersaglio (I1, M1).
+            target = _target(event)
+            if target is not None:
+                root, anchor = target
         # Senza sessione non c'è segnalino (e `bound/` stessa non è il segnalino di nessuno).
         marked = bool(event.session) and sessions._SAFE.match(event.session) is not None \
             and (state.root / sessions.BOUND_DIR / event.session).exists()
@@ -133,7 +173,7 @@ def run_hook(hook_event: str, stdin_text: str, *, env=None, now=None, plugin_roo
         if event.agent_id and subagents.get(conn, event.agent_id) is not None:
             subagents.touch(conn, event.agent_id, now=now)
         bound = sessions.bound_work(conn, event.session) if event.session else None
-        work = bound or (sessions.work_for_path(conn, event.cwd) if cwd_ok else None)
+        work = bound or (sessions.work_for_path(conn, anchor) if anchor is not None else None)
         if work is not None and work["work_base_sha"] and work["worktree"] \
                 and Path(work["worktree"]).is_dir():
             cfg_repo, ref = Path(work["worktree"]), work["work_base_sha"]
@@ -150,6 +190,7 @@ def run_hook(hook_event: str, stdin_text: str, *, env=None, now=None, plugin_roo
             return HookResult(0)
         except ConfigError as e:
             return _fail(control, f"tollgate.toml non valido: {e}", state.root)
+        active.register(state, root if root is not None else cfg_repo)
         if alarm:
             _set_alarm(config.get("hooks.timeout_s"))
         repo = root
