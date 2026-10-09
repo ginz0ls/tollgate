@@ -17,6 +17,9 @@ FAKE_BIN = textwrap.dedent('''\
     m = os.environ.get("FAKE_MODE", "0")
     if m == "sleep":
         time.sleep(30)
+    if m == "nap":
+        time.sleep(2)
+        m = "0"
     if m == "raise":
         raise RuntimeError("guasto")
     print("OUT")
@@ -59,6 +62,30 @@ class WrapperTest(unittest.TestCase):
                            input=json.dumps(payload), capture_output=True, text=True, env=env,
                            cwd=str(cwd or self.repo), timeout=30)
         return r, time.monotonic() - t0
+
+    def repo_with(self, toml):
+        self.n = getattr(self, "n", 0) + 1
+        repo, _, _ = make_origin_repo(self.tmp / f"r{self.n}", {"a.txt": "a\n"}, toml)
+        return repo
+
+    def proc_alive(self, pattern):
+        return subprocess.run(["pgrep", "-f", pattern], capture_output=True).returncode == 0
+
+    def wait_gone(self, pattern, seconds=3.0):
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            if not self.proc_alive(pattern):
+                return True
+            time.sleep(0.05)
+        return False
+
+    def json_msg(self, r):
+        """stdout dei rami off/on: un solo oggetto JSON con i due campi di UserPromptExpansion."""
+        out = json.loads(r.stdout)
+        hso = out["hookSpecificOutput"]
+        self.assertEqual(hso["hookEventName"], "UserPromptExpansion")
+        self.assertEqual(out["systemMessage"], hso["additionalContext"])
+        return out["systemMessage"]
 
     def off_payload(self, args, cwd=None):
         return {"hook_event_name": "UserPromptExpansion", "session_id": "s1",
@@ -163,7 +190,7 @@ class WrapperTest(unittest.TestCase):
         r, _ = self.run_wrapper("UserPromptExpansion", off, cwd=self.plain)
         self.assertEqual((self.ts.dir / "OFF").read_text(), "")
         self.assertEqual(r.returncode, 0)
-        self.assertNotIn("non è un numero intero", r.stderr)
+        self.assertEqual(self.json_msg(r), "tollgate spento. Per riaccenderlo: /tollgate:on")
         self.assertRegex((self.ts.dir / "off.log").read_text(), r"Z off\n$")
 
     def test_off_hours_with_leading_zero_is_decimal(self):
@@ -172,14 +199,85 @@ class WrapperTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0)
         until = int((self.ts.dir / "OFF").read_text().split("=")[1])
         self.assertLess(abs(until - (now + 8 * 3600)), 60)
-        self.assertIn("spento per 08 ore", r.stderr)
+        self.assertIn("spento per 08 ore", self.json_msg(r))
 
     def test_off_invalid_hours_means_no_expiry_and_warns(self):
         r, _ = self.run_wrapper("UserPromptExpansion", self.off_payload("0.5"), mode="2")
         self.assertEqual(r.returncode, 0)
         self.assertEqual((self.ts.dir / "OFF").read_text(), "")
-        self.assertIn("non è un numero intero di ore", r.stderr)
+        self.assertIn("non è un numero intero di ore (1-9999)", self.json_msg(r))
         self.assertRegex((self.ts.dir / "off.log").read_text(), r"Z off\n$")
+
+    def test_off_and_on_answer_on_stdout_as_json(self):
+        r, _ = self.run_wrapper("UserPromptExpansion", self.off_payload("2"), mode="2")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("spento per 2 ore", self.json_msg(r))
+        self.assertEqual(r.stderr, "")
+        on = dict(self.off_payload(""), command_name="tollgate:on")
+        r, _ = self.run_wrapper("UserPromptExpansion", on)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("acceso", self.json_msg(r))
+
+    def test_off_hours_validation_warns_without_expiry(self):
+        for args in ("0", "0000", "99999999999999999999", "2h", "-1"):
+            with self.subTest(args=args):
+                r, _ = self.run_wrapper("UserPromptExpansion", self.off_payload(args), mode="2")
+                self.assertEqual(r.returncode, 0)
+                self.assertEqual((self.ts.dir / "OFF").read_text(), "")
+                self.assertIn("non è un numero intero di ore (1-9999)", self.json_msg(r))
+                self.run_wrapper("UserPromptExpansion", dict(self.off_payload(""),
+                                                             command_name="tollgate:on"))
+
+    def test_off_hours_range_edges_are_accepted(self):
+        now = int(time.time())
+        for args, hours in (("1", 1), ("9999", 9999)):
+            with self.subTest(args=args):
+                self.run_wrapper("UserPromptExpansion", self.off_payload(args), mode="2")
+                until = int((self.ts.dir / "OFF").read_text().split("=")[1])
+                self.assertLess(abs(until - (now + hours * 3600)), 60)
+                self.run_wrapper("UserPromptExpansion", dict(self.off_payload(""),
+                                                             command_name="tollgate:on"))
+
+    def test_off_message_is_escaped_json(self):
+        args = 'a"b\\c'
+        r, _ = self.run_wrapper("UserPromptExpansion", self.off_payload(args), mode="2")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn('«a"b\\c» non è un numero intero', self.json_msg(r))
+
+    def test_timeout_s_reads_number_ignoring_comment(self):
+        repo = self.repo_with('schema_version = 1\n[hooks]\ntimeout_s = 5 # max 30\n')
+        t0 = time.monotonic()
+        r, _ = self.run_wrapper("PreToolUse", cwd=repo, mode="sleep")
+        self.assertEqual(r.returncode, 2)
+        self.assertLess(time.monotonic() - t0, 15)
+
+    def test_watchdog_is_capped_at_85(self):
+        repo = self.repo_with('schema_version = 1\n[hooks]\ntimeout_s = 900\n')
+        env = self.ts.env()
+        env["FAKE_MODE"] = "nap"
+        payload = {"hook_event_name": "PreToolUse", "session_id": "s1", "cwd": str(repo),
+                   "tool_input": {"command": "ls"}}
+        p = subprocess.Popen([str(self.plugin / "hooks" / "run"), "PreToolUse"],
+                             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, text=True, env=env, cwd=str(repo))
+        p.stdin.write(json.dumps(payload))
+        p.stdin.close()
+        time.sleep(0.5)
+        alive = self.proc_alive("^sleep 87$")
+        p.wait(timeout=30)
+        self.assertTrue(alive)
+        self.assertFalse(self.proc_alive("^sleep 902$"))
+
+    def test_watchdog_sleep_dies_with_fast_hook(self):
+        repo = self.repo_with('schema_version = 1\n[hooks]\ntimeout_s = 37\n')
+        r, _ = self.run_wrapper("PreToolUse", cwd=repo, mode="0")
+        self.assertEqual(r.returncode, 0)
+        self.assertTrue(self.wait_gone("^sleep 39$"))
+
+    def test_fast_hook_closes_pipes_quickly(self):
+        r, elapsed = self.run_wrapper("PreToolUse", mode="0")
+        self.assertEqual(r.returncode, 0)
+        self.assertLess(elapsed, 2)
 
 
 if __name__ == "__main__":
