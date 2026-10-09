@@ -53,6 +53,14 @@ class PreAgentTest(unittest.TestCase):
         self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1", bg=True)).exit, 2)
         self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1")).exit, 0)
 
+    def test_profile_agent_replaces_generic_implementer(self):
+        # Criterio 38: su un task con l'agente di profilo il generico tollgate:implementer è negato.
+        tasks.assign(self.lab.conn, self.lab.work, 1, implementer="tg-7-t1",
+                     agent_type="probe:implementer-frontend", pending="launch", now=self.lab.now)
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1")).exit, 2)
+        self.assertEqual(self.lab.hook(agent_payload(
+            self.lab, "probe:implementer-frontend", "tg-7-t1")).exit, 0)
+
     def test_readonly_always_allowed(self):
         for t in ("tollgate:task-reviewer", "Explore", "probe:reviewer-frontend"):
             self.assertEqual(self.lab.hook(agent_payload(self.lab, t)).exit, 0)

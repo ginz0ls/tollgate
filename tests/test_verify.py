@@ -304,6 +304,17 @@ class VerifyRunTest(unittest.TestCase):
         r = self._receipts()[0]
         self.assertEqual((r["state"], r["exit"]), ("red", 3))
 
+    def test_old_report_is_removed_before_run(self):
+        # Il comando non scrive il report: un report vecchio con test verdi non deve dare green.
+        (self.wt / "reports").mkdir()
+        (self.wt / "reports" / "junit.xml").write_text(
+            '<testsuite><testcase classname="t" name="a"/></testsuite>')
+        code, _ = verify.run_verify(self.ts.state, self.wt, now=T0,
+                                    environ=self._env(self._cfg("exit 0")))
+        self.assertFalse((self.wt / "reports" / "junit.xml").exists())
+        self.assertEqual(code, 1)
+        self.assertEqual(self._receipts()[0]["state"], "red")
+
     def test_work_none_leaves_work_null(self):
         # esecuzione dal checkout principale, fuori dal worktree di un lavoro
         code, lines = verify.run_verify(self.ts.state, self.main, now=T0,

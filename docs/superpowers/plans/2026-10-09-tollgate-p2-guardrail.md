@@ -28,7 +28,7 @@
 
 ## Decisioni di questo piano
 
-Scelte che la spec lascia aperte o che i fatti impongono. Il costo se sbagliate è indicato. Le decisioni 1, 2, 6 e 7 entrano nella revisione 21 della spec (Task 1 e Task 20).
+Scelte che la spec lascia aperte o che i fatti impongono. Il costo se sbagliate è indicato. Le decisioni 1, 2, 4, 5, 6, 7, 9, 10, 11, 13, 15 e 22 entrano nella revisione 21 della spec (Task 1 e Task 20).
 
 1. **Hook di controllo e hook informativi.** Di controllo sono gli hook `PreToolUse` (eventi d'ingresso `pre_edit`, `pre_bash`, `pre_agent`, `pre_send_message`, `pre_mcp`): un errore diventa 2. Informativi tutti gli altri (`SessionStart`, `UserPromptExpansion`, `PostToolUse`, `SubagentStart`, `SubagentStop`): un errore diventa 0 con avviso (spec 7.1 punti 6-7). Anche «Python mancante» (7.1 punto 4) segue questa regola: un `SubagentStop` che esce con 2 per sempre terrebbe vivo il subagente. Costo: un controllo informativo in errore passa in silenzio, come la spec già accetta per `SubagentStop`.
 2. **Eventi d'ingresso in più: `post_agent` e `post_skill`.** La tabella 7.2 (revisione 20) ha le righe `PostToolUse Agent` e `PostToolUse Skill`, ma l'elenco chiuso di 3.2 non ha gli eventi corrispondenti. Si aggiungono. Costo: nessuno, è un allineamento.
@@ -8743,7 +8743,7 @@ git commit -m "tollgate P2: SubagentStop per implementatori e subagenti di sola 
 
 **Files:**
 - Create: `tests/test_criteria_p2.py`
-- Modify: `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 21: decisioni 1, 6, 7, 13, 15, 22 di questo piano)
+- Modify: `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 21: decisioni 1, 2, 4, 5, 6, 7, 9, 10, 11, 13, 15, 22 di questo piano)
 - Modify: `docs/superpowers/plans/2026-10-08-tollgate-nucleo-piano-principale.md` (stato, sezione 3 con i nomi reali di P2, vincoli per P3)
 
 **Interfaces:**

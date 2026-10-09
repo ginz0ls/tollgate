@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest import mock
 
 from tests.helpers import ROOT, git, make_repo
-from tests.hookkit import Lab
+from tests.hookkit import DEFAULT_TOML, Lab
 from tollgate_core import git as core_git, phases
 from tollgate_core.paths import repo_key
 
@@ -462,6 +462,20 @@ class OrphanBashTest(unittest.TestCase):
                     self.assertEqual(lab.bash(cmd).exit, 0)
         finally:
             lab.close()
+
+class DetectModePushTest(unittest.TestCase):
+    """Criterio 34: in `detect` il push sul predefinito è negato a una sessione non legata."""
+
+    def setUp(self):
+        toml = DEFAULT_TOML.replace('mode = "protected"', 'mode = "detect"')
+        self.lab = Lab(bind=False, toml=toml)
+
+    def tearDown(self):
+        self.lab.close()
+
+    def test_push_default_branch_denied_in_detect(self):
+        r = self.lab.bash("git push origin main", cwd=self.lab.main, session_id="altra")
+        self.assertEqual(r.exit, 2)
 
 
 if __name__ == "__main__":

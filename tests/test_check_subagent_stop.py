@@ -6,7 +6,9 @@ from pathlib import Path
 from tests.hookkit import DEFAULT_TOML, SESSION, Lab, sample
 from tests.helpers import git
 from tests.test_check_writes import with_scope
-from tollgate_core import git as tg_git, phases, receipts, subagents, tasks
+from tollgate_analysis import profiles as prof
+from tollgate_core import git as tg_git, phases, receipts, scope, subagents, tasks
+from tollgate_core.config import load_config_text
 
 IMPL = "tollgate:implementer"
 
@@ -294,6 +296,32 @@ class ResumeTest(Base):
         self.assertEqual(subagents.get(self.lab.conn, "a1")["vetoes"], 1)
         self.hook_start("a1", IMPL)
         self.assertEqual(subagents.get(self.lab.conn, "a1")["vetoes"], 0)
+
+
+class WebProfileSkillTest(Base):
+    """Criterio 38: la skill di un profilo arriva al task dal piano e blocca il DONE (6.3)."""
+    toml = DEFAULT_TOML + '[profiles.web]\npaths = ["web/**"]\nskills = ["ui-ux-pro-max"]\n'
+
+    def setUp(self):
+        self.lab = Lab(toml=self.toml)
+        self.lab.wt.joinpath("web").mkdir()
+        skills = prof.task_skills(["web/app.ts"], load_config_text(self.toml).profiles)
+        scope.register_plan(self.lab.conn, self.lab.ts.state, self.lab.work,
+                            plan_path="docs/superpowers/plans/p.md", plan_sha="s",
+                            scope_paths=["web/app.ts"], plan_tasks=[(1, skills)],
+                            advance=False, now=self.lab.now)
+        tasks.task_event(self.lab.conn, self.lab.work, 1, "start", now=self.lab.now)
+        self.start("a1", IMPL, task=1)
+
+    def test_done_without_profile_skill_vetoes(self):
+        self.assertEqual(tasks.get_task(self.lab.conn, self.lab.work, 1)["skills_required"],
+                         '["ui-ux-pro-max"]')
+        self.green(self.commit(path="web/app.ts"))
+        r = self.stop(text=report())
+        self.assertEqual(r.exit, 2)
+        self.assertIn("ui-ux-pro-max", r.stderr)
+        tasks.add_skill_used(self.lab.conn, self.lab.work, 1, "ui-ux-pro-max")
+        self.assertEqual(self.stop(text=report()).exit, 0)
 
 
 if __name__ == "__main__":
