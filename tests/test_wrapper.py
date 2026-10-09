@@ -227,6 +227,22 @@ class WrapperTest(unittest.TestCase):
         self.assertEqual(self.json_msg(r), "tollgate spento. Per riaccenderlo: /tollgate:on")
         self.assertRegex((self.ts.dir / "off.log").read_text(), r"Z off\n$")
 
+    def test_off_hours_with_non_ascii_digits_is_rejected(self):
+        # Triage 13: in una locale UTF-8 `[0-9]` e `10#` potevano accettare cifre non ASCII.
+        for locale in ("it_IT.UTF-8", "C.UTF-8"):
+            with self.subTest(locale=locale):
+                env = self.ts.env()
+                env.update(LC_ALL=locale, FAKE_MODE="0")
+                (self.ts.dir / "OFF").unlink(missing_ok=True)
+                payload = json.dumps(self.off_payload("٣"), ensure_ascii=False)
+                r = subprocess.run([str(self.plugin / "hooks" / "run"), "UserPromptExpansion"],
+                                   input=payload.encode(), capture_output=True, env=env,
+                                   timeout=30)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual((self.ts.dir / "OFF").read_text(), "")
+                self.assertIn("non è un numero intero di ore",
+                              json.loads(r.stdout.decode())["systemMessage"])
+
     def test_off_hours_with_leading_zero_is_decimal(self):
         now = int(time.time())
         r, _ = self.run_wrapper("UserPromptExpansion", self.off_payload("08"), mode="2")

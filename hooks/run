@@ -62,7 +62,11 @@ if [ "$EVENT" = "UserPromptExpansion" ]; then
     mkdir -p "$STATE"
     ARGS="$(json_str command_args)"
     UNTIL=""
-    if [[ "$ARGS" =~ ^[0-9]{1,4}$ ]] && [ "$((10#$ARGS))" -ge 1 ]; then
+    # LC_ALL=C: in una locale UTF-8 cifre non ASCII passerebbero il test e `10#` darebbe un errore
+    # aritmetico che interrompe il ramo off (l'interruttore d'emergenza deve restare solido).
+    HOURS_OK=no
+    ( LC_ALL=C; [[ "$ARGS" =~ ^[0-9]{1,4}$ ]] && [ "$((10#$ARGS))" -ge 1 ] ) 2>/dev/null && HOURS_OK=yes
+    if [ "$HOURS_OK" = yes ]; then
       UNTIL=$(( $(date +%s) + 10#$ARGS * 3600 ))
       printf 'until=%s\n' "$UNTIL" > "$OFF"
       MSG="tollgate spento per $ARGS ore. Per riaccenderlo: /tollgate:on"
