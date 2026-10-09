@@ -539,6 +539,8 @@ L'ambito è quello di 6.6. Le regole sono «best effort».
 | Repo attivo | `git push` verso il ramo predefinito, in entrambe le modalità; `push --force` fuori da `open-pr` e `sync`, `reset --hard`, `--no-verify`, `rm -rf` fuori dal worktree | `deny`. L'hotfix passa da un ramo e da una PR (9.4) |
 | Repo attivo | `claude` e i suoi alias, `TOLLGATE_` nel comando, `tollgate hook`, scrittura sui file protetti | `deny` |
 
+**Forme equivalenti.** Git accetta il prefisso univoco di un'opzione lunga e gli alias definiti con `-c alias.<x>=<valore>`; le regole li leggono come l'originale. Un prefisso di almeno 3 caratteri di `--force`, `--force-with-lease`, `--mirror`, `--no-verify` o `--hard` vale come l'opzione intera (un prefisso ambiguo per git è un errore: viene negato lo stesso). Con `-c alias.<x>=<valore>` il sottocomando `<x>` è il primo token di `<valore>` (con i token seguenti tra gli argomenti); un alias che inizia con `!` è shell e il suo testo si analizza come un comando annidato. Per un comando che la shell non si legge (heredoc non chiuso, virgolette aperte) il ripiego testuale cerca anche `rm -r`, `hooksPath` (senza distinguere maiuscole), `tollgate.toml`, `.tollgate/` e `settings.json` / `settings.local.json`.
+
 **Rimozioni che toccano file protetti.** `rm`, `rmdir`, `mv`, `git rm`, `unlink` e `find -delete` su una cartella che contiene file protetti sono negati, anche quando il file è raggiunto solo da un glob. **`core.hooksPath` è negato a ogni livello di configurazione**, anche con l'opzione compatta `-c`. Vale anche per una sessione non legata.
 
 ### 7.5 `plan-check`

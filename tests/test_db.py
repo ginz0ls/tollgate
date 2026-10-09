@@ -159,7 +159,7 @@ class BackupRaceTest(unittest.TestCase):
         self.t = TempState()
         self.conn = db.open_db(self.t.state)
         self.addCleanup(self.t.cleanup)
-        self.addCleanup(self.conn.close)
+        self.addCleanup(lambda: self.conn.close())
 
     def test_same_instant_same_name_never_overwrites(self):
         # Simula il perdente della corsa: exists() non vede ancora la copia del vincitore.

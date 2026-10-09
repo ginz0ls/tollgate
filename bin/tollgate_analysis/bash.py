@@ -292,6 +292,10 @@ def parse(command: str, cwd: str) -> list[Cmd]:
                 for c in parse(inner, cmd.cwd):
                     c.nested = True
                     out.append(c)
+        elif argv and (alias_shell := shell_alias_command(cmd)) is not None:
+            for c in parse(alias_shell, cmd.cwd):
+                c.nested = True
+                out.append(c)
         elif argv and argv[0] == "eval" and len(argv) > 1:
             for c in parse(" ".join(argv[1:]), cmd.cwd):
                 c.nested = True
@@ -319,20 +323,95 @@ _CONFIG_READ = {"--get", "--get-all", "--get-regexp", "--get-urlmatch", "--list"
                 "--show-origin", "--show-scope", "--name-only"}
 
 
-def git_call(cmd: Cmd):
-    a = cmd.argv
-    if not a or os.path.basename(a[0]) != "git":
-        return None, [], None
-    i, c_dir = 1, None
+# Opzioni lunghe che le regole di 7.4 cercano. Git accetta il prefisso univoco di un'opzione lunga
+# (`--no-verif`, `--har`, `--force-w`): da 3 caratteri in su un prefisso vale l'opzione intera.
+# Un prefisso ambiguo per git è un errore: negarlo non costa nulla.
+_DANGEROUS_LONG = ("force", "force-with-lease", "mirror", "no-verify", "hard")
+_MIN_ABBREV = 3
+
+
+def _canonical_long(arg: str) -> str:
+    if not arg.startswith("--"):
+        return arg
+    name, eq, value = arg[2:].partition("=")
+    if len(name) < _MIN_ABBREV:
+        return arg
+    for opt in _DANGEROUS_LONG:
+        if opt.startswith(name):
+            return f"--{opt}{eq}{value}"
+    return arg
+
+
+def _canonical_args(args: list[str]) -> list[str]:
+    """Le opzioni lunghe abbreviate nella forma intera; dopo `--` si tratta di percorsi."""
+    out = []
+    for i, x in enumerate(args):
+        if x == "--":
+            return out + args[i:]
+        out.append(_canonical_long(x))
+    return out
+
+
+def _git_split(a: list[str]):
+    """argv di git -> (sottocomando, argomenti, directory di -C, alias definiti con -c)."""
+    i, c_dir, aliases = 1, None, {}
+
+    def note(kv: str):
+        key, _, value = kv.partition("=")
+        if key.lower().startswith("alias."):
+            aliases[key[6:].lower()] = value
+
     while i < len(a) and a[i].startswith("-"):
         if a[i] == "-C" and i + 1 < len(a):
             c_dir = a[i + 1]
             i += 2
+        elif a[i] == "-c" and i + 1 < len(a):
+            note(a[i + 1])
+            i += 2
+        elif a[i].startswith("-c") and not a[i].startswith("--") and len(a[i]) > 2:
+            note(a[i][2:])
+            i += 1
         elif a[i] in _GIT_OPT_ARG:
             i += 2
         else:
             i += 1
-    return (a[i] if i < len(a) else None), a[i + 1:], c_dir
+    return (a[i] if i < len(a) else None), a[i + 1:], c_dir, aliases
+
+
+def git_call(cmd: Cmd):
+    """(sottocomando, argomenti, directory di -C). Gli alias di `-c alias.<x>=<valore>` si
+    sostituiscono col loro contenuto (un alias di shell, `!...`, dà il sottocomando `!`: lo legge
+    `shell_alias_command`), le opzioni lunghe pericolose abbreviate si completano."""
+    a = cmd.argv
+    if not a or os.path.basename(a[0]) != "git":
+        return None, [], None
+    sub, args, c_dir, aliases = _git_split(a)
+    seen = set()
+    while sub is not None and sub.lower() in aliases and sub.lower() not in seen:
+        seen.add(sub.lower())
+        value = aliases[sub.lower()]
+        if value.startswith("!"):
+            return "!", _canonical_args(args), c_dir
+        try:
+            toks = shlex.split(value)
+        except ValueError:
+            toks = value.split()
+        if not toks:
+            break
+        sub, args = toks[0], toks[1:] + args
+    return sub, _canonical_args(args), c_dir
+
+
+def shell_alias_command(cmd: Cmd) -> str | None:
+    """Testo shell eseguito da un alias `-c alias.<x>=!<comando>` richiamato da `git <x> ...`."""
+    a = cmd.argv
+    if not a or os.path.basename(a[0]) != "git":
+        return None
+    sub, args, _, aliases = _git_split(a)
+    value = aliases.get(sub.lower()) if sub is not None else None
+    if value is None or not value.startswith("!"):
+        return None
+    return " ".join([value[1:]] + [shlex.quote(x) for x in args])
 
 
 _CONFIG_FILE_OPTS = {"--global", "--system", "--file", "-f", "--blob"}
@@ -891,6 +970,11 @@ _TEXT_DANGER = [
     (re.compile(r"\bcommit\b[^;&|]*\s-[a-zA-Z]*n[a-zA-Z]*\b"), "--no-verify"),
     (re.compile(r"TOLLGATE_"), "TOLLGATE_"),
     (re.compile(r"(^|[\s;&|(])claude(\s|$)"), "claude"),
+    (re.compile(r"rm\s+-[a-zA-Z]*[rR]"), "rm -r"),
+    (re.compile(r"hookspath", re.IGNORECASE), "core.hooksPath"),
+    (re.compile(r"tollgate\.toml"), "tollgate.toml"),
+    (re.compile(r"\.tollgate/"), ".tollgate/"),
+    (re.compile(r"settings(\.local)?\.json"), "settings.json"),
 ]
 
 

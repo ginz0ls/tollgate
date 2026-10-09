@@ -417,3 +417,70 @@ class FixRound2Test(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AbbreviationAndAliasTest(unittest.TestCase):
+    """I3 della revisione finale: git accetta il prefisso univoco di un'opzione lunga e gli
+    alias definiti con `-c`; le regole di 7.4 devono vederli."""
+
+    def test_abbreviated_force_options(self):
+        for opt in ("--forc", "--for", "--force-w", "--force-with", "--force-with-lease=x",
+                    "--mirro", "--mir", "--force-"):
+            with self.subTest(opt=opt):
+                self.assertTrue(bash.push_is_force(one(f"git push {opt} origin x")))
+
+    def test_abbreviated_no_verify_and_hard(self):
+        for opt in ("--no-verif", "--no-ver", "--no-v"):
+            with self.subTest(opt=opt):
+                self.assertEqual(bash.destructive(one(f"git commit {opt} -m x")), "--no-verify")
+        for opt in ("--har", "--hard"):
+            with self.subTest(opt=opt):
+                self.assertEqual(bash.destructive(one(f"git reset {opt} HEAD~1")),
+                                 "git reset --hard")
+
+    def test_short_or_unrelated_options_are_not_dangerous(self):
+        self.assertFalse(bash.push_is_force(one("git push --follow-tags origin x")))
+        self.assertFalse(bash.push_is_force(one("git push --force-if-includes origin x")))
+        self.assertFalse(bash.push_is_force(one("git push --fo origin x")))
+        self.assertIsNone(bash.destructive(one("git commit --no-edit")))
+        self.assertIsNone(bash.destructive(one("git reset --soft HEAD~1")))
+        # dopo `--` ciò che segue è un percorso
+        self.assertIsNone(bash.destructive(one("git checkout -- --har")))
+
+    def test_alias_with_dash_c_replaces_the_subcommand(self):
+        c = one("git -c alias.p=push p origin main")
+        self.assertEqual(bash.git_call(c), ("push", ["origin", "main"], None))
+        self.assertTrue(bash.is_push(c))
+        self.assertEqual(bash.push_targets(c), ["main"])
+        self.assertEqual(bash.branch_change(one("git -c alias.s=switch s main")), "git switch")
+        self.assertTrue(bash.push_is_force(one("git -c 'alias.pf=push --force' pf origin x")))
+        self.assertTrue(bash.push_is_force(one("git -calias.pf=push pf -f origin x")))
+        self.assertEqual(bash.destructive(one("git -c alias.rh='reset --hard' rh")),
+                         "git reset --hard")
+        self.assertTrue(bash.is_push(one("git -c alias.a=b -c alias.b=push a origin x")))
+
+    def test_shell_alias_is_parsed_as_shell(self):
+        out = cmds("git -c 'alias.p=!git push -f' p origin x")
+        self.assertTrue(any(bash.push_is_force(c) and c.nested for c in out))
+        out = cmds("git -c 'alias.z=!rm -rf /tmp/zz' z")
+        self.assertTrue(any(bash.rm_rf_targets(c) for c in out))
+
+    def test_non_alias_subcommands_are_untouched(self):
+        self.assertEqual(bash.git_call(one("git -c user.name=x push origin main"))[0], "push")
+        self.assertEqual(bash.git_call(one("git -c alias.p=push status"))[0], "status")
+
+
+class TextDangerFallbackTest(unittest.TestCase):
+    def test_new_patterns(self):
+        for text, label in (("bash <<EOF\nrm -rf /tmp/x\n", "rm -r"),
+                            ("bash <<EOF\nrm -fR /tmp/x\n", "rm -r"),
+                            ("bash <<EOF\ngit -c core.hooksPath=/x commit\n", "core.hooksPath"),
+                            ("bash <<EOF\ngit -c CORE.HOOKSPATH=/x commit\n", "core.hooksPath"),
+                            ("bash <<EOF\necho x > tollgate.toml\n", "tollgate.toml"),
+                            ("bash <<EOF\necho x > .tollgate/waivers/7.toml\n", ".tollgate/"),
+                            ("bash <<EOF\necho {} > .claude/settings.json\n", "settings.json"),
+                            ("bash <<EOF\necho {} > settings.local.json\n", "settings.json")):
+            with self.subTest(text=text):
+                self.assertEqual(bash.text_danger(text), label)
+        self.assertIsNone(bash.text_danger("bash <<EOF\nls -la\n"))
+        self.assertIsNone(bash.text_danger("bash <<EOF\nrm file.txt\n"))

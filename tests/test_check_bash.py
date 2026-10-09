@@ -75,6 +75,24 @@ class BoundSessionTest(unittest.TestCase):
         self.assertEqual(self.code("echo 'ciao"), 0)
         self.assertEqual(self.code("bash <<EOF\ngit push origin tg/7-demo\nEOF"), 2)
 
+    def test_abbreviated_options_and_aliases_are_denied(self):
+        # I3 della revisione finale: la tabella delle sonde.
+        for cmd in ("git push --force-w origin x", "git commit --no-verif -m x",
+                    "git reset --har HEAD~1", "git -c alias.p=push p origin main",
+                    "git -c alias.s=switch s main", "git -c 'alias.p=!git push -f' p",
+                    "git -c alias.x='commit --no-verify' x -m y"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.code(cmd, agent_id="a1"), 2)
+        self.assertEqual(self.code("git -c user.name=x status", agent_id="a1"), 0)
+
+    def test_unparsable_text_covers_more_dangers(self):
+        for body in ("rm -rf /tmp/x", "git -c core.hooksPath=/x commit -m y",
+                     "echo x > tollgate.toml", "echo x > .tollgate/waivers/7.toml",
+                     "echo {} > .claude/settings.json", "echo {} > settings.local.json"):
+            with self.subTest(body=body):
+                self.assertEqual(self.code(f"bash <<EOF\n{body}\n", agent_id="a1"), 2)
+        self.assertEqual(self.code("bash <<EOF\nls -la\n", agent_id="a1"), 0)
+
     def test_l0_coordinator_writes(self):
         lab = Lab(level="L0")
         try:
