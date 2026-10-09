@@ -23,10 +23,9 @@ class Cmd:
 
 
 _OPS = {";", "&&", "||", "|", "&", "|&", ";;", "(", ")"}
-_OPS_RE = re.compile(r"&&|\|\||\|&|;;|[;&|()]")
 _REDIR_OUT = {">", ">>", ">|", "&>", "&>>"}
 _REDIR_SKIP = {"<", "<<<", "<&", ">&", "<>"}
-_KEYWORDS = {"if", "then", "else", "elif", "do", "while", "until", "{", "!", "time"}
+_KEYWORDS = {"if", "then", "else", "elif", "do", "while", "until", "{", "!"}
 _WRAPPERS = {"sudo", "nohup", "time", "command", "exec", "nice", "env", "xargs", "timeout",
              "stdbuf", "builtin"}
 # Opzioni che prendono un argomento separato, per ciascun wrapper (`sudo -u bob git ...`).
@@ -49,73 +48,63 @@ _HEREDOC_AT = re.compile(r"(?<!<)<<(?!<)-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)
 _SHELL_LINE = re.compile(r"(?:^|[\s;&|(])(?:bash|sh|zsh|dash|ksh)(?=[\s;&|)]|$)")
 
 
-def _skip_heredoc_bodies(text: str, start: int, delims: list[str]) -> int:
-    """Indice dopo le righe di corpo di ogni heredoc in attesa, a partire da `start`."""
+# Segnaposto per `$(...)` e backtick: niente spazi, così `X=$(cmd)` resta un'assegnazione.
+_SUBST_TOKEN = "_TG_SUBST_"
+
+
+def _skip_heredoc_bodies(text: str, start: int, pending: list[tuple[str, bool]],
+                         inners: list[str]) -> int:
+    """Indice dopo i corpi degli heredoc in attesa, a partire da `start`. Il corpo di un
+    heredoc non quotato esegue `$(...)` e i backtick: quelle sostituzioni vanno in `inners`."""
     i = start
-    for delim in delims:
+    for delim, quoted in pending:
+        body_start = i
         while True:
             nl = text.find("\n", i)
             end = nl if nl >= 0 else len(text)
-            line = text[i:end]
-            i = end + 1
-            if line.strip() == delim:
+            if text[i:end].strip() == delim:
+                body = text[body_start:i]
+                i = end + 1
                 break
+            i = end + 1
             if nl < 0:
                 raise BashParseError(f"heredoc senza delimitatore '{delim}'")
+        if not quoted:
+            _collect_subst(body, inners)
     return i
 
 
-def _balanced(text: str, i: int) -> tuple[str, int]:
-    """Contenuto di `$(` che inizia prima di `i`, e indice dopo la `)` di chiusura.
-    Salta virgolette e corpi di heredoc, così le parentesi dentro di loro non contano."""
-    depth, pending, n, start = 1, [], len(text), i
-    while i < n:
-        c = text[i]
-        if c == "\\":
+def _collect_subst(s: str, inners: list[str]) -> None:
+    """Sostituzioni eseguite da un testo non quotato (corpo di heredoc)."""
+    i = 0
+    while i < len(s):
+        if s[i] == "\\":
             i += 2
-            continue
-        if c == "'":
-            j = text.find("'", i + 1)
+        elif s[i] == "`":
+            j = s.find("`", i + 1)
             if j < 0:
-                raise BashParseError("virgolette non chiuse")
+                raise BashParseError("backtick non chiuso")
+            inners.append(s[i + 1:j])
             i = j + 1
-            continue
-        if c == '"':
-            j = i + 1
-            while j < n and text[j] != '"':
-                j += 2 if text[j] == "\\" else 1
-            if j >= n:
-                raise BashParseError("virgolette non chiuse")
-            i = j + 1
-            continue
-        if c == "<" and not text.startswith("<<<", i):
-            m = _HEREDOC_AT.match(text, i)
-            if m:
-                pending.append(m.group(2))
-                i = m.end()
-                continue
-        if c == "\n":
-            i = _skip_heredoc_bodies(text, i + 1, pending) if pending else i + 1
-            pending = []
-            continue
-        if c == "(":
-            depth += 1
-        elif c == ")":
-            depth -= 1
-            if depth == 0:
-                return text[start:i], i + 1
-        i += 1
-    raise BashParseError("sostituzione $(...) non chiusa")
+        elif s.startswith("$(", i):
+            _, _, end = _scan(s, i + 2, True)
+            inners.append(s[i + 2:end - 1])
+            i = end
+        else:
+            i += 1
 
 
-def _split(text: str) -> tuple[str, list[str]]:
-    """Testo esterno (con `$(...)` sostituito da SUBST e corpi di heredoc tolti) e
-    contenuti delle sostituzioni, da analizzare a parte."""
+def _scan(text: str, i: int, nested: bool) -> tuple[str, list[str], int]:
+    """Scansione unica del testo di shell, al livello esterno (`nested=False`) o dentro un
+    `$(...)` (`nested=True`, si ferma alla `)` che lo chiude e ne ritorna l'indice dopo).
+    Ritorna (testo esterno con SEGNAPOSTO al posto delle sostituzioni e senza corpi di
+    heredoc, sostituzioni da analizzare a parte, indice finale)."""
     out: list[str] = []
     inners: list[str] = []
-    pending: list[str] = []
+    pending: list[tuple[str, bool]] = []
     in_dq = False
-    i, n = 0, len(text)
+    depth = 0
+    n = len(text)
     while i < n:
         c = text[i]
         if c == "\\":
@@ -139,15 +128,22 @@ def _split(text: str) -> tuple[str, list[str]]:
             if j < 0:
                 raise BashParseError("backtick non chiuso")
             inners.append(text[i + 1:j])
-            out.append(" SUBST ")
+            out.append(_SUBST_TOKEN)
             i = j + 1
             continue
         if text.startswith("$(", i):
-            inner, end = _balanced(text, i + 2)
-            inners.append(inner)
-            out.append(" SUBST ")
+            _, _, end = _scan(text, i + 2, True)
+            inners.append(text[i + 2:end - 1])
+            out.append(_SUBST_TOKEN)
             i = end
             continue
+        if not in_dq:
+            if nested and c == ")" and depth == 0:
+                return "".join(out), inners, i + 1
+            if c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
         if c == "<" and not in_dq and not text.startswith("<<<", i):
             m = _HEREDOC_AT.match(text, i)
             if m:
@@ -156,20 +152,22 @@ def _split(text: str) -> tuple[str, list[str]]:
                 line = text[line_start:line_end if line_end >= 0 else n]
                 if _SHELL_LINE.search(line):
                     raise BashParseError("heredoc verso una shell: il corpo non si legge")
-                pending.append(m.group(2))
+                pending.append((m.group(2), m.group(1) != ""))
                 out.append(m.group(0))
                 i = m.end()
                 continue
         if c == "\n":
             out.append("\n")
-            i = _skip_heredoc_bodies(text, i + 1, pending) if pending else i + 1
+            i = _skip_heredoc_bodies(text, i + 1, pending, inners) if pending else i + 1
             pending = []
             continue
         out.append(c)
         i += 1
+    if nested:
+        raise BashParseError("sostituzione $(...) non chiusa")
     if in_dq:
         raise BashParseError("virgolette non chiuse")
-    return "".join(out), inners
+    return "".join(out), inners, n
 
 
 def _norm(cwd: str, path: str) -> str:
@@ -220,18 +218,21 @@ def _shell_command(argv: list[str]) -> str | None:
     return None
 
 
+_PUNCT_RE = re.compile(r"<<<|<<|<>|&>>|&>|>>|>\||>&|<&|[<>]|&&|\|\||\|&|;;|[;&|()]")
+
+
 def _ops(tokens):
-    """shlex fonde la punteggiatura (`);`, `)&&`, `&&(`): la spezza negli operatori noti.
-    I token con redirezioni (`>&`, `&>`) restano interi."""
+    """shlex fonde la punteggiatura (`);`, `)&&`, `;>`): la spezza negli operatori e nelle
+    redirezioni noti. Ogni redirezione resta un token a sé, seguito dal suo bersaglio."""
     for t in tokens:
-        if t and set(t) <= set(";&|()<>") and not any(ch in "<>" for ch in t):
-            yield from _OPS_RE.findall(t)
+        if t and set(t) <= set(";&|()<>"):
+            yield from _PUNCT_RE.findall(t)
         else:
             yield t
 
 
 def parse(command: str, cwd: str) -> list[Cmd]:
-    outer, inners = _split(command.replace("\\\n", " "))
+    outer, inners, _ = _scan(command.replace("\\\n", " "), 0, False)
     extra: list[Cmd] = []
     for inner in inners:
         for c in parse(inner, cwd):

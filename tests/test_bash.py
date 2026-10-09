@@ -264,5 +264,42 @@ class FixRound1Test(unittest.TestCase):
         self.assertIsNone(bash.effect_reason(one("kubectl get pods/x"), cfg))
 
 
+class FixRound2Test(unittest.TestCase):
+    """Giro di correzione 2 del controller."""
+
+    def test_assignment_with_substitution_keeps_command(self):
+        for text in ["X=$(cmd) git push -f", "TOKEN=$(cat f) git push -f",
+                     "A=1 B=$(x) git push -f"]:
+            with self.subTest(text=text):
+                pushes = pushes_forced(text)
+                self.assertTrue(pushes)
+                self.assertEqual(pushes[0].argv, ["git", "push", "-f"])
+
+    def test_redirect_after_semicolon_is_not_a_command(self):
+        out = cmds("true;>f")
+        self.assertEqual([c.argv for c in out if c.argv], [["true"]])
+        self.assertTrue(any(bash.write_targets(c) == ["f"] for c in out))
+
+    def test_subshell_then_redirect_targets_log(self):
+        out = cmds("(git push -f)>log")
+        self.assertTrue(any(bash.push_is_force(c) for c in out))
+        self.assertTrue(any(bash.write_targets(c) == ["log"] for c in out))
+
+    def test_time_is_a_wrapper_with_p_flag(self):
+        c = one("time -p git push -f")
+        self.assertEqual(c.argv[:2], ["git", "push"])
+        self.assertTrue(bash.push_is_force(c))
+
+    def test_unquoted_heredoc_body_substitutions_run(self):
+        for text in ["cat <<EOF\n$(git push -f)\nEOF", "cat <<EOF\n`git push -f`\nEOF"]:
+            with self.subTest(text=text):
+                self.assertTrue(pushes_forced(text))
+
+    def test_quoted_heredoc_body_substitutions_are_data(self):
+        for text in ["cat <<'EOF'\n$(git push -f)\nEOF", 'cat <<"EOF"\n$(git push -f)\nEOF']:
+            with self.subTest(text=text):
+                self.assertFalse(pushes_forced(text))
+
+
 if __name__ == "__main__":
     unittest.main()
