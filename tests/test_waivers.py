@@ -50,6 +50,39 @@ class WaiversTest(unittest.TestCase):
                          [v_ids])
         self.assertEqual(waivers.unresolved([v_scope], None), [v_scope])
 
+    def test_pending_waiver_still_covers_locally(self):
+        # Decisione 9: in locale una deroga dichiarata scioglie la violazione anche se
+        # è pending; il blocco su ciò che è in attesa arriva da open-pr (P3).
+        f = wf(w(1, "test", pattern="**"))
+        self.assertEqual(waivers.status(f, approved_ids=set(), sensitive=lambda p: False),
+                         {"w-7-1": "pending"})
+        v = Violation("skip_added", "t.py", "", "test")
+        self.assertEqual(waivers.unresolved([v], f), [])
+
+    def test_test_deleted_needs_all_ids(self):
+        v = Violation("test_deleted", "t.py", "", "test", ("t::a", "t::b"))
+        self.assertFalse(waivers.covers(w(1, "test", "t.py", tests=["t::a"]), v))
+        self.assertTrue(waivers.covers(w(1, "test", "t.py", tests=["t::a", "t::b"]), v))
+
+    def test_violation_without_ids_needs_same_type_and_path(self):
+        v = Violation("skip_added", "t.py", "", "test")
+        self.assertTrue(waivers.covers(w(1, "test", "t.py"), v))
+        self.assertFalse(waivers.covers(w(1, "test", "other.py"), v))
+        self.assertFalse(waivers.covers(w(1, "ci", "t.py"), v))
+
+    def test_parse_rejects_non_list_waiver(self):
+        head = 'schema_version = 1\nissue = 7\nbranch = "b"\n'
+        with self.assertRaises(ValueError):
+            waivers.parse(head + "waiver = 5\n")
+        with self.assertRaises(ValueError):
+            waivers.parse(head + '[waiver]\nid = "w-7-1"\ntype = "scope"\nfile = "a"\n'
+                                 'choice = ""\nwhy = ""\ncost = ""\n')
+
+    def test_parse_rejects_duplicate_ids(self):
+        f = wf(w(1, "scope", "a"), w(1, "scope", "b"))
+        with self.assertRaises(ValueError):
+            waivers.parse(waivers.dumps(f))
+
 
 if __name__ == "__main__":
     unittest.main()

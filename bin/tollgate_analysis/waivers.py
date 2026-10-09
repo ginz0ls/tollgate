@@ -57,13 +57,19 @@ def parse(text: str) -> WaiverFile:
     issue, branch = raw.get("issue"), raw.get("branch")
     if not isinstance(issue, int) or isinstance(issue, bool) or not isinstance(branch, str):
         raise ValueError("issue o branch non validi")
-    out = []
-    for item in raw.get("waiver", []):
+    items = raw.get("waiver", [])
+    if not isinstance(items, list):
+        raise ValueError("waiver deve essere una lista di tabelle [[waiver]]")
+    out, seen = [], set()
+    for item in items:
         if not isinstance(item, dict):
             raise ValueError("[[waiver]] non è una tabella")
         wid, type_ = _str(item, "id"), _str(item, "type")
         if not _ID.match(wid) or type_ not in TYPES:
             raise ValueError(f"deroga non valida: {wid} {type_}")
+        if wid in seen:
+            raise ValueError(f"id duplicato: {wid}")
+        seen.add(wid)
         file, pattern = _str(item, "file", False), _str(item, "pattern", False)
         if (file is None) == (pattern is None):
             raise ValueError(f"{wid}: serve file oppure pattern")
@@ -125,17 +131,22 @@ def status(wf: WaiverFile, *, approved_ids, sensitive: Callable[[str], bool]) ->
 
 
 def covers(w: Waiver, v) -> bool:
+    """Una deroga copre una violazione se ha lo stesso tipo e lo stesso file o pattern.
+    Se la violazione ha identificativi di test (`ids`), la deroga deve elencarli tutti."""
     if w.type != v.waiver_type:
         return False
     ok = globs.match(w.pattern, v.path) if w.pattern is not None else w.file == v.path
     if not ok:
         return False
-    if v.kind == "test_id_missing":
+    if v.ids:
         return set(v.ids) <= set(w.tests)
     return True
 
 
 def unresolved(violations, wf: WaiverFile | None) -> list:
+    """Violazioni non coperte da alcuna deroga. Decisione 9 del piano: in locale anche una
+    deroga `pending` scioglie la violazione; il blocco su ciò che è in attesa arriva da
+    `open-pr` in P3, non da qui."""
     if wf is None:
         return list(violations)
     return [v for v in violations if not any(covers(w, v) for w in wf.waivers)]

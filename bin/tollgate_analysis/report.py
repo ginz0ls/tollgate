@@ -11,6 +11,8 @@ CUT_PREFIX = "NOTE: this agent stopped at its"
 
 @dataclass
 class ImplReport:
+    """`status` è lo stato normalizzato (maiuscolo, senza spazi). Uno stato fuori da
+    STATUSES rende il report non valido (fail-closed, spec 18.5)."""
     status: str
     data: dict = field(default_factory=dict)
     missing: list[str] = field(default_factory=list)
@@ -18,21 +20,32 @@ class ImplReport:
 
     @property
     def valid(self) -> bool:
-        return not self.missing
+        return not self.missing and not self.unknown_status
 
 
-def _last_json(text: str) -> dict | None:
+def _candidates(text: str) -> list[dict]:
+    """Oggetti JSON con la chiave `status`, dal fondo del testo verso l'inizio."""
     dec = json.JSONDecoder()
+    out: list[dict] = []
     pos = text.rfind("{")
     while pos >= 0:
         try:
             obj, _ = dec.raw_decode(text, pos)
             if isinstance(obj, dict) and "status" in obj:
-                return obj
+                out.append(obj)
         except json.JSONDecodeError:
             pass
         pos = text.rfind("{", 0, pos)
-    return None
+    return out
+
+
+def _last_json(text: str) -> dict | None:
+    """Preferisce l'oggetto che contiene tutti i campi REQUIRED; altrimenti l'ultimo."""
+    cands = _candidates(text)
+    for c in cands:
+        if all(k in c for k in REQUIRED):
+            return c
+    return cands[0] if cands else None
 
 
 def parse_report(text: str | None) -> ImplReport:
@@ -40,22 +53,27 @@ def parse_report(text: str | None) -> ImplReport:
     if data is None:
         return ImplReport("DONE", {}, list(REQUIRED))
     missing = [k for k in REQUIRED if k not in data]
-    status = data.get("status")
-    unknown = status not in STATUSES
-    return ImplReport("DONE" if unknown else status, data, missing, unknown)
+    raw = data.get("status")
+    status = raw.strip().upper() if isinstance(raw, str) else str(raw)
+    return ImplReport(status, data, missing, status not in STATUSES)
 
 
 def is_turn_cut(tool_response: dict | None) -> bool:
     """Il blocco lo scrive Claude Code, separato dall'output del subagente (P0, E6)."""
     if not isinstance(tool_response, dict):
         return False
-    if not isinstance(tool_response.get("harnessNoteCount"), int) \
-            or tool_response["harnessNoteCount"] < 1:
+    count = tool_response.get("harnessNoteCount")
+    if isinstance(count, bool) or not isinstance(count, int) or count < 1:
         return False
     content = tool_response.get("content")
     if not isinstance(content, list) or not content or not isinstance(content[0], dict):
         return False
     return str(content[0].get("text", "")).startswith(CUT_PREFIX)
+
+
+def _count(v) -> int:
+    """Solo gli interi veri contano: stringhe, liste, float (anche 1e999) e bool si saltano."""
+    return v if isinstance(v, int) and not isinstance(v, bool) else 0
 
 
 def transcript_tokens(path) -> int:
@@ -76,7 +94,7 @@ def transcript_tokens(path) -> int:
             usage = msg.get("usage") if isinstance(msg, dict) else None
             if not isinstance(usage, dict):
                 continue
-            total = sum(int(usage.get(k) or 0) for k in
+            total = sum(_count(usage.get(k)) for k in
                         ("input_tokens", "cache_creation_input_tokens", "output_tokens"))
             seen[str(msg.get("id") or f"riga-{n}")] = total
     return sum(seen.values())
