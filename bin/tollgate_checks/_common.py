@@ -1,0 +1,288 @@
+"""Aiuti condivisi dai controlli (non è un controllo: il registro salta i nomi con _)."""
+from __future__ import annotations
+
+import json
+import os
+import posixpath
+import re
+from pathlib import Path
+
+from tollgate_analysis import globs, level as lv, profiles as prof, testguard
+from tollgate_analysis.testguard import Violation
+from tollgate_analysis.waivers import unresolved
+from tollgate_analysis.protected import is_protected
+from tollgate_core import git, subagents
+from tollgate_core.paths import repo_key
+from tollgate_hooks.adapter import edit_path
+from tollgate_hooks.model import inject, record
+
+_TG = re.compile(r"^tg/(\d+)-")
+
+
+def _inside(p, root) -> bool:
+    """`p` è `root` o sta sotto `root` (percorsi già assoluti e risolti)."""
+    p, root = Path(p), Path(root)
+    return p == root or root in p.parents
+
+
+def edit_lexical(event) -> Path | None:
+    """Il percorso di Edit o Write come scritto, normalizzato ma senza risolvere i collegamenti."""
+    raw = edit_path(event)
+    if not raw:
+        return None
+    return Path(os.path.normpath(os.path.join(event.cwd, raw)))
+
+
+def edit_target(event) -> Path | None:
+    """Percorso assoluto e risolto (collegamenti compresi) che Edit o Write toccherebbe.
+    Si decide sul percorso vero: un collegamento nel worktree non aggira scope né protezioni;
+    i file protetti si valutano anche sul percorso non risolto (`is_protected_path`)."""
+    p = edit_lexical(event)
+    return p.resolve() if p is not None else None
+
+
+def path_forms(p) -> list[Path]:
+    """Le forme in cui un percorso può raggiungere un file: quella lessicale, quella risolta e
+    le intermedie (i primi i componenti risolti, il resto come scritto). Una protezione per
+    nome (`.claude/settings.json`) vale su una qualunque di esse: collegamenti a file, a
+    cartelle o a monte della radice del repo non la aggirano."""
+    lex = Path(os.path.normpath(p))
+    parts = lex.parts
+    forms = [lex]
+    for i in range(1, len(parts) + 1):
+        f = Path(*parts[:i]).resolve().joinpath(*parts[i:])
+        if f not in forms:
+            forms.append(f)
+    return forms
+
+
+def _repo_roots_along(forms) -> list[Path]:
+    """Cartelle con un `.git` lungo il percorso (senza lanciare git): radici candidate."""
+    out = []
+    for f in forms:
+        for a in f.parents:
+            if (a / ".git").exists() and a not in out:
+                out.append(a)
+    return out
+
+
+def output_excludes(ctx) -> list[str]:
+    """Cartelle di output (report, copertura, `.tollgate-run/`): fuori da livello e scope."""
+    return list(ctx.cfg("review.output_dirs")) + [".tollgate-run/"]
+
+
+def repo_key_of(repo) -> str | None:
+    url = git.origin_url(repo) if repo else None
+    return repo_key(url) if url else None
+
+
+def orphan_tg(ctx, repo) -> int | None:
+    """Ramo tg/<N>-* senza lavoro attivo per (repo, N): DB perso, serve adopt (12.4)."""
+    if repo is None:
+        return None
+    m = _TG.match(git.branch(repo) or "")
+    if not m:
+        return None
+    key = repo_key_of(repo)
+    if key is None:
+        return None
+    row = ctx.db.execute("SELECT 1 FROM work_items WHERE repo_key = ? AND issue = ? "
+                         "AND phase <> 'closed'", (key, int(m.group(1)))).fetchone()
+    return None if row else int(m.group(1))
+
+
+def governing_work(ctx, path):
+    """Le regole complete valgono nella sessione legata e per ogni percorso nel worktree (6.6)."""
+    if ctx.bound and ctx.work is not None:
+        return ctx.work
+    return ctx.work_for_path(path) if path is not None else None
+
+
+def in_main_checkout(p: Path, wt: Path) -> bool:
+    """`p` sta nel checkout principale, ma non in un altro worktree dentro di esso.
+    Solleva GitError se i worktree non si possono elencare."""
+    trees = [t for t, _ in git.worktrees(wt)]
+    return _inside(p, trees[0]) and not any(_inside(p, t) for t in trees[1:])
+
+
+def is_protected_path(ctx, p: Path, repo, work) -> bool:
+    """Protetto se lo dice una qualunque radice pertinente: il repo più vicino (può essere
+    annidato), il worktree del lavoro e il repo del contesto. Così un `git init` in una
+    cartella protetta non sposta la radice e non aggira la regola. `p` si valuta in tutte le
+    sue forme (`path_forms`): va passato il percorso lessicale, non solo quello risolto."""
+    forms = path_forms(p)
+    roots = []
+    for r in (repo, Path(work["worktree"]) if work is not None and work["worktree"] else None,
+              ctx.repo, *_repo_roots_along(forms)):
+        r = Path(r).resolve() if r is not None else None
+        if r is not None and r not in roots:
+            roots.append(r)
+    if not roots:
+        roots = [None]
+    for f in forms:
+        for r in roots:
+            rel = f.relative_to(r).as_posix() if r is not None and _inside(f, r) else None
+            if is_protected(rel, f, abs_roots=ctx.protected_roots(r)):
+                return True
+    return False
+
+
+def is_docs_md(rel: str | None) -> bool:
+    return bool(rel) and rel.startswith("docs/superpowers/") and rel.endswith(".md")
+
+
+# Ordine delle fasi di un lavoro (phases.SEQUENCES): la spec si scrive in spec_audit e il
+# piano in plan. Oltre quelle fasi la spec e il piano sono bloccati (6.2).
+_ORDER = ("spec_audit", "plan", "approval", "execution", "review", "pr_open", "closed")
+
+
+def _rank(phase: str | None) -> int:
+    return _ORDER.index(phase) if phase in _ORDER else len(_ORDER)
+
+
+def locked_docs(work) -> set[str]:
+    """Spec bloccata dopo approve spec, piano bloccato dopo la registrazione dello scope (6.2).
+    Un lavoro in blocco vale la fase precedente al blocco. Un ritorno con reopen riporta la
+    fase alla spec o al piano, e quei file tornano modificabili (l'approvazione resta storica).
+    """
+    phase = work["phase_before_block"] if work["phase"] == "blocked" else work["phase"]
+    out = set()
+    if work["plan_sha"] and work["plan_path"] and _rank(phase) > _rank("plan"):
+        out.add(work["plan_path"])
+    if work["spec_path"] and work["worktree"] and _rank(phase) > _rank("spec_audit"):
+        approval = Path(work["worktree"]) / f"docs/superpowers/reviews/{work['issue']}" \
+                                           "/spec-approval.md"
+        if approval.exists():
+            out.add(work["spec_path"])
+    return out
+
+
+def waiver_hint(v, issue) -> str:
+    target = f"--test {' --test '.join(v.ids)} " if v.ids else ""
+    return (f"tollgate waiver add {v.waiver_type} {v.path} {target}"
+            f"--choice … --why … --cost …")
+
+
+def explain(violations, issue) -> str:
+    lines = [f"- {v.path}: {v.detail} (deroga: {waiver_hint(v, issue)})" for v in violations]
+    return "\n".join(lines)
+
+
+def status_lines(ctx, work) -> list[str]:
+    lines = [f"tollgate: lavoro #{work['issue']} ({work['level']}), fase {work['phase']}"
+             + (f" (prima: {work['phase_before_block']})" if work["phase"] == "blocked" else "")]
+    for b in ctx.db.execute("SELECT id, type, reason FROM blocks WHERE work = ? AND closed "
+                            "IS NULL ORDER BY id LIMIT 3", (work["id"],)):
+        lines.append(f"blocco {b['id']} ({b['type']}): {b['reason'][:120]}")
+    counts = {r[0]: r[1] for r in ctx.db.execute(
+        "SELECT state, count(*) FROM tasks WHERE work = ? GROUP BY state", (work["id"],))}
+    if counts:
+        lines.append("task: " + ", ".join(f"{n} {s}" for s, n in sorted(counts.items())))
+    return lines
+
+
+def scope_exempt(ctx, work, rel: str, scope: set[str]) -> bool:
+    """Esenzioni dallo scope (7.4). I percorsi di `scope` sono nomi letterali (possono
+    contenere `[ ]`): si confrontano per uguaglianza, mai come pattern. Solo `[scope] always`
+    è fatto di pattern."""
+    if rel.startswith(".superpowers/") or rel == f".tollgate/waivers/{work['issue']}.toml":
+        return True
+    if git.excluded(rel, output_excludes(ctx)):
+        return True
+    if is_docs_md(rel) and not rel.startswith("docs/superpowers/reviews/") \
+            and rel not in locked_docs(work):
+        return True
+    if globs.match_any(ctx.cfg("scope.always"), rel):
+        return True
+    manifest = ctx.cfg("scope.lockfiles").get(posixpath.basename(rel))
+    return bool(manifest and posixpath.join(posixpath.dirname(rel), manifest) in scope)
+
+
+def level_records(ctx, work) -> list:
+    """Ricalcolo del livello sul diff dalla base, working tree e file nuovi compresi
+    (decisione 18), senza le cartelle di output. Il livello sale e non scende mai."""
+    wt = Path(work["worktree"]) if work["worktree"] else None
+    base = work["work_base_sha"]
+    if not base or wt is None or not wt.is_dir():
+        return []
+    skip = output_excludes(ctx)
+    changes = git.changes(wt, base, exclude=skip)
+    cfg = ctx.cfg("levels")
+    paths = [c.path for c in changes] + [c.old_path for c in changes if c.old_path]
+    computed = lv.diff_level(changes, diff_bytes=git.diff_size(wt, base, exclude=skip),
+                             sensitive_paths=cfg["sensitive_paths"],
+                             l0_max_files=cfg["l0_max_files"], l0_max_lines=cfg["l0_max_lines"],
+                             l0_max_bytes=cfg["l0_max_bytes"])
+    profs = ctx.config.profiles
+    computed = lv.max_level(computed, prof.min_level(
+        prof.active_profiles(paths, profs, ctx.cfg("profiles.active")), profs))
+    new = lv.next_level(current=work["level"], computed=computed, cap=work["level_cap"],
+                        cap_paths=json.loads(work["level_cap_paths"] or "[]"),
+                        sensitive_now=lv.sensitive_in(paths, cfg["sensitive_paths"]))
+    if new == work["level"]:
+        return []
+    if work["level"] == "L0" and work["phase"] == "execution":
+        out = [record("phase", work=work["id"], to="plan", cause="l0_grew")]
+        if new == "L2":
+            out.append(record("level", work=work["id"], level="L2"))
+        out.append(inject(f"tollgate: il diff supera le soglie di L0: il lavoro sale a {new} e "
+                          f"torna in fase plan. Serve un piano (writing-plans)."))
+        return out
+    return [record("level", work=work["id"], level=new),
+            inject(f"tollgate: il lavoro sale a {new} (percorsi sensibili o soglie).")]
+
+
+def commit_violations(ctx, work, wt: Path, base_ref: str, head_ref: str | None,
+                      changes) -> list:
+    """Violazioni di test-guard e scope su `changes` (da `base_ref` a `head_ref`; `None` è il
+    working tree), senza le cartelle di output e `.tollgate-run/`. Restano solo quelle non
+    coperte da una deroga, anche in attesa (decisione 9)."""
+    skip = output_excludes(ctx)
+    changes = [c for c in changes if not git.excluded(c.path, skip)]
+    out = []
+    if ctx.component("test_guard"):
+        tg = []
+        for c in changes:
+            base_text = None if c.status == "A" else git.text_at(wt, base_ref,
+                                                                 c.old_path or c.path)
+            if c.status == "D":
+                head_text = None
+            elif head_ref is None:
+                head_text = git.worktree_text(wt, c.path)
+            else:
+                head_text = git.text_at(wt, head_ref, c.path)
+            tg.append(testguard.Change(c.status, c.path, c.old_path, base_text, head_text,
+                                       c.binary))
+        out += testguard.check(tg, ctx.guard_config(work, [c.path for c in changes])).violations
+    if ctx.component("scope_check") and work["level"] != "L0" and work["plan_sha"]:
+        scope = ctx.scope(work)
+        for c in changes:
+            if c.path not in scope and not scope_exempt(ctx, work, c.path, scope):
+                out.append(Violation("out_of_scope", c.path, "file fuori dallo scope del piano",
+                                     "scope"))
+    return unresolved(out, ctx.waiver_file(work))
+
+
+def budget_cut_records(ctx, agent_id: str, tokens=None) -> list:
+    """Taglio di maxTurns (6.3). La riga si chiude sempre come `cut` (altrimenti resterebbe un
+    falso scrittore vivo); task in budget superato e blocco `needs_you` solo con `task_budget`.
+    Vale per il primo piano (PostToolUse Agent) e per background e riprese (UserPromptSubmit)."""
+    row = subagents.get(ctx.db, agent_id)
+    if row is None or row["state"] != "running":
+        return []
+    count = tokens if isinstance(tokens, int) and not isinstance(tokens, bool) else None
+    out = [record("subagent_finish", agent_id=agent_id, state="cut", tokens=count)]
+    if not ctx.component("task_budget"):
+        return out
+    work, number = row["work"], row["task"]
+    if work is not None and number is not None:
+        t = ctx.db.execute("SELECT state FROM tasks WHERE work = ? AND number = ?",
+                           (work, number)).fetchone()
+        if t is not None and t["state"] == "running":
+            out += [record("task", work=work, number=number, event="budget_exceeded"),
+                    record("block", work=work, type="needs_you",
+                           reason=f"budget superato: maxTurns esaurito sul task {number}. "
+                                  f"Proposta: dividere il task")]
+    out.append(inject("tollgate: il subagente ha esaurito maxTurns. Il task è bloccato con "
+                      "needs_you: non riprenderlo con SendMessage."))
+    return out

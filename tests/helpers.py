@@ -40,3 +40,24 @@ def make_repo(path):
     path.mkdir(parents=True, exist_ok=True)
     git(path, "init", "-q", "-b", "main")
     return path
+
+
+def make_origin_repo(root, files: dict, toml: str):
+    """Origin nudo e checkout principale con tollgate.toml sul predefinito (repo attivo, 7.1)."""
+    root = Path(root)
+    origin = root / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True,
+                   capture_output=True)
+    main = make_repo(root / "main")
+    (main / "tollgate.toml").write_text(toml)
+    for rel, text in files.items():
+        p = main / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text)
+    git(main, "add", "-A")
+    git(main, "commit", "-qm", "base")
+    git(main, "remote", "add", "origin", str(origin))
+    git(main, "push", "-q", "-u", "origin", "main")
+    git(main, "remote", "set-head", "origin", "main")
+    git(main, "config", "tollgate.defaultBranch", "main")
+    return main, origin, git(main, "rev-parse", "HEAD")

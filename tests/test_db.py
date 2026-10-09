@@ -3,7 +3,10 @@ import sqlite3
 import subprocess
 import sys
 import textwrap
+import time
 import unittest
+from datetime import datetime, timezone
+from pathlib import Path
 from unittest import mock
 
 from tests.helpers import BIN, TempState
@@ -36,7 +39,8 @@ class OpenTest(unittest.TestCase):
         names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertTrue(TABLES <= names, TABLES - names)
         self.assertEqual(conn.execute(
-            "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "1")
+            "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0],
+            str(db.latest_version()))
 
     def test_concurrent_first_open(self):
         code = textwrap.dedent(f"""
@@ -53,7 +57,8 @@ class OpenTest(unittest.TestCase):
             self.assertEqual(p.returncode, 0, err)
         conn = db.open_db(self.t.state)
         self.assertEqual(conn.execute(
-            "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "1")
+            "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0],
+            str(db.latest_version()))
         conn.close()
 
     def test_fresh_db_makes_no_backup_and_reopen_is_idempotent(self):
@@ -70,11 +75,12 @@ class OpenTest(unittest.TestCase):
 
     def test_migration_makes_backup_first(self):
         db.open_db(self.t.state).close()
-        extra = db.MIGRATIONS + [(2, ["CREATE TABLE extra (x INTEGER)"])]
+        extra_version = db.latest_version() + 1
+        extra = db.MIGRATIONS + [(extra_version, ["CREATE TABLE extra (x INTEGER)"])]
         with mock.patch.object(db, "MIGRATIONS", extra):
             conn = db.open_db(self.t.state)
         self.addCleanup(conn.close)
-        backups = list(self.t.state.backup_dir.glob("*migrazione-2*.db"))
+        backups = list(self.t.state.backup_dir.glob(f"*migrazione-{extra_version}*.db"))
         self.assertEqual(len(backups), 1)
         old = sqlite3.connect(backups[0])
         self.addCleanup(old.close)
@@ -112,6 +118,122 @@ class OpenTest(unittest.TestCase):
         conn.execute("UPDATE work_items SET phase='closed'")
         insert_work(conn, phase="plan")
         self.assertEqual(conn.execute("SELECT count(*) FROM work_items").fetchone()[0], 2)
+
+
+class MigrationV2Test(unittest.TestCase):
+    def setUp(self):
+        self.ts = TempState()
+
+    def tearDown(self):
+        self.ts.cleanup()
+
+    def test_from_v1_adds_columns_and_backup(self):
+        saved = db.MIGRATIONS[:]
+        try:
+            db.MIGRATIONS[:] = saved[:1]
+            db.open_db(self.ts.state).close()
+        finally:
+            db.MIGRATIONS[:] = saved
+        conn = db.open_db(self.ts.state)
+        try:
+            self.assertEqual(conn.execute(
+                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "2")
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(subagents)")}
+            self.assertTrue({"last_seen", "vetoes", "report"} <= cols)
+            self.assertIn("pending", {r[1] for r in conn.execute("PRAGMA table_info(tasks)")})
+            self.assertIn("level_cap_paths",
+                          {r[1] for r in conn.execute("PRAGMA table_info(work_items)")})
+            conn.execute("SELECT session, last_seen FROM session_seen").fetchall()
+        finally:
+            conn.close()
+        self.assertTrue(list(self.ts.state.backup_dir.glob("tollgate-*-migrazione-2.db")))
+
+
+_FROZEN = datetime(2026, 10, 9, 12, 0, 0, 123456, tzinfo=timezone.utc)
+
+
+class BackupRaceTest(unittest.TestCase):
+    """C1 della revisione finale: due copie nello stesso istante non si pestano."""
+
+    def setUp(self):
+        self.t = TempState()
+        self.conn = db.open_db(self.t.state)
+        self.addCleanup(self.t.cleanup)
+        self.addCleanup(lambda: self.conn.close())
+
+    def test_same_instant_same_name_never_overwrites(self):
+        # Simula il perdente della corsa: exists() non vede ancora la copia del vincitore.
+        with mock.patch.object(db.clock, "now", return_value=_FROZEN), \
+                mock.patch.object(Path, "exists", return_value=False):
+            first = db.backup(self.conn, self.t.state, "migrazione-2")
+            second = db.backup(self.conn, self.t.state, "migrazione-2")
+        self.assertNotEqual(first, second)
+        self.assertTrue(first.exists() and second.exists())
+        self.assertEqual(sorted(p.name for p in self.t.state.backup_dir.iterdir()),
+                         sorted([first.name, second.name]))
+
+    def test_concurrent_backups_with_frozen_clock(self):
+        self.conn.close()
+        self.conn = db.open_db(self.t.state)
+        start = time.time() + 1.5
+        code = textwrap.dedent(f"""
+            import sys, time
+            from datetime import datetime, timezone
+            sys.path.insert(0, {str(BIN)!r})
+            from unittest import mock
+            from tollgate_core import db
+            from tollgate_core.paths import resolve_state
+            conn = db.open_db(resolve_state())
+            while time.time() < {start!r}:
+                pass
+            frozen = datetime(2026, 10, 9, 12, 0, 0, 123456, tzinfo=timezone.utc)
+            with mock.patch.object(db.clock, "now", return_value=frozen):
+                for _ in range(8):
+                    db.backup(conn, resolve_state(), "migrazione-2")
+            conn.close()
+        """)
+        procs = [subprocess.Popen([sys.executable, "-B", "-c", code], env=self.t.env(),
+                                  stderr=subprocess.PIPE, text=True) for _ in range(3)]
+        for p in procs:
+            _, err = p.communicate(timeout=120)
+            self.assertEqual(p.returncode, 0, err)
+        self.assertEqual(list(self.t.state.backup_dir.glob(".tmp-*")), [])
+
+    def test_concurrent_migration_of_v1_db_with_rows(self):
+        self.conn.close()
+        self.t.cleanup()
+        self.t = TempState()
+        self.addCleanup(self.t.cleanup)
+        saved = db.MIGRATIONS[:]
+        try:
+            db.MIGRATIONS[:] = saved[:1]
+            conn = db.open_db(self.t.state)
+        finally:
+            db.MIGRATIONS[:] = saved
+        insert_work(conn)
+        conn.close()
+        self.conn = sqlite3.connect(":memory:")
+        code = textwrap.dedent(f"""
+            import sys
+            sys.path.insert(0, {str(BIN)!r})
+            from tollgate_core import db
+            from tollgate_core.paths import resolve_state
+            db.open_db(resolve_state()).close()
+        """)
+        procs = [subprocess.Popen([sys.executable, "-B", "-c", code], env=self.t.env(),
+                                  stderr=subprocess.PIPE, text=True) for _ in range(4)]
+        for p in procs:
+            _, err = p.communicate(timeout=120)
+            self.assertEqual(p.returncode, 0, err)
+        conn = db.open_db(self.t.state)
+        self.addCleanup(conn.close)
+        self.assertEqual(conn.execute("SELECT value FROM meta WHERE key='schema_version'")
+                         .fetchone()[0], str(db.latest_version()))
+        self.assertEqual(conn.execute("SELECT count(*) FROM work_items").fetchone()[0], 1)
+        copies = list(self.t.state.backup_dir.glob("tollgate-*-migrazione-2.db"))
+        self.assertTrue(copies)
+        for c in copies:
+            self.assertTrue(db.integrity_ok(c))
 
 
 class TxTest(unittest.TestCase):

@@ -1,7 +1,7 @@
 import unittest
 
 from tests.helpers import TempState
-from tollgate_core import clock, db, dod, phases, tasks
+from tollgate_core import clock, db, dod, phases, receipts, tasks
 
 T0 = clock.parse("2026-10-08T10:00:00.000000Z")
 EXT_OK = {"guard_scope": True, "must_have": True, "approvals": True, "specialists": True}
@@ -136,3 +136,34 @@ class DodTest(unittest.TestCase):
 
     def test_dod_passes_empty_is_false(self):
         self.assertFalse(dod.dod_passes([]))
+
+
+class UncountedTest(unittest.TestCase):
+    def setUp(self):
+        self.ts = TempState()
+        self.conn = db.open_db(self.ts.state)
+        self.w = phases.create_work(self.conn, repo_key="r", issue=1, level="L0", now=T0)
+
+    def tearDown(self):
+        self.conn.close()
+        self.ts.cleanup()
+
+    def _receipt(self, exit_code):
+        receipts.add(self.conn, work=self.w, sha="h", command="verify", resolved_command="x",
+                     exit_code=exit_code, tests_run=None, tests_skipped=None, duration=0.1,
+                     log=None, produced_by="verify", state="uncounted", now=T0)
+
+    def test_uncounted_ok_only_with_allow_no_tests_and_exit_zero(self):
+        self._receipt(0)
+        item = dod.compute_dod(self.conn, self.w, head_sha="h", allow_no_tests=True,
+                               required_commands=["verify"])[0]
+        self.assertTrue(item.ok)
+        item = dod.compute_dod(self.conn, self.w, head_sha="h", allow_no_tests=False,
+                               required_commands=["verify"])[0]
+        self.assertFalse(item.ok)
+
+    def test_uncounted_with_failure_is_red(self):
+        self._receipt(1)
+        item = dod.compute_dod(self.conn, self.w, head_sha="h", allow_no_tests=True,
+                               required_commands=["verify"])[0]
+        self.assertFalse(item.ok)

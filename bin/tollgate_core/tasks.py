@@ -85,3 +85,42 @@ def add_skill_used(conn, work: int, number: int, skill: str) -> None:
             used.append(skill)
             conn.execute("UPDATE tasks SET skills_used = ? WHERE work = ? AND number = ?",
                          (json.dumps(used), work, number))
+
+
+PENDING = ("launch", "resume")
+
+
+def assign(conn, work: int, number: int, *, implementer: str, agent_type: str, pending: str,
+           reviewer_type: str | None = None, now, session=None) -> None:
+    """Scritto da `task start` (P3): chi può partire o riprendere su questo task (6.3)."""
+    if pending not in PENDING:
+        raise ValueError(f"pending sconosciuto: {pending}")
+    with db.tx(conn):
+        get_task(conn, work, number)
+        conn.execute("UPDATE tasks SET implementer = ?, agent_type = ?, reviewer_type = ?, "
+                     "pending = ? WHERE work = ? AND number = ?",
+                     (implementer, agent_type, reviewer_type, pending, work, number))
+        _log(conn, get_task(conn, work, number), now=now, session=session)
+
+
+def take_pending(conn, work: int, *, agent_type: str, resume: bool) -> int | None:
+    """Associa un subagente che parte (o riprende) al task in sospeso del suo tipo."""
+    want = "resume" if resume else "launch"
+    with db.tx(conn):
+        row = conn.execute("SELECT number FROM tasks WHERE work = ? AND pending = ? "
+                           "AND agent_type = ? ORDER BY number LIMIT 1",
+                           (work, want, agent_type)).fetchone()
+        if row is None:
+            return None
+        conn.execute("UPDATE tasks SET pending = NULL WHERE work = ? AND number = ?",
+                     (work, row["number"]))
+        return row["number"]
+
+
+def add_commit(conn, work: int, number: int, sha: str) -> None:
+    with db.tx(conn):
+        commits = json.loads(get_task(conn, work, number)["commits"])
+        if sha not in commits:
+            commits.append(sha)
+            conn.execute("UPDATE tasks SET commits = ? WHERE work = ? AND number = ?",
+                         (json.dumps(commits), work, number))

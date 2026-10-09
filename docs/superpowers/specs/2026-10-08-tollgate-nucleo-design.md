@@ -1,7 +1,7 @@
 # tollgate: specifica del nucleo (sotto-progetto A)
 
 Data: 8 ottobre 2026.
-Revisione: **20**: esiti delle verifiche P0 (`docs/verifiche/2026-10-08-p0-esiti.md`): ripresa degli implementatori per nome, taglio di `maxTurns` riconosciuto in `PostToolUse Agent`, modalità del gate riconosciuta dal messaggio della GET di protezione, forma degli identificativi JUnit per strumento, comandi `!` fuori dagli hook. Revisione 19: must-have legati ai test, `tollgate stats`, `attenzione` diviso tra «da leggere» e «informative» (decisione dell'utente dopo l'analisi dei problemi d'uso). Revisione 18: pratiche delle software house (task piccoli, standard del revisore, disaccordo istruito, budget per task, Definition of Done, report a campi fissi, spec con «cosa non fare»), da `docs/RICERCA-ORGANIZZAZIONE.md` (decisione dell'utente). Revisione 17: profili verticali e trasversali, precedenza per specificità, CI del progetto non più protetta. Revisione 16: implementatori e revisori per area, specialisti finali in L2, tetto di 3 skill. Il catalogo dei profili è in `2026-10-08-tollgate-profili-verticali.md`. La revisione 14 ha chiuso l'audit come «sospeso»; i residui sono nel file di stato. Le revisioni precedenti sono nella sezione 20.
+Revisione: **21**: esiti delle verifiche P2 (`docs/verifiche/2026-10-09-p2-verifiche.md`): eventi d'ingresso `post_agent`, `post_skill` e `prompt_submit` (taglio di `maxTurns` in background e alla ripresa); `record` come operazione. Decisioni del piano P2 riportate in questa revisione: 1, 2, 4, 5, 6, 7, 9, 10, 11, 13, 15 e 22; ruling del controller di P2 sulle sezioni 3.2, 6.2, 6.3, 6.6, 7.1, 7.4, 8.1-8.5, 11.3, 12.2, 18.2 e 18.5. Revisione 20: esiti delle verifiche P0 (`docs/verifiche/2026-10-08-p0-esiti.md`): ripresa degli implementatori per nome, taglio di `maxTurns` riconosciuto in `PostToolUse Agent`, modalità del gate riconosciuta dal messaggio della GET di protezione, forma degli identificativi JUnit per strumento, comandi `!` fuori dagli hook. Revisione 19: must-have legati ai test, `tollgate stats`, `attenzione` diviso tra «da leggere» e «informative» (decisione dell'utente dopo l'analisi dei problemi d'uso). Revisione 18: pratiche delle software house (task piccoli, standard del revisore, disaccordo istruito, budget per task, Definition of Done, report a campi fissi, spec con «cosa non fare»), da `docs/RICERCA-ORGANIZZAZIONE.md` (decisione dell'utente). Revisione 17: profili verticali e trasversali, precedenza per specificità, CI del progetto non più protetta. Revisione 16: implementatori e revisori per area, specialisti finali in L2, tetto di 3 skill. Il catalogo dei profili è in `2026-10-08-tollgate-profili-verticali.md`. La revisione 14 ha chiuso l'audit come «sospeso»; i residui sono nel file di stato. Le revisioni precedenti sono nella sezione 20.
 Stato: **audit sospeso, pronta per il piano** (`docs/audit/2026-10-08-audit-spec-nucleo-stato.md`).
 Fonti: `docs/REPORT-CONFRONTO-WORKFLOW.md`, `docs/COSA-TENERE.md`, `docs/RICERCA-PAPER.md`. I codici R e H usati nel testo sono spiegati nella sezione 19.
 
@@ -229,17 +229,17 @@ tollgate/
 
 **Registro dei controlli.** Ogni controllo è un modulo in `bin/tollgate_checks/` con una costante `CHECK = {"api": 1, "events": [...], "component": "...", "order": n}` e una funzione `decide(event, ctx) -> decision`. I moduli girano in ordine di `order`; il nome rompe solo i pareggi. Un modulo con `api` diversa non viene caricato e il suo evento riceve `deny` con un avviso: un controllo che manca non deve passare in silenzio. B aggiunge moduli senza toccare quelli esistenti.
 
-**Eventi d'ingresso** (elenco chiuso, diverso dai tipi di log di 18.4): `session_start`, `prompt_expansion`, `pre_edit`, `post_edit`, `pre_bash`, `post_bash`, `pre_agent`, `pre_send_message`, `pre_mcp`, `subagent_start`, `subagent_stop`, `subagent_handback`. Ognuno porta `session`, `cwd`, `agent_id`, `agent_type` e l'input dello strumento così come arriva.
+**Eventi d'ingresso** (elenco chiuso, diverso dai tipi di log di 18.4): `session_start`, `prompt_expansion`, `pre_edit`, `post_edit`, `pre_bash`, `post_bash`, `pre_agent`, `pre_send_message`, `pre_mcp`, `subagent_start`, `subagent_stop`, `subagent_handback`, `post_agent`, `post_skill`, `prompt_submit` (`UserPromptSubmit`). Ognuno porta `session`, `cwd`, `agent_id`, `agent_type` e l'input dello strumento così come arriva.
 
-**Contesto** (`ctx`, in sola lettura): la configurazione risolta (base del lavoro o punta del predefinito), letture in sola lettura per ogni tabella di 12.2 (`work_items`, `tasks`, `scope`, `receipts`, `subagents`, `acts`, `intents`, `blocks`, `findings`), un accesso a git (diff dalla base, file, impronte) e l'ora. Un modulo non scrive mai nel DB: chiede di farlo con `record`.
+**Contesto** (`ctx`, in sola lettura): la configurazione risolta (base del lavoro o punta del predefinito), letture in sola lettura per ogni tabella di 12.2 (`work_items`, `tasks`, `scope`, `receipts`, `subagents`, `acts`, `intents`, `blocks`, `findings`), un accesso a git (diff dalla base, file, impronte) e l'ora. Un modulo non scrive mai nel DB: chiede di farlo con `record`. `ctx.approved_waivers(work)` restituisce gli id delle deroghe che hanno un atto `approve waiver` nel lavoro, in qualunque stato dell'atto (decisione 10 del piano P2): è l'API che P3 usa per `open-pr`.
 
-**Decisioni:** `allow`, `deny <motivo>`, `inject <testo>`, `record <tipo di log> <data>`. Si combinano così: il primo `deny` vince; gli `inject` si concatenano in ordine dentro il budget (6.3); i `record` vengono scritti tutti, anche dopo un `deny`.
+**Decisioni:** `allow`, `deny <motivo>`, `inject <testo>`, `record <operazione> <data>`: un'operazione di un elenco chiuso del motore, che scrive anche il suo evento di 18.4. Si combinano così: il primo `deny` vince; gli `inject` si concatenano in ordine dentro il budget (6.3); i `record` vengono scritti tutti, anche dopo un `deny`.
 
 **Adattatore dell'harness.** Traduce l'input degli hook in eventi d'ingresso e la decisione nella risposta di Claude Code. D aggiunge un adattatore per un altro harness senza toccare i moduli.
 
 **Altre regole.**
 - Componenti spegnibili (R10).
-- I pattern usano ovunque il dialetto di `.gitignore`.
+- I pattern di percorsi usano il dialetto di `.gitignore`, implementato una volta in `tollgate_analysis/globs.py`. I pattern di comandi (`[external_effects] allow`, comandi configurati) seguono fnmatch: `*` attraversa `/`.
 - Prima si estende ciò che esiste (H44).
 
 ---
@@ -350,7 +350,7 @@ L1 e L2, plan:  checkpoint + /clear → writing-plans (la skill dà le intestazi
 
    Poi `act apply` scrive `docs/superpowers/reviews/<N>/spec-approval.md` (18.3), che il coordinatore committa con la spec. È la prova versionata dell'approvazione: la usano `start --spec`, `adopt` e il gate. `approve plan` scrive allo stesso modo `plan-approval.md`.
 
-   **Blocco dopo l'approvazione.** La spec non si modifica più da `approve spec`; il piano non si modifica più dalla registrazione dello scope (in L1 dopo `plan-check`, in L2 ad `approve plan`). `approve plan` rifiuta se lo SHA attuale della spec non è quello di `spec-approval`. Per modificarli serve `/tollgate:reopen spec|plan <motivo>` (8.4): la fase torna a `spec_audit` o a `plan`, l'approvazione precedente resta come storico ma non vale più, e lo scope si registra di nuovo con il nuovo piano. Il brief dei task e `review prepare` leggono il piano alla versione registrata (`plan_sha`), non dal working tree.
+   **Blocco dopo l'approvazione.** La spec non si modifica più da `approve spec`; il piano non si modifica più dalla registrazione dello scope (in L1 dopo `plan-check`, in L2 ad `approve plan`). Il blocco vale solo nelle fasi successive a quella dell'approvazione: in `spec_audit` la spec resta modificabile anche se `spec-approval.md` esiste, e dopo `reopen` torna modificabile il documento riaperto. `approve plan` rifiuta se lo SHA attuale della spec non è quello di `spec-approval`. Per modificarli serve `/tollgate:reopen spec|plan <motivo>` (8.4): la fase torna a `spec_audit` o a `plan`, l'approvazione precedente resta come storico ma non vale più, e lo scope si registra di nuovo con il nuovo piano. Il brief dei task e `review prepare` leggono il piano alla versione registrata (`plan_sha`), non dal working tree.
 
    **Componenti spenti.** Con `spec_adversary`, `spec_audit` o `plan_adversary` a `false`, la condizione corrispondente non si applica, il file di approvazione lo riporta e il gate dà `attenzione` rosso (9.2).
 5. **Piano in L2.** `tollgate:plan-adversary` segue lo stesso schema dei giri avversariali, con tetto `plan_rounds` (2) e `resolve` → «avversario del piano sospeso». Il passaggio `plan → approval` lo fa la CLI quando l'ultimo giro è pulito o sospeso. `approve plan` è accettato solo in `approval`.
@@ -408,8 +408,8 @@ execution (sessione pulita)
 **Dimensione e budget del task** (task piccoli: Google small CLs, GitLab, DORA small batches; budget fisso: Shape Up).
 - **Dimensione.** A `task review-prepare` si misurano le righe aggiunte più rimosse del task, esclusi lockfile e file generati. Oltre `task_lines_warn` (200) il brief del revisore lo segnala; oltre `task_lines_max` (500) il report dell'implementatore deve contenere una motivazione, e `attenzione` lo riporta. Test e codice stanno nello stesso task; un refactoring va in un task a sé. `plan-adversary` segnala i task del piano che toccano più di `task_files_warn` (8) file.
 - **Budget.** Ogni implementatore ha `maxTurns` nel frontmatter (predefinito `[tasks] max_turns`, 60) e un tetto di token per livello (`[tasks] max_tokens`). Superato il budget, il task va in `blocked` con un `needs_you` che propone di dividerlo: niente «ancora un giro» automatico.
-  - **Taglio di `maxTurns`.** Claude Code interrompe il subagente **senza** `SubagentStop` (verificato in P0). Lo riconosce `PostToolUse Agent`: `tool_response.harnessNoteCount` ≥ 1 e il **primo** blocco di `content`, scritto da Claude Code e separato dall'output del subagente, comincia con «NOTE: this agent stopped at its». Il testo del subagente da solo non basta, così non può simulare il taglio. `PostToolUse Agent` chiude anche la riga in `subagents` (`ended`, stato `cut`), come farebbe `SubagentStop`: senza, lo scrittore unico resterebbe occupato per `stale_minutes`. `tollgate:execute` lancia gli implementatori in primo piano, perché i task sono in sequenza, e `PreToolUse Agent` nega `run_in_background` per l'implementatore. Restano da verificare il taglio in background e durante una ripresa con `SendMessage` (16); finché non sono verificati, la rete è `stale_minutes`: un implementatore senza eventi diventa `interrupted` e il task torna `pending`.
-  - **Token.** Si sommano gli `usage` del transcript (`agent_transcript_path`) a `SubagentStop`, prima che il task lasci `running`: così il tetto vale anche per un implementatore che chiude con DONE. `tool_response.totalTokens` di `PostToolUse Agent`, presente solo in primo piano, serve come riscontro nelle statistiche.
+  - **Taglio di `maxTurns`.** Claude Code interrompe il subagente **senza** `SubagentStop` (verificato in P0). Lo riconosce `PostToolUse Agent`: `tool_response.harnessNoteCount` ≥ 1 e il **primo** blocco di `content`, scritto da Claude Code e separato dall'output del subagente, comincia con «NOTE: this agent stopped at its». Il testo del subagente da solo non basta, così non può simulare il taglio. `PostToolUse Agent` chiude anche la riga in `subagents` (`ended`, stato `cut`), come farebbe `SubagentStop`: senza, lo scrittore unico resterebbe occupato per `stale_minutes`. `tollgate:execute` lancia gli implementatori in primo piano, perché i task sono in sequenza, e `PreToolUse Agent` nega `run_in_background` per l'implementatore. Il taglio in background e durante una ripresa con `SendMessage` non produce né `SubagentStop` né un `PostToolUse` con il taglio (verificato in P2, 16): si riconosce da `UserPromptSubmit`: il `prompt` deve **cominciare** con `<task-notification>`, e si esamina **blocco per blocco** (più notifiche nello stesso prompt si contano separatamente). Un blocco è un taglio se il suo `<summary>` contiene «stopped at its N-turn limit»; `<task-id>` è l'`agent_id` e `<subagent_tokens>`, se c'è, è il conteggio dei token. Una notifica citata in mezzo al prompt di un utente non taglia nulla. L'evento d'ingresso `prompt_submit` (3.2) esce subito con 0 se il prompt non comincia con `<task-notification>`. Ogni taglio chiude la riga in `subagents` (`cut`), sempre. Il task con quell'`agent_id` passa in `blocked` con `needs_you` (budget superato) solo se il componente `task_budget` è acceso. `stale_minutes` resta la rete di sicurezza: un implementatore senza eventi diventa `interrupted` e il task torna `pending`.
+  - **Token.** Si sommano gli `usage` del transcript (`agent_transcript_path`) a `SubagentStop`, prima che il task lasci `running`: così il tetto vale anche per un implementatore che chiude con DONE. Il conteggio è `input_tokens + cache_creation_input_tokens + output_tokens` sui messaggi unici per `message.id`: `cache_read_input_tokens` è escluso, perché riconta l'intero contesto a ogni turno (decisione 20 del piano P2). `tool_response.totalTokens` di `PostToolUse Agent`, presente solo in primo piano, serve come riscontro nelle statistiche.
 - **Report a campi fissi.** Il messaggio finale dell'implementatore ha i campi di 18.5 (stato, fatto, test, file, dubbi, cosa resta, motivazione della dimensione). Un report senza i campi obbligatori è **non valido**: veto con l'elenco dei campi mancanti, che conta tra i 2 veti di 8.1. Serve a chi riprende il task: note strutturate riducono il costo della ripresa (arXiv 2606.02875).
 
 **Transizioni di `tasks.state`.**
@@ -469,9 +469,13 @@ execution (sessione pulita)
 | Repo attivo, sessione non legata a un lavoro, fuori dai worktree dei lavori | Le righe «Repo attivo» di 7.4, più i file protetti in `PreToolUse` Edit e Write. È l'unico elenco valido |
 | **Sessione legata a un lavoro attivo** (0), su qualunque ramo e in qualunque directory, e **ogni comando dentro il worktree** di un lavoro attivo | **Tutte.** Il nome del ramo non conta. Sono negati il cambio e la rinomina del ramo nel worktree, le scritture nel checkout principale e il push o la PR di qualunque ramo fuori da `open-pr` |
 
+**Altri lavori.** Una sessione legata che scrive nel worktree di un **altro** lavoro attivo è negata. Fuori dai worktree dei lavori (per esempio in una cartella temporanea) la scrittura passa. I file protetti valgono rispetto a **ogni** radice: il repo più vicino, il worktree e il checkout principale.
+
 **Come si riconosce il ramo.**
 - Per i file, dal loro repository.
 - Per Bash, dalla directory effettiva, compresi `cd` e `git -C`.
+
+**La protezione segue il bersaglio, non il `cwd`.** Una sessione avviata in una cartella madre o in un repo vicino non attivo non scavalca le regole di un repo attivo che l'azione nomina. Per `PreToolUse` Edit, Write e Bash, quando il `cwd` non è in un repo attivo (o non esiste), repo e configurazione si prendono dal bersaglio: il file per Edit e Write, la directory effettiva (`-C`, `cd`, anche relativi al `cwd`) e i bersagli di scrittura e rimozione (redirect, `sed -i`, `rm`, con `~` espanso) per Bash, dove è ricavabile; per Edit e Write anche un percorso relativo si risolve rispetto al `cwd`. I percorsi di `git checkout`, `restore` e `rm` sono relativi alla directory di `-C`. Il primo bersaglio in un repo attivo dà repo e configurazione (il checkout principale e i suoi worktree sono lo stesso repo, e vale il worktree collegato se un bersaglio ci cade dentro); se l'azione tocca più repo attivi diversi (cartella comune di git diversa) è negata con un messaggio che chiede di dividerla. Se il `cwd` non esiste e non c'è un bersaglio in un repo attivo, l'hook esce con 0 come per un repo non attivo. Per non far partire Python a ogni hook fuori dai repo attivi, il runner tiene un registro delle radici attive in `<cartella di stato>/active/<hash>` (percorsi del checkout principale e dei worktree, una riga ciascuno; lo scrive il runner quando vede un repo attivo e, in P3, anche `start`). Il wrapper, su `PreToolUse` con il `cwd` non attivo e la sessione non legata, lancia Python se il registro non è vuoto (percorsi relativi, `~`, `cd` e `git -C` non nominano la radice nell'input, quindi un prefiltro testuale li perderebbe); con registro vuoto esce con 0 senza costo. Costo: finché esiste un repo attivo noto, ogni `PreToolUse` fuori dai repo attivi avvia Python, che esce subito con 0 se né il `cwd` né il bersaglio stanno in un repo attivo.
 
 **Worktree.**
 - `git worktree add` doppio → negato.
@@ -486,13 +490,13 @@ execution (sessione pulita)
 **Il problema.** Solo l'uscita 2 blocca. Un'uscita 1, un crash o un timeout lasciano passare (verificato su hooks.md, 08/10/2026).
 
 **Cosa fa il wrapper, in ordine:**
-1. `/tollgate:on` e `/tollgate:off [ore]` creano o cancellano `OFF`, con una scadenza facoltativa, senza passare da Python né dal DB. Dal terminale vale lo stesso `touch ~/.local/state/tollgate/OFF`: ogni messaggio di errore del wrapper lo riporta alla lettera, così l'uscita d'emergenza non dipende da `UserPromptExpansion`.
-2. Se `OFF` è attivo: esce con 0, scrive l'avviso «tollgate spento» su stderr e registra il salto in un file.
-3. Controlla in shell, senza rete, se il repo è attivo: cerca `tollgate.toml` su `origin/<tollgate.defaultBranch>` (scritto da `init` e `start`), poi su `origin/HEAD`, `origin/main` e `origin/master`. Se il repo non è attivo esce con 0. Se non trova nessun riferimento remoto esce con 0 e avvisa: il repo è trattato come non attivo. `start` rifiuta di partire se il wrapper non vedrebbe il repo come attivo.
-4. Se manca Python ≥ 3.11: esce con 2 e spiega perché.
-5. Lancia `bin/tollgate hook <evento>` con una scadenza interna (`[hooks] timeout_s`, predefinito 20 s).
-6. **Hook di controllo**: qualunque esito diverso da 0 o 2 diventa 2.
-7. **Hook informativi, `SubagentStop` e `UserPromptExpansion`**: un errore diventa 0, con un avviso. Così un DB guasto non blocca mai i comandi `/tollgate:*`; l'atto in quel caso non viene registrato e la skill lo dice.
+1. `/tollgate:on` e `/tollgate:off [ore]` creano o cancellano `OFF`, con una scadenza facoltativa, senza passare da Python né dal DB. Dal terminale vale lo stesso `touch ~/.local/state/tollgate/OFF`: ogni messaggio di errore del wrapper lo riporta alla lettera, così l'uscita d'emergenza non dipende da `UserPromptExpansion`. Il messaggio di `/tollgate:off` e `/tollgate:on` esce su stdout come `systemMessage` e `additionalContext`: su stderr, con uscita 0, il modello non lo riceve. Le ore valgono da 1 a 9999; un valore diverso spegne senza scadenza e il messaggio lo dice.
+2. Se `OFF` è attivo: esce con 0, scrive l'avviso «tollgate spento» su stderr e registra il salto in `skipped.log`. `OFF` si controlla prima della ricerca del repo attivo, di Python e di ogni logica di tollgate; dall'input il wrapper legge solo `command_name` e `command_args` per `/tollgate:on|off` e, per `UserPromptSubmit`, la presenza di `<task-notification>` (decisione 5 del piano P2).
+3. Controlla in shell, senza rete, se il repo è attivo: cerca `tollgate.toml` su `origin/<tollgate.defaultBranch>` (scritto da `init` e `start`), poi su `origin/HEAD`, `origin/main` e `origin/master`. Se il repo non è attivo esce con 0. Se non trova nessun riferimento remoto esce con 0 e avvisa: il repo è trattato come non attivo. Un repo non attivo resta attivo per una sessione che ha il segnalino `<cartella di stato>/bound/<session_id>`: l'hook lo scrive quando la sessione si lega a un lavoro, così le regole valgono in ogni cartella (6.6), e `start` lo pulisce per le sessioni chiuse (decisione 22 del piano P2). `start` rifiuta di partire se il wrapper non vedrebbe il repo come attivo. Su `PreToolUse`, se il `cwd` non è attivo e la sessione non è legata, il wrapper guarda il registro delle radici attive (6.6): se non è vuoto lancia Python, che decide dal bersaglio; se è vuoto esce con 0.
+4. Se manca Python ≥ 3.11: un hook di controllo esce con 2 e spiega perché; un hook informativo esce con 0 con un avviso (decisione 1 del piano P2: un `SubagentStop` che uscisse con 2 terrebbe vivo il subagente).
+5. Lancia `bin/tollgate hook <evento>` con una scadenza interna (`[hooks] timeout_s`, predefinito 20 s). Python imposta `signal.alarm` su quella scadenza, come configurata. Il wrapper legge `timeout_s` dal riferimento remoto e tiene un cane da guardia a `timeout_s + 2` secondi, con `timeout_s` limitato a 85 s: il tetto vale solo per il cane da guardia (al più 87 s), con i descrittori chiusi, perché un processo orfano non tenga aperta la pipe di Claude Code. `hooks.json` dichiara `timeout: 90` (decisione 4 del piano P2).
+6. **Hook di controllo** (`PreToolUse`: `pre_edit`, `pre_bash`, `pre_agent`, `pre_send_message`, `pre_mcp`; decisione 1 del piano P2): qualunque esito diverso da 0 o 2 diventa 2.
+7. **Hook informativi** (tutti gli altri eventi: `SessionStart`, `UserPromptExpansion`, `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`): un errore diventa 0, con un avviso. Così un DB guasto non blocca mai i comandi `/tollgate:*`; l'atto in quel caso non viene registrato e la skill lo dice.
 
 Ogni messaggio d'errore riporta il percorso assoluto di `bin/tollgate` e il comando `touch` per `OFF`.
 
@@ -503,9 +507,9 @@ Ogni messaggio d'errore riporta il percorso assoluto di `bin/tollgate` e il coma
 | `SessionStart` | `startup`, `resume`, `clear`, `compact`, `fork` | Se la directory è dentro il worktree di un lavoro attivo, lega la sessione al lavoro (0). Inietta lo stato e il checkpoint. Segna come `interrupted` i subagenti `running` **di sessioni non vive** (0); mai in base alla sola origine «precedente» |
 | `UserPromptExpansion` | comandi `tollgate:*`, forma lunga e breve | Registra l'atto (8.4) da `command_name`, che è sempre nella forma lunga, e `command_args` |
 | `PreToolUse` | `Edit`, `Write`, `NotebookEdit`, `MultiEdit` | In `spec_audit`, `plan`, `approval`, `blocked`, `review` e `pr_open`: solo `.md` sotto `docs/superpowers/` (in `spec_audit` e `approval` non sotto `plans/`; mai spec e piano bloccati, 6.2); per correggere il codice dopo `finish` si torna in `execution` con `start`. In `execution`: fuori scope → `deny`; codice scritto dalla sessione principale in L1 o L2 → `deny`. In L0 non c'è scope: scrive la sessione principale, e il superamento delle soglie di 5 porta a L1. File protetti → `deny`, anche quando sono `.md` sotto `docs/superpowers/reviews/`. Sempre ammessi: gli altri `.md` sotto `docs/superpowers/` e `.superpowers/` |
-| `PostToolUse` | `Edit`, `Write`, `MultiEdit` | Ricalcola il livello; sui piani lancia `plan-check` (7.5) |
+| `PostToolUse`, `PostToolUseFailure` | `Edit`, `Write`, `MultiEdit` | Ricalcola il livello; sui piani lancia `plan-check` (7.5). `PostToolUseFailure` (modifica partita ma finita male) è mappato sugli stessi eventi d'ingresso (`post_edit`) |
 | `PostToolUse` | `Skill` | Se lo invoca un implementatore (`agent_id`), registra la skill per il suo task (6.3) |
-| `PostToolUse` | `Bash` | In una sessione legata o nel worktree: se `HEAD` ha commit nuovi non registrati (anche da `merge`, `cherry-pick`, `revert`, `am`), li registra e fa girare test-guard e scope su di essi; una violazione apre un blocco `needs_you`. Se il ramo del worktree è cambiato, apre `needs_you`. È il controllo a valle che copre i comandi non riconosciuti da 7.4 |
+| `PostToolUse`, `PostToolUseFailure` | `Bash` | In una sessione legata o nel worktree: se `HEAD` ha commit nuovi non registrati (anche da `merge`, `cherry-pick`, `revert`, `am`), li registra e fa girare test-guard e scope su di essi; una violazione apre un blocco `needs_you`. Se il ramo del worktree è cambiato, apre `needs_you`. È il controllo a valle che copre i comandi non riconosciuti da 7.4 |
 | `PreToolUse` | `Bash` | 7.4 |
 | `PreToolUse` | `mcp__.*` | Effetto esterno, se lo strumento non è in `mcp_allow` (8.5) |
 | `PreToolUse` | `Agent` | Guardia del contesto. **Scrittore unico**: nessun nuovo implementatore se un altro è `running` nel worktree. Un subagente senza eventi da più di `stale_minutes` (30) diventa `interrupted`, anche se la sua sessione è viva: è un subagente bloccato. In `execution` (L1, L2) ammette come scrittore solo il tipo scelto da `task start` per il task in sospeso (`tollgate:implementer` o l'implementatore per area, 6.3), con il `name` scritto nel brief e senza `run_in_background` |
@@ -534,6 +538,10 @@ L'ambito è quello di 6.6. Le regole sono «best effort».
 | Repo attivo | Effetti esterni (8.5): `gh pr merge` e `gh` in scrittura (`api` con `-X` non GET, `-f`, `-F`, `--input`, `graphql` con `mutation`; `pr create`, `pr edit`, `pr review`, `pr close`, `release`, `workflow run`, `secret`, `project`, `issue edit`, `issue close` e `issue create`) | `deny` fino all'atto |
 | Repo attivo | `git push` verso il ramo predefinito, in entrambe le modalità; `push --force` fuori da `open-pr` e `sync`, `reset --hard`, `--no-verify`, `rm -rf` fuori dal worktree | `deny`. L'hotfix passa da un ramo e da una PR (9.4) |
 | Repo attivo | `claude` e i suoi alias, `TOLLGATE_` nel comando, `tollgate hook`, scrittura sui file protetti | `deny` |
+
+**Forme equivalenti.** I file protetti si valutano sul percorso come scritto e su quello risolto, anche solo in parte (un collegamento a un file, a una cartella o a monte del repo non aggira la protezione: per esempio `~/.claude/settings.json` gestito con i dotfile). Git accetta il prefisso univoco di un'opzione lunga e gli alias definiti con `-c alias.<x>=<valore>`; le regole li leggono come l'originale. Un prefisso di almeno 3 caratteri di `--force`, `--force-with-lease`, `--mirror`, `--no-verify` o `--hard` vale come l'opzione intera (un prefisso ambiguo per git è un errore: viene negato lo stesso). Con `-c alias.<x>=<valore>` il sottocomando `<x>` è il primo token di `<valore>` (con i token seguenti tra gli argomenti); un alias che inizia con `!` è shell e il suo testo si analizza come un comando annidato. Per un comando che la shell non si legge (heredoc non chiuso, virgolette aperte) il ripiego testuale cerca anche `rm -r`, `hooksPath` (senza distinguere maiuscole), `tollgate.toml`, `.tollgate/` e `settings.json` / `settings.local.json`.
+
+**Rimozioni che toccano file protetti.** `rm`, `rmdir`, `mv`, `git rm`, `unlink` e `find -delete` su una cartella che contiene file protetti sono negati, anche quando il file è raggiunto solo da un glob. **`core.hooksPath` è negato a ogni livello di configurazione**, anche con l'opzione compatta `-c`. Vale anche per una sessione non legata.
 
 ### 7.5 `plan-check`
 
@@ -576,19 +584,19 @@ Le intestazioni si cambiano in `[plan] required_sections`, e i profili possono a
 - **Ambiente**: ripulito, con le sole variabili di `[commands] env_allow`, senza `.env`, token o stringhe di connessione.
 - **Cosa registrano**: SHA, comando risolto, uscita, test eseguiti e saltati, durata, log.
 - **Conteggio dei test**: si legge da `report`, oppure da `report_related` per i test correlati. Il file di report si cancella prima di ogni esecuzione.
-- **Stati**: `green` (uscita 0, almeno un test e nessun `failure` o `error` nel report), `red` (uscita diversa da 0, **oppure** report con `failure` o `error` anche con uscita 0: copre `|| true`), `empty` (nessun test), `uncounted` (manca il report), `unverified` (manca il comando). Nessun nuovo tentativo automatico: un rosso resta rosso.
+- **Stati**: `green` (uscita 0, almeno un test e nessun `failure` o `error` nel report), `red` (uscita diversa da 0, **oppure** report con `failure` o `error` anche con uscita 0: copre `|| true`), `empty` (nessun test), `uncounted` (nessun `report` configurato; con un `report` configurato e assente lo stato è `red`), `unverified` (manca il comando). Nessun nuovo tentativo automatico: un rosso resta rosso.
 - **`allow_no_tests = true`**: `empty` vale come `green` sia in locale sia nel gate, sempre con `attenzione` rosso. `uncounted` vale come `green` solo se il comando ha uscita 0 **e** non ha un `report` configurato; se il report è configurato e manca, resta rosso.
 - **Nessun test correlato**: si esegue il gate completo.
 - **Worktree pulito**: si controlla prima di eseguire, escludendo `output_dirs`.
 - **`{files}`**: ogni nome passa per `shlex.quote`, e i file cancellati sono esclusi.
 
 **`SubagentStop` per gli implementatori.**
-- Con `DONE` o `DONE_WITH_CONCERNS` e commit nuovi: serve una ricevuta `green` sull'ultimo commit.
+- Con `DONE` o `DONE_WITH_CONCERNS` e commit nuovi: devono essere `green` **tutti** i comandi del gate sull'ultimo commit, con la stessa regola della Definition of Done (8.7), oppure una ricevuta `green` dei test correlati (`related`) sullo stesso commit. Un gate solo parziale non basta.
 - Con `DONE` o `DONE_WITH_CONCERNS`, nessun commit e impronta dei file cambiata rispetto alla partenza: veto, «committa e verifica».
 - Senza commit e senza modifiche: passa.
 - Con `BLOCKED` o `NEEDS_CONTEXT` basta una ricevuta qualunque, oppure un blocco aperto.
-- Uno stato non riconosciuto vale come `DONE` (un report non valido, 6.3, non è uno stato non riconosciuto).
-- Dopo 2 veti si apre `needs_you` e il subagente chiude.
+- Uno stato non riconosciuto rende il report non valido (18.5): non vale come `DONE`, e il componente `report_fields` lo mette in veto.
+- Dopo 2 veti si apre `needs_you` e il subagente chiude. Alla ripresa i veti tornano a zero; per un subagente di sola lettura l'impronta si prende di nuovo alla ripresa (7.3).
 
 ### 8.2 test-guard
 
@@ -597,7 +605,7 @@ Gira in locale al `git commit` e nel gate dentro `verdict`.
 **Nei file di test** (`test_globs` più quelli dei profili attivi):
 - file cancellati, riconoscendo le rinomine;
 - identificativi della base che mancano nella testa. In locale si ricavano per analisi statica: `describe`/`it`/`test` in JS e TS, `def test_*` e classi `Test*` in Python, `func Test*` in Go. L'analisi statica produce la stessa forma del JUnit di ogni strumento (7.5), così i due insiemi si confrontano. Nel gate vengono dal report JUnit. Gli identificativi della base sono i soli test **eseguiti e non saltati** nella base; nella testa uno `skipped` conta come **mancante**;
-- asserzioni diminuite (`assert_markers` per linguaggio, contate senza commenti e stringhe);
+- asserzioni diminuite (`assert_markers` per linguaggio). Salti e asserzioni si contano sia sul codice senza commenti e stringhe sia sul testo grezzo, e vale il caso peggiore: un errore dello scanner non nasconde un indebolimento (fail-closed);
 - marcatori di salto aggiunti, solo a parola intera:
   - JS e TS: `xit`, `xdescribe`, `xtest`, `.skip`, `.only`, `.todo`, `.fixme`, `.skipIf`, `.runIf(false)`, `.fails`;
   - Python: `pytest.skip(`, `pytest.mark.skip` (con o senza parentesi, compreso `skipif`), `xfail`, `@unittest.skip`, `skipIf`, `skipUnless`;
@@ -606,7 +614,7 @@ Gira in locale al `git commit` e nel gate dentro `verdict`.
   - Rust: `#[ignore]`.
 
 **In tutto il repo:**
-- soglie di copertura abbassate;
+- soglie di copertura abbassate o rimosse, anche se commentate: una chiave conta come abbassata se lo è in una delle due letture (pulita o grezza). I file di copertura noti (`.nycrc`, `.coveragerc`, `setup.cfg` e simili) si controllano in ogni cartella del repo, non solo alla radice;
 - CI modificata;
 - snapshot e fixture aggiornati (`fixture_globs`);
 - `verification_globs` (configurazione di test e copertura): queste modifiche non bloccano, ma richiedono una deroga `command`, valida subito e sempre visibile in `attenzione`;
@@ -626,6 +634,7 @@ Gira in locale al `git commit` e nel gate dentro `verdict`.
 - **`command`**: vale subito ed è sempre in `attenzione`;
 - **`test`, `ci`, `threshold`**: restano in attesa fino ad `approve waiver`;
 - **`--pattern <glob>`** (codemod): una sola deroga per molti file, sempre in attesa e in `attenzione`;
+- **in locale** una deroga dichiarata scioglie la violazione anche se è ancora in attesa: il commit passa, e `open-pr` rifiuta finché ci sono deroghe in attesa (decisione 9 del piano P2). Nel gate restano in `attenzione`;
 - **deroga scritta a mano da te** in una PR manuale: va nel file dell'issue chiusa dalla PR, e il gate la tratta come qualunque deroga dichiarata.
 
 **Blocchi** (`tollgate block open <tipo> --reason`):
@@ -636,6 +645,8 @@ Gira in locale al `git commit` e nel gate dentro `verdict`.
 ### 8.4 Atti dell'utente
 
 Li registra `UserPromptExpansion` quando digiti il comando. Il tipo di atto viene da `command_name`, sempre nella forma lunga (`tollgate:approve`) anche quando digiti la breve, e gli argomenti da `command_args` (verificato in P0, anche per le skill con `disable-model-invocation`). L'atto registra `source`, `actor`, sessione, lavoro della sessione (se legata), oggetto e testo digitato. `source` è un elenco aperto: il nucleo usa `claude-code`, D aggiunge gli altri harness. Ogni atto ha uno `state` (`pending`, `consumed`, `expired`). Gli atti che autorizzano una volta sola (`finish`, `approve effect`, `approve pr`, `approve rebase`, `sync`, `adopt`, `cleanup`, `abandon`) diventano `consumed` quando la CLI li usa, e la CLI li accetta solo se sono dello stesso lavoro e dello stesso oggetto (issue, SHA o identificativo); per `adopt` e `cleanup`, che si danno da una sessione non legata, il lavoro è `null`. Tutti tranne `finish` vanno usati nella stessa sessione e scadono dopo `[acts] ttl_minutes` (10). **`finish` non scade a tempo e non è legato alla sessione:** è legato allo SHA di HEAD del lavoro e decade appena HEAD è diverso (nuovo commit, reset, rebase), così sopravvive anche al `/clear` della guardia del contesto, perché tra il comando e `open-pr` passano `finish check` e la revisione, che durano più di 10 minuti. Un secondo `/tollgate:finish` sullo stesso SHA riprende dal ciclo registrato, senza aprirne uno nuovo.
+
+**Oggetto e target** (decisione 15 del piano P2). `approve <oggetto> [<target>]`: il target è il secondo argomento per `waiver`, `effect`, `finding`, `level`, `rounds` e `spec` (numero di fette); per `pr` è lo SHA di HEAD; per `plan`, `rebase` e `unverified-*` non c'è target. `reopen spec|plan <motivo>` ha come oggetto `spec` o `plan`. `resolve <id> <nota>` ha come target `<id>`, anche `writer`. `adopt #N` e `abandon #N` hanno come target `N`. `finish` lega il lavoro della sessione e lo SHA di HEAD. Tutti gli argomenti restano in `args`. Un `approve waiver` vale in ogni stato del suo atto (`pending`, `consumed`, `expired`): approvare una deroga non la consuma, quindi la scadenza di questa tabella non la tocca (decisione 10 del piano P2).
 
 | Atto | Effetto |
 |---|---|
@@ -681,7 +692,7 @@ Li registra `UserPromptExpansion` quando digiti il comando. Il tipo di atto vien
 **Come funziona:**
 1. veto, con un identificativo;
 2. `/tollgate:approve effect <id>`;
-3. l'effetto passa una volta, per quel comando esatto;
+3. l'effetto passa una volta, per quel comando esatto. L'atto si consuma a `PostToolUse Bash`, e anche a `PostToolUseFailure Bash` (un comando con uscita diversa da 0 è partito lo stesso), non a `PreToolUse`: un comando negato non consuma nulla. Per MCP, poiché l'adattatore di P2 non mappa `PostToolUse` MCP, l'atto si consuma a `PreToolUse`;
 4. il permesso diventa un intento, con chiave (comando, lavoro, SHA);
 5. se lo stesso effetto si ripete sullo stesso SHA, ti avvisa con «già eseguito alle…».
 
@@ -850,7 +861,7 @@ C'è una sola revisione finale: `tollgate:execute` non ne ha una propria.
 
 ### 11.1 Dipendenze
 
-- **Superpowers** con l'intervallo `>=6.4.1 <7.0.0`, per brainstorming, writing-plans, TDD e debugging. Di Superpowers tollgate usa solo il formato del piano (`### Task N`, `Create:`/`Modify:`/`Test:`), che `plan-check` verifica. I tag di versione esistono, con il prefisso `v` (`v6.4.1`, `v6.4.2`; verificato in P0). Se il risolutore delle `dependencies` non accetta il prefisso (da verificare in P2, 16), la dipendenza va senza intervallo e la versione la controlla `start` leggendo il `plugin.json` di Superpowers.
+- **Superpowers** (versione minima 6.4.1), per brainstorming, writing-plans, TDD e debugging. Di Superpowers tollgate usa solo il formato del piano (`### Task N`, `Create:`/`Modify:`/`Test:`), che `plan-check` verifica. In `dependencies` va **senza `version`** (verificato in P2, 16): la documentazione risolve i vincoli sui tag `<plugin>--v<versione>`, mentre Superpowers ha solo `v6.4.1` e `v6.4.2`, e con un repository proprio l'installazione potrebbe fallire («has no git tag satisfying»). La versione minima la controlla `start` leggendo il `plugin.json` di Superpowers (P3). `plugin.json` si convalida con `claude plugin validate`.
 - **`marketplace.json`** con l'allowlist tra marketplace.
 
 ### 11.2 `/tollgate:init`
@@ -868,7 +879,7 @@ C'è una sola revisione finale: `tollgate:execute` non ne ha una propria.
 
 ### 11.3 `/tollgate:setup`
 
-Un plugin non può impostare la statusline principale (verificato). `/tollgate:setup` ti mostra la modifica da fare a `~/.claude/settings.json`. La statusline scrive il file `ctx/<session_id>.json`. Senza statusline, o con un valore `null`, la guardia del contesto non blocca.
+Un plugin non può impostare la statusline principale (verificato). `/tollgate:setup` ti mostra la modifica da fare a `~/.claude/settings.json`. La statusline scrive il file `<cartella di stato>/ctx/<session_id>.json` nella forma `{"used_pct": <numero o null>}` (decisione 13 del piano P2). File assente, illeggibile o con `null` non bloccano nulla: la guardia del contesto, in quel caso, non interviene.
 
 ### 11.4 `tollgate.toml`
 
@@ -1040,6 +1051,12 @@ Le soglie della revisione 18 vengono da pratiche pensate per le persone (Google,
 | `meta` | schema_version | |
 
 Le deroghe non sono nel DB: stanno nel ramo, in `.tollgate/waivers/<N>.toml`.
+
+**Migrazione 2** (decisione 7 del piano P2; le migrazioni successive restano solo in avanti). Servono dati che lo schema 1 non ha:
+- `session_seen(session, last_seen)`: ogni hook la aggiorna, per la sessione viva (0);
+- `subagents.last_seen` (subagente fermo da più di `stale_minutes`), `subagents.vetoes` (i 2 veti di 8.1) e `subagents.report` (il report arrivato con `SubagentHandback` prima di `SubagentStop`);
+- `tasks.pending` (`launch` o `resume`): il `task start` in sospeso di 6.3, scritto da `tasks.assign`;
+- `work_items.level_cap_paths`: il tetto di livello resta finché il diff non tocca un percorso sensibile nuovo (5).
 
 **Chiavi sconosciute in `tollgate.toml`:** ignorate con un avviso, così B può aggiungere chiavi di profilo. Una chiave nota con un tipo sbagliato è un errore.
 
@@ -1323,12 +1340,21 @@ Ogni criterio è un'azione con un esito binario.
 | `pull_request_target` verso un ramo non predefinito | Scatta e usa sempre la definizione del ramo predefinito | 9.2 |
 | Sorgente fissata per gli stati di commit | Funziona: con `app_id` 15368 uno stato pubblicato con un token personale lascia la PR bloccata, uno di `github-actions[bot]` la sblocca | 1.2, 9.3 |
 | Dependabot e `workflow_run` | Il `workflow_run` riceve i permessi dichiarati e i segreti normali | 9.1 |
-| Tag di Superpowers | `v6.4.1` e `v6.4.2`, con il prefisso `v` | 11.1 |
+| Tag di Superpowers | `v6.4.1` e `v6.4.2`, senza il nome del plugin; la documentazione chiede `<plugin>--v<versione>` (vedi P2) | 11.1 |
 | JUnit di vitest, jest e pytest | Identificativi stabili; forma diversa per strumento; jest-junit senza il file con la configurazione predefinita | 7.5, 8.2, 11.2 |
 
+**Verificato in P2, il 09/10/2026** (rapporto in `docs/verifiche/2026-10-09-p2-verifiche.md`; Claude Code 2.1.295).
+
+| Cosa | Esito | Dove incide |
+|---|---|---|
+| Taglio di `maxTurns` per un subagente in background (E7) e alla ripresa con `SendMessage` (E8) | Nessun `SubagentStop`. `maxTurns` riparte da zero a ogni ripresa. Il taglio si riconosce da `UserPromptSubmit` con `prompt` `<task-notification>` che contiene «stopped at its N-turn limit»; `<task-id>` è l'`agent_id`. `PostToolUse SendMessage` non porta il taglio | 6.3, 7.2 |
+| Input reali di `Write`, `Edit`, `Skill` e `Write` di un subagente (E9) | Campioni in `spikes/fixtures/hook-inputs/samples.json`. Con un permesso negato `PreToolUse` scatta e `PostToolUse` no | 7.2 |
+| `dependencies` con `version` (D1) | I vincoli si risolvono sui tag `<plugin>--v<versione>` (documentazione); Superpowers ha solo `v6.4.1` e `v6.4.2`. Nessun `version`; ripiego di 11.1. Dipendenza tra marketplace: `allowCrossMarketplaceDependenciesOn`. Convalida: `claude plugin validate` | 11.1 |
+| `additionalContext` e uscita 2 (D2, documentazione) | `additionalContext` vale per `SessionStart`, `SubagentStart` (contesto del subagente), `UserPromptSubmit`, `UserPromptExpansion`, `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`. Uscita 2: blocca `PreToolUse`, impedisce `SubagentStop`, mostra stderr al modello in `PostToolUse` | 7.2 |
+| `MultiEdit` e `NotebookEdit` (D3, documentazione) | `NotebookEdit` esiste, con `notebook_path`; `MultiEdit` non è documentato | 7.2 |
+
 **Ancora da verificare:**
-- come appare il taglio di `maxTurns` per un subagente in background e durante una ripresa con `SendMessage`, e se `maxTurns` riparte da zero alla ripresa. Conta per i giri di correzione 1-3, che passano tutti da `SendMessage`; la ripresa è asincrona (in E1 `PostToolUse SendMessage` torna prima del secondo `SubagentStop`). Si verifica all'inizio di P2;
-- se il risolutore delle `dependencies` dei plugin accetta i tag con il prefisso `v` (P2, 11.1).
+- la forma dell'input di `NotebookEdit` osservata in un hook.
 
 ---
 
@@ -1402,6 +1428,11 @@ cost = "…"
 declared_by = "agent"     # agent | user
 ```
 
+Regole (rev 21):
+- `file` è relativo alla radice del worktree. `waiver add` con un percorso assoluto dentro il worktree lo rende relativo; fuori dal worktree è rifiutato.
+- Per `type = "test"` serve `--test` con gli identificativi; senza, il comando è rifiutato.
+- Una deroga con `tests` copre una violazione con identificativi solo se sono elencati **tutti** gli identificativi della violazione.
+
 ### 18.3 Intestazione dei report
 
 ```yaml
@@ -1432,7 +1463,7 @@ I file `spec-approval` e `plan-approval` li scrive solo `act apply`, con questi 
 
 **Revisore finale:** `{"sha", "code", "outcome": "ok" | "needs_fix" | "needs_you", "findings": [{"severity", "confidence": 0-1, "file", "line", "rule", "text"}]}`, dove `rule` è la regola `R-…` violata o il passo del piano (8.6). L'identificativo lo assegna `SubagentStop`: `f-<ciclo>-<n>`.
 
-**Report dell'implementatore** (ultimo messaggio, un blocco JSON): `{"v": 1, "task": k, "status": "DONE" | "DONE_WITH_CONCERNS" | "BLOCKED" | "NEEDS_CONTEXT", "done": "…", "tests": "comando ed esito", "files": [...], "must_have": ["M1"], "concerns": "…", "left": "…", "size_reason": null}`. `size_reason` è obbligatorio oltre `task_lines_max`.
+**Report dell'implementatore** (ultimo messaggio, un blocco JSON): `{"v": 1, "task": k, "status": "DONE" | "DONE_WITH_CONCERNS" | "BLOCKED" | "NEEDS_CONTEXT", "done": "…", "tests": "comando ed esito", "files": [...], "must_have": ["M1"], "concerns": "…", "left": "…", "size_reason": null}`. `size_reason` è obbligatorio oltre `task_lines_max`. Uno `status` fuori dai quattro valori rende il report non valido (fail-closed).
 
 **Revisore del task:** `{"v": 1, "task": k, "sha", "code", "outcome": "approved" | "changes", "spec_compliance": ["missing" | "extra"] (vuoto se aderente), "findings": [{"severity", "file", "line", "rule", "text"}]}`. Vale solo con lo SHA e il codice del brief di `task review-prepare`. `rule` è la regola violata (`R-…`) o il passo del piano: senza, il rilievo non vale.
 
@@ -1487,3 +1518,4 @@ L'elenco completo è in `docs/COSA-TENERE.md`.
 | 18 | 08/10/2026 | Decisione dell'utente, da `docs/RICERCA-ORGANIZZAZIONE.md`: dimensione e budget del task (`[tasks]`), report dell'implementatore a campi fissi, standard del revisore e disaccordo istruito con regola citata, Definition of Done per livello (8.7, campo `dod` dei profili e del JSON), spec L2 con «Tane di coniglio» e «Cosa non fare»; criteri 39-41; ogni pratica è un componente spegnibile in `[components]`, e `status` indica quale tetto ha fermato il lavoro |
 | 19 | 08/10/2026 | Decisione dell'utente dopo l'analisi dei problemi d'uso: must-have legati ai test (7.5, 8.7, componente `must_have_tests`); `tollgate stats` dagli eventi (3.1); voci di `attenzione` divise in «da leggere» e «informative», con lo stato rosso solo per le prime (9.2); criteri 42-44 |
 | 20 | 08/10/2026 | Esiti delle verifiche P0 (`docs/verifiche/2026-10-08-p0-esiti.md`). Conseguenze K1-K12 approvate dall'utente; le aggiunte emerse applicandole (nome `-r<giro>`, implementatori in primo piano senza `run_in_background`, `app_id` letto al lancio del comando, `EnterWorktree` in 6.1, prefisso `v` in P2) e le correzioni della revisione finale del ramo (token letti a `SubagentStop`, riga del subagente chiusa al taglio, riconoscimento del taglio dal blocco dell'harness, `handbackReport`, `SendMessage` dalla sessione principale, riga Dependabot di 13) sono state elencate all'utente prima del merge. Contenuto: implementatori lanciati con un nome fisso e ripresi per nome, tabella nome → `agent_id` (`subagents.name`); `PostToolUse Agent` per il taglio di `maxTurns`; token dal transcript a `SubagentStop`; `SubagentHandback` fonte primaria in auto mode; subagenti interni ignorati; atti da `command_name`; comandi `!` tra i limiti di 1.2; forma JUnit degli identificativi per strumento e configurazione di jest-junit in `init`; modalità riconosciuta da codice e messaggio della GET di protezione (404 «Branch not protected» → `protected`); sorgente fissata con `app_id` letto dal check-run di `tollgate-base`; ingresso nel worktree con `EnterWorktree`, con il ripiego «cd && claude»; PR di Dependabot in 9.1; `mcpServers` ignorato; sezione 16 aggiornata; riga Dependabot di 13; criteri 4, 10, 11, 39 e 42 |
+| 21 | 09/10/2026 | Esiti delle verifiche P2 (`docs/verifiche/2026-10-09-p2-verifiche.md`): taglio di `maxTurns` in background e alla ripresa riconosciuto da `UserPromptSubmit` con `<task-notification>`; tag delle `dependencies` nella forma `<plugin>--v<versione>`, quindi nessun `version` per Superpowers; `additionalContext` per evento; eventi d'ingresso `post_agent`, `post_skill` e `prompt_submit`; `record <operazione>` come operazione di un elenco chiuso; decisioni del piano P2 riportate 1, 2, 4, 5, 6, 7, 9, 10, 11, 13, 15 e 22; sezioni toccate: 3.2 (pattern di percorsi e di comandi, `Ctx.approved_waivers` come API per P3), 6.2 (blocco di spec e piano solo dopo l'approvazione), 6.3 (taglio riconosciuto per prompt che comincia con `<task-notification>`, blocco per blocco; riga sempre `cut`), 6.6 (sessione legata negata in un altro lavoro; file protetti per ogni radice), 7.1 (classificazione degli hook, Python mancante, scadenza con `signal.alarm` e cane da guardia, `OFF` con `off.log`, segnalino `bound/`, messaggi su stdout), 7.4 (rimozioni che toccano file protetti; `core.hooksPath` negato), 8.1 (report configurato e assente → `red`; gate completo come la DoD; veti azzerati alla ripresa; stato non riconosciuto → report non valido), 8.2 (salti e asserzioni sul testo grezzo; soglie abbassate anche se commentate), 8.3 (deroghe in locale anche se in attesa), 8.4 (oggetto e target degli atti; `approve waiver` in ogni stato), 8.5 (consumo a `PostToolUse Bash`, MCP a `PreToolUse`), 11.1, 11.3 (forma del file del contesto), 12.2 (migrazione 2), 16, 18.2 (`file` relativo, `--test`, identificativi completi), 18.5 (status fuori dai quattro valori), 20; sezione 16 aggiornata. Correzioni della revisione finale del ramo (stessa revisione): 6.6 e 7.1 punto 3 (la protezione segue il bersaglio, non il `cwd`: registro delle radici attive in `<stato>/active/`; Python parte fuori dai repo attivi se il registro non è vuoto e decide dal bersaglio, anche relativo), 7.2 e 8.5 punto 3 (`PostToolUseFailure` per Bash e modifiche; l'adattatore di P2 non mappa `PostToolUse` MCP), 7.4 (opzioni lunghe abbreviate, alias con `-c`, ripiego testuale più largo) |

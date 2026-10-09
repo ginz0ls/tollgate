@@ -1,0 +1,196 @@
+#!/usr/bin/env bash
+# Wrapper degli hook di tollgate (spec 7.1). Uso: hooks/run <EventoDiClaudeCode>
+# Solo l'uscita 2 blocca: qui ogni errore di un hook di controllo diventa 2,
+# ogni errore di un hook informativo diventa 0 con un avviso.
+set -u
+EVENT="${1:-}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BIN="$ROOT/bin/tollgate"
+STATE="${HOME}/.local/state/tollgate"
+if [ -n "${TOLLGATE_STATE:-}" ] && [ -f "${TOLLGATE_STATE}/.tollgate-test" ]; then
+  STATE="$TOLLGATE_STATE"
+fi
+OFF="$STATE/OFF"
+HINT="Per spegnere tollgate: /tollgate:off, oppure dal terminale: touch $STATE/OFF"
+case "$EVENT" in PreToolUse) CONTROL=yes ;; *) CONTROL=no ;; esac
+INPUT="$(cat)"
+
+# UserPromptSubmit scatta a ogni prompt: senza una notifica di subagente non c'è nulla da fare,
+# e Python non deve partire.
+if [ "$EVENT" = "UserPromptSubmit" ]; then
+  case "$INPUT" in
+    *'<task-notification>'*) ;;
+    *) exit 0 ;;
+  esac
+fi
+
+now_iso() { date -u +%Y-%m-%dT%H:%M:%S.000000Z; }
+iso_of() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%S.000000Z 2>/dev/null \
+  || date -u -r "$1" +%Y-%m-%dT%H:%M:%S.000000Z; }
+# Valore stringa della prima occorrenza di una chiave dell'input, senza jq (best effort).
+# La prima occorrenza è quella di primo livello: i campi di Claude Code precedono tool_input.
+json_str() {
+  printf '%s' "$INPUT" | awk -v k="$1" '
+    { s = s $0 " " }
+    END {
+      re = "\"" k "\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]|\\\\.)*\""
+      if (match(s, re)) {
+        v = substr(s, RSTART, RLENGTH)
+        sub("^\"" k "\"[[:space:]]*:[[:space:]]*\"", "", v)
+        sub("\"$", "", v)
+        gsub(/\\"/, "\"", v)
+        gsub(/\\\\/, "\\", v)
+        print v
+      }
+    }'
+}
+
+# Messaggio per l'utente e per il modello dei rami off/on (D2 del Task 1: stderr con uscita 0
+# viene scartato da Claude Code). Un solo oggetto JSON su stdout, escape di virgolette e backslash.
+expansion_json() {
+  local m
+  m="$(printf '%s' "$1" | tr -d '\000-\037')"
+  m="${m//\\/\\\\}"
+  m="${m//\"/\\\"}"
+  printf '{"systemMessage": "%s", "hookSpecificOutput": {"hookEventName": "UserPromptExpansion", "additionalContext": "%s"}}\n' "$m" "$m"
+}
+
+# 1. Interruttore senza Python né DB.
+if [ "$EVENT" = "UserPromptExpansion" ]; then
+  CMD="$(json_str command_name)"
+  if [ "$CMD" = "tollgate:off" ]; then
+    mkdir -p "$STATE"
+    ARGS="$(json_str command_args)"
+    UNTIL=""
+    # LC_ALL=C: in una locale UTF-8 cifre non ASCII passerebbero il test e `10#` darebbe un errore
+    # aritmetico che interrompe il ramo off (l'interruttore d'emergenza deve restare solido).
+    HOURS_OK=no
+    ( LC_ALL=C; [[ "$ARGS" =~ ^[0-9]{1,4}$ ]] && [ "$((10#$ARGS))" -ge 1 ] ) 2>/dev/null && HOURS_OK=yes
+    if [ "$HOURS_OK" = yes ]; then
+      UNTIL=$(( $(date +%s) + 10#$ARGS * 3600 ))
+      printf 'until=%s\n' "$UNTIL" > "$OFF"
+      MSG="tollgate spento per $ARGS ore. Per riaccenderlo: /tollgate:on"
+    else
+      : > "$OFF"
+      if [ -n "$ARGS" ]; then
+        MSG="tollgate spento senza scadenza: «$ARGS» non è un numero intero di ore (1-9999). Per riaccenderlo: /tollgate:on"
+      else
+        MSG="tollgate spento. Per riaccenderlo: /tollgate:on"
+      fi
+    fi
+    if [ -n "$UNTIL" ]; then
+      printf '%s off %s\n' "$(now_iso)" "$UNTIL" >> "$STATE/off.log"
+    else
+      printf '%s off\n' "$(now_iso)" >> "$STATE/off.log"
+    fi
+    expansion_json "$MSG"
+    exit 0
+  fi
+  if [ "$CMD" = "tollgate:on" ]; then
+    if [ -e "$OFF" ]; then
+      rm -f "$OFF"
+      printf '%s on\n' "$(now_iso)" >> "$STATE/off.log"
+      expansion_json "tollgate acceso. Per spegnerlo: /tollgate:off"
+    else
+      expansion_json "tollgate era già acceso. Per spegnerlo: /tollgate:off"
+    fi
+    exit 0
+  fi
+fi
+
+# 2. OFF attivo, salvo scadenza passata.
+if [ -e "$OFF" ]; then
+  UNTIL="$(sed -n 's/^until=\([0-9][0-9]*\)$/\1/p' "$OFF" 2>/dev/null | head -n 1)"
+  if [ -n "$UNTIL" ] && [ "$(date +%s)" -ge "$UNTIL" ]; then
+    rm -f "$OFF"
+    printf '%s on\n' "$(iso_of "$UNTIL")" >> "$STATE/off.log"
+  else
+    printf '%s skip %s\n' "$(now_iso)" "$EVENT" >> "$STATE/skipped.log" 2>/dev/null
+    echo "tollgate spento ($OFF): nessun controllo. Per riaccenderlo: /tollgate:on" >&2
+    exit 0
+  fi
+fi
+
+# 3. Repo attivo? tollgate.toml sul ramo predefinito di origin, senza rete.
+CWD="$(json_str cwd)"
+[ -n "$CWD" ] && [ -d "$CWD" ] || CWD="$PWD"
+ACTIVE=no; FOUND=no; REF=""
+B="$(git -C "$CWD" config --get tollgate.defaultBranch 2>/dev/null)"
+for ref in ${B:+"origin/$B"} origin/HEAD origin/main origin/master; do
+  if git -C "$CWD" rev-parse --verify -q "$ref^{commit}" >/dev/null 2>&1; then
+    FOUND=yes; REF="$ref"
+    git -C "$CWD" cat-file -e "$ref:tollgate.toml" 2>/dev/null && ACTIVE=yes
+    break
+  fi
+done
+SESSION="$(json_str session_id | tr -cd 'A-Za-z0-9_-')"
+if [ "$ACTIVE" = no ] && [ -n "$SESSION" ] && [ -e "$STATE/bound/$SESSION" ]; then
+  ACTIVE=yes   # sessione legata a un lavoro: le regole valgono in ogni cartella (6.6)
+fi
+if [ "$ACTIVE" = no ] && [ "$EVENT" = PreToolUse ] && [ -d "$STATE/active" ]; then
+  # Il cwd non è in un repo attivo, ma esiste almeno un repo attivo noto (registro scritto da
+  # Python): il bersaglio può starci con percorsi relativi, `~`, `cd` o `git -C`, che l'input non
+  # nomina alla lettera. Python decide dal bersaglio (6.6). Registro vuoto: nessun costo.
+  if [ -n "$(cat "$STATE"/active/* 2>/dev/null | sed '/^$/d' | head -n 1)" ]; then
+    ACTIVE=yes
+  fi
+fi
+if [ "$ACTIVE" = no ]; then
+  if [ "$FOUND" = no ] && git -C "$CWD" rev-parse --git-dir >/dev/null 2>&1; then
+    echo "tollgate: nessun riferimento remoto (origin/HEAD, main, master): repo trattato come non attivo" >&2
+  fi
+  exit 0
+fi
+
+# 4. Python >= 3.11.
+PY=""
+for c in python3 python3.13 python3.12 python3.11; do
+  if command -v "$c" >/dev/null 2>&1 \
+     && "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
+    PY="$c"; break
+  fi
+done
+if [ -z "$PY" ]; then
+  echo "tollgate: serve Python >= 3.11 per i controlli. Programma: $BIN. $HINT" >&2
+  [ "$CONTROL" = yes ] && exit 2
+  exit 0
+fi
+
+# 5. Il controllo, con un cane da guardia oltre la scadenza interna di Python (decisione 4).
+TIMEOUT=20
+if [ -n "$REF" ]; then
+  T="$(git -C "$CWD" show "$REF:tollgate.toml" 2>/dev/null | awk '
+    /^\[hooks\]/ { s = 1; next } /^\[/ { s = 0 }
+    s && /^[[:space:]]*timeout_s[[:space:]]*=/ {
+      if (match($0, /=[[:space:]]*[0-9]+/)) { v = substr($0, RSTART, RLENGTH); gsub(/[^0-9]/, "", v); print v }
+      exit
+    }')"
+  if [ -n "$T" ] && [ "${#T}" -le 3 ] && [ "$((10#$T))" -ge 1 ]; then TIMEOUT=$((10#$T)); fi
+fi
+[ "$TIMEOUT" -gt 85 ] && TIMEOUT=85
+TMPO="$(mktemp)"; TMPE="$(mktemp)"
+trap 'rm -f "$TMPO" "$TMPE"' EXIT
+printf '%s' "$INPUT" | "$PY" "$BIN" hook "$EVENT" >"$TMPO" 2>"$TMPE" &
+PID=$!
+# Cane da guardia: alla fine del hook il wrapper lo ferma, e il guardiano ferma il suo sleep.
+( trap 'kill "$SP" 2>/dev/null; exit 0' TERM
+  sleep $(( TIMEOUT + 2 )) & SP=$!
+  wait "$SP" && kill -TERM "$PID" ) >/dev/null 2>&1 </dev/null &
+WD=$!
+wait "$PID"; RC=$?
+kill "$WD" >/dev/null 2>&1
+
+# 6-7. Uscite.
+if [ "$RC" -eq 0 ] || [ "$RC" -eq 2 ]; then
+  cat "$TMPO"; cat "$TMPE" >&2
+  exit "$RC"
+fi
+mkdir -p "$STATE"
+{ printf '%s %s rc=%s\n' "$(now_iso)" "$EVENT" "$RC"; cat "$TMPE"; } >> "$STATE/hook-errors.log" 2>/dev/null
+if [ "$CONTROL" = yes ]; then
+  cat "$TMPE" >&2
+  echo "tollgate: controllo non riuscito (uscita $RC): azione negata. Log: $STATE/hook-errors.log. Programma: $BIN. $HINT" >&2
+  exit 2
+fi
+echo "tollgate: avviso, hook $EVENT non riuscito (uscita $RC) e ignorato. $HINT" >&2
+exit 0

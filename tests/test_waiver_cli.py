@@ -1,0 +1,138 @@
+import shutil
+import subprocess
+import sys
+import tempfile
+import textwrap
+import time
+import unittest
+from datetime import datetime, timezone
+from pathlib import Path
+
+from tests.helpers import BIN, TempState, git, make_repo
+from tollgate_analysis import waivers
+from tollgate_core import db, phases, waiver_cli
+from tollgate_core.cli import UsageError
+
+T0 = datetime(2026, 10, 9, 10, 0, tzinfo=timezone.utc)
+
+
+class WaiverCliTest(unittest.TestCase):
+    def setUp(self):
+        self.ts = TempState()
+        self.tmp = Path(tempfile.mkdtemp(prefix="tollgate-waiver-"))
+        self.wt = make_repo(self.tmp / "wt")
+        (self.wt / "a").write_text("x")
+        git(self.wt, "add", "-A")
+        git(self.wt, "commit", "-qm", "x")
+        conn = db.open_db(self.ts.state)
+        self.work = phases.create_work(conn, repo_key="r", issue=7, level="L1", now=T0,
+                                       worktree=str(self.wt), branch="tg/7-x")
+        conn.close()
+
+    def tearDown(self):
+        self.ts.cleanup()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def stored(self):
+        return waivers.parse((self.wt / ".tollgate/waivers/7.toml").read_text())
+
+    def test_add_two_waivers(self):
+        w1 = waiver_cli.add_waiver(self.ts.state, self.wt / "src", type_="scope", file="src/x.py",
+                                   choice="c", why="w", cost="k", now=T0)
+        w2 = waiver_cli.add_waiver(self.ts.state, self.wt, type_="test", file="tests/t.py",
+                                   tests=["t::a"], choice="c", why="w", cost="k", now=T0)
+        self.assertEqual((w1, w2), ("w-7-1", "w-7-2"))
+        wf = waivers.parse((self.wt / ".tollgate/waivers/7.toml").read_text())
+        self.assertEqual((wf.issue, wf.branch, [w.id for w in wf.waivers]),
+                         (7, "tg/7-x", ["w-7-1", "w-7-2"]))
+        self.assertEqual([w.file for w in wf.waivers], ["src/x.py", "tests/t.py"])
+        conn = db.open_db(self.ts.state)
+        try:
+            self.assertEqual(conn.execute("SELECT count(*) FROM events WHERE type="
+                                          "'waiver_added'").fetchone()[0], 2)
+        finally:
+            conn.close()
+
+    def test_concurrent_adds_keep_every_waiver(self):
+        # M6: lettura, assegnazione dell'id e scrittura sono una sezione critica.
+        start = time.time() + 1.5
+        code = textwrap.dedent(f"""
+            import sys, time
+            sys.path.insert(0, {str(BIN)!r})
+            from pathlib import Path
+            from tollgate_core import waiver_cli
+            from tollgate_core.paths import resolve_state
+            while time.time() < {start!r}:
+                pass
+            for i in range(6):
+                waiver_cli.add_waiver(resolve_state(), Path({str(self.wt)!r}), type_="scope",
+                                      file=f"src/{{sys.argv[1]}}{{i}}.py", choice="c", why="w",
+                                      cost="k")
+        """)
+        procs = [subprocess.Popen([sys.executable, "-B", "-c", code, tag], env=self.ts.env(),
+                                  stderr=subprocess.PIPE, text=True) for tag in "ab"]
+        for p in procs:
+            _, err = p.communicate(timeout=120)
+            self.assertEqual(p.returncode, 0, err)
+        ids = [w.id for w in self.stored().waivers]
+        self.assertEqual(len(ids), 12)
+        self.assertEqual(len(set(ids)), 12)
+        self.assertEqual(sorted(w.file for w in self.stored().waivers),
+                         sorted(f"src/{t}{i}.py" for t in "ab" for i in range(6)))
+        self.assertEqual([p.name for p in (self.wt / ".tollgate/waivers").glob("*.tmp*")], [])
+
+    def test_errors(self):
+        with self.assertRaises(UsageError):
+            waiver_cli.add_waiver(self.ts.state, self.wt, type_="boh", file="a", choice="c",
+                                  why="w", cost="k", now=T0)
+        with self.assertRaises(UsageError):
+            waiver_cli.add_waiver(self.ts.state, self.wt, type_="scope", choice="c", why="w",
+                                  cost="k", now=T0)
+        with self.assertRaises(UsageError):
+            waiver_cli.add_waiver(self.ts.state, self.tmp, type_="scope", file="a", choice="c",
+                                  why="w", cost="k", now=T0)
+
+    def test_relative_file_is_relative_to_worktree_root(self):
+        sub = self.wt / "sub"
+        sub.mkdir()
+        waiver_cli.add_waiver(self.ts.state, sub, type_="scope", file="x.py", choice="c",
+                              why="w", cost="k", now=T0)
+        waiver_cli.add_waiver(self.ts.state, self.wt, type_="scope", file="./a", choice="c",
+                              why="w", cost="k", now=T0)
+        self.assertEqual([w.file for w in self.stored().waivers], ["x.py", "a"])
+
+    def test_absolute_file_inside_worktree_is_made_relative(self):
+        waiver_cli.add_waiver(self.ts.state, self.wt, type_="scope",
+                              file=str(self.wt / "src" / "y.py"), choice="c", why="w",
+                              cost="k", now=T0)
+        self.assertEqual(self.stored().waivers[0].file, "src/y.py")
+
+    def test_file_outside_worktree_is_rejected(self):
+        for bad in ("../fuori.py", str(self.tmp / "fuori.py")):
+            with self.subTest(file=bad), self.assertRaises(UsageError) as cm:
+                waiver_cli.add_waiver(self.ts.state, self.wt, type_="scope", file=bad,
+                                      choice="c", why="w", cost="k", now=T0)
+            self.assertIn("fuori dal worktree", str(cm.exception))
+        self.assertFalse((self.wt / ".tollgate/waivers/7.toml").exists())
+
+    def test_type_test_requires_test_ids(self):
+        with self.assertRaises(UsageError) as cm:
+            waiver_cli.add_waiver(self.ts.state, self.wt, type_="test", file="tests/t.py",
+                                  choice="c", why="w", cost="k", now=T0)
+        self.assertIn("--test", str(cm.exception))
+        self.assertFalse((self.wt / ".tollgate/waivers/7.toml").exists())
+
+    def test_block_open(self):
+        bid = waiver_cli.open_block_cmd(self.ts.state, self.wt, type_="test_spec_conflict",
+                                        reason="il test contraddice la spec", now=T0)
+        conn = db.open_db(self.ts.state)
+        try:
+            self.assertEqual(phases.get_work(conn, self.work)["phase"], "blocked")
+            self.assertEqual(conn.execute("SELECT type FROM blocks WHERE id = ?",
+                                          (bid,)).fetchone()[0], "test_spec_conflict")
+        finally:
+            conn.close()
+
+
+if __name__ == "__main__":
+    unittest.main()
