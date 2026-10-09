@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 from tests.hookkit import DEFAULT_FILES, DEFAULT_TOML, Lab
 from tollgate_core import phases, scope, tasks
@@ -163,6 +164,16 @@ class PlanCheckHookTest(unittest.TestCase):
             self.assertEqual(scope.paths(lab.conn, lab.work), set())
         finally:
             lab.close()
+
+    def test_level_failure_does_not_block_plan_registration(self):
+        from tollgate_core import git as core_git
+        self.plan.write_text(plan_text())
+        with mock.patch("tollgate_checks.post_edit.level_records",
+                        side_effect=core_git.GitError("boom")):
+            r = self.lab.post_edit(self.plan)
+        self.assertEqual(r.exit, 0, r.stderr)
+        self.assertEqual(phases.get_work(self.lab.conn, self.lab.work)["phase"], "execution")
+        self.assertIn("livello", r.stdout)
 
     def test_second_plan_is_ignored(self):
         self.plan.write_text(plan_text())

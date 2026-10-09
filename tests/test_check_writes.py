@@ -1,10 +1,12 @@
 import os
 import unittest
+from unittest import mock
 
 from tests.helpers import git as g
 from tests.hookkit import DEFAULT_TOML, Lab
 from tollgate_analysis import waivers
-from tollgate_core import scope
+from tollgate_core import git as core_git, phases, scope
+from tollgate_core.paths import repo_key
 
 IMPL = "a-impl"
 
@@ -124,6 +126,66 @@ class ExecutionL1Test(unittest.TestCase):
                     self.assertEqual(lab.pre_edit(lab.wt / rel, agent_id=IMPL).exit, 2)
         finally:
             lab.close()
+
+
+class NestedRepoTest(unittest.TestCase):
+    """Un repo annidato non aggira la protezione: rel si valuta su ogni radice pertinente."""
+    CASES = (("docs/superpowers/reviews/7", "r.md"), (".tollgate", "waivers/7.toml"))
+
+    def test_bound_session(self):
+        lab = Lab()
+        try:
+            with_scope(lab)
+            for nested, f in self.CASES:
+                with self.subTest(nested=nested):
+                    (lab.wt / nested).mkdir(parents=True, exist_ok=True)
+                    g(lab.wt / nested, "init", "-q")
+                    r = lab.pre_edit(lab.wt / nested / f, agent_id=IMPL)
+                    self.assertEqual(r.exit, 2, r.stderr)
+                    self.assertIn("protetto", r.stderr)
+        finally:
+            lab.close()
+
+    def test_unbound_session(self):
+        lab = Lab(bind=False)
+        try:
+            for nested, f in self.CASES:
+                with self.subTest(nested=nested):
+                    (lab.main / nested).mkdir(parents=True, exist_ok=True)
+                    g(lab.main / nested, "init", "-q")
+                    r = lab.pre_edit(lab.main / nested / f, cwd=lab.main, session_id="altra")
+                    self.assertEqual(r.exit, 2, r.stderr)
+                    self.assertIn("protetto", r.stderr)
+        finally:
+            lab.close()
+
+
+class RoutingTest(unittest.TestCase):
+    def setUp(self):
+        self.lab = Lab()
+        with_scope(self.lab)
+
+    def tearDown(self):
+        self.lab.close()
+
+    def test_worktrees_failure_denies(self):
+        with mock.patch.object(core_git, "worktrees", side_effect=core_git.GitError("boom")):
+            r = self.lab.pre_edit(self.lab.tmp / "fuori.txt", agent_id=IMPL)
+        self.assertEqual(r.exit, 2)
+        self.assertIn("worktree", r.stderr)
+        self.assertIn("verificare", r.stderr)
+
+    def test_other_active_work_is_denied_but_tmp_is_allowed(self):
+        wt8 = self.lab.tmp / "wt 8"
+        g(self.lab.main, "worktree", "add", "-q", "-b", "tg/8-altro", str(wt8))
+        phases.create_work(self.lab.conn, repo_key=repo_key(str(self.lab.origin)), issue=8,
+                           level="L1", now=self.lab.now, branch="tg/8-altro",
+                           worktree=str(wt8), work_base_sha=self.lab.base,
+                           gate_mode="protected")
+        r = self.lab.pre_edit(wt8 / "src/app.py", agent_id=IMPL)
+        self.assertEqual(r.exit, 2)
+        self.assertIn("#8", r.stderr)
+        self.assertEqual(self.lab.pre_edit(self.lab.tmp / "fuori.txt", agent_id=IMPL).exit, 0)
 
 
 class SymlinkTest(unittest.TestCase):

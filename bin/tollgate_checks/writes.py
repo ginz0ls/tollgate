@@ -18,12 +18,26 @@ _NO_PLANS = ("spec_audit", "approval")
 
 
 def _in_main_checkout(p: Path, wt: Path) -> bool:
-    """Nel checkout principale, ma non in un altro worktree che sta dentro di esso."""
-    try:
-        trees = [t for t, _ in git.worktrees(wt)]
-    except git.GitError:
-        return False
+    """Nel checkout principale, ma non in un altro worktree che sta dentro di esso.
+    Solleva GitError se i worktree non si possono elencare."""
+    trees = [t for t, _ in git.worktrees(wt)]
     return _inside(p, trees[0]) and not any(_inside(p, t) for t in trees[1:])
+
+
+def _protected(ctx, p: Path, repo, work) -> bool:
+    """Protetto se lo dice una qualunque radice pertinente: il repo più vicino (può essere
+    annidato), il worktree del lavoro e il repo del contesto. Così un `git init` in una
+    cartella protetta non sposta la radice e non aggira la regola."""
+    roots = []
+    for r in (repo, Path(work["worktree"]) if work is not None and work["worktree"] else None,
+              ctx.repo):
+        r = Path(r).resolve() if r is not None else None
+        if r is not None and r not in roots:
+            roots.append(r)
+    if not roots:
+        roots = [None]
+    return any(is_protected(ctx.rel(p, r) if r else None, p, abs_roots=ctx.protected_roots(r))
+               for r in roots)
 
 
 def decide(event, ctx):
@@ -32,10 +46,16 @@ def decide(event, ctx):
         return []
     repo = git.toplevel(p)
     rel = ctx.rel(p, repo) if repo else None
-    if is_protected(rel, p, abs_roots=ctx.protected_roots(repo)):
+    work = governing_work(ctx, p)
+    if _protected(ctx, p, repo, work):
         return [deny(f"{p} è un file protetto: lo scrivono solo la CLI e gli hook di tollgate "
                      f"(7.4)", rule="protected")]
-    work = governing_work(ctx, p)
+    if ctx.bound and ctx.work is not None:
+        other = ctx.work_for_path(p)
+        if other is not None and other["id"] != ctx.work["id"]:
+            return [deny(f"{p} sta nel worktree del lavoro #{other['issue']}, ma questa sessione "
+                         f"è legata al lavoro #{ctx.work['issue']}: le regole valgono in "
+                         f"qualunque directory (6.6)", rule="other_work")]
     if work is None:
         n = orphan_tg(ctx, repo)
         if n is not None and not is_docs_md(rel):
@@ -48,7 +68,13 @@ def decide(event, ctx):
     wt = Path(work["worktree"]).resolve()
     rel_w = ctx.rel(p, wt)
     if rel_w is None:
-        if _in_main_checkout(p, wt):
+        try:
+            in_main = _in_main_checkout(p, wt)
+        except git.GitError as e:
+            return [deny(f"non è stato possibile verificare i worktree ({e}): scrittura fuori "
+                         f"dal worktree del lavoro #{work['issue']} negata (6.6)",
+                         rule="main_checkout")]
+        if in_main:
             return [deny(f"scrittura nel checkout principale negata durante il lavoro "
                          f"#{work['issue']}: si lavora nel worktree {wt} (6.6)",
                          rule="main_checkout")]

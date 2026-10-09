@@ -57,4 +57,10 @@ def decide(event, ctx):
     rel = ctx.rel(p, wt)
     if rel is None:
         return []
-    return level_records(ctx, work) + _plan(ctx, work, wt, rel)
+    plan = _plan(ctx, work, wt, rel)  # prima: un errore del livello non deve fermare il piano
+    try:
+        level = level_records(ctx, work)
+    except Exception as e:  # noqa: BLE001 - il ricalcolo è informativo, il piano no
+        level = [inject(f"tollgate: ricalcolo del livello non riuscito ({e}); riprova alla "
+                        f"prossima modifica.")]
+    return level + plan
