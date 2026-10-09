@@ -1,7 +1,10 @@
+import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tests.helpers import git as g, make_repo
 from tollgate_core import git
@@ -100,6 +103,83 @@ class GitTest(unittest.TestCase):
         (self.repo / "nuovo.txt").write_text("x")
         self.assertNotEqual(git.fingerprint(self.repo, ["reports/"]), f0)
         self.assertFalse(git.is_clean(self.repo, ["reports/"]))
+
+    def test_read_only_leaves_index_untouched(self):
+        f = self.repo / "src" / "a.py"
+        st = f.stat()
+        os.utime(f, ns=(st.st_atime_ns, st.st_mtime_ns + 5_000_000_000))
+        idx = self.repo / ".git" / "index"
+        before = (idx.read_bytes(), idx.stat().st_mtime_ns)
+        git.changes(self.repo, self.base)
+        git.diff_size(self.repo, self.base)
+        git.is_clean(self.repo, [])
+        self.assertEqual((idx.read_bytes(), idx.stat().st_mtime_ns), before)
+
+    def test_timeout_becomes_git_error(self):
+        slow = subprocess.TimeoutExpired(cmd=["git"], timeout=10)
+        with patch("tollgate_core.git.subprocess.run", side_effect=slow):
+            with self.assertRaises(git.GitError) as cm:
+                git.run(self.repo, "status")
+            self.assertIn("timeout", str(cm.exception))
+            self.assertFalse(git.ok(self.repo, "status"))
+            self.assertIsNone(git.toplevel(self.repo))
+
+    def test_fingerprint_survives_symlink_loop(self):
+        (self.repo / "loop").symlink_to(self.repo / "loop")
+        f0 = git.fingerprint(self.repo, [])
+        self.assertEqual(git.fingerprint(self.repo, []), f0)
+
+    @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "root legge ogni file")
+    def test_fingerprint_survives_unreadable_file(self):
+        f = self.repo / "segreto.txt"
+        f.write_text("x")
+        f.chmod(0)
+        try:
+            f0 = git.fingerprint(self.repo, [])
+            self.assertEqual(git.fingerprint(self.repo, []), f0)
+        finally:
+            f.chmod(0o644)
+
+    def test_untracked_is_scanned_in_blocks(self):
+        (self.repo / "grande.txt").write_text("riga\n" * 100000 + "fine")
+        (self.repo / "tardi.txt").write_bytes(b"a\n" * 5000 + b"\0")
+        with patch.object(Path, "read_bytes", side_effect=AssertionError("letto tutto")):
+            got = {c.path: c for c in git.changes(self.repo, self.base)}
+        self.assertEqual((got["grande.txt"].added, got["grande.txt"].binary), (100001, False))
+        self.assertFalse(got["tardi.txt"].binary)
+
+    def _sentinel_script(self, name):
+        """Script che crea un file sentinella. Il percorso non ha spazi: git lo lancia tramite shell.
+        Il test di controllo (git diretto) dimostra che lo script scatta davvero."""
+        bindir = Path(tempfile.mkdtemp(prefix="tgexe"))
+        self.addCleanup(shutil.rmtree, bindir, True)
+        sentinel = bindir / "sentinella"
+        script = bindir / name
+        script.write_text(f"#!/bin/sh\ntouch '{sentinel}'\nexit 0\n")
+        script.chmod(0o755)
+        return script, sentinel
+
+    def test_external_diff_driver_never_runs(self):
+        script, sentinel = self._sentinel_script("ext.sh")
+        g(self.repo, "config", "diff.external", str(script))
+        (self.repo / "src" / "a.py").write_text("cambiato\n")
+        g(self.repo, "diff")  # controllo: il driver scatta con git diretto (patch, non --stat)
+        self.assertTrue(sentinel.exists())
+        sentinel.unlink()
+        git.changes(self.repo, self.base)
+        git.diff_size(self.repo, self.base)
+        self.assertFalse(sentinel.exists())
+
+    def test_fsmonitor_hook_never_runs(self):
+        script, sentinel = self._sentinel_script("fsmon.sh")
+        g(self.repo, "config", "core.fsmonitor", str(script))
+        (self.repo / "src" / "a.py").write_text("cambiato\n")
+        g(self.repo, "status", "--porcelain")  # controllo: l'hook scatta con git diretto
+        self.assertTrue(sentinel.exists())
+        sentinel.unlink()
+        git.is_clean(self.repo, [])
+        git.changes(self.repo, self.base)
+        self.assertFalse(sentinel.exists())
 
 
 if __name__ == "__main__":

@@ -3,11 +3,17 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import subprocess
+import tempfile
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+GIT_TIMEOUT_S = 10
+_HEAD_BYTES = 8000  # byte letti per riconoscere un file binario (come per i blob)
+_BLOCK = 1 << 16  # blocco di lettura per contare le righe
 
 
 class GitError(Exception):
@@ -24,16 +30,20 @@ class Change:
     binary: bool
 
 
-def _proc(repo, args, input_=None):
+def _proc(repo, args, input_=None, timeout=GIT_TIMEOUT_S, extra_env=None):
+    # Sola lettura (I1): nessun lock opzionale. Niente comandi dal repo (M2): nessun fsmonitor.
+    cmd = ["git", "-c", "core.fsmonitor=false", "--no-optional-locks", "-C", str(repo), *args]
+    env = {**os.environ, "GIT_OPTIONAL_LOCKS": "0", **(extra_env or {})}
     try:
-        return subprocess.run(["git", "-C", str(repo), *args], capture_output=True,
-                              input=input_)
+        return subprocess.run(cmd, capture_output=True, input=input_, env=env, timeout=timeout)
     except FileNotFoundError as e:
         raise GitError("git non disponibile") from e
+    except subprocess.TimeoutExpired as e:
+        raise GitError(f"git {' '.join(args)}: timeout dopo {timeout} s") from e
 
 
-def run(repo, *args, check=True) -> str:
-    r = _proc(repo, args)
+def run(repo, *args, check=True, env=None) -> str:
+    r = _proc(repo, args, extra_env=env)
     if check and r.returncode != 0:
         raise GitError(f"git {' '.join(args)}: "
                        f"{r.stderr.decode('utf-8', 'replace').strip()}")
@@ -175,25 +185,53 @@ def _parse_z(numstat: str, status: str) -> list[Change]:
     return out
 
 
+def _scan(path: Path) -> tuple[bool, int]:
+    """(binario, righe) senza caricare il file in memoria: NUL nei primi 8000 byte, righe a blocchi."""
+    with open(path, "rb") as f:
+        head = f.read(_HEAD_BYTES)
+        if b"\0" in head:
+            return True, 0
+        lines, last = head.count(b"\n"), head[-1:]
+        while chunk := f.read(_BLOCK):
+            lines += chunk.count(b"\n")
+            last = chunk[-1:]
+    if last and last != b"\n":
+        lines += 1
+    return False, lines
+
+
 def _untracked(repo) -> list[Change]:
     out = []
     for rel in run(repo, "ls-files", "--others", "--exclude-standard", "-z").split("\0"):
         if not rel:
             continue
         try:
-            data = (Path(repo) / rel).read_bytes()
+            binary, lines = _scan(Path(repo) / rel)
         except OSError:
             continue
-        binary = b"\0" in data[:8000]
-        lines = 0 if binary else data.count(b"\n") + (1 if data and not data.endswith(b"\n") else 0)
         out.append(Change("A", rel, None, lines, 0, binary))
     return out
 
 
+@contextmanager
+def _private_index(repo):
+    """Copia temporanea dell'indice per i diff col working tree: `git diff` riscrive l'indice col refresh
+    anche con GIT_OPTIONAL_LOCKS=0 (I1). Il vero `.git/index` non si tocca mai."""
+    src = Path(run(repo, "rev-parse", "--path-format=absolute", "--git-path", "index").strip())
+    with tempfile.TemporaryDirectory(prefix="tollgate-index-") as tmp:
+        dst = Path(tmp) / "index"
+        if src.is_file():
+            shutil.copyfile(src, dst)
+        yield {"GIT_INDEX_FILE": str(dst)}
+
+
 def changes(repo, base: str, *, head: str | None = None) -> list[Change]:
     refs = [base] if head is None else [base, head]
-    numstat = run(repo, "diff", "-M", "--numstat", "-z", *refs, "--")
-    status = run(repo, "diff", "-M", "--name-status", "-z", *refs, "--")
+    with nullcontext({}) if head is not None else _private_index(repo) as env:
+        numstat = run(repo, "diff", "-M", "--no-ext-diff", "--no-textconv", "--numstat", "-z",
+                      *refs, "--", env=env)
+        status = run(repo, "diff", "-M", "--no-ext-diff", "--no-textconv", "--name-status", "-z",
+                     *refs, "--", env=env)
     out = _parse_z(numstat, status)
     if head is None:
         out += _untracked(repo)
@@ -207,7 +245,9 @@ def commit_changes(repo, sha: str) -> list[Change]:
 
 def diff_size(repo, base: str, *, head: str | None = None) -> int:
     refs = [base] if head is None else [base, head]
-    size = len(run(repo, "diff", "--no-color", *refs, "--").encode("utf-8", "surrogateescape"))
+    with nullcontext({}) if head is not None else _private_index(repo) as env:
+        size = len(run(repo, "diff", "--no-color", "--no-ext-diff", "--no-textconv", *refs,
+                       "--", env=env).encode("utf-8", "surrogateescape"))
     if head is None:
         for rel in run(repo, "ls-files", "--others", "--exclude-standard", "-z").split("\0"):
             if rel:
@@ -273,6 +313,8 @@ def fingerprint(repo, exclude) -> str:
             digest = "cancellato"
         except IsADirectoryError:
             digest = "cartella"
+        except OSError:
+            digest = "illeggibile"
         h.update(f"{rel}\0{digest}\n".encode("utf-8", "surrogateescape"))
     return h.hexdigest()
 
