@@ -200,10 +200,10 @@ def _scan(path: Path) -> tuple[bool, int]:
     return False, lines
 
 
-def _untracked(repo) -> list[Change]:
+def _untracked(repo, exclude=()) -> list[Change]:
     out = []
     for rel in run(repo, "ls-files", "--others", "--exclude-standard", "-z").split("\0"):
-        if not rel:
+        if not rel or excluded(rel, exclude):
             continue
         try:
             binary, lines = _scan(Path(repo) / rel)
@@ -225,16 +225,23 @@ def _private_index(repo):
         yield {"GIT_INDEX_FILE": str(dst)}
 
 
-def changes(repo, base: str, *, head: str | None = None) -> list[Change]:
+def _pathspecs(exclude) -> list[str]:
+    """Pathspec che tolgono dal diff le cartelle `exclude` (nomi letterali, dalla radice)."""
+    return [f":(top,literal,exclude){e.rstrip('/')}" for e in exclude]
+
+
+def changes(repo, base: str, *, head: str | None = None, exclude=()) -> list[Change]:
+    """Differenze dalla base. `exclude`: cartelle o file (output_dirs) da lasciar fuori."""
     refs = [base] if head is None else [base, head]
+    specs = _pathspecs(exclude)
     with nullcontext({}) if head is not None else _private_index(repo) as env:
         numstat = run(repo, "diff", "-M", "--no-ext-diff", "--no-textconv", "--numstat", "-z",
-                      *refs, "--", env=env)
+                      *refs, "--", *specs, env=env)
         status = run(repo, "diff", "-M", "--no-ext-diff", "--no-textconv", "--name-status", "-z",
-                     *refs, "--", env=env)
+                     *refs, "--", *specs, env=env)
     out = _parse_z(numstat, status)
     if head is None:
-        out += _untracked(repo)
+        out += _untracked(repo, exclude)
     return out
 
 
@@ -243,14 +250,14 @@ def commit_changes(repo, sha: str) -> list[Change]:
     return changes(repo, parent, head=sha)
 
 
-def diff_size(repo, base: str, *, head: str | None = None) -> int:
+def diff_size(repo, base: str, *, head: str | None = None, exclude=()) -> int:
     refs = [base] if head is None else [base, head]
     with nullcontext({}) if head is not None else _private_index(repo) as env:
         size = len(run(repo, "diff", "--no-color", "--no-ext-diff", "--no-textconv", *refs,
-                       "--", env=env).encode("utf-8", "surrogateescape"))
+                       "--", *_pathspecs(exclude), env=env).encode("utf-8", "surrogateescape"))
     if head is None:
         for rel in run(repo, "ls-files", "--others", "--exclude-standard", "-z").split("\0"):
-            if rel:
+            if rel and not excluded(rel, exclude):
                 try:
                     size += (Path(repo) / rel).stat().st_size
                 except OSError:
@@ -296,7 +303,7 @@ def rev_list(repo, base: str, head: str) -> list[str]:
     return [s for s in run(repo, "rev-list", "--reverse", f"{base}..{head}").split() if s]
 
 
-def _excluded(rel: str, exclude) -> bool:
+def excluded(rel: str, exclude) -> bool:
     return any(rel == e.rstrip("/") or rel.startswith(e.rstrip("/") + "/") for e in exclude)
 
 
@@ -305,7 +312,7 @@ def fingerprint(repo, exclude) -> str:
     h = hashlib.sha256()
     files = run(repo, "ls-files", "-co", "--exclude-standard", "-z").split("\0")
     for rel in sorted({f for f in files if f}):
-        if _excluded(rel, exclude):
+        if excluded(rel, exclude):
             continue
         try:
             digest = hashlib.sha1((Path(repo) / rel).read_bytes()).hexdigest()
@@ -331,4 +338,4 @@ def is_clean(repo, exclude) -> bool:
         paths.append(rel)
         if code[0] in "RC":
             skip = True
-    return all(_excluded(p, exclude) for p in paths)
+    return all(excluded(p, exclude) for p in paths)

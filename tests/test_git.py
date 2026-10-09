@@ -60,6 +60,33 @@ class GitTest(unittest.TestCase):
                          ("R", "tests/test_a.py"))
         self.assertGreater(git.diff_size(self.repo, self.base), 0)
 
+    def test_changes_and_size_exclude_dirs(self):
+        (self.repo / "reports").mkdir()
+        (self.repo / "reports" / "junit.xml").write_text("<x/>\n" * 100)
+        (self.repo / ".tollgate-run").mkdir()
+        (self.repo / ".tollgate-run" / "o.log").write_text("o\n" * 100)
+        (self.repo / "src" / "a.py").write_text("uno\ndue\ntre\n")
+        (self.repo / "src" / "reports.py").write_text("r\n")
+        exclude = ["reports/", ".tollgate-run/"]
+        got = git.changes(self.repo, self.base, exclude=exclude)
+        self.assertEqual(sorted(c.path for c in got), ["src/a.py", "src/reports.py"])
+        self.assertEqual(len(git.changes(self.repo, self.base)), 4)
+        plain = git.diff_size(self.repo, self.base)
+        small = git.diff_size(self.repo, self.base, exclude=exclude)
+        self.assertLess(small, 200)
+        self.assertEqual(plain - small, 700)
+
+    def test_exclude_applies_to_tracked_changes(self):
+        (self.repo / "reports").mkdir()
+        (self.repo / "reports" / "j.xml").write_text("a\n")
+        g(self.repo, "add", "-A")
+        g(self.repo, "commit", "-qm", "reports")
+        base = git.head(self.repo)
+        (self.repo / "reports" / "j.xml").write_text("a\nb\nc\n")
+        self.assertEqual([c.path for c in git.changes(self.repo, base)], ["reports/j.xml"])
+        self.assertEqual(git.changes(self.repo, base, exclude=["reports/"]), [])
+        self.assertEqual(git.diff_size(self.repo, base, exclude=["reports/"]), 0)
+
     def test_commits_and_text(self):
         (self.repo / "src" / "a.py").unlink()
         g(self.repo, "commit", "-qam", "via a")
