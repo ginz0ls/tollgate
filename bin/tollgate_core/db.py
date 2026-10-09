@@ -112,7 +112,19 @@ SCHEMA_V1 = [
     "CREATE INDEX events_work ON events(work, seq)",
 ]
 
-MIGRATIONS: list[tuple[int, list[str]]] = [(1, SCHEMA_V1)]
+# Migrazione 2 (piano P2, decisione 7): dati che servono agli hook.
+SCHEMA_V2 = [
+    "CREATE TABLE session_seen (session TEXT PRIMARY KEY, last_seen TEXT NOT NULL)",
+    "ALTER TABLE subagents ADD COLUMN last_seen TEXT",
+    "ALTER TABLE subagents ADD COLUMN vetoes INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE subagents ADD COLUMN report TEXT",
+    "ALTER TABLE tasks ADD COLUMN pending TEXT "
+    "CHECK (pending IS NULL OR pending IN ('launch','resume'))",
+    "ALTER TABLE work_items ADD COLUMN level_cap_paths TEXT NOT NULL DEFAULT '[]'",
+    "CREATE INDEX subagents_work ON subagents(work, state)",
+]
+
+MIGRATIONS: list[tuple[int, list[str]]] = [(1, SCHEMA_V1), (2, SCHEMA_V2)]
 
 
 def latest_version() -> int:
@@ -149,10 +161,12 @@ def _migrate(conn: sqlite3.Connection, state: State) -> None:
     if current > latest_version():
         raise DbTooNew(f"il DB ha lo schema {current}, questa versione di tollgate arriva a "
                        f"{latest_version()}: aggiornare il plugin")
+    # Un DB creato in questa stessa apertura non ha dati da proteggere: niente copia.
+    fresh = current == 0
     for target, statements in MIGRATIONS:
         if target <= current:
             continue
-        if current > 0:
+        if not fresh:
             backup(conn, state, f"migrazione-{target}")
         with tx(conn):
             # Un altro processo può aver migrato mentre aspettavamo il lucchetto.

@@ -88,3 +88,37 @@ class TasksTest(unittest.TestCase):
         tasks.add_skill_used(self.conn, self.w, 1, "tdd")
         tasks.add_skill_used(self.conn, self.w, 1, "tdd")
         self.assertEqual(json.loads(tasks.get_task(self.conn, self.w, 1)["skills_used"]), ["tdd"])
+
+
+class AssignTest(unittest.TestCase):
+    def setUp(self):
+        self.t = TempState()
+        self.conn = db.open_db(self.t.state)
+        self.w = phases.create_work(self.conn, repo_key="github.com/o/r", issue=1, level="L1",
+                                    now=T0)
+        tasks.add_task(self.conn, self.w, 1, source="plan", now=T0)
+
+    def tearDown(self):
+        self.conn.close()
+        self.t.cleanup()
+
+    def test_assign_and_take_launch(self):
+        tasks.assign(self.conn, self.w, 1, implementer="tg-7-t1", agent_type="tollgate:implementer",
+                     pending="launch", now=T0)
+        self.assertIsNone(tasks.take_pending(self.conn, self.w, agent_type="general-purpose",
+                                             resume=False))
+        self.assertIsNone(tasks.take_pending(self.conn, self.w, agent_type="tollgate:implementer",
+                                             resume=True))
+        self.assertEqual(tasks.take_pending(self.conn, self.w, agent_type="tollgate:implementer",
+                                            resume=False), 1)
+        self.assertIsNone(tasks.get_task(self.conn, self.w, 1)["pending"])
+
+    def test_assign_rejects_unknown_pending(self):
+        with self.assertRaises(ValueError):
+            tasks.assign(self.conn, self.w, 1, implementer="x", agent_type="y", pending="boh",
+                         now=T0)
+
+    def test_add_commit_dedup(self):
+        tasks.add_commit(self.conn, self.w, 1, "abc")
+        tasks.add_commit(self.conn, self.w, 1, "abc")
+        self.assertEqual(tasks.get_task(self.conn, self.w, 1)["commits"], '["abc"]')
