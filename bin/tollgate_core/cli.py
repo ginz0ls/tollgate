@@ -49,6 +49,21 @@ def build_parser() -> argparse.ArgumentParser:
     vp = sub.add_parser("verify", help="esegue i comandi del gate e registra le ricevute (8.1)")
     vp.add_argument("--related", action="store_true",
                     help="solo i test correlati ai file cambiati")
+    wp = sub.add_parser("waiver", help="deroghe (8.3)")
+    wsub = wp.add_subparsers(dest="waiver_cmd", required=True)
+    wa = wsub.add_parser("add", help="dichiara una deroga in .tollgate/waivers/<N>.toml")
+    wa.add_argument("type", metavar="tipo")
+    wa.add_argument("file", nargs="?", metavar="file")
+    wa.add_argument("--pattern", metavar="GLOB")
+    wa.add_argument("--test", action="append", default=[], metavar="ID")
+    wa.add_argument("--choice", required=True)
+    wa.add_argument("--why", required=True)
+    wa.add_argument("--cost", required=True)
+    bp = sub.add_parser("block", help="blocchi del lavoro (8.3)")
+    bsub = bp.add_subparsers(dest="block_cmd", required=True)
+    bo = bsub.add_parser("open", help="apre un blocco; lo chiude l'utente")
+    bo.add_argument("type", metavar="tipo")
+    bo.add_argument("--reason", required=True)
     return p
 
 
@@ -125,6 +140,17 @@ def main(argv: list[str]) -> int:
             code, lines = verify.run_verify(state, Path.cwd(), related=args.related)
             print("\n".join(lines))
             return code
+        if args.cmd == "waiver":
+            from . import waiver_cli
+            print(waiver_cli.add_waiver(state, Path.cwd(), type_=args.type, file=args.file,
+                                        pattern=args.pattern, tests=args.test,
+                                        choice=args.choice, why=args.why, cost=args.cost))
+            return 0
+        if args.cmd == "block":
+            from . import waiver_cli
+            print(waiver_cli.open_block_cmd(state, Path.cwd(), type_=args.type,
+                                            reason=args.reason))
+            return 0
         conn = db.open_db(state)
         try:
             if args.cmd == "status":
@@ -147,7 +173,7 @@ def main(argv: list[str]) -> int:
                 return 0
         finally:
             conn.close()
-    except (db.DbError, UsageError) as e:
+    except (db.DbError, UsageError, phases.TransitionError) as e:
         print(f"tollgate: {e}", file=sys.stderr)
         return 1
     except sqlite3.Error as e:
