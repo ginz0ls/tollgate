@@ -42,6 +42,10 @@ def _commit(conn, state, ctx, d):
                            session=ctx.event.session)
 
 
+def _invalidate_finish(conn, state, ctx, d):
+    acts.invalidate_finish(conn, d["work"], d["head"], now=ctx.now, session=ctx.event.session)
+
+
 def _effect_execute(conn, state, ctx, d):
     act = acts.find_usable(conn, type_="approve", object_="effect",
                            target=effects.effect_id(d["key"]), work=d.get("work"),
@@ -88,6 +92,7 @@ _OPS = {
     "task_commit": lambda c, s, x, d: tasks.add_commit(c, d["work"], d["number"], d["sha"]),
     "skill_used": lambda c, s, x, d: tasks.add_skill_used(c, d["work"], d["number"], d["skill"]),
     "commit": _commit,
+    "invalidate_finish": _invalidate_finish,
     "effect_request": lambda c, s, x, d: effects.request(
         c, key=d["key"], command=d["command"], work=d.get("work"), sha=d.get("sha"), now=x.now,
         session=x.event.session),

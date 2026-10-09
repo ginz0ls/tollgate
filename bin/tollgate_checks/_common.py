@@ -6,7 +6,9 @@ import posixpath
 import re
 from pathlib import Path
 
-from tollgate_analysis import globs, level as lv, profiles as prof
+from tollgate_analysis import globs, level as lv, profiles as prof, testguard
+from tollgate_analysis.testguard import Violation
+from tollgate_analysis.waivers import unresolved
 from tollgate_analysis.protected import is_protected
 from tollgate_core import git
 from tollgate_core.paths import repo_key
@@ -190,3 +192,34 @@ def level_records(ctx, work) -> list:
         return out
     return [record("level", work=work["id"], level=new),
             inject(f"tollgate: il lavoro sale a {new} (percorsi sensibili o soglie).")]
+
+
+def commit_violations(ctx, work, wt: Path, base_ref: str, head_ref: str | None,
+                      changes) -> list:
+    """Violazioni di test-guard e scope su `changes` (da `base_ref` a `head_ref`; `None` è il
+    working tree), senza le cartelle di output e `.tollgate-run/`. Restano solo quelle non
+    coperte da una deroga, anche in attesa (decisione 9)."""
+    skip = output_excludes(ctx)
+    changes = [c for c in changes if not git.excluded(c.path, skip)]
+    out = []
+    if ctx.component("test_guard"):
+        tg = []
+        for c in changes:
+            base_text = None if c.status == "A" else git.text_at(wt, base_ref,
+                                                                 c.old_path or c.path)
+            if c.status == "D":
+                head_text = None
+            elif head_ref is None:
+                head_text = git.worktree_text(wt, c.path)
+            else:
+                head_text = git.text_at(wt, head_ref, c.path)
+            tg.append(testguard.Change(c.status, c.path, c.old_path, base_text, head_text,
+                                       c.binary))
+        out += testguard.check(tg, ctx.guard_config(work, [c.path for c in changes])).violations
+    if ctx.component("scope_check") and work["level"] != "L0" and work["plan_sha"]:
+        scope = ctx.scope(work)
+        for c in changes:
+            if c.path not in scope and not scope_exempt(ctx, work, c.path, scope):
+                out.append(Violation("out_of_scope", c.path, "file fuori dallo scope del piano",
+                                     "scope"))
+    return unresolved(out, ctx.waiver_file(work))
