@@ -106,6 +106,23 @@ class BoundSessionTest(unittest.TestCase):
             with self.subTest(cmd=cmd):
                 self.assertEqual(self.code(cmd), 2)
 
+    def test_git_c_targets_resolve_against_the_c_directory(self):
+        sub = self.lab.wt / "src"
+        for cmd in ("git -C .. checkout origin/main -- tollgate.toml",
+                    "git -C .. restore tollgate.toml", "git -C .. rm tollgate.toml",
+                    f"git -C '{self.lab.wt}' checkout origin/main -- tollgate.toml",
+                    f"git -C '{self.lab.wt}' restore tollgate.toml"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.lab.bash(cmd, agent_id="a1", cwd=sub).exit, 2)
+        self.assertEqual(self.lab.bash("git -C .. restore src/app.py", agent_id="a1",
+                                       cwd=sub).exit, 0)
+
+    def test_restores_from_index_attached_and_abbreviated_source(self):
+        for cmd in ("git restore -sHEAD~1 src/app.py", "git restore --so=HEAD~1 src/app.py",
+                    "git restore --sour HEAD~1 src/app.py"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.code(cmd), 2)
+
     def test_unparsable_text_covers_more_dangers(self):
         for body in ("rm -rf /tmp/x", "git -c core.hooksPath=/x commit -m y",
                      "echo x > tollgate.toml", "echo x > .tollgate/waivers/7.toml",

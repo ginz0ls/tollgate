@@ -101,6 +101,37 @@ class ActiveRootsTest(unittest.TestCase):
                     r = self.wrapper(self.bash_payload(cmd, cwd))
                     self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_main_checkout_and_its_worktree_are_one_repo(self):
+        # Fix round 3: checkout principale e worktree condividono il repo git.
+        main, wt = self.lab.main, self.lab.wt
+        for cmd in (f"git -C '{main}' status; git -C '{wt}' status",
+                    f"git -C '{wt}' diff && git -C '{main}' log",
+                    f"echo x > '{main}/a.txt'; echo y > '{wt}/b.txt'",
+                    f"rm '{main}/x' '{wt}/y'"):
+            for cwd in (self.outside, self.lab.tmp):
+                with self.subTest(cmd=cmd, cwd=str(cwd)):
+                    r = self.wrapper(self.bash_payload(cmd, cwd))
+                    self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_worktree_is_preferred_when_main_and_worktree_are_both_named(self):
+        main, wt = self.lab.main, self.lab.wt
+        r = self.wrapper(self.bash_payload(
+            f"echo x > '{main}/a.txt'; echo y > '{wt}/.tollgate/waivers/7.toml'", self.outside))
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertNotIn("più repo attivi", r.stderr)
+
+    def test_git_c_targets_resolve_against_the_c_directory(self):
+        # Fix round 3: il bersaglio di checkout/restore/rm e' relativo alla directory di -C.
+        main = self.lab.main
+        for cmd in ("git -C main checkout origin/main -- tollgate.toml",
+                    "git -C main restore tollgate.toml",
+                    "git -C main rm tollgate.toml",
+                    f"git -C '{main}' checkout origin/main -- tollgate.toml",
+                    f"git -C '{main}' restore tollgate.toml"):
+            with self.subTest(cmd=cmd):
+                r = self.wrapper(self.bash_payload(cmd, self.lab.tmp))
+                self.assertEqual(r.returncode, 2, r.stderr)
+
     def test_command_touching_two_active_repos_is_denied_with_a_message(self):
         second = make_repo(self.outside / "secondo")
         (second / "tollgate.toml").write_text(

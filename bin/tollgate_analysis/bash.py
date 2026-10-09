@@ -656,13 +656,29 @@ def _target_dir(args: list[str]) -> str | None:
     return None
 
 
+def _is_source_option(x: str) -> bool:
+    """`-s`, `-s<albero>`, `--source`, `--source=...` e i prefissi abbreviati (`--so`, `--sour=`)."""
+    if x.startswith("--"):
+        name = x[2:].partition("=")[0]
+        return len(name) >= 2 and "source".startswith(name)
+    return x.startswith("-s")
+
+
+def _in_c_dir(cmd: Cmd, targets: list[str]) -> list[str]:
+    """I percorsi di un comando git sono relativi alla directory di `-C`, non al `cwd`."""
+    if git_call(cmd)[2] is None:
+        return targets
+    base = effective_dir(cmd)
+    return [_norm(base, t) for t in targets]
+
+
 def _git_restore_targets(cmd: Cmd) -> list[str]:
     """File che `git checkout <albero> -- <file>` e `git restore <file>` riscrivono."""
     sub, args, _ = git_call(cmd)
     if sub not in ("checkout", "restore"):
         return []
     if "--" in args:
-        return args[args.index("--") + 1:]
+        return _in_c_dir(cmd, args[args.index("--") + 1:])
     if sub == "checkout":
         return []
     out, i = [], 0
@@ -674,7 +690,7 @@ def _git_restore_targets(cmd: Cmd) -> list[str]:
         else:
             out.append(args[i])
             i += 1
-    return out
+    return _in_c_dir(cmd, out)
 
 
 def restores_from_index(cmd: Cmd) -> bool:
@@ -684,7 +700,7 @@ def restores_from_index(cmd: Cmd) -> bool:
     if sub == "checkout":
         return bool(args) and args[0] == "--"
     if sub == "restore":
-        return not any(x in ("-s", "--source") or x.startswith("--source=") for x in args)
+        return not any(_is_source_option(x) for x in args)
     return False
 
 
@@ -767,7 +783,7 @@ def removal_targets(cmd: Cmd) -> list[str]:
         return roots if _find_removes(expr) else []
     sub, args, _ = git_call(cmd)
     if sub == "rm":
-        return _positional(args)
+        return _in_c_dir(cmd, _positional(args))
     return []
 
 

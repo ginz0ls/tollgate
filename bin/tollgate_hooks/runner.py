@@ -144,14 +144,24 @@ def _target(event) -> list[tuple[Path, Path]]:
             paths.append(Path(bash.effective_dir(c)))
             paths += [_candidate(c.cwd, t) for t in
                       bash.write_targets(c) + bash.removal_targets(c)]
-    found: dict[Path, Path] = {}
+    # Un solo elemento per repo git (stessa cartella comune): il checkout principale e i suoi
+    # worktree sono lo stesso repo. Tra i candidati dello stesso repo vale un worktree
+    # collegato, se un bersaglio ci cade dentro, altrimenti il primo.
+    found: dict[Path, tuple[Path, Path]] = {}
     for p in paths:
         if p is None:
             continue
         repo = git.toplevel(p)
-        if repo is not None and repo not in found and _repo_active(repo):
-            found[repo] = p
-    return list(found.items())
+        if repo is None or not _repo_active(repo):
+            continue
+        try:
+            key = git.common_dir(repo)
+            linked = repo != git.main_worktree(repo)
+        except git.GitError:
+            continue
+        if key not in found or (linked and found[key][0] == git.main_worktree(repo)):
+            found[key] = (repo, p)
+    return list(found.values())
 
 
 def run_hook(hook_event: str, stdin_text: str, *, env=None, now=None, plugin_root=None,
