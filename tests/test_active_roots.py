@@ -132,6 +132,30 @@ class ActiveRootsTest(unittest.TestCase):
                 r = self.wrapper(self.bash_payload(cmd, self.lab.tmp))
                 self.assertEqual(r.returncode, 2, r.stderr)
 
+    def test_chained_git_c_options_compose(self):
+        main = self.lab.main
+        for cmd in ("git -C main/src -C .. restore tollgate.toml",
+                    "git -C main -C src restore ../tollgate.toml",
+                    "git -C main -C . restore tollgate.toml",
+                    "git -C main/src -C .. rm tollgate.toml",
+                    "git -C main/src -C .. checkout origin/main -- tollgate.toml",
+                    f"git -C vicino -C '{main}' restore tollgate.toml",
+                    "git -C . -C main restore tollgate.toml"):
+            with self.subTest(cmd=cmd):
+                (main / "src").mkdir(exist_ok=True)
+                r = self.wrapper(self.bash_payload(cmd, self.lab.tmp))
+                self.assertEqual(r.returncode, 2, r.stderr)
+
+    def test_unverifiable_target_repo_is_denied(self):
+        from unittest import mock
+        from tollgate_core import git as core_git
+        from tollgate_hooks import runner
+        with mock.patch.object(core_git, "common_dir", side_effect=core_git.GitError("boom")):
+            r = self.lab.bash(f"echo x > '{self.lab.main}/a.txt'", cwd=self.outside,
+                              session_id=OTHER)
+        self.assertEqual(r.exit, 2, r.stderr)
+        self.assertIn("non è stato possibile verificare", r.stderr)
+
     def test_command_touching_two_active_repos_is_denied_with_a_message(self):
         second = make_repo(self.outside / "secondo")
         (second / "tollgate.toml").write_text(

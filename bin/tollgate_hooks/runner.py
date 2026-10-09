@@ -42,6 +42,10 @@ class _Timeout(BaseException):
     pass
 
 
+class _Unverifiable(Exception):
+    pass
+
+
 def _footer(state_root: Path) -> str:
     return (f"Programma: {db.BIN_PATH}. Per spegnere tollgate: /tollgate:off, "
             f"oppure dal terminale: touch {state_root / 'OFF'}")
@@ -157,8 +161,9 @@ def _target(event) -> list[tuple[Path, Path]]:
         try:
             key = git.common_dir(repo)
             linked = repo != git.main_worktree(repo)
-        except git.GitError:
-            continue
+        except git.GitError as e:
+            raise _Unverifiable(f"non è stato possibile verificare il repo del bersaglio "
+                                f"{repo} ({e}): azione negata per prudenza") from e
         if key not in found or (linked and found[key][0] == git.main_worktree(repo)):
             found[key] = (repo, p)
     return list(found.values())
@@ -193,7 +198,10 @@ def run_hook(hook_event: str, stdin_text: str, *, env=None, now=None, plugin_roo
         if event.kind in _TARGET_KINDS and not _repo_active(root):
             # Il cwd non è in un repo attivo (o non esiste): repo e configurazione vengono dal
             # bersaglio (I1, M1).
-            targets = _target(event)
+            try:
+                targets = _target(event)
+            except _Unverifiable as e:
+                return _fail(control, str(e), state.root)
             if len(targets) > 1:
                 names = ", ".join(str(r) for r, _ in targets)
                 return _fail(True, f"l'azione tocca più repo attivi ({names}): dividila in "

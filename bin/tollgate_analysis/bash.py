@@ -366,7 +366,8 @@ def _git_split(a: list[str]):
 
     while i < len(a) and a[i].startswith("-"):
         if a[i] == "-C" and i + 1 < len(a):
-            c_dir = a[i + 1]
+            # git compone i -C: ognuno e' relativo al precedente, un assoluto azzera la base.
+            c_dir = os.path.normpath(os.path.join(c_dir, a[i + 1])) if c_dir else a[i + 1]
             i += 2
         elif a[i] == "-c" and i + 1 < len(a):
             note(a[i + 1])
