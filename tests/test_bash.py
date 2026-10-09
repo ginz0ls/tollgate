@@ -266,6 +266,68 @@ class FixRound1Test(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertTrue(bash.writes(one(text)))
 
+    def test_mv_source_is_a_target(self):
+        self.assertEqual(bash.write_targets(one("mv a b")), ["a", "b"])
+        self.assertEqual(bash.write_targets(one("mv a b dir")), ["a", "b", "dir"])
+        self.assertEqual(sorted(bash.write_targets(one("mv -t dir a b"))), ["a", "b", "dir"])
+        self.assertEqual(sorted(bash.write_targets(one("mv --target-directory=dir a"))),
+                         ["a", "dir"])
+        self.assertEqual(bash.write_targets(one("cp a b")), ["b"])
+        self.assertEqual(bash.write_targets(one("cp --remove-source-files a b")), ["a", "b"])
+        self.assertEqual(bash.write_targets(one("cp -t dir a")), ["dir"])
+
+    def test_removal_targets(self):
+        self.assertEqual(bash.removal_targets(one("rm -rf a b")), ["a", "b"])
+        self.assertEqual(bash.removal_targets(one("rmdir d")), ["d"])
+        self.assertEqual(bash.removal_targets(one("mv a b dir")), ["a", "b"])
+        self.assertEqual(sorted(bash.removal_targets(one("mv -t dir a b"))), ["a", "b"])
+        self.assertEqual(bash.removal_targets(one("cp a b")), [])
+        self.assertEqual(bash.removal_targets(one("touch a")), [])
+
+    def test_force_if_includes_alone_is_not_force(self):
+        self.assertFalse(bash.push_is_force(one("git push --force-if-includes origin x")))
+        self.assertTrue(bash.push_is_force(one("git push --force --force-if-includes origin x")))
+        self.assertTrue(bash.push_is_force(one("git push --force-with-lease origin x")))
+        self.assertTrue(bash.push_is_force(one("git push -f --force-if-includes origin x")))
+        self.assertTrue(bash.push_is_force(one("git push --force-with-lease "
+                                               "--force-if-includes origin x")))
+
+    def test_tag_listing_forms_are_reads(self):
+        for text in ("git tag -n", "git tag -n5", "git tag --contains abc", "git tag --list",
+                     "git tag -l", "git tag --merged main", "git tag --points-at HEAD",
+                     "git tag -l 'v*'", "git tag --sort=-v:refname"):
+            with self.subTest(text=text):
+                self.assertFalse(bash.writes(one(text)))
+        for text in ("git tag v1", "git tag -a v1 -m x", "git tag -d v1", "git tag -f v1",
+                     "git tag --delete v1", "git tag -s v1"):
+            with self.subTest(text=text):
+                self.assertTrue(bash.writes(one(text)))
+
+    def test_hooks_path_override(self):
+        for text in ("git -c core.hooksPath=/x commit -m y", "git -c core.hookspath=/x status",
+                     "git config core.hooksPath /x", "git config --global core.hooksPath /x",
+                     "git config --system core.hooksPath /x", "git config --unset core.hooksPath",
+                     "git config --file f core.hooksPath /x", "git --config-env=core.hooksPath=V st",
+                     "GIT_CONFIG_KEY_0=core.hooksPath git status"):
+            with self.subTest(text=text):
+                self.assertTrue(bash.hooks_path_override(one(text)))
+        for text in ("git config --get core.hooksPath", "git config user.name x",
+                     "git -c user.name=x commit -m y", "git status", "echo core.hooksPath"):
+            with self.subTest(text=text):
+                self.assertFalse(bash.hooks_path_override(one(text)))
+
+    def test_text_effect_fallback(self):
+        for text in ("echo 'x; ssh host", "echo 'a && psql -c x", "echo 'a; npm  publish",
+                     "echo 'a; gh pr create --fill", "echo 'a; curl -X POST http://x",
+                     "echo 'a; curl -d x http://x", "echo 'a; docker push img",
+                     "echo 'a; supabase db push", "echo 'a; gh pr merge 3"):
+            with self.subTest(text=text):
+                self.assertIsNotNone(bash.text_effect(text))
+        for text in ("echo 'ciao", "echo 'a; sshd -t", "echo 'a; curl http://x",
+                     "echo 'a; gh pr view 3", "echo 'a; cat essh"):
+            with self.subTest(text=text):
+                self.assertIsNone(bash.text_effect(text))
+
     def test_git_config_write_target(self):
         self.assertEqual(bash.git_config_write(one("git config core.hooksPath /x")), "local")
         self.assertEqual(bash.git_config_write(one("git config --unset user.name")), "local")

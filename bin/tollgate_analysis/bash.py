@@ -336,6 +336,8 @@ def git_call(cmd: Cmd):
 
 
 _CONFIG_FILE_OPTS = {"--global", "--system", "--file", "-f", "--blob"}
+_TAG_CHANGE = {"--delete", "--force", "--annotate", "--sign", "--local-user", "--message",
+               "--file", "--create-reflog"}
 _BRANCH_LISTING = {"-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "-l", "--list",
                    "--show-current", "--merged", "--no-merged", "--contains", "--no-contains",
                    "--sort", "--format", "--color", "--no-color", "--column", "--no-column",
@@ -356,7 +358,13 @@ def _read_only_git(sub: str | None, args: list[str]) -> bool:
     if sub == "remote":
         return first in (None, "-v", "--verbose", "show", "get-url")
     if sub == "tag":
-        return listing or not args
+        if any(x in _TAG_CHANGE or (x.startswith("-") and not x.startswith("--")
+                                    and set(x[1:]) & set("dafsumF"))
+               for x in args):
+            return False
+        return not args or listing or any(
+            x.startswith(("-n", "--contains", "--no-contains", "--merged", "--no-merged",
+                          "--points-at", "--sort", "--format", "--column")) for x in args)
     if sub == "branch":
         flags_ok = all(x.split("=", 1)[0] in _BRANCH_LISTING for x in args if x.startswith("-"))
         return flags_ok and (listing or not _positional(args))
@@ -371,6 +379,34 @@ def _is_mutating(sub: str | None, args: list[str]) -> bool:
             return False
         return len(_positional(args)) >= 2  # `git config chiave valore`
     return sub in _GIT_MUTATING and not _read_only_git(sub, args)
+
+
+def hooks_path_override(cmd: Cmd) -> bool:
+    """`core.hooksPath` impostato per il comando (`git -c`, `--config-env`, variabili
+    `GIT_CONFIG_*`) o scritto con `git config` a qualunque livello: aggira `.git/hooks`."""
+    a = cmd.argv
+    if not a or os.path.basename(a[0]) != "git":
+        return False
+    key = "core.hookspath"
+    if any(key in v.lower() for v in cmd.env.values()):
+        return True
+    i = 1
+    while i < len(a) and a[i].startswith("-"):
+        if a[i] == "-c" and i + 1 < len(a):
+            if a[i + 1].split("=", 1)[0].lower() == key:
+                return True
+            i += 2
+        elif a[i].startswith("--config-env="):
+            if a[i].split("=", 2)[1].lower() == key:
+                return True
+            i += 1
+        elif a[i] in _GIT_OPT_ARG:
+            i += 2
+        else:
+            i += 1
+    sub, args, _ = git_call(cmd)
+    return sub == "config" and _is_mutating(sub, args) and any(
+        x.lower() == key for x in _positional(args))
 
 
 def git_mutating(cmd: Cmd) -> bool:
@@ -410,7 +446,9 @@ def push_is_force(cmd: Cmd) -> bool:
     sub, args, _ = git_call(cmd)
     if sub != "push":
         return False
-    if any(x == "--mirror" or x.startswith("--force") for x in args):
+    # `--force-if-includes` da solo non forza: lo fa con --force o --force-with-lease.
+    if any(x == "--mirror" or x == "--force" or x.startswith("--force-with-lease")
+           for x in args):
         return True
     # `-f` anche nei gruppi corti (`-fu`, `-uf`).
     if any(x.startswith("-") and not x.startswith("--") and "f" in x[1:] for x in args):
@@ -546,8 +584,18 @@ def write_targets(cmd: Cmd) -> list[str]:
         out += _inplace_files(args)
     elif base in ("cp", "mv", "install", "ln"):
         target = _target_dir(args)
+        # `mv` toglie anche le sorgenti, e `cp --remove-source-files` pure.
+        removes = base == "mv" or (base == "cp" and any(
+            x.startswith("--remove-source") for x in args))
         if target is not None:
+            if removes:
+                srcs = list(pos)
+                if target in srcs:
+                    srcs.remove(target)
+                out += srcs
             out.append(target)
+        elif removes:
+            out += pos
         elif len(pos) >= 2:
             out.append(pos[-1])
     elif base in ("rm", "touch", "mkdir", "rmdir", "truncate"):
@@ -557,6 +605,25 @@ def write_targets(cmd: Cmd) -> list[str]:
     elif base == "dd":
         out += [x[3:] for x in args if x.startswith("of=")]
     return out
+
+
+def removal_targets(cmd: Cmd) -> list[str]:
+    """Ciò che `rm`, `rmdir` e `mv` (le sorgenti) tolgono dal loro posto."""
+    a = cmd.argv
+    if not a:
+        return []
+    base = os.path.basename(a[0])
+    if base in ("rm", "rmdir"):
+        return _positional(a[1:])
+    if base == "mv":
+        pos = _positional(a[1:])
+        target = _target_dir(a[1:])
+        if target is None:
+            return pos[:-1]
+        if target in pos:
+            pos.remove(target)
+        return pos
+    return []
 
 
 def writes(cmd: Cmd) -> bool:
@@ -784,6 +851,35 @@ _TEXT_DANGER = [
 def text_danger(raw: str) -> str | None:
     """Ripiego per i comandi che shlex non legge: si cerca per testo."""
     for rx, label in _TEXT_DANGER:
+        if rx.search(raw):
+            return label
+    return None
+
+
+_B = r"(?:^|[\s;&|(`'\"])"
+_E = r"(?=[\s;&|)`'\"]|$)"
+_TEXT_EFFECTS = [
+    (re.compile(_B + r"\s+".join(re.escape(w) for w in prefix) + _E),
+     "effetto esterno: " + " ".join(prefix)) for prefix in _DEFAULT_EFFECTS] + [
+    (re.compile(_B + r"supabase\s+(?:db|functions|secrets|link|migration|storage|projects|orgs|"
+                r"branches)\b(?!\s+(?:list|diff|dump|ls|download)\b)"),
+     "effetto esterno: supabase in scrittura"),
+    (re.compile(_B + r"gh\s+(?:(?:-R|--repo)\s+\S+\s+)?(?:pr\s+(?:create|edit|review|close|merge)|"
+                r"workflow\s+run|issue\s+(?:edit|close|create)|release|secret|project)" + _E),
+     "gh in scrittura"),
+    (re.compile(_B + r"gh\s+api\b[^;&|]*(?:\s-X\s*(?!GET\b)\w|--method[ =](?!GET\b)|\s-[fF]\s|"
+                r"--field|--raw-field|--input)"), "gh in scrittura"),
+    (re.compile(_B + r"curl\b[^;&|]*(?:\s-X\s*(?!GET\b)\w|--request[ =](?!GET\b)|\s-d\b|"
+                r"--data|\s-F\b|--form|\s-T\b|--upload-file|--json)"),
+     "curl con metodo diverso da GET o con dati"),
+    (re.compile(_B + r"wget\b[^;&|]*--(?:post-|body-|method[ =](?!GET\b))"),
+     "wget con metodo diverso da GET o con dati"),
+]
+
+
+def text_effect(raw: str) -> str | None:
+    """Ripiego per i comandi che shlex non legge: effetti esterni cercati per testo."""
+    for rx, label in _TEXT_EFFECTS:
         if rx.search(raw):
             return label
     return None

@@ -139,6 +139,85 @@ class GitInternalsTest(unittest.TestCase):
             lab.close()
 
 
+class RemovalTest(unittest.TestCase):
+    """mv toglie la sorgente; rm, rmdir e mv su un antenato di un file protetto."""
+    ANCESTORS = ("rm -rf .tollgate", "rm -rf docs/superpowers/reviews", "rm -r .tollgate/waivers",
+                 "rm -rf .git", "rm -rf .", "rm -rf ./", "rmdir .tollgate", "rm -rf ..",
+                 "rm -rf docs", "rm -rf docs/superpowers", "rm -f tollgate.toml",
+                 "mv .tollgate /tmp/zz", "mv docs/superpowers/reviews /tmp/zz",
+                 "mv tollgate.toml /tmp/zz", "mv .tollgate/waivers/7.toml /tmp/zz",
+                 "mv -t /tmp/zz .tollgate", "mv src/app.py tollgate.toml")
+
+    def test_bound_session(self):
+        lab = Lab()
+        try:
+            (lab.wt / ".tollgate/waivers").mkdir(parents=True)
+            (lab.wt / ".tollgate/waivers/7.toml").write_text("x\n")
+            for cmd in self.ANCESTORS:
+                with self.subTest(cmd=cmd):
+                    r = lab.bash(cmd, agent_id="a1")
+                    self.assertEqual(r.exit, 2, r.stderr)
+            for cmd in ("rm -rf build", "rm -rf docs/altro", "rmdir vuota", "mv src/app.py "
+                        "src/b.py", "mv src/app.py docs/superpowers/", "rm src/app.py",
+                        "mv -t src docs/superpowers/README.md", "cp src/app.py src/c.py",
+                        "cp tollgate.toml /tmp/copia.toml"):
+                with self.subTest(cmd=cmd):
+                    self.assertEqual(lab.bash(cmd, agent_id="a1").exit, 0)
+        finally:
+            lab.close()
+
+    def test_main_checkout_git_dir(self):
+        lab = Lab(bind=False)
+        try:
+            for cmd in ("rm -rf .git", "rm -rf .git/hooks", "mv .git/config /tmp/zz",
+                        "rm -rf .tollgate", "rm -rf ."):
+                with self.subTest(cmd=cmd):
+                    self.assertEqual(lab.bash(cmd, cwd=lab.main, session_id="altra").exit, 2)
+            self.assertEqual(lab.bash("rm -rf build", cwd=lab.main, session_id="altra").exit, 0)
+        finally:
+            lab.close()
+
+    def test_state_directory_ancestor(self):
+        lab = Lab()
+        try:
+            r = lab.bash(f"rm -rf '{lab.ts.dir.parent}'", agent_id="a1")
+            self.assertEqual(r.exit, 2, r.stderr)
+        finally:
+            lab.close()
+
+
+class GitHooksPathTest(unittest.TestCase):
+    def test_denied_at_every_level(self):
+        lab = Lab()
+        try:
+            for cmd in ("git -c core.hooksPath=/x commit -m y", "git -c core.hookspath=/x status",
+                        "git config core.hooksPath /x", "git config --global core.hooksPath /x",
+                        "git config --system core.hooksPath /x",
+                        "git config --unset core.hooksPath",
+                        "git --config-env=core.hooksPath=V status",
+                        "GIT_CONFIG_KEY_0=core.hooksPath git status"):
+                with self.subTest(cmd=cmd):
+                    r = lab.bash(cmd, agent_id="a1")
+                    self.assertEqual(r.exit, 2, r.stderr)
+                    self.assertIn("hooksPath", r.stderr)
+            for cmd in ("git config --get core.hooksPath", "git -c user.name=x status",
+                        "git config --global user.name x"):
+                with self.subTest(cmd=cmd):
+                    self.assertEqual(lab.bash(cmd, agent_id="a1").exit, 0)
+        finally:
+            lab.close()
+
+    def test_unbound_session(self):
+        lab = Lab(bind=False)
+        try:
+            for cmd in ("git -c core.hooksPath=/x commit -m y", "git config --global "
+                        "core.hooksPath /x"):
+                with self.subTest(cmd=cmd):
+                    self.assertEqual(lab.bash(cmd, cwd=lab.main, session_id="altra").exit, 2)
+        finally:
+            lab.close()
+
+
 class RoutingTest(unittest.TestCase):
     """Stessa logica di writes.py: ogni radice, altro lavoro, worktree illeggibili, fuori repo."""
 
@@ -229,6 +308,23 @@ class RepoLevelTest(unittest.TestCase):
     def test_force_push_denied(self):
         self.assertEqual(self.code("git push --force-with-lease origin tg/7-demo"), 2)
         self.assertEqual(self.code("git push origin +tg/7-demo"), 2)
+
+    def test_force_if_includes_alone_is_not_a_force_push(self):
+        self.assertEqual(self.code("git push --force-if-includes origin tg/7-demo"), 0)
+        self.assertEqual(self.code("git push --force --force-if-includes origin tg/7-demo"), 2)
+        self.assertEqual(self.code("git push --force-with-lease --force-if-includes origin "
+                                   "tg/7-demo"), 2)
+
+    def test_tag_listing_is_not_a_write(self):
+        lab = Lab(work=False)
+        try:
+            git(lab.wt, "checkout", "-q", "-b", "tg/7-orfano")
+            for cmd in ("git tag -n", "git tag --contains HEAD", "git tag --list", "git tag -l"):
+                with self.subTest(cmd=cmd):
+                    self.assertEqual(lab.bash(cmd).exit, 0)
+            self.assertEqual(lab.bash("git tag v1").exit, 2)
+        finally:
+            lab.close()
 
     def test_work_branch_and_worktree_protection(self):
         self.assertEqual(self.code("git merge tg/7-demo"), 2)

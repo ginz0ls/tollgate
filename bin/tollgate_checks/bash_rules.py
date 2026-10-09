@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 
 from tollgate_analysis import bash
+from tollgate_analysis.protected import REPO_PROTECTED
 from tollgate_core import git
 from tollgate_hooks.model import deny
 
@@ -20,6 +21,10 @@ CHECK = {"api": 1, "events": ["pre_bash"], "component": None, "order": 20}
 _SUBST = "_TG_SUBST_"
 # `TOLLGATE_X=1; cmd`: l'assegnazione da sola non lascia traccia nei comandi letti.
 _TOLLGATE_ASSIGN = re.compile(r"(?:^|[\s;&|(])TOLLGATE_\w*=")
+
+
+# Un percorso concreto per ogni pattern protetto: serve a vedere se una cartella ne contiene.
+_PROBES = [pat.replace("**", "x").replace("*", "x").lstrip("/") for pat in REPO_PROTECTED]
 
 
 def _abs(c: bash.Cmd, target: str) -> Path | None:
@@ -41,6 +46,18 @@ def _write_paths(c: bash.Cmd, edir: Path, repo: Path | None) -> list[tuple[str, 
     elif cfg and cfg != "local" and (p := _abs(c, cfg)) is not None:
         out.append((cfg, p))
     return out
+
+
+def _removes_protected(ctx, p: Path, repo: Path | None, work) -> bool:
+    """`p` (tolto con rm, rmdir o mv) è, o contiene, un file protetto o la radice del lavoro."""
+    wt = Path(work["worktree"]).resolve() if work is not None and work["worktree"] else None
+    roots = [r for r in (wt, Path(ctx.repo).resolve() if ctx.repo is not None else None) if r]
+    if any(_inside(r, p) for r in roots):
+        return True
+    if repo is not None:
+        roots.append(Path(repo).resolve())
+    return any(_inside(r / probe, p) for r in roots for probe in _PROBES) or any(
+        _inside(ar, p) for r in roots + [None] for ar in ctx.protected_roots(r))
 
 
 def _active_branches(ctx, repo) -> dict[str, object]:
@@ -70,6 +87,9 @@ def _forbidden(c: bash.Cmd, raw: str) -> tuple[str, str] | None:
         return "forbidden", "le variabili TOLLGATE_ sono negate nei comandi (3.1)"
     if bash.is_tollgate_hook(c):
         return "forbidden", "tollgate hook lo lancia solo hooks/run"
+    if bash.hooks_path_override(c):
+        return "forbidden", ("core.hooksPath è negato: aggira .git/hooks, che è protetto, "
+                             "come --no-verify (7.4)")
     d = bash.destructive(c)
     if d:
         return "destructive", f"{d} è negato (7.4)"
@@ -191,6 +211,11 @@ def _check(event, ctx, c: bash.Cmd, raw: str) -> tuple[str, str] | None:
         if is_protected_path(ctx, p, git.toplevel(p), governing_work(ctx, p)):
             return "protected", (f"{raw_target}: {p} è un file protetto: lo scrivono solo la CLI "
                                  f"e gli hook di tollgate (7.4)")
+    for raw_target in bash.removal_targets(c):
+        p = _abs(c, raw_target)
+        if p is not None and _removes_protected(ctx, p, git.toplevel(p), governing_work(ctx, p)):
+            return "protected", (f"{raw_target} è, o contiene, un file protetto o la radice del "
+                                 f"lavoro: lo tolgono solo la CLI e gli hook di tollgate (7.4)")
     if ctx.bound and ctx.work is not None:
         touched = [p for _, p in paths] + ([edir] if bash.git_mutating(c) else [])
         for p in touched:

@@ -1,8 +1,15 @@
-"""Effetti esterni (spec 8.5): veto con identificativo, una esecuzione per atto."""
+"""Effetti esterni (spec 8.5): veto con identificativo, una esecuzione per atto.
+
+`PreToolUse` controlla che ogni effetto della riga abbia un atto valido e non consuma nulla:
+se la riga viene negata da un altro controllo l'atto resta intatto. Il consumo (l'effetto
+risulta eseguito) avviene in `PostToolUse Bash`, che scatta solo se il comando è partito. Gli
+strumenti MCP non hanno un `PostToolUse` nell'adattatore: per loro l'atto si consuma al
+`PreToolUse`."""
 from __future__ import annotations
 
 import fnmatch
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 from tollgate_analysis import bash
@@ -11,52 +18,75 @@ from tollgate_hooks.model import deny, inject, record
 
 from ._common import governing_work
 
-CHECK = {"api": 1, "events": ["pre_bash", "pre_mcp"], "component": None, "order": 30}
+CHECK = {"api": 1, "events": ["pre_bash", "post_bash", "pre_mcp"], "component": None,
+         "order": 30}
 
 
-def _intent(ctx, event, command: str, reason: str, repo: Path | None, where: Path):
-    """Un effetto riconosciuto: (messaggio di veto o None, decisioni se l'atto lo permette)."""
+@dataclass(frozen=True)
+class Intent:
+    key: str
+    eid: str
+    work: int | None
+    sha: str | None
+    command: str
+    reason: str
+    row: object
+    prev: str | None
+    act: object
+
+
+def _intent(ctx, event, command: str, reason: str, repo: Path | None, where: Path) -> Intent:
     work = governing_work(ctx, where)
     work_id = work["id"] if work is not None else None
     sha = git.head(repo) if repo else None
     key = effects.effect_key(command, work_id, sha)
     eid = effects.effect_id(key)
     row = effects.get(ctx.db, key)
-    prev = effects.executed_at(row)
     act = acts.find_usable(ctx.db, type_="approve", object_="effect", target=eid, work=work_id,
                            session=event.session, now=ctx.now)
-    request = record("effect_request", key=key, command=command, work=work_id, sha=sha)
-    if act is None:
-        msg = (f"effetto esterno ({reason}): {command[:200]}. Per eseguirlo una volta l'utente "
-               f"digita /tollgate:approve effect {eid}")
-        if prev:
-            msg += f". Attenzione: già eseguito alle {prev} su questo SHA"
-        return key, msg, [request]
-    warn = f" (attenzione: già eseguito alle {prev} su questo SHA)" if prev else ""
-    allowed = ([] if row is not None else [request])
-    allowed += [record("effect_execute", key=key, act_id=act["act_id"], work=work_id),
-                inject(f"tollgate: effetto {eid} permesso una volta dall'atto "
-                       f"{act['act_id']}{warn}")]
-    return key, None, allowed
+    return Intent(key, eid, work_id, sha, command, reason, row, effects.executed_at(row), act)
 
 
-def _verdict(intents):
-    """Un solo veto per tutta la riga: se un effetto non ha l'atto, nessun atto si consuma
-    (la riga non gira). Lo stesso effetto ripetuto nella riga ne consuma uno per volta."""
-    seen, out, denied = set(), [], None
-    for key, msg, decisions in intents:
-        if key in seen and msg is None:
-            msg = ("la riga ripete lo stesso effetto: un atto vale una esecuzione, lancia i "
-                   "comandi separatamente")
-            decisions = []
-        seen.add(key)
-        if msg is not None and denied is None:
-            denied = msg
-        out.append((msg, decisions))
+def _request(i: Intent):
+    return record("effect_request", key=i.key, command=i.command, work=i.work, sha=i.sha)
+
+
+def _execute(i: Intent):
+    """Richiesta (se manca la riga) e consumo dell'atto."""
+    return ([] if i.row is not None else [_request(i)]) + [
+        record("effect_execute", key=i.key, act_id=i.act["act_id"], work=i.work)]
+
+
+def _veto_text(i: Intent) -> str:
+    why = i.reason if i.reason.startswith("effetto esterno") else f"effetto esterno ({i.reason})"
+    msg = (f"{why}: {i.command[:200]}. Per eseguirlo una volta l'utente digita "
+           f"/tollgate:approve effect {i.eid}")
+    if i.prev:
+        msg += f". Attenzione: già eseguito alle {i.prev} su questo SHA"
+    return msg
+
+
+def _gate(intents: list[Intent], *, consume: bool):
+    """Un solo veto per tutta la riga: basta un effetto senza atto. Lo stesso effetto
+    ripetuto nella riga ha bisogno di un atto per ogni esecuzione."""
+    seen, denied, requests, allowed = set(), None, [], []
+    for i in intents:
+        repeated = i.key in seen
+        seen.add(i.key)
+        if i.act is None or repeated:
+            if denied is None:
+                denied = _veto_text(i) if i.act is None else (
+                    "la riga ripete lo stesso effetto: un atto vale una esecuzione, lancia i "
+                    "comandi separatamente")
+            requests.append(_request(i))
+            continue
+        warn = f" (attenzione: già eseguito alle {i.prev} su questo SHA)" if i.prev else ""
+        allowed += _execute(i) if consume else [_request(i)]
+        allowed.append(inject(f"tollgate: effetto {i.eid} permesso una volta dall'atto "
+                              f"{i.act['act_id']}{warn}"))
     if denied is not None:
-        return [deny(denied, rule="effects")] + [d for msg, ds in out if msg is not None
-                                                  for d in ds]
-    return [d for _, ds in out for d in ds]
+        return [deny(denied, rule="effects")] + requests
+    return allowed
 
 
 def _script_reason(ctx, c: bash.Cmd) -> str | None:
@@ -77,21 +107,19 @@ def _script_reason(ctx, c: bash.Cmd) -> str | None:
     return None
 
 
-def decide(event, ctx):
-    if event.kind == "pre_mcp":
-        name = event.tool_name or ""
-        if any(fnmatch.fnmatchcase(name, pat) for pat in ctx.cfg("external_effects.mcp_allow")):
-            return []
-        command = f"{name} {json.dumps(event.tool_input, sort_keys=True, ensure_ascii=False)}"
-        return _verdict([_intent(ctx, event, command, "strumento MCP non in mcp_allow",
-                                 ctx.repo, event.cwd)])
+def _bash_intents(event, ctx) -> list[Intent]:
+    raw = str(event.tool_input.get("command") or "")
     try:
-        cmds = bash.parse(str(event.tool_input.get("command") or ""), str(event.cwd))
+        cmds = bash.parse(raw, str(event.cwd))
     except bash.BashParseError:
-        return []
+        label = bash.text_effect(raw)
+        if not label:
+            return []
+        repo = git.toplevel(event.cwd) if event.cwd.exists() else None
+        return [_intent(ctx, event, " ".join(raw.split()), label, repo, event.cwd)]
     ee = ctx.cfg("external_effects")
     cfg = bash.EffectsCfg(ee["commands"], ee["project_scripts"], ee["allow"])
-    intents = []
+    out = []
     for c in cmds:
         if bash.uses_tollgate_bin(c, str(ctx.plugin_bin)):
             continue
@@ -99,5 +127,24 @@ def decide(event, ctx):
         reason = bash.effect_reason(c, cfg) or _script_reason(ctx, c)
         if reason:
             repo = git.toplevel(edir) if edir.exists() else None
-            intents.append(_intent(ctx, event, bash.normalized(c), reason, repo, edir))
-    return _verdict(intents)
+            out.append(_intent(ctx, event, bash.normalized(c), reason, repo, edir))
+    return out
+
+
+def decide(event, ctx):
+    if event.kind == "pre_mcp":
+        name = event.tool_name or ""
+        if any(fnmatch.fnmatchcase(name, pat) for pat in ctx.cfg("external_effects.mcp_allow")):
+            return []
+        command = f"{name} {json.dumps(event.tool_input, sort_keys=True, ensure_ascii=False)}"
+        return _gate([_intent(ctx, event, command, "strumento MCP non in mcp_allow", ctx.repo,
+                              event.cwd)], consume=True)
+    intents = _bash_intents(event, ctx)
+    if event.kind == "pre_bash":
+        return _gate(intents, consume=False)
+    out, seen = [], set()
+    for i in intents:
+        if i.act is not None and i.key not in seen:
+            seen.add(i.key)
+            out += _execute(i)
+    return out
