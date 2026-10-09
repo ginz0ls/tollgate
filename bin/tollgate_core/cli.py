@@ -46,6 +46,8 @@ def build_parser() -> argparse.ArgumentParser:
     dp = sub.add_parser("db", help="manutenzione del DB")
     dsub = dp.add_subparsers(dest="db_cmd", required=True)
     dsub.add_parser("restore", help="ripristina l'ultima copia integra (solo da terminale)")
+    hp = sub.add_parser("hook", help="solo per hooks/run: adattatore per Claude Code")
+    hp.add_argument("event", metavar="evento")
     vp = sub.add_parser("verify", help="esegue i comandi del gate e registra le ricevute (8.1)")
     vp.add_argument("--related", action="store_true",
                     help="solo i test correlati ai file cambiati")
@@ -132,6 +134,12 @@ def main(argv: list[str]) -> int:
     if args.cmd is None:
         parser.print_help()
         return 0
+    if args.cmd == "hook":
+        from tollgate_hooks.runner import run_hook
+        r = run_hook(args.event, sys.stdin.read(), alarm=True)
+        sys.stdout.write(r.stdout)
+        sys.stderr.write(r.stderr)
+        return r.exit
     state = resolve_state()
     try:
         if args.cmd == "db":
