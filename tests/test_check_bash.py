@@ -99,6 +99,12 @@ class BoundSessionTest(unittest.TestCase):
         self.assertEqual(self.code("git restore src/app.py", agent_id="a1"), 0)
         self.assertEqual(self.code("git checkout -- src/app.py"), 0)
         self.assertEqual(self.code("git restore src/app.py"), 0)
+        # Minor 3: con un albero o --source il coordinatore scriverebbe codice nuovo.
+        for cmd in ("git checkout origin/main -- src/app.py", "git checkout HEAD~1 -- src/app.py",
+                    "git restore --source=HEAD~1 src/app.py", "git restore -s HEAD~1 src/app.py",
+                    "git restore --source HEAD~1 -- src/app.py"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.code(cmd), 2)
 
     def test_unparsable_text_covers_more_dangers(self):
         for body in ("rm -rf /tmp/x", "git -c core.hooksPath=/x commit -m y",

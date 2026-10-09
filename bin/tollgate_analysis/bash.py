@@ -677,6 +677,17 @@ def _git_restore_targets(cmd: Cmd) -> list[str]:
     return out
 
 
+def restores_from_index(cmd: Cmd) -> bool:
+    """`git checkout -- <file>` e `git restore <file>` senza albero né `--source`: tornano alla
+    versione dell'indice, non scrivono codice nuovo."""
+    sub, args, _ = git_call(cmd)
+    if sub == "checkout":
+        return bool(args) and args[0] == "--"
+    if sub == "restore":
+        return not any(x in ("-s", "--source") or x.startswith("--source=") for x in args)
+    return False
+
+
 def write_targets(cmd: Cmd) -> list[str]:
     a = cmd.argv
     out = list(cmd.redirects)

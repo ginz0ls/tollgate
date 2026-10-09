@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.helpers import ROOT, make_repo
+from tests.helpers import ROOT, git as run_git, make_repo
 from tests.hookkit import Lab
 from tollgate_core import active
 
@@ -27,9 +27,10 @@ class ActiveRootsTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.outside, True)
         self.neighbor = make_repo(self.outside / "vicino")   # repo senza tollgate.toml
 
-    def wrapper(self, payload):
+    def wrapper(self, payload, extra_env=None):
+        env = dict(self.lab.ts.env(), **(extra_env or {}))
         r = subprocess.run([str(ROOT / "hooks" / "run"), "PreToolUse"], input=json.dumps(payload),
-                           capture_output=True, text=True, env=self.lab.ts.env(),
+                           capture_output=True, text=True, env=env,
                            cwd=payload["cwd"], timeout=60)
         return r
 
@@ -70,6 +71,49 @@ class ActiveRootsTest(unittest.TestCase):
         r = self.wrapper(self.edit_payload(self.lab.wt / ".tollgate/waivers/7.toml",
                                            self.outside))
         self.assertEqual(r.returncode, 2, r.stderr)
+
+    def test_relative_and_home_forms_from_a_parent_directory(self):
+        # Fix round 2: il cwd e' la cartella madre che contiene il repo attivo.
+        parent = self.lab.tmp
+        main = self.lab.main
+        env_home = {"HOME": str(parent)}
+        forms = {
+            "write relativo": ("w", "main/tollgate.toml"),
+            "redirect con ~": ("b", "echo x > ~/main/tollgate.toml"),
+            "cd relativo e push": ("b", "cd main && git push origin main"),
+            "git -C relativo": ("b", "git -C main push origin main"),
+            "redirect assoluto": ("b", f"echo x > '{main}/tollgate.toml'"),
+            "sed -i assoluto": ("b", f"sed -i s/a/b/ '{main}/tollgate.toml'"),
+            "cd relativo e redirect": ("b", "cd main && echo x > tollgate.toml"),
+            "rm assoluto": ("b", f"rm '{main}/tollgate.toml'"),
+        }
+        for name, (kind, arg) in forms.items():
+            payload = self.edit_payload(arg, parent) if kind == "w" \
+                else self.bash_payload(arg, parent)
+            with self.subTest(form=name):
+                r = self.wrapper(payload, env_home)
+                self.assertEqual(r.returncode, 2, r.stderr)
+
+    def test_command_touching_no_active_repo_passes_from_outside(self):
+        for cwd in (self.outside, self.neighbor, self.lab.tmp):
+            for cmd in ("ls /tmp", "echo x > note.txt", "cd vicino && git status"):
+                with self.subTest(cwd=str(cwd), cmd=cmd):
+                    r = self.wrapper(self.bash_payload(cmd, cwd))
+                    self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_command_touching_two_active_repos_is_denied_with_a_message(self):
+        second = make_repo(self.outside / "secondo")
+        (second / "tollgate.toml").write_text(
+            'schema_version = 1\n[gate]\nmode = "protected"\n[commands]\nverify = "true"\n'
+            'gate = ["verify"]\n')
+        run_git(second, "add", "-A")
+        run_git(second, "commit", "-qm", "x")
+        run_git(second, "update-ref", "refs/remotes/origin/main", "HEAD")
+        active.register(self.lab.ts.state, second)
+        r = self.wrapper(self.bash_payload(
+            f"echo x > '{self.lab.main}/a.txt'; echo y > '{second}/b.txt'", self.outside))
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn("più repo attivi", r.stderr)
 
     def test_unrelated_actions_outside_still_pass(self):
         r = self.wrapper(self.edit_payload(self.outside / "note.txt", self.outside))

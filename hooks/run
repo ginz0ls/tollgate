@@ -128,9 +128,10 @@ if [ "$ACTIVE" = no ] && [ -n "$SESSION" ] && [ -e "$STATE/bound/$SESSION" ]; th
   ACTIVE=yes   # sessione legata a un lavoro: le regole valgono in ogni cartella (6.6)
 fi
 if [ "$ACTIVE" = no ] && [ "$EVENT" = PreToolUse ] && [ -d "$STATE/active" ]; then
-  # Il cwd non è in un repo attivo: se l'input nomina una radice attiva nota (registro scritto da
-  # Python), il bersaglio sta in un repo attivo e i controlli vanno fatti lo stesso (6.6).
-  if printf '%s' "$INPUT" | grep -qFf <(cat "$STATE"/active/* 2>/dev/null | sed '/^$/d'); then
+  # Il cwd non è in un repo attivo, ma esiste almeno un repo attivo noto (registro scritto da
+  # Python): il bersaglio può starci con percorsi relativi, `~`, `cd` o `git -C`, che l'input non
+  # nomina alla lettera. Python decide dal bersaglio (6.6). Registro vuoto: nessun costo.
+  if [ -n "$(cat "$STATE"/active/* 2>/dev/null | sed '/^$/d' | head -n 1)" ]; then
     ACTIVE=yes
   fi
 fi

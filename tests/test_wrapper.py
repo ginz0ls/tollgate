@@ -139,10 +139,20 @@ class WrapperTest(unittest.TestCase):
         r, _ = self.run_wrapper("PreToolUse", payload, cwd=self.plain, mode="2")
         self.assertEqual(r.returncode, 2)
 
-    def test_active_root_not_named_never_starts_python(self):
+    def test_non_empty_registry_starts_python_even_if_no_root_is_named(self):
+        # Fix round 2: percorsi relativi, `~` e `cd` non nominano la radice nell'input.
         self.register_active(self.repo)
         payload = {"hook_event_name": "PreToolUse", "session_id": "s9", "cwd": str(self.plain),
+                   "tool_name": "Bash", "tool_input": {"command": "cd r && git push"}}
+        r, _ = self.run_wrapper("PreToolUse", payload, cwd=self.plain, mode="2")
+        self.assertEqual(r.returncode, 2)
+
+    def test_empty_or_missing_registry_never_starts_python(self):
+        payload = {"hook_event_name": "PreToolUse", "session_id": "s9", "cwd": str(self.plain),
                    "tool_name": "Bash", "tool_input": {"command": "ls /tmp"}}
+        r, _ = self.run_wrapper("PreToolUse", payload, cwd=self.plain, mode="2")
+        self.assertEqual((r.returncode, r.stdout), (0, ""))
+        (self.ts.dir / "active").mkdir()
         r, _ = self.run_wrapper("PreToolUse", payload, cwd=self.plain, mode="2")
         self.assertEqual((r.returncode, r.stdout), (0, ""))
 

@@ -110,23 +110,48 @@ def _repo_active(repo) -> bool:
         return False
 
 
-def _target(event) -> tuple[Path, Path] | None:
-    """Repo attivo (e percorso) che l'azione di controllo nomina, dove si ricava: il file di
-    Edit/Write, la directory effettiva (`-C`, `cd`) di ogni comando Bash."""
+_SUBST = "_TG_SUBST_"
+_GLOB_CHARS = "*?["
+
+
+def _candidate(base: str, raw: str) -> Path | None:
+    """Percorso di un bersaglio: `~` espanso, relativo al `cwd` effettivo del comando; per un
+    glob vale la cartella che precede il primo carattere glob."""
+    if not raw or _SUBST in raw:
+        return None
+    first = min((i for i, ch in enumerate(raw) if ch in _GLOB_CHARS), default=None)
+    if first is not None:
+        raw = raw[:first][:raw[:first].rfind("/") + 1] or "."
+    return Path(os.path.normpath(os.path.join(base, os.path.expanduser(raw))))
+
+
+def _target(event) -> list[tuple[Path, Path]]:
+    """Repo attivi (e percorso) che l'azione di controllo nomina, dove si ricava: il file di
+    Edit/Write; per Bash la directory effettiva (`-C`, `cd`) di ogni comando e i suoi bersagli
+    di scrittura e rimozione (redirect, `sed -i`, `rm`...). Un solo elemento per repo."""
     if event.kind == "pre_edit":
         raw = adapter.edit_path(event)
-        paths = [Path(os.path.normpath(os.path.join(event.cwd, raw)))] if raw else []
+        paths = [_candidate(str(event.cwd), raw)] if raw else []
     else:
         try:
             cmds = bash.parse(str(event.tool_input.get("command") or ""), str(event.cwd))
         except bash.BashParseError:
-            return None
-        paths = [Path(bash.effective_dir(c)) for c in cmds if c.argv]
+            return []
+        paths = []
+        for c in cmds:
+            if not c.argv and not c.redirects:
+                continue
+            paths.append(Path(bash.effective_dir(c)))
+            paths += [_candidate(c.cwd, t) for t in
+                      bash.write_targets(c) + bash.removal_targets(c)]
+    found: dict[Path, Path] = {}
     for p in paths:
+        if p is None:
+            continue
         repo = git.toplevel(p)
-        if _repo_active(repo):
-            return repo, p
-    return None
+        if repo is not None and repo not in found and _repo_active(repo):
+            found[repo] = p
+    return list(found.items())
 
 
 def run_hook(hook_event: str, stdin_text: str, *, env=None, now=None, plugin_root=None,
@@ -158,13 +183,19 @@ def run_hook(hook_event: str, stdin_text: str, *, env=None, now=None, plugin_roo
         if event.kind in _TARGET_KINDS and not _repo_active(root):
             # Il cwd non è in un repo attivo (o non esiste): repo e configurazione vengono dal
             # bersaglio (I1, M1).
-            target = _target(event)
-            if target is not None:
-                root, anchor = target
+            targets = _target(event)
+            if len(targets) > 1:
+                names = ", ".join(str(r) for r, _ in targets)
+                return _fail(True, f"l'azione tocca più repo attivi ({names}): dividila in "
+                                   f"azioni separate, una per repo", state.root)
+            if targets:
+                root, anchor = targets[0]
         # Senza sessione non c'è segnalino (e `bound/` stessa non è il segnalino di nessuno).
         marked = bool(event.session) and sessions._SAFE.match(event.session) is not None \
             and (state.root / sessions.BOUND_DIR / event.session).exists()
         if root is None and not marked:
+            return HookResult(0)
+        if hook_event == "PreToolUse" and not marked and not _repo_active(root):
             return HookResult(0)
         conn = db.open_db(state)
         offlog.import_log(conn, state)

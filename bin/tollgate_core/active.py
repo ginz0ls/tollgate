@@ -2,8 +2,9 @@
 
 La protezione segue il bersaglio, non il `cwd`: per ogni repo attivo il runner scrive in
 `<stato>/active/<hash>` i percorsi del checkout principale e dei worktree, uno per riga. Il
-wrapper `hooks/run` li cerca con `grep -F` nell'input dei `PreToolUse` quando il `cwd` non è in
-un repo attivo: se l'input ne nomina uno, lancia Python, altrimenti esce senza costo.
+wrapper `hooks/run`, su `PreToolUse` con il `cwd` fuori dai repo attivi, lancia Python se il
+registro non è vuoto (il bersaglio può essere relativo, con `~`, `cd` o `git -C`); registro
+vuoto: esce senza costo.
 (In P3 li scriverà anche `start`.)"""
 from __future__ import annotations
 
