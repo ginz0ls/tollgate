@@ -9,7 +9,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import VERSION, clock, db, events, phases, stats
+from . import VERSION, clock, db, events, phases, stats, verify
 from .paths import repo_key, resolve_state
 
 
@@ -45,6 +45,9 @@ def build_parser() -> argparse.ArgumentParser:
     dp = sub.add_parser("db", help="manutenzione del DB")
     dsub = dp.add_subparsers(dest="db_cmd", required=True)
     dsub.add_parser("restore", help="ripristina l'ultima copia integra (solo da terminale)")
+    vp = sub.add_parser("verify", help="esegue i comandi del gate e registra le ricevute (8.1)")
+    vp.add_argument("--related", action="store_true",
+                    help="solo i test correlati ai file cambiati")
     return p
 
 
@@ -117,6 +120,10 @@ def main(argv: list[str]) -> int:
     try:
         if args.cmd == "db":
             return _restore(state)
+        if args.cmd == "verify":
+            code, lines = verify.run_verify(state, Path.cwd(), related=args.related)
+            print("\n".join(lines))
+            return code
         conn = db.open_db(state)
         try:
             if args.cmd == "status":
