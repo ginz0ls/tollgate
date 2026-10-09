@@ -10,7 +10,7 @@ from tollgate_analysis import globs, level as lv, profiles as prof, testguard
 from tollgate_analysis.testguard import Violation
 from tollgate_analysis.waivers import unresolved
 from tollgate_analysis.protected import is_protected
-from tollgate_core import git
+from tollgate_core import git, subagents
 from tollgate_core.paths import repo_key
 from tollgate_hooks.adapter import edit_path
 from tollgate_hooks.model import inject, record
@@ -223,3 +223,25 @@ def commit_violations(ctx, work, wt: Path, base_ref: str, head_ref: str | None,
                 out.append(Violation("out_of_scope", c.path, "file fuori dallo scope del piano",
                                      "scope"))
     return unresolved(out, ctx.waiver_file(work))
+
+
+def budget_cut_records(ctx, agent_id: str, tokens=None) -> list:
+    """Taglio di maxTurns (6.3): riga chiusa `cut`, task in budget superato, blocco `needs_you`.
+    Vale per il primo piano (PostToolUse Agent) e per background e riprese (UserPromptSubmit)."""
+    row = subagents.get(ctx.db, agent_id)
+    if row is None or row["state"] != "running":
+        return []
+    count = tokens if isinstance(tokens, int) and not isinstance(tokens, bool) else None
+    out = [record("subagent_finish", agent_id=agent_id, state="cut", tokens=count)]
+    work, number = row["work"], row["task"]
+    if work is not None and number is not None:
+        t = ctx.db.execute("SELECT state FROM tasks WHERE work = ? AND number = ?",
+                           (work, number)).fetchone()
+        if t is not None and t["state"] == "running":
+            out += [record("task", work=work, number=number, event="budget_exceeded"),
+                    record("block", work=work, type="needs_you",
+                           reason=f"budget superato: maxTurns esaurito sul task {number}. "
+                                  f"Proposta: dividere il task")]
+    out.append(inject("tollgate: il subagente ha esaurito maxTurns. Il task è bloccato con "
+                      "needs_you: non riprenderlo con SendMessage."))
+    return out

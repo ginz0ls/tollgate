@@ -55,6 +55,37 @@ class SubagentsTest(unittest.TestCase):
         self.assertEqual(tasks.get_task(self.conn, self.w, 1)["state"], "pending")
         self.assertEqual(subagents.running(self.conn, work=self.w), [])
 
+    def test_is_stale_uses_last_seen_then_started(self):
+        self._start()
+        row = subagents.get(self.conn, "a1")
+        self.assertFalse(subagents.is_stale(row, now=T0 + timedelta(minutes=29), stale_minutes=30))
+        self.assertTrue(subagents.is_stale(row, now=T0 + timedelta(minutes=30), stale_minutes=30))
+        subagents.touch(self.conn, "a1", now=T0 + timedelta(minutes=29))
+        row = subagents.get(self.conn, "a1")
+        self.assertFalse(subagents.is_stale(row, now=T0 + timedelta(minutes=30), stale_minutes=30))
+        subagents.set_name(self.conn, "senza-visto", "n", session="s1", work=self.w, now=T0)
+        self.conn.execute("UPDATE subagents SET last_seen = NULL WHERE id = 'senza-visto'")
+        self.assertFalse(subagents.is_stale(subagents.get(self.conn, "senza-visto"),
+                                            now=T0 + timedelta(days=1), stale_minutes=30))
+
+    def test_interrupt_is_noop_when_not_running(self):
+        subagents.interrupt(self.conn, "mai-visto", now=T0)
+        self._start()
+        subagents.finish(self.conn, "a1", state="done", declared_status="DONE", now=T0)
+        n = self.conn.execute("SELECT count(*) FROM events").fetchone()[0]
+        subagents.interrupt(self.conn, "a1", now=T0 + timedelta(hours=1))
+        row = subagents.get(self.conn, "a1")
+        self.assertEqual((row["state"], row["declared_status"]), ("done", "DONE"))
+        self.assertEqual(self.conn.execute("SELECT count(*) FROM events").fetchone()[0], n)
+
+    def test_interrupt_leaves_task_that_is_not_running(self):
+        tasks.task_event(self.conn, self.w, 1, "start", now=T0)
+        tasks.task_event(self.conn, self.w, 1, "report_done", now=T0)
+        self._start()
+        subagents.interrupt(self.conn, "a1", now=T0 + timedelta(hours=1))
+        self.assertEqual(subagents.get(self.conn, "a1")["state"], "interrupted")
+        self.assertEqual(tasks.get_task(self.conn, self.w, 1)["state"], "review")
+
     def test_finish_records_event(self):
         self._start()
         subagents.finish(self.conn, "a1", state="done", declared_status="DONE", tokens=123, now=T0)
