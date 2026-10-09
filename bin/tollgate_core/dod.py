@@ -39,13 +39,21 @@ def _receipt(conn, work: int, head_sha: str, allow_no_tests: bool,
     if not required_commands:
         return False, "nessun comando richiesto"
     rows = conn.execute(
-        "SELECT r.command, r.state FROM receipts r WHERE r.work = ? AND r.sha = ? AND r.id = "
-        "(SELECT max(id) FROM receipts x WHERE x.work = r.work AND x.sha = r.sha "
+        "SELECT r.command, r.state, r.exit FROM receipts r WHERE r.work = ? AND r.sha = ? "
+        "AND r.id = (SELECT max(id) FROM receipts x WHERE x.work = r.work AND x.sha = r.sha "
         "AND x.command = r.command) ORDER BY r.command", (work, head_sha)).fetchall()
     if not rows:
         return False, f"nessuna ricevuta su {head_sha}"
-    bad = [f"{r['command']}={r['state']}" for r in rows
-           if not (r["state"] == "green" or (r["state"] == "empty" and allow_no_tests))]
+
+    def ok(r) -> bool:
+        if r["state"] == "green":
+            return True
+        if allow_no_tests and r["state"] == "empty":
+            return True
+        # Decisione 11: `uncounted` (comando senza test contati) vale con uscita 0.
+        return allow_no_tests and r["state"] == "uncounted" and r["exit"] == 0
+
+    bad = [f"{r['command']}={r['state']}" for r in rows if not ok(r)]
     have = {r["command"] for r in rows}
     missing = [c for c in required_commands if c not in have]
     if missing:
