@@ -14,8 +14,10 @@ def get(conn, agent_id: str):
 
 
 def start(conn, *, agent_id: str, type_: str, session: str, work: int | None,
-          task: int | None, base_sha: str | None, fingerprint: str | None, now) -> bool:
-    """Registra la partenza; alla ripresa (stessa riga) non tocca agent_base_sha né l'impronta."""
+          task: int | None, base_sha: str | None, fingerprint: str | None, now,
+          refresh_fingerprint: bool = False) -> bool:
+    """Registra la partenza; alla ripresa (stessa riga) non tocca agent_base_sha. L'impronta si
+    riprende solo con `refresh_fingerprint` (sola lettura, 7.3). I veti ripartono da zero."""
     ts = clock.fmt(now)
     with db.tx(conn):
         row = get(conn, agent_id)
@@ -32,8 +34,10 @@ def start(conn, *, agent_id: str, type_: str, session: str, work: int | None,
                          (type_, work, task, session, base_sha, fingerprint, ts, ts, agent_id))
         else:
             conn.execute("UPDATE subagents SET resumes = resumes + 1, state = 'running', "
-                         "ended = NULL, last_seen = ?, task = coalesce(task, ?) WHERE id = ?",
-                         (ts, task, agent_id))
+                         "ended = NULL, vetoes = 0, last_seen = ?, task = coalesce(task, ?), "
+                         "fingerprint = CASE WHEN ? THEN coalesce(?, fingerprint) "
+                         "ELSE fingerprint END WHERE id = ?",
+                         (ts, task, 1 if refresh_fingerprint else 0, fingerprint, agent_id))
         record_event(conn, "subagent_start", {"id": agent_id, "type": type_, "task": task,
                                               "resumed": resumed},
                      now=now, session=session, work=work)

@@ -5,7 +5,9 @@ import json
 from dataclasses import dataclass
 from typing import Mapping
 
+from . import receipts
 from .phases import get_work
+from .verify import counts_green
 
 EXTERNAL_KEYS = ("guard_scope", "must_have", "approvals", "specialists")
 ITEMS_BY_LEVEL = {
@@ -34,31 +36,27 @@ class DodItem:
     detail: str = ""
 
 
-def _receipt(conn, work: int, head_sha: str, allow_no_tests: bool,
-             required_commands: list[str]) -> tuple[bool, str]:
+def receipt_verdict(rows, head_sha: str, allow_no_tests: bool,
+                    required_commands: list[str]) -> tuple[bool, str]:
+    """Un solo punto per DoD e SubagentStop: i comandi richiesti del gate ci sono tutti e ogni
+    ricevuta (ultima per comando) conta green."""
     if not required_commands:
         return False, "nessun comando richiesto"
-    rows = conn.execute(
-        "SELECT r.command, r.state, r.exit FROM receipts r WHERE r.work = ? AND r.sha = ? "
-        "AND r.id = (SELECT max(id) FROM receipts x WHERE x.work = r.work AND x.sha = r.sha "
-        "AND x.command = r.command) ORDER BY r.command", (work, head_sha)).fetchall()
     if not rows:
         return False, f"nessuna ricevuta su {head_sha}"
-
-    def ok(r) -> bool:
-        if r["state"] == "green":
-            return True
-        if allow_no_tests and r["state"] == "empty":
-            return True
-        # Decisione 11: `uncounted` (comando senza test contati) vale con uscita 0.
-        return allow_no_tests and r["state"] == "uncounted" and r["exit"] == 0
-
-    bad = [f"{r['command']}={r['state']}" for r in rows if not ok(r)]
+    bad = [f"{r['command']}={r['state']}" for r in rows
+           if not counts_green(r["state"], r["exit"], allow_no_tests)]
     have = {r["command"] for r in rows}
     missing = [c for c in required_commands if c not in have]
     if missing:
         bad.append("mancano: " + ", ".join(missing))
     return (not bad), ", ".join(bad)
+
+
+def _receipt(conn, work: int, head_sha: str, allow_no_tests: bool,
+             required_commands: list[str]) -> tuple[bool, str]:
+    return receipt_verdict(receipts.latest(conn, work, head_sha), head_sha, allow_no_tests,
+                           required_commands)
 
 
 def _tasks(conn, work: int) -> tuple[bool, str]:

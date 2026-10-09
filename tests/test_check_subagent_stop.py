@@ -112,7 +112,9 @@ class ReceiptGateTest(Base):
 class BudgetAndSizeTest(Base):
     def test_tokens_over_cap_block_even_with_green(self):
         self.green(self.commit())
-        tr = Path(tempfile.mkdtemp()) / "t.jsonl"
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        tr = Path(tmp.name) / "t.jsonl"
         tr.write_text(json.dumps({"type": "assistant", "message": {
             "id": "m", "usage": {"input_tokens": 500000, "output_tokens": 1}}}) + "\n")
         self.assertEqual(self.stop(text=report(), transcript=str(tr)).exit, 0)
@@ -236,6 +238,62 @@ class ReadonlyOffTest(Base):
         (self.lab.wt / "src/app.py").write_text("manomesso\n")
         self.stop(aid="r1", atype="tollgate:task-reviewer", text="ok")
         self.assertEqual(subagents.get(self.lab.conn, "r1")["state"], "done")
+
+
+class GateCompletenessTest(Base):
+    toml = DEFAULT_TOML.replace('gate = ["verify"]', 'gate = ["verify", "lint"]\nlint = "true"')
+
+    def rec(self, sha, command, state="green", exit_code=0):
+        receipts.add(self.lab.conn, work=self.lab.work, sha=sha, command=command,
+                     resolved_command="true", exit_code=exit_code, tests_run=2,
+                     tests_skipped=0, duration=0.1, log=None, produced_by="verify", state=state,
+                     now=self.lab.now)
+
+    def test_partial_gate_vetoes(self):
+        self.rec(self.commit(), "verify")
+        self.assertEqual(self.stop(text=report()).exit, 2)
+
+    def test_foreign_command_does_not_complete_the_gate(self):
+        self.rec(self.commit(), "profile:x:test")
+        self.assertEqual(self.stop(text=report()).exit, 2)
+
+    def test_full_gate_passes(self):
+        sha = self.commit()
+        self.rec(sha, "verify")
+        self.rec(sha, "lint")
+        self.assertEqual(self.stop(text=report()).exit, 0)
+
+    def test_related_green_still_suffices(self):
+        self.rec(self.commit(), "related")
+        self.assertEqual(self.stop(text=report()).exit, 0)
+
+
+class ResumeTest(Base):
+    def hook_start(self, aid, atype):
+        return self.lab.hook(sample("SubagentStart-none", session_id=SESSION,
+                                    cwd=str(self.lab.wt), agent_id=aid, agent_type=atype))
+
+    def test_resumed_reviewer_is_not_tampered_by_others_commits(self):
+        self.hook_start("r1", "tollgate:task-reviewer")
+        self.commit("def somma(a, b):\n    return a + b + 0\n")
+        self.hook_start("r1", "tollgate:task-reviewer")
+        self.stop(aid="r1", atype="tollgate:task-reviewer", text="ok")
+        self.assertEqual(subagents.get(self.lab.conn, "r1")["state"], "done")
+        self.assertEqual(phases.get_work(self.lab.conn, self.lab.work)["phase"], "execution")
+
+    def test_resume_keeps_base_sha(self):
+        self.hook_start("r1", "tollgate:task-reviewer")
+        base = subagents.get(self.lab.conn, "r1")["agent_base_sha"]
+        self.commit()
+        self.hook_start("r1", "tollgate:task-reviewer")
+        self.assertEqual(subagents.get(self.lab.conn, "r1")["agent_base_sha"], base)
+
+    def test_resume_resets_vetoes(self):
+        self.commit()
+        self.stop(text=report())
+        self.assertEqual(subagents.get(self.lab.conn, "a1")["vetoes"], 1)
+        self.hook_start("a1", IMPL)
+        self.assertEqual(subagents.get(self.lab.conn, "a1")["vetoes"], 0)
 
 
 if __name__ == "__main__":

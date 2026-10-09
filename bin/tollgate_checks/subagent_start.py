@@ -24,7 +24,8 @@ def decide(event, ctx):
     out = [record("subagent_start", agent_id=event.agent_id, type=event.agent_type,
                   work=work["id"] if work is not None else None,
                   task=row["task"] if row is not None else None, base_sha=base, fingerprint=fp,
-                  take_pending=implementer and work is not None, resume=resume)]
+                  take_pending=implementer and work is not None, resume=resume,
+                  refresh_fingerprint=resume and not implementer)]
     if implementer and work is not None:
         out.append(inject(
             f"tollgate: sei un subagente che scrive nel lavoro #{work['issue']}. Lavora solo sui "

@@ -6,8 +6,8 @@ import posixpath
 from pathlib import Path
 
 from tollgate_analysis import globs, report
-from tollgate_core import git, receipts, subagents
-from tollgate_core.verify import counts_green
+from tollgate_core import dod, git, receipts, subagents
+from tollgate_core.verify import counts_green, gate_commands
 from tollgate_hooks.model import deny, record
 
 CHECK = {"api": 1, "events": ["subagent_stop"], "component": None, "order": 20}
@@ -46,19 +46,20 @@ def _skill_missing(task) -> list[str]:
             if s not in used and s.split(":")[-1] not in tail]
 
 
-def _receipt_ok(ctx, work_id: int, head: str) -> bool:
-    """Decisione 24: una ricevuta `related` green sull'ultimo commit basta; altrimenti
-    devono essere green tutte le altre (una `related` vuota o rossa non pesa sul gate)."""
+def _receipt_ok(ctx, work, head: str, wt: Path) -> bool:
+    """Decisione 24: una ricevuta `related` green sull'ultimo commit basta. Altrimenti vale la
+    stessa regola della DoD (`dod.receipt_verdict`): tutti i comandi del gate, profili attivi
+    compresi, presenti e green. Una `related` vuota o rossa non pesa sul gate."""
     allow = ctx.cfg("project.allow_no_tests")
-    latest = receipts.latest(ctx.db, work_id, head)
-
-    def good(r) -> bool:
-        return counts_green(r["state"], r["exit"], allow)
-
-    if any(r["command"] == "related" and good(r) for r in latest):
+    latest = receipts.latest(ctx.db, work["id"], head)
+    if any(r["command"] == "related" and counts_green(r["state"], r["exit"], allow)
+           for r in latest):
         return True
-    gate = [r for r in latest if r["command"] != "related"]
-    return bool(gate) and all(good(r) for r in gate)
+    base = work["work_base_sha"]
+    files = [c.path for c in git.changes(wt, base, head=head) if c.status != "D"] if base else []
+    required = [s.name for s in gate_commands(ctx.config, files)]
+    return dod.receipt_verdict([r for r in latest if r["command"] != "related"], head, allow,
+                               required)[0]
 
 
 def decide(event, ctx):
@@ -121,7 +122,7 @@ def decide(event, ctx):
     done = rep.status in ("DONE", "DONE_WITH_CONCERNS")
     if ctx.component("subagent_receipt_gate"):
         if done and commits:
-            if not _receipt_ok(ctx, wid, head):
+            if not _receipt_ok(ctx, work, head, wt):
                 return veto(f"DONE senza ricevuta green su {head[:10]}: lancia "
                             f"'{ctx.plugin_bin}' verify")
         elif done:

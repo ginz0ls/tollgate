@@ -32,7 +32,8 @@ def _subagent_start(conn, state, ctx, d):
                                   resume=bool(d.get("resume"))) or task
     subagents.start(conn, agent_id=d["agent_id"], type_=d["type"], session=ctx.event.session,
                     work=d.get("work"), task=task, base_sha=d.get("base_sha"),
-                    fingerprint=d.get("fingerprint"), now=ctx.now)
+                    fingerprint=d.get("fingerprint"), now=ctx.now,
+                    refresh_fingerprint=bool(d.get("refresh_fingerprint")))
 
 
 def _commit(conn, state, ctx, d):
