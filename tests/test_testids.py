@@ -79,6 +79,10 @@ class ScanRobustnessTest(unittest.TestCase):
         self.assertEqual(out.split()[-2:], [";", "y"])
         self.assertNotIn("it", out.split())
 
+    def test_unterminated_string_ends_at_line_end(self):
+        out = scan.js_code("const v = <p>users' list</p>\nit('y')", jsx=True)
+        self.assertIn("it", out.split())
+
     def test_fstring_expression_not_counted(self):
         self.assertNotIn("assert_x", scan.py_code('x = f"{assert_x}"\n').split())
 

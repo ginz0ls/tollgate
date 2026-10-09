@@ -142,11 +142,31 @@ class TestScannerRobustness(unittest.TestCase):
 
     def test_commented_threshold_counts_as_removed(self):
         self.assertEqual(kinds([Change("M", "packages/web/.nycrc", None, '{"lines": 90}',
-                                       '{\n  // "lines": 90\n}\n')]), ["threshold_lowered"])
+                                       '{\n  # "lines": 90\n}\n')]), ["threshold_lowered"])
 
     def test_nycrc_lowered(self):
         self.assertEqual(kinds([Change("M", ".nycrc", None, '{"lines": 90}', '{"lines": 10}')]),
                          ["threshold_lowered"])
+
+    def test_coveragerc_lowered_after_star_slash_glob(self):
+        base = "omit =\n    */tests/*\n    */migrations/*\n[report]\nfail_under = 80\n"
+        head = base.replace("fail_under = 80", "fail_under = 10")
+        self.assertEqual(kinds([Change("M", ".coveragerc", None, base, head)]),
+                         ["threshold_lowered"])
+
+    def test_setup_cfg_lowered_after_star_slash_glob(self):
+        base = "[coverage:report]\nomit =\n    */tests/*\nfail_under = 80\n"
+        head = base.replace("fail_under = 80", "fail_under = 10")
+        self.assertEqual(kinds([Change("M", "setup.cfg", None, base, head)]),
+                         ["threshold_lowered"])
+
+    def test_unchanged_coveragerc_with_star_slash_glob_is_clean(self):
+        base = "omit =\n    */tests/*\n[report]\nfail_under = 80\n"
+        self.assertEqual(kinds([Change("M", ".coveragerc", None, base, base)]), [])
+
+    def test_commented_threshold_in_nycrc_json_counts_as_removed(self):
+        self.assertEqual(kinds([Change("M", ".nycrc.json", None, '{"lines": 90}',
+                                       '{\n  // "lines": 90\n}\n')]), ["threshold_lowered"])
 
     def test_coverage_config_deleted(self):
         self.assertEqual(kinds([Change("D", ".coveragerc", None, "fail_under = 90\n", None)]),

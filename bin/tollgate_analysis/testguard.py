@@ -96,10 +96,16 @@ def _count(code: str, patterns) -> int:
     return sum(len(re.findall(p, code)) for p in patterns)
 
 
-def _strip_comments(text: str) -> str:
-    """Toglie i commenti (//, /* */, #, ; a inizio riga) rispettando le stringhe, che non
-    attraversano le righe."""
-    out, i, n, quote, line_start = [], 0, len(text), None, True
+_C_STYLE_EXT = (".js", ".cjs", ".mjs", ".ts", ".cts", ".mts", ".json", ".jsonc")
+
+
+def _strip_comments(text: str, path: str) -> str:
+    """Toglie i commenti rispettando le stringhe, che non attraversano le righe. Nei file
+    C-like (.js, .ts, .json...) toglie //, /* */ e #; negli altri formati (ini, toml, yaml,
+    .coveragerc, .nycrc) toglie solo # e ; a inizio riga o preceduti da spazio, così
+    `*/tests/*` non viene letto come commento."""
+    c_style = path.endswith(_C_STYLE_EXT)
+    out, i, n, quote, prev = [], 0, len(text), None, "\n"
     while i < n:
         c = text[i]
         if quote:
@@ -107,43 +113,56 @@ def _strip_comments(text: str) -> str:
             if c == "\\" and i + 1 < n:
                 out.append(text[i + 1])
                 i += 2
+                prev = text[i - 1]
                 continue
             if c == quote or c == "\n":
                 quote = None
             i += 1
+            prev = c
+            continue
+        if c_style:
+            block = text.startswith("/*", i)
+            line = text.startswith("//", i)
+        else:
+            block = False
+            line = c in "#;" and prev in " \t\n"
+        if block or line:
+            if block:
+                j = text.find("*/", i + 2)
+                i = n if j < 0 else j + 2
+            else:
+                j = text.find("\n", i)
+                i = n if j < 0 else j
+            prev = "\n"
             continue
         if c in "'\"`":
             quote = c
-            out.append(c)
-            i += 1
-            line_start = False
-            continue
-        if text.startswith("//", i) or c == "#" or (c == ";" and line_start):
-            j = text.find("\n", i)
-            i = n if j < 0 else j
-            continue
-        if text.startswith("/*", i):
-            j = text.find("*/", i + 2)
-            i = n if j < 0 else j + 2
-            continue
         out.append(c)
-        line_start = c == "\n" or (line_start and c in " \t")
+        prev = c
         i += 1
     return "".join(out)
 
 
-def _thresholds(text: str | None) -> dict[str, float]:
+def _thresholds(text: str) -> dict[str, float]:
     out: dict[str, float] = {}
-    for key, val in _THRESH.findall(_strip_comments(text or "")):
+    for key, val in _THRESH.findall(text):
         k = key.lower().replace("-", "_")
         out[k] = min(out.get(k, float("inf")), float(val))
     return out
 
 
-def _lowered(base_text: str, head_text: str | None) -> list[str]:
-    """Soglie della base abbassate o rimosse nella testa (una chiave assente vale 0)."""
-    base_t, head_t = _thresholds(base_text), _thresholds(head_text)
-    return sorted(k for k, v in base_t.items() if k not in head_t or head_t[k] < v)
+def _lowered(base_text: str, head_text: str | None, path: str) -> list[str]:
+    """Soglie della base abbassate o rimosse nella testa (una chiave assente vale 0).
+    Fail-closed: si confronta sia il testo pulito sia quello grezzo, e una chiave conta come
+    abbassata se lo è in una delle due letture."""
+    out: set[str] = set()
+    head = head_text or ""
+    readings = ((_strip_comments(base_text, path), _strip_comments(head, path)),
+                (base_text, head))
+    for base_r, head_r in readings:
+        base_t, head_t = _thresholds(base_r), _thresholds(head_r)
+        out.update(k for k, v in base_t.items() if k not in head_t or head_t[k] < v)
+    return sorted(out)
 
 
 def _test_file(c: Change, cfg: GuardConfig, out: list[Violation]) -> None:
@@ -216,7 +235,7 @@ def check(changes, cfg: GuardConfig) -> GuardResult:
             r.watched.append(c.path)
         coverage = any(globs.match_any(COVERAGE_CONFIG_GLOBS, p) for p in paths)
         if (verification or watched or coverage) and not c.binary and c.base_text is not None:
-            lowered = _lowered(c.base_text, c.head_text)
+            lowered = _lowered(c.base_text, c.head_text, c.path)
             if lowered:
                 r.violations.append(Violation("threshold_lowered", c.path,
                                               "soglie abbassate o rimosse: "

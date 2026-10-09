@@ -111,7 +111,8 @@ def js_tokens(text: str, jsx: bool = False):
                 tok, i = ("p", c), i + 1
             else:
                 j, buf = i + 1, []
-                while j < n and text[j] != c:
+                # Come in JS, una stringa non terminata finisce a fine riga.
+                while j < n and text[j] != c and text[j] != "\n":
                     if text[j] == "\\" and j + 1 < n:
                         buf.append(text[j + 1])
                         j += 2
