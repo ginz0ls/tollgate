@@ -52,6 +52,15 @@ class LevelTest(unittest.TestCase):
         finally:
             lab.close()
 
+    def test_failed_edit_event_recomputes_level(self):
+        lab = Lab(level="L0", phase="execution")
+        try:
+            (lab.wt / "src/big.txt").write_text("x" * 5000)
+            lab.post_edit(lab.wt / "src/big.txt", hook_event_name="PostToolUseFailure")
+            self.assertEqual(phases.get_work(lab.conn, lab.work)["level"], "L1")
+        finally:
+            lab.close()
+
     def test_untracked_file_counts_for_size(self):
         lab = Lab(level="L0", phase="execution")
         try:

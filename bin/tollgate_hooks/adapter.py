@@ -18,7 +18,8 @@ _PLAIN = {"SessionStart": "session_start", "UserPromptExpansion": "prompt_expans
 # "log": nessuna iniezione (il runner scrive il testo nel log degli hook).
 INJECT_MODE = {"SessionStart": "context", "UserPromptExpansion": "context",
                "UserPromptSubmit": "context", "PreToolUse": "context",
-               "PostToolUse": "context", "SubagentStart": "context", "SubagentStop": "log"}
+               "PostToolUse": "context", "PostToolUseFailure": "context",
+               "SubagentStart": "context", "SubagentStop": "log"}
 # Eventi d'ingresso la cui iniezione non arriva al modello (SubagentHandback è un PostToolUse).
 NO_INJECT_KINDS = frozenset({"subagent_stop", "subagent_handback"})
 
@@ -36,6 +37,12 @@ def _kind(hook_event: str, tool: str | None) -> str | None:
         if tool in EDIT_TOOLS:
             return "post_edit"
         return _POST.get(tool)
+    if hook_event == "PostToolUseFailure":
+        # Il comando o la modifica sono partiti anche se sono finiti male: stessi effetti di
+        # PostToolUse (consumo dell'atto, commit visti, livello), solo per Bash e per le modifiche.
+        if tool in EDIT_TOOLS:
+            return "post_edit"
+        return "post_bash" if tool == "Bash" else None
     return None
 
 

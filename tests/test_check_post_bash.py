@@ -36,6 +36,15 @@ class PostBashTest(unittest.TestCase):
         self.lab.bash("git status", post=True, agent_id="a1")
         self.assertEqual(len(self.lab.events("commit")), 1)
 
+    def test_commit_of_a_failed_command_is_recorded(self):
+        (self.lab.wt / "src/app.py").write_text("def somma(a, b):\n    return b + a\n")
+        git(self.lab.wt, "commit", "-qam", "ok")
+        head1 = git(self.lab.wt, "rev-parse", "HEAD")
+        r = self.lab.bash("git commit -qam ok && false", post=True, agent_id="a1",
+                          hook_event_name="PostToolUseFailure")
+        self.assertEqual(r.exit, 0, r.stderr)
+        self.assertEqual(self.lab.events("commit"), [{"sha": head1}])
+
     def _finish_state(self):
         return self.lab.conn.execute("SELECT state FROM acts WHERE type='finish'").fetchone()[0]
 

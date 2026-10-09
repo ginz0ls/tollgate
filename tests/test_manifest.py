@@ -9,8 +9,8 @@ class ManifestTest(unittest.TestCase):
     def test_hooks_json(self):
         hooks = json.loads((ROOT / "hooks" / "hooks.json").read_text())["hooks"]
         self.assertEqual(set(hooks), {"SessionStart", "UserPromptExpansion", "UserPromptSubmit",
-                                      "PreToolUse", "PostToolUse", "SubagentStart",
-                                      "SubagentStop"})
+                                      "PreToolUse", "PostToolUse", "PostToolUseFailure",
+                                      "SubagentStart", "SubagentStop"})
         pre = hooks["PreToolUse"][0]["matcher"]
         for tool in ("Edit", "Write", "MultiEdit", "NotebookEdit", "Bash", "Agent", "SendMessage"):
             self.assertRegex(tool, f"^(?:{pre})$")
@@ -19,6 +19,11 @@ class ManifestTest(unittest.TestCase):
         post = hooks["PostToolUse"][0]["matcher"]
         for tool in ("Edit", "Write", "Bash", "Agent", "Skill", "SubagentHandback"):
             self.assertRegex(tool, f"^(?:{post})$")
+        fail = hooks["PostToolUseFailure"][0]["matcher"]
+        for tool in ("Edit", "Write", "MultiEdit", "NotebookEdit", "Bash"):
+            self.assertRegex(tool, f"^(?:{fail})$")
+        for tool in ("Read", "Agent", "Skill"):
+            self.assertNotRegex(tool, f"^(?:{fail})$")
         self.assertNotIn("matcher", hooks["UserPromptSubmit"][0])
         for event, groups in hooks.items():
             for h in groups[0]["hooks"]:

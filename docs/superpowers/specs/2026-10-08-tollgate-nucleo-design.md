@@ -496,7 +496,7 @@ execution (sessione pulita)
 4. Se manca Python ≥ 3.11: un hook di controllo esce con 2 e spiega perché; un hook informativo esce con 0 con un avviso (decisione 1 del piano P2: un `SubagentStop` che uscisse con 2 terrebbe vivo il subagente).
 5. Lancia `bin/tollgate hook <evento>` con una scadenza interna (`[hooks] timeout_s`, predefinito 20 s). Python imposta `signal.alarm` su quella scadenza, come configurata. Il wrapper legge `timeout_s` dal riferimento remoto e tiene un cane da guardia a `timeout_s + 2` secondi, con `timeout_s` limitato a 85 s: il tetto vale solo per il cane da guardia (al più 87 s), con i descrittori chiusi, perché un processo orfano non tenga aperta la pipe di Claude Code. `hooks.json` dichiara `timeout: 90` (decisione 4 del piano P2).
 6. **Hook di controllo** (`PreToolUse`: `pre_edit`, `pre_bash`, `pre_agent`, `pre_send_message`, `pre_mcp`; decisione 1 del piano P2): qualunque esito diverso da 0 o 2 diventa 2.
-7. **Hook informativi** (tutti gli altri eventi: `SessionStart`, `UserPromptExpansion`, `UserPromptSubmit`, `PostToolUse`, `SubagentStart`, `SubagentStop`): un errore diventa 0, con un avviso. Così un DB guasto non blocca mai i comandi `/tollgate:*`; l'atto in quel caso non viene registrato e la skill lo dice.
+7. **Hook informativi** (tutti gli altri eventi: `SessionStart`, `UserPromptExpansion`, `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`): un errore diventa 0, con un avviso. Così un DB guasto non blocca mai i comandi `/tollgate:*`; l'atto in quel caso non viene registrato e la skill lo dice.
 
 Ogni messaggio d'errore riporta il percorso assoluto di `bin/tollgate` e il comando `touch` per `OFF`.
 
@@ -507,9 +507,9 @@ Ogni messaggio d'errore riporta il percorso assoluto di `bin/tollgate` e il coma
 | `SessionStart` | `startup`, `resume`, `clear`, `compact`, `fork` | Se la directory è dentro il worktree di un lavoro attivo, lega la sessione al lavoro (0). Inietta lo stato e il checkpoint. Segna come `interrupted` i subagenti `running` **di sessioni non vive** (0); mai in base alla sola origine «precedente» |
 | `UserPromptExpansion` | comandi `tollgate:*`, forma lunga e breve | Registra l'atto (8.4) da `command_name`, che è sempre nella forma lunga, e `command_args` |
 | `PreToolUse` | `Edit`, `Write`, `NotebookEdit`, `MultiEdit` | In `spec_audit`, `plan`, `approval`, `blocked`, `review` e `pr_open`: solo `.md` sotto `docs/superpowers/` (in `spec_audit` e `approval` non sotto `plans/`; mai spec e piano bloccati, 6.2); per correggere il codice dopo `finish` si torna in `execution` con `start`. In `execution`: fuori scope → `deny`; codice scritto dalla sessione principale in L1 o L2 → `deny`. In L0 non c'è scope: scrive la sessione principale, e il superamento delle soglie di 5 porta a L1. File protetti → `deny`, anche quando sono `.md` sotto `docs/superpowers/reviews/`. Sempre ammessi: gli altri `.md` sotto `docs/superpowers/` e `.superpowers/` |
-| `PostToolUse` | `Edit`, `Write`, `MultiEdit` | Ricalcola il livello; sui piani lancia `plan-check` (7.5) |
+| `PostToolUse`, `PostToolUseFailure` | `Edit`, `Write`, `MultiEdit` | Ricalcola il livello; sui piani lancia `plan-check` (7.5). `PostToolUseFailure` (modifica partita ma finita male) è mappato sugli stessi eventi d'ingresso (`post_edit`) |
 | `PostToolUse` | `Skill` | Se lo invoca un implementatore (`agent_id`), registra la skill per il suo task (6.3) |
-| `PostToolUse` | `Bash` | In una sessione legata o nel worktree: se `HEAD` ha commit nuovi non registrati (anche da `merge`, `cherry-pick`, `revert`, `am`), li registra e fa girare test-guard e scope su di essi; una violazione apre un blocco `needs_you`. Se il ramo del worktree è cambiato, apre `needs_you`. È il controllo a valle che copre i comandi non riconosciuti da 7.4 |
+| `PostToolUse`, `PostToolUseFailure` | `Bash` | In una sessione legata o nel worktree: se `HEAD` ha commit nuovi non registrati (anche da `merge`, `cherry-pick`, `revert`, `am`), li registra e fa girare test-guard e scope su di essi; una violazione apre un blocco `needs_you`. Se il ramo del worktree è cambiato, apre `needs_you`. È il controllo a valle che copre i comandi non riconosciuti da 7.4 |
 | `PreToolUse` | `Bash` | 7.4 |
 | `PreToolUse` | `mcp__.*` | Effetto esterno, se lo strumento non è in `mcp_allow` (8.5) |
 | `PreToolUse` | `Agent` | Guardia del contesto. **Scrittore unico**: nessun nuovo implementatore se un altro è `running` nel worktree. Un subagente senza eventi da più di `stale_minutes` (30) diventa `interrupted`, anche se la sua sessione è viva: è un subagente bloccato. In `execution` (L1, L2) ammette come scrittore solo il tipo scelto da `task start` per il task in sospeso (`tollgate:implementer` o l'implementatore per area, 6.3), con il `name` scritto nel brief e senza `run_in_background` |
@@ -690,7 +690,7 @@ Li registra `UserPromptExpansion` quando digiti il comando. Il tipo di atto vien
 **Come funziona:**
 1. veto, con un identificativo;
 2. `/tollgate:approve effect <id>`;
-3. l'effetto passa una volta, per quel comando esatto. L'atto si consuma a `PostToolUse Bash`, quando il comando è partito, non a `PreToolUse`: un comando negato non consuma nulla. Per MCP, che non ha `PostToolUse`, l'atto si consuma a `PreToolUse`;
+3. l'effetto passa una volta, per quel comando esatto. L'atto si consuma a `PostToolUse Bash`, e anche a `PostToolUseFailure Bash` (un comando con uscita diversa da 0 è partito lo stesso), non a `PreToolUse`: un comando negato non consuma nulla. Per MCP, poiché l'adattatore di P2 non mappa `PostToolUse` MCP, l'atto si consuma a `PreToolUse`;
 4. il permesso diventa un intento, con chiave (comando, lavoro, SHA);
 5. se lo stesso effetto si ripete sullo stesso SHA, ti avvisa con «già eseguito alle…».
 

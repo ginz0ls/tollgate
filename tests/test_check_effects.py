@@ -56,6 +56,18 @@ class EffectsTest(unittest.TestCase):
         self.assertIn("già eseguito alle", r.stderr)
         self.assertEqual(EID.search(r.stderr).group(1), eid)
 
+    def test_failed_command_still_consumes_the_act(self):
+        # PostToolUseFailure: il comando è partito anche se è finito con un errore (I2).
+        eid = self.veto_id("ssh a")
+        approve(self.lab, eid)
+        self.assertEqual(self.lab.bash("ssh a").exit, 0)
+        r = self.lab.bash("ssh a", post=True, hook_event_name="PostToolUseFailure")
+        self.assertEqual(r.exit, 0, r.stderr)
+        self.assertEqual(len(self.lab.events("effect_executed")), 1)
+        r = self.lab.bash("ssh a")
+        self.assertEqual(r.exit, 2)
+        self.assertIn("già eseguito alle", r.stderr)
+
     def test_denied_line_keeps_the_act_valid(self):
         eid = self.veto_id("ssh a")
         approve(self.lab, eid)

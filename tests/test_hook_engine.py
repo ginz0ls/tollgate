@@ -124,6 +124,15 @@ class AdapterTest(unittest.TestCase):
                     tool_input={"notebook_path": "/x/n.ipynb"})
         self.assertEqual(adapter.edit_path(adapter.to_event("PreToolUse", nb)), "/x/n.ipynb")
 
+    def test_post_tool_use_failure_maps_to_post_kinds(self):
+        for tool, kind in (("Bash", "post_bash"), ("Write", "post_edit"), ("Edit", "post_edit"),
+                           ("Agent", None), ("Skill", None), ("Read", None)):
+            s = sample("PostToolUse-Bash", hook_event_name="PostToolUseFailure", tool_name=tool)
+            ev = adapter.to_event("PostToolUseFailure", s)
+            with self.subTest(tool=tool):
+                self.assertEqual(ev.kind if ev else None, kind)
+        self.assertEqual(adapter.INJECT_MODE["PostToolUseFailure"], "context")
+
     def test_render(self):
         self.assertEqual(adapter.render("PreToolUse", "no", None)[:1], (2,))
         code, out, _ = adapter.render("SessionStart", None, "ciao")
