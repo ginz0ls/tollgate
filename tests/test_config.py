@@ -110,6 +110,12 @@ class LoadTextTest(unittest.TestCase):
             '[profiles]\nactive = ["web"]\n')
         self.assertIn("profilo attivo non dichiarato: web", cfg.warnings)
 
+    def test_active_profile_declared_gives_no_warning(self):
+        cfg = load_config_text(
+            'schema_version = 1\n[gate]\nmode = "protected"\n'
+            '[profiles]\nactive = ["web"]\n[profiles.web]\npaths = ["web/**"]\n')
+        self.assertEqual(cfg.warnings, [])
+
 
 class LoadFromGitTest(unittest.TestCase):
     def setUp(self):

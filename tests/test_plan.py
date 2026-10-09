@@ -54,6 +54,14 @@ class PlanCheckTest(unittest.TestCase):
     def test_manual_test_allowed(self):
         self.assertTrue(check(make(must_have="M1. Colore giusto — test: manuale")).ok)
 
+    def test_brackets_in_scope_are_literal_names(self):
+        r = check(make(files=["- Create: `app/[id]/page.tsx`"]))
+        self.assertTrue(r.ok, r.problems)
+        self.assertEqual(r.scope, ["app/[id]/page.tsx"])
+
+    def test_question_mark_in_scope_rejected(self):
+        self.assertFalse(check(make(files=["- Create: `src/a?.py`"])).ok)
+
     def test_too_many_files(self):
         files = [f"- Create: `src/f{i}.py`" for i in range(4)]
         self.assertFalse(check(make(files=files), max_scope=3).ok)
