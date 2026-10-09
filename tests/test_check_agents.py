@@ -221,11 +221,41 @@ class PromptSubmitCutTest(unittest.TestCase):
         self.prompt(notification("a-bg"))
         self.assertEqual(self.state(), ("done", "running", "execution"))
 
-    def test_component_off_ignores_notification(self):
+    def test_budget_component_off_still_closes_row_without_block(self):
         self.lab.close()
         self.setUp_with("[components]\ntask_budget = false\n")
         self.prompt(notification("a-bg"))
+        self.assertEqual(self.state(), ("cut", "running", "execution"))
+        self.assertEqual(subagents.running(self.lab.conn, work=self.lab.work), [])
+        self.assertIsNone(self.lab.conn.execute("SELECT 1 FROM blocks").fetchone())
+
+    def test_two_notifications_cut_only_the_matching_one(self):
+        start(self.lab, "a-ok")
+        self.prompt(notification("a-ok", "completed normally") + "\n"
+                    + notification("a-bg"))
+        self.assertEqual(subagents.get(self.lab.conn, "a-ok")["state"], "running")
+        self.assertEqual(subagents.get(self.lab.conn, "a-bg")["state"], "cut")
+
+    def test_two_cut_notifications_cut_both(self):
+        start(self.lab, "a-2")
+        self.prompt(notification("a-bg") + "\n" + notification("a-2"))
+        self.assertEqual(subagents.get(self.lab.conn, "a-bg")["state"], "cut")
+        self.assertEqual(subagents.get(self.lab.conn, "a-2")["state"], "cut")
+
+    def test_user_quoting_a_notification_cuts_nothing(self):
+        self.prompt("guarda cosa mi è arrivato:\n" + notification("a-bg"))
         self.assertEqual(self.state(), ("running", "running", "execution"))
+
+    def test_phrase_only_in_result_cuts_nothing(self):
+        text = notification("a-bg", "completed normally").replace(
+            "<result>NOTE: completed normally", "<result>NOTE: stopped at its 2-turn limit")
+        self.assertIn("2-turn limit</result>", text)
+        self.prompt(text)
+        self.assertEqual(self.state(), ("running", "running", "execution"))
+
+    def test_leading_whitespace_is_allowed(self):
+        self.prompt("\n  " + notification("a-bg"))
+        self.assertEqual(self.state()[0], "cut")
 
     def setUp_with(self, extra):
         self.lab = Lab(toml=DEFAULT_TOML + extra)
@@ -263,6 +293,22 @@ class PostAgentExtraTest(unittest.TestCase):
                              cwd=str(self.lab.wt)))
         self.assertEqual(subagents.get(self.lab.conn, "aaf79e12a030de3c4")["report"], "uno")
 
+    def test_foreground_cut_with_budget_off_closes_row_only(self):
+        self.lab.close()
+        self.lab = Lab(toml=DEFAULT_TOML + "[components]\ntask_budget = false\n")
+        with_scope(self.lab)
+        tasks.assign(self.lab.conn, self.lab.work, 1, implementer="tg-7-t1", agent_type=IMPL,
+                     pending="launch", now=self.lab.now)
+        tasks.task_event(self.lab.conn, self.lab.work, 1, "start", now=self.lab.now)
+        cut = sample("PostToolUse-Agent-maxturns-cut", session_id=SESSION, cwd=str(self.lab.wt))
+        aid = cut["tool_response"]["agentId"]
+        start(self.lab, aid)
+        self.lab.hook(cut)
+        row = subagents.get(self.lab.conn, aid)
+        self.assertEqual((row["state"], row["tokens"]), ("cut", 15247))
+        self.assertEqual(tasks.get_task(self.lab.conn, self.lab.work, 1)["state"], "running")
+        self.assertIsNone(self.lab.conn.execute("SELECT 1 FROM blocks").fetchone())
+
     def test_foreground_cut_records_tokens(self):
         cut = sample("PostToolUse-Agent-maxturns-cut", session_id=SESSION, cwd=str(self.lab.wt))
         start(self.lab, cut["tool_response"]["agentId"])
@@ -290,6 +336,20 @@ class SendMessageExtraTest(unittest.TestCase):
         subagents.set_name(self.lab.conn, "r1", "rev", session=SESSION, work=self.lab.work,
                            now=self.lab.now)
         self.assertEqual(send(self.lab, "rev").exit, 0)
+
+    def test_subagent_sender_allowed_outside_execution(self):
+        self.lab.goto("review")
+        self.assertEqual(send(self.lab, "tg-7-t1", agent_id="altro").exit, 0)
+
+    def test_stale_target_is_not_interrupted_before_resume(self):
+        tasks.assign(self.lab.conn, self.lab.work, 1, implementer="tg-7-t1", agent_type=IMPL,
+                     pending="resume", now=self.lab.now)
+        r = self.lab.hook(sample("PreToolUse-SendMessage", session_id=SESSION,
+                                 cwd=str(self.lab.wt),
+                                 tool_input={"to": "tg-7-t1", "message": "m"}),
+                          now=self.lab.now + timedelta(minutes=31))
+        self.assertEqual(r.exit, 0)
+        self.assertEqual(subagents.get(self.lab.conn, "a1")["state"], "running")
 
     def test_resume_blocked_by_another_live_writer(self):
         subagents.finish(self.lab.conn, "a1", state="done", now=self.lab.now)

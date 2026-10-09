@@ -226,13 +226,16 @@ def commit_violations(ctx, work, wt: Path, base_ref: str, head_ref: str | None,
 
 
 def budget_cut_records(ctx, agent_id: str, tokens=None) -> list:
-    """Taglio di maxTurns (6.3): riga chiusa `cut`, task in budget superato, blocco `needs_you`.
+    """Taglio di maxTurns (6.3). La riga si chiude sempre come `cut` (altrimenti resterebbe un
+    falso scrittore vivo); task in budget superato e blocco `needs_you` solo con `task_budget`.
     Vale per il primo piano (PostToolUse Agent) e per background e riprese (UserPromptSubmit)."""
     row = subagents.get(ctx.db, agent_id)
     if row is None or row["state"] != "running":
         return []
     count = tokens if isinstance(tokens, int) and not isinstance(tokens, bool) else None
     out = [record("subagent_finish", agent_id=agent_id, state="cut", tokens=count)]
+    if not ctx.component("task_budget"):
+        return out
     work, number = row["work"], row["task"]
     if work is not None and number is not None:
         t = ctx.db.execute("SELECT state FROM tasks WHERE work = ? AND number = ?",

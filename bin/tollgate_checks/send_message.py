@@ -26,10 +26,10 @@ def decide(event, ctx):
         return []
     if not target["type"] or ctx.readonly(target["type"]):
         return []
-    if not from_main:
-        return [deny("un subagente non riprende un subagente che scrive", rule="writer")]
     if not in_exec:
         return []
+    if not from_main:
+        return [deny("un subagente non riprende un subagente che scrive", rule="writer")]
     task = None
     if target["task"] is not None:
         task = ctx.db.execute("SELECT * FROM tasks WHERE work = ? AND number = ?",

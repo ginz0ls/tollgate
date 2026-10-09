@@ -23,10 +23,10 @@ def context_pct(ctx, session: str):
 
 def live_writers(ctx, work_id, exclude=()):
     """(scrittori vivi, record di interruzione dei fermi oltre stale_minutes)."""
-    rows = subagents.running(ctx.db, work=work_id)
+    rows = [r for r in subagents.running(ctx.db, work=work_id) if r["id"] not in exclude]
     stale = [r for r in rows if subagents.is_stale(r, now=ctx.now,
                                                     stale_minutes=ctx.stale_minutes)]
-    live = [r for r in rows if r not in stale and r["id"] not in exclude
+    live = [r for r in rows if r not in stale
             and not ctx.readonly(r["type"])]
     return live, [record("subagent_interrupt", agent_id=r["id"]) for r in stale]
 

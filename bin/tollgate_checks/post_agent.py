@@ -25,6 +25,6 @@ def decide(event, ctx):
     hb = tr.get("handbackReport")
     if isinstance(hb, dict) and isinstance(hb.get("text"), str):
         out.append(record("subagent_report", agent_id=aid, text=hb["text"]))
-    if ctx.component("task_budget") and report.is_turn_cut(tr):
+    if report.is_turn_cut(tr):
         out += budget_cut_records(ctx, aid, tr.get("totalTokens"))
     return out
