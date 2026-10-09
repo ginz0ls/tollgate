@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "SessionStart": [{"hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run\" SessionStart", "timeout": 90}]}],
+    "UserPromptExpansion": [{"hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run\" UserPromptExpansion", "timeout": 90}]}],
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run\" UserPromptSubmit", "timeout": 90}]}],
+    "PreToolUse": [{"matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|Agent|SendMessage|mcp__.*", "hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run\" PreToolUse", "timeout": 90}]}],
+    "PostToolUse": [{"matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|Agent|Skill|SubagentHandback", "hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run\" PostToolUse", "timeout": 90}]}],
+    "SubagentStart": [{"hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run\" SubagentStart", "timeout": 90}]}],
+    "SubagentStop": [{"hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run\" SubagentStop", "timeout": 90}]}]
+  }
+}
