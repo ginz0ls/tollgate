@@ -254,6 +254,32 @@ class FixRound1Test(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(bash.writes(one(text)))
 
+    def test_listing_forms_are_not_writes(self):
+        for text in ["git branch", "git branch -a", "git branch -vv", "git branch --list 'tg/*'",
+                     "git worktree list", "git stash list", "git tag", "git tag -l 'v*'",
+                     "git remote -v", "git remote show origin", "git submodule status"]:
+            with self.subTest(text=text):
+                self.assertFalse(bash.writes(one(text)))
+        for text in ["git branch nuovo", "git branch -D x", "git branch -m a b", "git tag v1",
+                     "git tag -d v1", "git worktree add ../x", "git stash", "git stash pop",
+                     "git remote add o u", "git remote remove o"]:
+            with self.subTest(text=text):
+                self.assertTrue(bash.writes(one(text)))
+
+    def test_git_config_write_target(self):
+        self.assertEqual(bash.git_config_write(one("git config core.hooksPath /x")), "local")
+        self.assertEqual(bash.git_config_write(one("git config --unset user.name")), "local")
+        self.assertEqual(bash.git_config_write(one("git -C ../r config a b")), "local")
+        self.assertEqual(bash.git_config_write(one("git config --file /r/.git/config a b")),
+                         "/r/.git/config")
+        self.assertEqual(bash.git_config_write(one("git config --file=/x/c a b")), "/x/c")
+        for text in ("git config --global a b", "git config --system a b", "git config --get a",
+                     "git config --list", "git config -l", "git status"):
+            with self.subTest(text=text):
+                self.assertIsNone(bash.git_config_write(one(text)))
+        self.assertTrue(bash.git_mutating(one("git config a b")))
+        self.assertFalse(bash.git_mutating(one("echo x > f")))
+
     def test_command_patterns_cross_slash_and_allow_applies(self):
         cfg = bash.EffectsCfg(commands=["./scripts/deploy.sh *"])
         self.assertIsNotNone(bash.effect_reason(one("./scripts/deploy.sh a"), cfg))

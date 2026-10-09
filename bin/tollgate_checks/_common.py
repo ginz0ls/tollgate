@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 from tollgate_analysis import globs, level as lv, profiles as prof
+from tollgate_analysis.protected import is_protected
 from tollgate_core import git
 from tollgate_core.paths import repo_key
 from tollgate_hooks.adapter import edit_path
@@ -61,6 +62,29 @@ def governing_work(ctx, path):
     if ctx.bound and ctx.work is not None:
         return ctx.work
     return ctx.work_for_path(path) if path is not None else None
+
+
+def in_main_checkout(p: Path, wt: Path) -> bool:
+    """`p` sta nel checkout principale, ma non in un altro worktree dentro di esso.
+    Solleva GitError se i worktree non si possono elencare."""
+    trees = [t for t, _ in git.worktrees(wt)]
+    return _inside(p, trees[0]) and not any(_inside(p, t) for t in trees[1:])
+
+
+def is_protected_path(ctx, p: Path, repo, work) -> bool:
+    """Protetto se lo dice una qualunque radice pertinente: il repo più vicino (può essere
+    annidato), il worktree del lavoro e il repo del contesto. Così un `git init` in una
+    cartella protetta non sposta la radice e non aggira la regola."""
+    roots = []
+    for r in (repo, Path(work["worktree"]) if work is not None and work["worktree"] else None,
+              ctx.repo):
+        r = Path(r).resolve() if r is not None else None
+        if r is not None and r not in roots:
+            roots.append(r)
+    if not roots:
+        roots = [None]
+    return any(is_protected(ctx.rel(p, r) if r else None, p, abs_roots=ctx.protected_roots(r))
+               for r in roots)
 
 
 def is_docs_md(rel: str | None) -> bool:

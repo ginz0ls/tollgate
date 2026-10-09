@@ -335,6 +335,34 @@ def git_call(cmd: Cmd):
     return (a[i] if i < len(a) else None), a[i + 1:], c_dir
 
 
+_CONFIG_FILE_OPTS = {"--global", "--system", "--file", "-f", "--blob"}
+_BRANCH_LISTING = {"-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "-l", "--list",
+                   "--show-current", "--merged", "--no-merged", "--contains", "--no-contains",
+                   "--sort", "--format", "--color", "--no-color", "--column", "--no-column",
+                   "--points-at", "-i", "--ignore-case"}
+
+
+def _read_only_git(sub: str | None, args: list[str]) -> bool:
+    """Forme di sola lettura dei sottocomandi che di norma scrivono (`git branch -a`,
+    `git worktree list`...): l'elenco non è una scrittura (decisione 16)."""
+    first = args[0] if args else None
+    listing = any(x in ("-l", "--list") for x in args)
+    if sub == "worktree":
+        return first == "list"
+    if sub == "stash":
+        return first in ("list", "show")
+    if sub == "submodule":
+        return first in ("status", "summary")
+    if sub == "remote":
+        return first in (None, "-v", "--verbose", "show", "get-url")
+    if sub == "tag":
+        return listing or not args
+    if sub == "branch":
+        flags_ok = all(x.split("=", 1)[0] in _BRANCH_LISTING for x in args if x.startswith("-"))
+        return flags_ok and (listing or not _positional(args))
+    return False
+
+
 def _is_mutating(sub: str | None, args: list[str]) -> bool:
     if sub == "config":
         if any(x in _CONFIG_WRITE for x in args):
@@ -342,7 +370,27 @@ def _is_mutating(sub: str | None, args: list[str]) -> bool:
         if any(x in _CONFIG_READ for x in args):
             return False
         return len(_positional(args)) >= 2  # `git config chiave valore`
-    return sub in _GIT_MUTATING
+    return sub in _GIT_MUTATING and not _read_only_git(sub, args)
+
+
+def git_mutating(cmd: Cmd) -> bool:
+    """Comando git che scrive nel repo (non conta i redirect del comando)."""
+    sub, args, _ = git_call(cmd)
+    return _is_mutating(sub, args)
+
+
+def git_config_write(cmd: Cmd) -> str | None:
+    """`git config` in forma di scrittura: «local» per il config del repo (`.git/config`),
+    il percorso dato con `--file`, None se legge o scrive `--global` o `--system`."""
+    sub, args, _ = git_call(cmd)
+    if sub != "config" or not _is_mutating(sub, args):
+        return None
+    for i, x in enumerate(args):
+        if x in ("--file", "-f") and i + 1 < len(args):
+            return args[i + 1]
+        if x.startswith("--file="):
+            return x.split("=", 1)[1]
+    return None if any(x in _CONFIG_FILE_OPTS for x in args) else "local"
 
 
 def effective_dir(cmd: Cmd) -> str:
@@ -512,8 +560,7 @@ def write_targets(cmd: Cmd) -> list[str]:
 
 
 def writes(cmd: Cmd) -> bool:
-    sub, args, _ = git_call(cmd)
-    return bool(write_targets(cmd)) or _is_mutating(sub, args)
+    return bool(write_targets(cmd)) or git_mutating(cmd)
 
 
 def is_claude(cmd: Cmd) -> bool:

@@ -3,41 +3,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tollgate_analysis.protected import is_protected
 from tollgate_analysis.testguard import Violation
 from tollgate_analysis.waivers import unresolved
 from tollgate_core import git
 from tollgate_hooks.model import deny
 
-from ._common import (_inside, edit_target, explain, governing_work, is_docs_md, locked_docs,
-                      orphan_tg, scope_exempt)
+from ._common import (edit_target, explain, governing_work, in_main_checkout, is_docs_md,
+                      is_protected_path, locked_docs, orphan_tg, scope_exempt)
 
 CHECK = {"api": 1, "events": ["pre_edit"], "component": None, "order": 20}
 _DOCS_ONLY = ("spec_audit", "plan", "approval", "blocked", "review", "pr_open")
 _NO_PLANS = ("spec_audit", "approval")
-
-
-def _in_main_checkout(p: Path, wt: Path) -> bool:
-    """Nel checkout principale, ma non in un altro worktree che sta dentro di esso.
-    Solleva GitError se i worktree non si possono elencare."""
-    trees = [t for t, _ in git.worktrees(wt)]
-    return _inside(p, trees[0]) and not any(_inside(p, t) for t in trees[1:])
-
-
-def _protected(ctx, p: Path, repo, work) -> bool:
-    """Protetto se lo dice una qualunque radice pertinente: il repo più vicino (può essere
-    annidato), il worktree del lavoro e il repo del contesto. Così un `git init` in una
-    cartella protetta non sposta la radice e non aggira la regola."""
-    roots = []
-    for r in (repo, Path(work["worktree"]) if work is not None and work["worktree"] else None,
-              ctx.repo):
-        r = Path(r).resolve() if r is not None else None
-        if r is not None and r not in roots:
-            roots.append(r)
-    if not roots:
-        roots = [None]
-    return any(is_protected(ctx.rel(p, r) if r else None, p, abs_roots=ctx.protected_roots(r))
-               for r in roots)
 
 
 def decide(event, ctx):
@@ -47,7 +23,7 @@ def decide(event, ctx):
     repo = git.toplevel(p)
     rel = ctx.rel(p, repo) if repo else None
     work = governing_work(ctx, p)
-    if _protected(ctx, p, repo, work):
+    if is_protected_path(ctx, p, repo, work):
         return [deny(f"{p} è un file protetto: lo scrivono solo la CLI e gli hook di tollgate "
                      f"(7.4)", rule="protected")]
     if ctx.bound and ctx.work is not None:
@@ -69,7 +45,7 @@ def decide(event, ctx):
     rel_w = ctx.rel(p, wt)
     if rel_w is None:
         try:
-            in_main = _in_main_checkout(p, wt)
+            in_main = in_main_checkout(p, wt)
         except git.GitError as e:
             return [deny(f"non è stato possibile verificare i worktree ({e}): scrittura fuori "
                          f"dal worktree del lavoro #{work['issue']} negata (6.6)",
