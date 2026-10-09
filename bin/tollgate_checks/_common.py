@@ -23,6 +23,8 @@ def orphan_tg(ctx, repo) -> int | None:
     if not m:
         return None
     key = repo_key_of(repo)
+    if key is None:
+        return None
     row = ctx.db.execute("SELECT 1 FROM work_items WHERE repo_key = ? AND issue = ? "
                          "AND phase <> 'closed'", (key, int(m.group(1)))).fetchone()
     return None if row else int(m.group(1))
@@ -39,12 +41,25 @@ def is_docs_md(rel: str | None) -> bool:
     return bool(rel) and rel.startswith("docs/superpowers/") and rel.endswith(".md")
 
 
+# Ordine delle fasi di un lavoro (phases.SEQUENCES): la spec si scrive in spec_audit e il
+# piano in plan. Oltre quelle fasi la spec e il piano sono bloccati (6.2).
+_ORDER = ("spec_audit", "plan", "approval", "execution", "review", "pr_open", "closed")
+
+
+def _rank(phase: str | None) -> int:
+    return _ORDER.index(phase) if phase in _ORDER else len(_ORDER)
+
+
 def locked_docs(work) -> set[str]:
-    """Spec bloccata dopo approve spec, piano bloccato dopo la registrazione dello scope (6.2)."""
+    """Spec bloccata dopo approve spec, piano bloccato dopo la registrazione dello scope (6.2).
+    Un lavoro in blocco vale la fase precedente al blocco. Un ritorno con reopen riporta la
+    fase alla spec o al piano, e quei file tornano modificabili (l'approvazione resta storica).
+    """
+    phase = work["phase_before_block"] if work["phase"] == "blocked" else work["phase"]
     out = set()
-    if work["plan_sha"] and work["plan_path"]:
+    if work["plan_sha"] and work["plan_path"] and _rank(phase) > _rank("plan"):
         out.add(work["plan_path"])
-    if work["spec_path"] and work["worktree"]:
+    if work["spec_path"] and work["worktree"] and _rank(phase) > _rank("spec_audit"):
         approval = Path(work["worktree"]) / f"docs/superpowers/reviews/{work['issue']}" \
                                            "/spec-approval.md"
         if approval.exists():

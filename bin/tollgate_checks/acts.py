@@ -19,6 +19,8 @@ def decide(event, ctx):
     name = str(event.raw.get("command_name") or "")
     if not name.startswith("tollgate:"):
         return []
+    if "expansion_type" in event.raw and event.raw["expansion_type"] != "slash_command":
+        return []
     type_ = name.split(":", 1)[1]
     if type_ in ("off", "on") or type_ not in acts.ACT_TYPES:
         return []
@@ -65,4 +67,4 @@ def decide(event, ctx):
     return [record("expire_acts"),
             record("act", type=type_, object=obj, target=target, args=args, typed_text=typed,
                    work=work_id, head_sha=head if type_ == "finish" else None),
-            inject(f"tollgate: atto registrato ({label})")]
+            inject(f"tollgate: atto ricevuto ({label})")]

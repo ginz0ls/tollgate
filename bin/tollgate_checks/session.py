@@ -9,6 +9,7 @@ from tollgate_hooks.model import inject, record
 from ._common import orphan_tg, status_lines
 
 CHECK = {"api": 1, "events": ["session_start"], "component": None, "order": 10}
+MAX_LINES, MAX_CHARS = 10, 1500
 
 
 def decide(event, ctx):
@@ -27,12 +28,23 @@ def decide(event, ctx):
                               f"scritture sono negate finché l'utente non lancia "
                               f"/tollgate:adopt #{n}."))
         return out
-    lines = status_lines(ctx, work)
+    cp_lines = []
     if work["worktree"]:
         cp = Path(work["worktree"]) / f"docs/superpowers/reviews/{work['issue']}/checkpoint.md"
         try:
-            lines += ["checkpoint:"] + cp.read_text(encoding="utf-8").strip().splitlines()
+            cp_lines = cp.read_text(encoding="utf-8").strip().splitlines()
         except OSError:
             pass
-    out.append(inject("\n".join(lines)))
+    out.append(inject(compose(status_lines(ctx, work), cp_lines)))
     return out
+
+
+def compose(status: list[str], cp_lines: list[str]) -> str:
+    """Stato e checkpoint entro il budget di SessionStart (6.3: ≤ 10 righe, ≤ 1.500 caratteri).
+    Il checkpoint tiene le ultime righe, dove sta il prossimo passo: si scartano le prime."""
+    room = MAX_LINES - len(status) - 1
+    body = cp_lines[-room:] if room > 0 and cp_lines else []
+    out = status + (["checkpoint:"] + body if body else [])
+    while len("\n".join(out)) > MAX_CHARS and len(out) > len(status) + 1:
+        out.pop(len(status) + 1)
+    return "\n".join(out)

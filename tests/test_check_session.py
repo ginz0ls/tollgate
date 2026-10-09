@@ -65,6 +65,21 @@ class SessionStartTest(unittest.TestCase):
         finally:
             lab.close()
 
+    def test_long_checkpoint_keeps_its_last_lines(self):
+        lab = Lab()
+        try:
+            cp = lab.wt / "docs/superpowers/reviews/7/checkpoint.md"
+            cp.parent.mkdir(parents=True)
+            cp.write_text("\n".join(f"riga {i}" for i in range(1, 40))
+                          + "\nProssimo passo: task 3 ULTIMO\n")
+            r = lab.hook(start_payload(lab, SESSION, source="clear"))
+            ctx = context_of(r)
+            self.assertIn("Prossimo passo: task 3 ULTIMO", ctx)
+            self.assertLessEqual(len(ctx.splitlines()), 10)
+            self.assertLessEqual(len(ctx), 1500)
+        finally:
+            lab.close()
+
     def test_orphan_tg_branch_points_to_adopt(self):
         lab = Lab(work=False)
         try:

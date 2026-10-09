@@ -257,14 +257,14 @@ class WrapperTest(unittest.TestCase):
         env["FAKE_MODE"] = "nap"
         payload = {"hook_event_name": "PreToolUse", "session_id": "s1", "cwd": str(repo),
                    "tool_input": {"command": "ls"}}
-        p = subprocess.Popen([str(self.plugin / "hooks" / "run"), "PreToolUse"],
-                             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, text=True, env=env, cwd=str(repo))
-        p.stdin.write(json.dumps(payload))
-        p.stdin.close()
-        time.sleep(0.5)
-        alive = self.proc_alive("^sleep 87$")
-        p.wait(timeout=30)
+        with subprocess.Popen([str(self.plugin / "hooks" / "run"), "PreToolUse"],
+                              stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, text=True, env=env, cwd=str(repo)) as p:
+            p.stdin.write(json.dumps(payload))
+            p.stdin.close()
+            time.sleep(0.5)
+            alive = self.proc_alive("^sleep 87$")
+            p.wait(timeout=30)
         self.assertTrue(alive)
         self.assertFalse(self.proc_alive("^sleep 902$"))
 
