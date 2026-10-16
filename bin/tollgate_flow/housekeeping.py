@@ -24,17 +24,26 @@ def _remove_older(directory: Path, limit: float, pattern: str = "*") -> None:
 
 
 def run(conn, state, cfg, *, now) -> list[str]:
-    """Potatura di eventi, segnalini, copie temporanee e file vecchi. Righe di avviso."""
+    """Potatura di eventi, segnalini, copie temporanee e file vecchi. Righe di avviso.
+    Ogni pulizia è indipendente: un errore in una diventa un avviso e non salta le altre."""
     warnings = []
     retention = timedelta(days=cfg.get("retention.retention_days"))
-    try:
-        events.prune_events(conn, now, cfg.get("retention.events_days"))
-        sessions.prune_bound(conn, state, now=now, stale_minutes=cfg.get("review.stale_minutes"))
-    except (sqlite3.Error, OSError) as e:
-        warnings.append(f"pulizia del database non riuscita: {e}")
     stamp = now.timestamp()
-    _remove_older(state.backup_dir, (stamp - TMP_BACKUP_MAX_AGE.total_seconds()), ".tmp-*")
+
+    def step(what, fn):
+        try:
+            fn()
+        except (sqlite3.Error, OSError, ValueError, TypeError) as e:
+            warnings.append(f"pulizia non riuscita ({what}): {e}")
+
+    step("eventi", lambda: events.prune_events(conn, now, cfg.get("retention.events_days")))
+    step("segnalini delle sessioni", lambda: sessions.prune_bound(
+        conn, state, now=now, stale_minutes=cfg.get("review.stale_minutes")))
+    step("copie temporanee", lambda: _remove_older(
+        state.backup_dir, stamp - TMP_BACKUP_MAX_AGE.total_seconds(), ".tmp-*"))
     for name in ("logs", "ctx"):
-        _remove_older(state.root / name, stamp - retention.total_seconds())
-    _remove_older(state.root / sessions.CLI_DIR, stamp - CLI_SIGNAL_MAX_AGE.total_seconds())
+        step(name, lambda name=name: _remove_older(state.root / name,
+                                                   stamp - retention.total_seconds()))
+    step("segnali della CLI", lambda: _remove_older(
+        state.root / sessions.CLI_DIR, stamp - CLI_SIGNAL_MAX_AGE.total_seconds()))
     return warnings

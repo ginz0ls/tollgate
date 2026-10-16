@@ -150,7 +150,7 @@ class StartNewTest(StartCase):
             ("tollgate-run.yml", dict(gate=False), None),
             ("6.3.0", dict(), superpowers("6.3.0")),
             ("8.0.0", dict(), superpowers("8.0.0")),
-            ("gh", dict(), no_auth),
+            ("gh non è autenticato (gh auth status fallisce)", dict(), no_auth),
             ("github.com", dict(), not_github),
             ("senza rete non si avvia un lavoro nuovo", dict(), offline),
         ]
@@ -358,6 +358,50 @@ class StartNewTest(StartCase):
         self.assertEqual(len(self.rows(fl)), 1)
 
 
+    def test_worktree_add_failure_refuses(self):
+        fl = self.make()
+        base = fl.main / ".claude" / "worktrees"
+        base.mkdir(parents=True)
+        base.chmod(0o555)
+        self.addCleanup(base.chmod, 0o755)
+        if os.access(base, os.W_OK):
+            self.skipTest("la cartella resta scrivibile (utente privilegiato)")
+        self.refused(fl, "creazione del worktree")
+        self.assertEqual(fl.git("branch", "--list", "tg/*"), "")
+
+    def test_git_config_failure_refuses(self):
+        fl = self.make()
+        (fl.main / ".git" / "config.lock").write_text("")
+        self.refused(fl, "configurazione git")
+
+    def test_issue_file_failure_is_incomplete_registration(self):
+        fl = self.make(files={".tollgate-run": "un file dove serve una cartella\n"})
+        r = fl.cli("start", "7")
+        self.assertEqual(r.returncode, 4, out(r))
+        self.assertIn("registrazione incompleta: testo dell'issue", r.stdout)
+        self.assertTrue(r.stdout.strip().splitlines()[-1].startswith(
+            "prossimo passo: EnterWorktree "))
+        (row,) = self.rows(fl)
+        self.assertTrue((fl.ts.dir / "bound" / SESSION).is_file())
+        self.assertTrue(list((fl.ts.dir / "backup").glob("*-start.db")))
+        self.assertTrue(Path(row["worktree"]).is_dir())
+
+    def test_exclude_failure_does_not_skip_issue_file(self):
+        fl = self.make()
+        exclude = fl.main / ".git" / "info" / "exclude"
+        exclude.unlink(missing_ok=True)
+        exclude.parent.mkdir(exist_ok=True)
+        exclude.parent.chmod(0o555)
+        self.addCleanup(exclude.parent.chmod, 0o755)
+        if os.access(exclude.parent, os.W_OK):
+            self.skipTest("la cartella resta scrivibile (utente privilegiato)")
+        r = fl.cli("start", "7")
+        self.assertEqual(r.returncode, 4, out(r))
+        self.assertIn("registrazione incompleta: info/exclude", r.stdout)
+        (row,) = self.rows(fl)
+        self.assertTrue((Path(row["worktree"]) / ".tollgate-run" / "7" / "issue.md").is_file())
+
+
 class HousekeepingTest(StartCase):
     def age(self, path, hours):
         t = (clock.now() - timedelta(hours=hours)).timestamp()
@@ -409,6 +453,36 @@ class HousekeepingTest(StartCase):
     def cfg(self, fl):
         from tollgate_core import config
         return config.load_config(fl.ts.state, fl.main, "origin/main")
+
+    def test_malformed_sessions_do_not_skip_other_cleanups(self):
+        fl = self.make(issue=9)
+        state = fl.ts.state
+        now = clock.now()
+        old_event = events.record_event(fl.conn, "off", {}, now=now - timedelta(days=200))
+        fl.conn.execute("UPDATE work_items SET sessions = 'non è json'")
+        fl.conn.commit()
+        sessions.mark_bound(state, "morta")
+        tmp = fl.ts.dir / "backup" / ".tmp-x"
+        tmp.parent.mkdir(exist_ok=True)
+        tmp.write_text("x")
+        self.age(tmp, 2)
+        warnings = housekeeping.run(fl.conn, state, self.cfg(fl), now=now)
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("segnalini delle sessioni", warnings[0])
+        self.assertFalse(tmp.exists())
+        seqs = [r[0] for r in fl.conn.execute("SELECT seq FROM events")]
+        self.assertNotIn(old_event, seqs)
+
+    def test_prune_events_error_does_not_skip_prune_bound(self):
+        from unittest import mock
+        fl = self.make(issue=9)
+        state = fl.ts.state
+        sessions.mark_bound(state, "morta")
+        with mock.patch.object(events, "prune_events", side_effect=OSError("disco")):
+            warnings = housekeeping.run(fl.conn, state, self.cfg(fl), now=clock.now())
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("eventi", warnings[0])
+        self.assertFalse((fl.ts.dir / "bound" / "morta").exists())
 
     def test_prune_bound_keeps_sessions_of_active_work_only(self):
         fl = self.make(issue=9)

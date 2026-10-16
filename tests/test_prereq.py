@@ -1,5 +1,6 @@
 import json
 import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -79,6 +80,15 @@ class PrereqTest(unittest.TestCase):
                              ([".github/workflows/tollgate-run.yml"], "0.1.0"))
         finally:
             fl.close()
+
+    def test_is_github_has_timeout_and_survives_git_errors(self):
+        from unittest import mock
+        fl = FlowLab()
+        self.addCleanup(fl.close)
+        for exc in (subprocess.TimeoutExpired("git", 10), FileNotFoundError("git")):
+            with mock.patch.object(prereq.subprocess, "run", side_effect=exc) as run:
+                self.assertFalse(prereq.is_github(fl.main))
+            self.assertIn("timeout", run.call_args.kwargs)
 
     def test_is_github_reads_raw_url(self):
         fl = FlowLab()

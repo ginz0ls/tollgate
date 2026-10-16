@@ -54,6 +54,14 @@ def worktree_add(repo, path, *, branch: str, start_point: str | None, new_branch
         _checked(repo, "worktree", "add", str(path), branch)
 
 
+def delete_branch(repo, branch: str) -> None:
+    """Toglie un ramo locale appena creato da un `worktree add` fallito. Mai un'eccezione."""
+    try:
+        _run(repo, "branch", "-D", branch)
+    except GitWriteError:
+        pass
+
+
 def add_excludes(repo, lines: list[str]) -> None:
     """Righe nuove in `info/exclude` della cartella comune, senza duplicati."""
     target = git.common_dir(repo) / "info" / "exclude"

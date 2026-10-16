@@ -62,8 +62,12 @@ def gate_status(repo, ref: str) -> tuple[list[str], str | None]:
 def is_github(repo) -> bool:
     """`remote.origin.url` grezzo: `git remote get-url` espande `insteadOf` (e nei test dà un
     percorso locale). La chiave del repo resta `repo_key(git.origin_url(repo))`."""
-    r = subprocess.run(["git", "-C", str(repo), "config", "--get", "remote.origin.url"],
-                       capture_output=True, text=True)
+    try:
+        r = subprocess.run(["git", "-C", str(repo), "config", "--get", "remote.origin.url"],
+                           capture_output=True, text=True, timeout=git.GIT_TIMEOUT_S,
+                           stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
     url = r.stdout.strip()
     return r.returncode == 0 and bool(url) and repo_key(url).startswith("github.com/")
 

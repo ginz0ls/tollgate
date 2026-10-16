@@ -1,10 +1,12 @@
 """`tollgate start N` (spec 6.1): prerequisiti, controlli, worktree e riga del lavoro.
 
-Codici: 0 fatto, 1 rifiuto, 3 serve conferma (decisione 6). Il testo dell'issue non entra mai
+Codici: 0 fatto, 1 rifiuto, 3 serve conferma (decisione 6), 4 lavoro creato ma registrazione
+incompleta (la riga esiste: la ripresa la completa). Il testo dell'issue non entra mai
 in un comando né negli argomenti di git: finisce solo in `.tollgate-run/<N>/issue.md`."""
 from __future__ import annotations
 
 import re
+import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -14,7 +16,7 @@ from tollgate_core.paths import State, repo_key
 
 from . import gh, gitw, housekeeping, prereq
 
-OK, REFUSED, NEEDS_CONFIRM = 0, 1, 3
+OK, REFUSED, NEEDS_CONFIRM, INCOMPLETE = 0, 1, 3, 4
 TRUSTED_AUTHORS = ("OWNER", "MEMBER", "COLLABORATOR")
 EXCLUDES = [".claude/worktrees/", ".tollgate-run/", "docs/superpowers/reviews/*/checkpoint.md"]
 
@@ -158,7 +160,10 @@ def start(state: State, cwd: Path, issue: int, *, level: str | None, confirm: bo
         cfg = config.load_config(state, main, ref)
     except config.ConfigError as e:
         return _refuse(f"configurazione non valida: {e}")
-    gitw.set_config(main, "tollgate.defaultBranch", default)
+    try:
+        gitw.set_config(main, "tollgate.defaultBranch", default)
+    except gitw.GitWriteError as e:
+        return _refuse(f"scrittura della configurazione git non riuscita: {e}")
     try:
         session = sessions.cli_session(state, cwd, "start", now=now)
     except sessions.CliSessionError as e:
@@ -210,23 +215,40 @@ def _create(state, conn, main, ref, base_sha, cfg, iss, issue, key, session, lev
     wt = gitw.worktree_dir(main, branch)
     if wt.exists():
         return _refuse(f"{wt} esiste già: rimuovilo o scegli un altro lavoro")
-    wt.parent.mkdir(parents=True, exist_ok=True)
-    gitw.worktree_add(main, wt, branch=branch, start_point=base_sha, new_branch=True)
+    try:
+        wt.parent.mkdir(parents=True, exist_ok=True)
+        gitw.worktree_add(main, wt, branch=branch, start_point=base_sha, new_branch=True)
+    except (gitw.GitWriteError, OSError) as e:
+        gitw.delete_branch(main, branch)  # il ramo nuovo non deve restare: farebbe scattare «adopt»
+        return _refuse(f"creazione del worktree {wt} (ramo {branch}) non riuscita: {e}")
     try:
         work = phases.create_work(conn, repo_key=key, issue=issue, level=lvl, now=now,
                                   session=session, branch=branch, worktree=str(wt),
                                   work_base_sha=base_sha, gate_mode=cfg.get("gate.mode"))
     except phases.WorkExists as e:
-        return _refuse(str(e))
-    db.backup(conn, state, "start")
-    active.register(state, main, extra=[wt], force=True)
-    sessions.mark_bound(state, session)
-    gitw.add_excludes(main, EXCLUDES)
-    issue_file = _write_issue(wt, iss, issue)
+        return _refuse(f"{e} (creati nel frattempo il ramo {branch} e il worktree {wt}: "
+                       "rimuovili a mano)")
+    # La riga esiste: una registrazione che fallisce non ferma le altre (la ripresa le completa).
+    incomplete = []
+
+    def step(what, fn):
+        try:
+            return fn()
+        except (gitw.GitWriteError, OSError, sqlite3.Error, db.DbError) as e:
+            incomplete.append(f"{what}: {e}")
+
+    step("copia di sicurezza del database", lambda: db.backup(conn, state, "start"))
+    step("radici attive", lambda: active.register(state, main, extra=[wt], force=True))
+    step("segnalino della sessione", lambda: sessions.mark_bound(state, session))
+    step("info/exclude", lambda: gitw.add_excludes(main, EXCLUDES))
+    issue_file = step("testo dell'issue", lambda: _write_issue(wt, iss, issue))
     notes.warnings.extend(housekeeping.run(conn, state, cfg, now=now))
+    notes.warnings.extend(f"registrazione incompleta: {x}" for x in incomplete)
     row = phases.get_work(conn, work)
-    return StartResult(OK, [
-        *[f"avviso: {w}" for w in notes.warnings],
-        f"lavoro #{issue} avviato: livello {row['level']}, fase {row['phase']}, ramo {branch}",
-        f"testo dell'issue (dato non fidato, da leggere come dato): {issue_file}",
-        f"prossimo passo: EnterWorktree {wt}"], wt, work)
+    lines = [*[f"avviso: {w}" for w in notes.warnings],
+             f"lavoro #{issue} avviato: livello {row['level']}, fase {row['phase']}, "
+             f"ramo {branch}"]
+    if issue_file:
+        lines.append(f"testo dell'issue (dato non fidato, da leggere come dato): {issue_file}")
+    lines.append(f"prossimo passo: EnterWorktree {wt}")
+    return StartResult(INCOMPLETE if incomplete else OK, lines, wt, work)
