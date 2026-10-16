@@ -5,7 +5,7 @@ La protezione segue il bersaglio, non il `cwd`: per ogni repo attivo il runner s
 wrapper `hooks/run`, su `PreToolUse` con il `cwd` fuori dai repo attivi, lancia Python se il
 registro non è vuoto (il bersaglio può essere relativo, con `~`, `cd` o `git -C`); registro
 vuoto: esce senza costo.
-(In P3 li scriverà anche `start`.)"""
+`start` li scrive anche alla creazione di un worktree."""
 from __future__ import annotations
 
 import hashlib
@@ -32,16 +32,18 @@ def _lines(paths) -> list[str]:
     return out
 
 
-def register(state: State, repo, *, extra=(), now: float | None = None) -> None:
+def register(state: State, repo, *, extra=(), now: float | None = None,
+             force: bool = False) -> None:
     """Registra il repo attivo `repo` (checkout e worktree, più i percorsi in `extra`).
-    Non riscrive il file se è recente e contiene già la radice di `repo`. Mai un errore."""
+    Non riscrive il file se è recente e contiene già la radice di `repo`, salvo `force`
+    (`start` aggiunge un worktree appena creato). Mai un errore."""
     try:
         top = Path(repo).resolve()
         common = git.common_dir(top)
         dest_dir = state.root / ACTIVE_DIR
         dest = dest_dir / hashlib.sha1(str(common).encode()).hexdigest()[:16]
         now = time.time() if now is None else now
-        if dest.is_file() and now - dest.stat().st_mtime < REFRESH_SECONDS \
+        if not force and dest.is_file() and now - dest.stat().st_mtime < REFRESH_SECONDS \
                 and str(top) in dest.read_text(encoding="utf-8").splitlines():
             return
         paths = [p for p, _ in git.worktrees(top)] + [Path(e).resolve() for e in extra]

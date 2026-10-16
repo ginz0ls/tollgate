@@ -3,7 +3,8 @@
 
 Dati (JSON):
   {"auth": true,
-   "issues": {"7": {"number": 7, "title": "...", "body": "...", "state": "OPEN", ...}},
+   "issues": {"7": {"number": 7, "title": "...", "body": "...", "state": "OPEN",
+                    "labels": [{"name": "security"}], "author_association": "OWNER"}},
    "issue_list": [{...}],
    "prs": [{"headRefName": "tg/7-x", ...}],
    "statuses": {"<sha>": {"statuses": [{"context": "tollgate/guard", "state": "success"}]}}}
@@ -16,6 +17,7 @@ import re
 import sys
 
 _COMMITS_STATUS = re.compile(r"^repos/[^/]+/[^/]+/commits/([^/]+)/status$")
+_ISSUE_REST = re.compile(r"^repos/[^/]+/[^/]+/issues/(\d+)$")
 
 
 def _flag(args, name):
@@ -80,6 +82,13 @@ def main(argv):
             if status is None:
                 _fail(f"stati del commit {m.group(1)} assenti dai dati")
             print(json.dumps(status))
+            return 0
+        m = _ISSUE_REST.match(argv[1])
+        if m:
+            issue = (data.get("issues") or {}).get(m.group(1))
+            if issue is None:
+                _fail(f"issue {m.group(1)} assente dai dati")
+            print(json.dumps(issue))
             return 0
     _fail(f"chiamata non prevista: {' '.join(argv)}")
 

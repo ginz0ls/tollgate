@@ -59,6 +59,26 @@ def mark_bound(state: State, session: str) -> None:
     (d / session).touch()
 
 
+def prune_bound(conn, state: State, *, now, stale_minutes: int) -> int:
+    """Toglie i segnalini delle sessioni non vive e non legate a un lavoro attivo (vincolo 3)."""
+    d = state.root / BOUND_DIR
+    if not d.is_dir():
+        return 0
+    keep = set()
+    for row in conn.execute("SELECT sessions FROM work_items WHERE phase <> 'closed'"):
+        keep |= set(json.loads(row[0]))
+    removed = 0
+    for f in d.iterdir():
+        if f.is_file() and f.name not in keep \
+                and not alive(conn, f.name, now=now, stale_minutes=stale_minutes):
+            try:
+                f.unlink()
+                removed += 1
+            except OSError:
+                pass
+    return removed
+
+
 class CliSessionError(Exception):
     pass
 

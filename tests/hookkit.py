@@ -54,7 +54,8 @@ def sample(name, **changes):
 
 class Lab:
     def __init__(self, *, level="L1", phase="execution", toml=DEFAULT_TOML, files=None,
-                 bind=True, work=True, session=SESSION, issue=7, origin_url=None):
+                 bind=True, work=True, session=SESSION, issue=7, origin_url=None,
+                 worktree=True):
         self.session = session
         self.ts = TempState()
         self.tmp = Path(tempfile.mkdtemp(prefix="tollgate lab "))
@@ -67,7 +68,8 @@ class Lab:
         # la chiave del repo è ovunque repo_key(git.origin_url(repo)) (get-url espande insteadOf)
         key_source = core_git.origin_url(self.main)
         self.wt = self.tmp / f"wt {issue}"
-        git(self.main, "worktree", "add", "-q", "-b", f"tg/{issue}-demo", str(self.wt))
+        if worktree:
+            git(self.main, "worktree", "add", "-q", "-b", f"tg/{issue}-demo", str(self.wt))
         self.conn = db.open_db(self.ts.state)
         self.work = None
         self.now = T0 + timedelta(minutes=1)

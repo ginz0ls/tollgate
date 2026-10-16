@@ -1,4 +1,4 @@
-"""Sottocomandi di bin/tollgate (spec 3.1). P1: status, stats, events, db restore."""
+"""Sottocomandi di bin/tollgate (spec 3.1): radice di composizione, importa anche il flusso."""
 from __future__ import annotations
 
 import argparse
@@ -32,6 +32,16 @@ def _date(value: str) -> datetime:
         raise argparse.ArgumentTypeError("data attesa nella forma AAAA-MM-GG") from e
 
 
+def _issue_number(value: str) -> int:
+    try:
+        n = int(value.lstrip("#"))
+    except ValueError as e:
+        raise argparse.ArgumentTypeError("numero di issue atteso (7 oppure #7)") from e
+    if n < 1:
+        raise argparse.ArgumentTypeError("numero di issue atteso (7 oppure #7)")
+    return n
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="tollgate", description="CLI di tollgate")
     p.add_argument("--version", action="version", version=f"tollgate {VERSION}")
@@ -46,6 +56,13 @@ def build_parser() -> argparse.ArgumentParser:
     dp = sub.add_parser("db", help="manutenzione del DB")
     dsub = dp.add_subparsers(dest="db_cmd", required=True)
     dsub.add_parser("restore", help="ripristina l'ultima copia integra (solo da terminale)")
+    sa = sub.add_parser("start", help="avvia o riprende il lavoro su un'issue (6.1)")
+    sa.add_argument("issue", type=_issue_number, metavar="N")
+    sa.add_argument("--level", choices=("L1", "L2"), help="livello scelto dall'utente")
+    sa.add_argument("--confirm", action="store_true",
+                    help="conferma gli avvisi che la prima chiamata ha elencato (codice 3)")
+    sa.add_argument("--reopen-execution", action="store_true",
+                    help="in review o pr_open riporta la fase a execution")
     hp = sub.add_parser("hook", help="solo per hooks/run: adattatore per Claude Code")
     hp.add_argument("event", metavar="evento")
     vp = sub.add_parser("verify", help="esegue i comandi del gate e registra le ricevute (8.1)")
@@ -148,6 +165,14 @@ def main(argv: list[str]) -> int:
             code, lines = verify.run_verify(state, Path.cwd(), related=args.related)
             print("\n".join(lines))
             return code
+        if args.cmd == "start":
+            from tollgate_flow import start as flow_start
+            result = flow_start.start(state, Path.cwd(), args.issue, level=args.level,
+                                      confirm=args.confirm,
+                                      reopen_execution=args.reopen_execution,
+                                      claude_dir=Path.home() / ".claude")
+            print("\n".join(result.lines))
+            return result.code
         if args.cmd == "waiver":
             from . import waiver_cli
             print(waiver_cli.add_waiver(state, Path.cwd(), type_=args.type, file=args.file,

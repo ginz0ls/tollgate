@@ -190,6 +190,16 @@ class ActiveRootsTest(unittest.TestCase):
         self.assertTrue(active.prefixes(self.lab.ts.state))
         self.assertIn(str(self.lab.wt.resolve()), active.prefixes(self.lab.ts.state))
 
+    def test_register_force_adds_extra_even_when_file_is_fresh(self):
+        state = self.lab.ts.state
+        active.register(state, self.lab.main)
+        extra = self.outside / "nuovo worktree"
+        extra.mkdir()
+        active.register(state, self.lab.main, extra=[extra])
+        self.assertNotIn(str(extra.resolve()), active.prefixes(state))
+        active.register(state, self.lab.main, extra=[extra], force=True)
+        self.assertIn(str(extra.resolve()), active.prefixes(state))
+
 
 if __name__ == "__main__":
     unittest.main()

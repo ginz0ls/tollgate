@@ -26,7 +26,8 @@ class FlowLab:
             tree.update(GATE_FILES)
             tree[".github/tollgate/VERSION"] = VERSION + "\n"
         self.lab = Lab(toml=toml, files=tree, work=issue is not None, session=SESSION,
-                       issue=issue or 7, origin_url=ORIGIN_URL)
+                       issue=issue or 7, origin_url=ORIGIN_URL,
+                       worktree=issue is not None)
         self.ts, self.tmp, self.main, self.origin = (self.lab.ts, self.lab.tmp, self.lab.main,
                                                      self.lab.origin)
         self.conn, self.work, self.wt = self.lab.conn, self.lab.work, self.lab.wt
