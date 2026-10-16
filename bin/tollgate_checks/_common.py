@@ -11,7 +11,7 @@ from tollgate_analysis import globs, level as lv, profiles as prof, testguard
 from tollgate_analysis.testguard import Violation
 from tollgate_analysis.waivers import unresolved
 from tollgate_analysis.protected import is_protected
-from tollgate_core import git, subagents
+from tollgate_core import config, git, subagents
 from tollgate_core.paths import repo_key
 from tollgate_hooks.adapter import edit_path
 from tollgate_hooks.model import inject, record
@@ -68,7 +68,7 @@ def _repo_roots_along(forms) -> list[Path]:
 
 def output_excludes(ctx) -> list[str]:
     """Cartelle di output (report, copertura, `.tollgate-run/`): fuori da livello e scope."""
-    return list(ctx.cfg("review.output_dirs")) + [".tollgate-run/"]
+    return config.output_excludes(ctx.config)
 
 
 def fingerprint_changed(ctx, row, wt: Path) -> bool:

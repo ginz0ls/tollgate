@@ -200,3 +200,74 @@ class BlockTest(unittest.TestCase):
         self.assertEqual(self.phase(), "closed")
         with self.assertRaises(TransitionError):
             phases.open_block(self.conn, self.t.state, self.w, "needs_you", "r", now=T0)
+
+
+class LevelCapTest(unittest.TestCase):
+    def setUp(self):
+        self.t = TempState()
+        self.conn = db.open_db(self.t.state)
+
+    def tearDown(self):
+        self.conn.close()
+        self.t.cleanup()
+
+    def new(self, level, phase, issue=1):
+        w = phases.create_work(self.conn, repo_key="github.com/o/r", issue=issue, level=level,
+                               now=T0)
+        seq = phases.SEQUENCES[level]
+        while phases.get_work(self.conn, w)["phase"] != phase:
+            cur = phases.get_work(self.conn, w)["phase"]
+            nxt = seq[seq.index(cur) + 1]
+            cause = phases._FORWARD_CONDITION.get((cur, nxt), "advance")
+            phases.set_phase(self.conn, self.t.state, w, nxt, cause, now=T0)
+        return w
+
+    def level_changes(self):
+        return [e["data"] for e in events.export_events(self.conn, 0)
+                if e["type"] == "level_change"]
+
+    def test_cap_lowers_level_and_records_paths(self):
+        w = self.new("L2", "execution")
+        phases.set_level_cap(self.conn, w, "L1", "solo un rinomino", ["src/auth/x.py"],
+                             now=T0, session="s1")
+        row = phases.get_work(self.conn, w)
+        self.assertEqual((row["level"], row["phase"], row["level_cap"], row["level_cap_reason"]),
+                         ("L1", "execution", "L1", "solo un rinomino"))
+        self.assertEqual(json.loads(row["level_cap_paths"]), ["src/auth/x.py"])
+        self.assertEqual(self.level_changes()[-1], {"from": "L2", "to": "L1", "cause": "cap"})
+
+    def test_cap_above_level_keeps_level(self):
+        w = self.new("L1", "execution")
+        phases.set_level_cap(self.conn, w, "L2", "ok", [], now=T0)
+        row = phases.get_work(self.conn, w)
+        self.assertEqual((row["level"], row["level_cap"]), ("L1", "L2"))
+        self.assertEqual(self.level_changes(), [])
+
+    def test_cap_refused_when_phase_not_in_target_sequence(self):
+        w = self.new("L2", "spec_audit")
+        with self.assertRaises(TransitionError):
+            phases.set_level_cap(self.conn, w, "L1", "motivo", [], now=T0)
+        row = phases.get_work(self.conn, w)
+        self.assertEqual((row["level"], row["level_cap"]), ("L2", None))
+
+    def test_cap_in_blocked_uses_phase_before_block(self):
+        w = self.new("L2", "spec_audit")
+        phases.open_block(self.conn, self.t.state, w, "needs_you", "r", now=T0)
+        with self.assertRaises(TransitionError):
+            phases.set_level_cap(self.conn, w, "L1", "motivo", [], now=T0)
+        w2 = self.new("L2", "execution", issue=2)
+        phases.open_block(self.conn, self.t.state, w2, "needs_you", "r", now=T0)
+        phases.set_level_cap(self.conn, w2, "L1", "motivo", [], now=T0)
+        row = phases.get_work(self.conn, w2)
+        self.assertEqual((row["level"], row["phase"]), ("L1", "blocked"))
+
+    def test_cap_on_closed_work_refused(self):
+        w = self.new("L1", "execution")
+        phases.set_phase(self.conn, self.t.state, w, "closed", "abandoned", now=T0)
+        with self.assertRaises(TransitionError):
+            phases.set_level_cap(self.conn, w, "L0", "motivo", [], now=T0)
+
+    def test_unknown_cap_refused(self):
+        w = self.new("L1", "execution")
+        with self.assertRaises(ValueError):
+            phases.set_level_cap(self.conn, w, "L9", "motivo", [], now=T0)

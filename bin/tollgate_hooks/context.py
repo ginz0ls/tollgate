@@ -2,20 +2,17 @@
 from __future__ import annotations
 
 import os
-import re
 from dataclasses import dataclass
 from pathlib import Path
 
 from tollgate_analysis import profiles as prof, waivers
 from tollgate_analysis.testguard import DEFAULT_TEST_GLOBS, GuardConfig
 
-from tollgate_core import git, scope, sessions
+from tollgate_core import config, git, scope, sessions
 from tollgate_core.config import Config
 from tollgate_core.paths import State
 
 from .model import Event
-
-_AREA_READONLY = re.compile(r"^[^:]+:(reviewer|final)-")
 
 
 class ReadDb:
@@ -50,10 +47,7 @@ class Ctx:
         return bool(self.config.data["components"].get(name, True))
 
     def readonly(self, agent_type: str | None) -> bool:
-        if not agent_type:
-            return False
-        return agent_type in self.cfg("review.readonly_agents") or bool(
-            _AREA_READONLY.match(agent_type))
+        return config.is_readonly(self.config, agent_type)
 
     @property
     def stale_minutes(self) -> int:

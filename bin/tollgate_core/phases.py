@@ -163,6 +163,30 @@ def set_level(conn, work: int, level: str, *, now, session=None) -> None:
                          now=now, session=session, work=work)
 
 
+def set_level_cap(conn, work: int, cap: str, reason: str, cap_paths: list[str], *, now,
+                  session=None) -> None:
+    """Tetto al livello (spec 5, decisione 14): ammesso solo se la fase corrente (per `blocked`,
+    quella prima del blocco) esiste nella sequenza di `cap`. Non tocca la fase."""
+    if cap not in LEVELS:
+        raise ValueError(f"livello sconosciuto: {cap}")
+    with db.tx(conn):
+        row = get_work(conn, work)
+        phase = row["phase_before_block"] if row["phase"] == "blocked" else row["phase"]
+        if row["phase"] == "closed":
+            raise TransitionError("il lavoro è chiuso")
+        if phase not in SEQUENCES[cap]:
+            raise TransitionError(f"{cap} non ha la fase {phase}: il livello si abbassa solo "
+                                  "in una fase che esiste anche nella sequenza di arrivo")
+        conn.execute("UPDATE work_items SET level_cap = ?, level_cap_reason = ?, "
+                     "level_cap_paths = ?, updated = ? WHERE id = ?",
+                     (cap, reason, json.dumps(list(cap_paths)), clock.fmt(now), work))
+        if LEVELS.index(cap) < LEVELS.index(row["level"]):
+            conn.execute("UPDATE work_items SET level = ? WHERE id = ?", (cap, work))
+            record_event(conn, "level_change",
+                         {"from": row["level"], "to": cap, "cause": "cap"},
+                         now=now, session=session, work=work)
+
+
 def open_block(conn, state: State, work: int, type_: str, reason: str, *, now,
                session=None) -> int:
     if type_ not in BLOCK_TYPES:

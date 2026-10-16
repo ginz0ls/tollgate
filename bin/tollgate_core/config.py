@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import re
 import subprocess
 import tomllib
 from dataclasses import dataclass, field
@@ -10,6 +11,7 @@ from pathlib import Path
 from .paths import State, test_env
 
 SCHEMA_VERSION = 1
+_AREA_READONLY = re.compile(r"^[^:]+:(reviewer|final)-")
 
 
 class ConfigError(Exception):
@@ -260,3 +262,17 @@ def load_config(state: State, repo: Path, ref: str, env=None) -> Config:
             raise ConfigError(f"{override}: codifica non UTF-8") from e
         return load_config_text(text, source=override)
     return load_config_at(repo, ref)
+
+
+def is_readonly(cfg: Config, agent_type: str | None) -> bool:
+    """Subagente di sola lettura (7.3): in `review.readonly_agents` o di un'area
+    (`<plugin>:reviewer-*`, `<plugin>:final-*`)."""
+    if not agent_type:
+        return False
+    return agent_type in cfg.get("review.readonly_agents") or bool(
+        _AREA_READONLY.match(agent_type))
+
+
+def output_excludes(cfg: Config) -> list[str]:
+    """Cartelle di output (report, copertura, `.tollgate-run/`): fuori da livello e scope."""
+    return list(cfg.get("review.output_dirs")) + [".tollgate-run/"]

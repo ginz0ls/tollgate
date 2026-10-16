@@ -72,6 +72,10 @@ def build_parser() -> argparse.ArgumentParser:
     tr.add_argument("number", type=int, metavar="K")
     td = tsub.add_parser("done", help="chiude il task approvato dal revisore")
     td.add_argument("number", type=int, metavar="K")
+    ap = sub.add_parser("act", help="atti dell'utente (8.4)")
+    asub = ap.add_subparsers(dest="act_cmd", required=True)
+    aa = asub.add_parser("apply", help="applica un atto registrato (resolve, approve level)")
+    aa.add_argument("act_id", nargs="?", metavar="ID", help="senza id: l'ultimo atto pending")
     hp = sub.add_parser("hook", help="solo per hooks/run: adattatore per Claude Code")
     hp.add_argument("event", metavar="evento")
     vp = sub.add_parser("verify", help="esegue i comandi del gate e registra le ricevute (8.1)")
@@ -195,6 +199,14 @@ def main(argv: list[str]) -> int:
                                                        claude_dir=Path.home() / ".claude")
                     print(f"{path}\n{summary}")
             except taskcmd.TaskError as e:
+                print(f"tollgate: {e}", file=sys.stderr)
+                return 1
+            return 0
+        if args.cmd == "act":
+            from tollgate_flow import actapply
+            try:
+                print(actapply.apply_act(state, Path.cwd(), args.act_id))
+            except actapply.ActApplyError as e:
                 print(f"tollgate: {e}", file=sys.stderr)
                 return 1
             return 0
