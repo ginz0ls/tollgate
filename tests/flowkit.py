@@ -20,12 +20,14 @@ GATE_FILES = {f".github/workflows/tollgate-{n}.yml": f"name: tollgate-{n}\n"
 
 
 class FlowLab:
-    def __init__(self, *, toml=DEFAULT_TOML, files=None, gate=True, issue=None):
+    def __init__(self, *, toml=DEFAULT_TOML, files=None, gate=True, issue=None, level="L1",
+                 phase="execution"):
         tree = dict(DEFAULT_FILES, **(files or {}))
         if gate:
             tree.update(GATE_FILES)
             tree[".github/tollgate/VERSION"] = VERSION + "\n"
-        self.lab = Lab(toml=toml, files=tree, work=issue is not None, session=SESSION,
+        self.lab = Lab(level=level, phase=phase, toml=toml, files=tree,
+                       work=issue is not None, session=SESSION,
                        issue=issue or 7, origin_url=ORIGIN_URL,
                        worktree=issue is not None)
         self.ts, self.tmp, self.main, self.origin = (self.lab.ts, self.lab.tmp, self.lab.main,

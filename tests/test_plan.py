@@ -38,6 +38,7 @@ class PlanCheckTest(unittest.TestCase):
         self.assertEqual(r.scope, ["src/a.py", "tests/test_a.py"])
         self.assertEqual(r.must_haves[0].tests, ["tests.test_a::test_sum"])
         self.assertEqual([t.number for t in r.tasks], [1])
+        self.assertEqual(r.tasks[0].test_files, ["tests/test_a.py"])
 
     def test_missing_section(self):
         r = check(make(drop="Rischi"))

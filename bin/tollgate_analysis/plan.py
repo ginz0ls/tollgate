@@ -25,6 +25,8 @@ class PlanTask:
     title: str
     files: list[str] = field(default_factory=list)
     must_haves: list[str] | None = None
+    test_files: list[str] = field(default_factory=list)
+    test_files: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -121,7 +123,10 @@ def _parse(text: str):
         if task is not None:
             fm = _FILE.match(line)
             if fm:
-                task.files.extend(_file_values(fm.group(2)))
+                values = _file_values(fm.group(2))
+                task.files.extend(values)
+                if fm.group(1) == "Test":
+                    task.test_files.extend(values)
                 continue
             mm = _TASK_MH.match(line)
             if mm:

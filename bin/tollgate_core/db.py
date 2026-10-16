@@ -126,7 +126,14 @@ SCHEMA_V2 = [
     "CREATE INDEX subagents_work ON subagents(work, state)",
 ]
 
-MIGRATIONS: list[tuple[int, list[str]]] = [(1, SCHEMA_V1), (2, SCHEMA_V2)]
+# Migrazione 3 (piano P3a, decisione 9): verdetto del revisore e prenotazione del lancio.
+SCHEMA_V3 = [
+    "ALTER TABLE tasks ADD COLUMN review_sha TEXT",
+    "ALTER TABLE tasks ADD COLUMN review_findings TEXT NOT NULL DEFAULT '[]'",
+    "ALTER TABLE tasks ADD COLUMN reserved_at TEXT",
+]
+
+MIGRATIONS: list[tuple[int, list[str]]] = [(1, SCHEMA_V1), (2, SCHEMA_V2), (3, SCHEMA_V3)]
 
 
 def latest_version() -> int:

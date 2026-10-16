@@ -63,6 +63,11 @@ def build_parser() -> argparse.ArgumentParser:
                     help="conferma gli avvisi che la prima chiamata ha elencato (codice 3)")
     sa.add_argument("--reopen-execution", action="store_true",
                     help="in review o pr_open riporta la fase a execution")
+    tp = sub.add_parser("task", help="task del piano (6.3)")
+    tsub = tp.add_subparsers(dest="task_cmd", required=True)
+    ts = tsub.add_parser("start", help="assegna il task a un implementatore e scrive il brief")
+    ts.add_argument("number", type=int, metavar="K")
+    ts.add_argument("--fix", action="store_true", help="giro di correzione dopo un verdetto")
     hp = sub.add_parser("hook", help="solo per hooks/run: adattatore per Claude Code")
     hp.add_argument("event", metavar="evento")
     vp = sub.add_parser("verify", help="esegue i comandi del gate e registra le ricevute (8.1)")
@@ -173,6 +178,16 @@ def main(argv: list[str]) -> int:
                                       claude_dir=Path.home() / ".claude")
             print("\n".join(result.lines))
             return result.code
+        if args.cmd == "task":
+            from tollgate_flow import taskcmd
+            try:
+                path, summary = taskcmd.task_start(state, Path.cwd(), args.number, fix=args.fix,
+                                                   claude_dir=Path.home() / ".claude")
+            except taskcmd.TaskError as e:
+                print(f"tollgate: {e}", file=sys.stderr)
+                return 1
+            print(f"{path}\n{summary}")
+            return 0
         if args.cmd == "waiver":
             from . import waiver_cli
             print(waiver_cli.add_waiver(state, Path.cwd(), type_=args.type, file=args.file,

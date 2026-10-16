@@ -90,6 +90,45 @@ class PreAgentTest(unittest.TestCase):
                     self.assertIn("contesto", r.stdout)
 
 
+class ResumeTaskTest(unittest.TestCase):
+    def setUp(self):
+        self.lab = Lab()
+        with_scope(self.lab)
+        tasks.add_task(self.lab.conn, self.lab.work, 2, source="plan", now=self.lab.now)
+        for n in (1, 2):
+            tasks.assign(self.lab.conn, self.lab.work, n, implementer=f"tg-7-t{n}",
+                         agent_type=IMPL, pending="launch", now=self.lab.now)
+
+    def tearDown(self):
+        self.lab.close()
+
+    def test_resume_takes_its_own_task(self):
+        start(self.lab, "a1")  # prende il task 1
+        start(self.lab, "a2")  # prende il task 2
+        for agent in ("a1", "a2"):
+            subagents.finish(self.lab.conn, agent, state="done", declared_status="DONE",
+                             now=self.lab.now)
+        for n in (1, 2):
+            tasks.assign(self.lab.conn, self.lab.work, n, implementer=f"tg-7-t{n}",
+                         agent_type=IMPL, pending="resume", now=self.lab.now)
+        start(self.lab, "a2")
+        self.assertEqual(subagents.get(self.lab.conn, "a2")["task"], 2)
+        self.assertIsNone(tasks.get_task(self.lab.conn, self.lab.work, 2)["pending"])
+        self.assertEqual(tasks.get_task(self.lab.conn, self.lab.work, 1)["pending"], "resume")
+
+    def test_resumed_implementer_keeps_fingerprint(self):
+        start(self.lab, "a1")
+        before = subagents.get(self.lab.conn, "a1")["fingerprint"]
+        (self.lab.wt / "src/app.py").write_text("x = 2\n")
+        git(self.lab.wt, "commit", "-qam", "lavoro")
+        subagents.finish(self.lab.conn, "a1", state="done", now=self.lab.now)
+        tasks.assign(self.lab.conn, self.lab.work, 1, implementer="tg-7-t1", agent_type=IMPL,
+                     pending="resume", now=self.lab.now)
+        start(self.lab, "a1")
+        row = subagents.get(self.lab.conn, "a1")
+        self.assertEqual((row["resumes"], row["fingerprint"]), (1, before))
+
+
 class StartAndResumeTest(unittest.TestCase):
     def setUp(self):
         self.lab = Lab()

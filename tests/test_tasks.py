@@ -122,3 +122,88 @@ class AssignTest(unittest.TestCase):
         tasks.add_commit(self.conn, self.w, 1, "abc")
         tasks.add_commit(self.conn, self.w, 1, "abc")
         self.assertEqual(tasks.get_task(self.conn, self.w, 1)["commits"], '["abc"]')
+
+
+class TaskCmdSupportTest(unittest.TestCase):
+    def setUp(self):
+        self.t = TempState()
+        self.conn = db.open_db(self.t.state)
+        self.w = phases.create_work(self.conn, repo_key="github.com/o/r", issue=1, level="L1",
+                                    now=T0)
+        for n in (1, 2):
+            tasks.add_task(self.conn, self.w, n, source="plan", now=T0)
+
+    def tearDown(self):
+        self.conn.close()
+        self.t.cleanup()
+
+    def row(self, n):
+        return tasks.get_task(self.conn, self.w, n)
+
+    def test_assign_keeps_reviewer_type(self):
+        kw = dict(implementer="tg-1-t1", agent_type="tollgate:implementer", now=T0)
+        tasks.assign(self.conn, self.w, 1, pending="launch", reviewer_type="tollgate:task-reviewer",
+                     **kw)
+        tasks.assign(self.conn, self.w, 1, pending="resume", **kw)
+        self.assertEqual(self.row(1)["reviewer_type"], "tollgate:task-reviewer")
+        tasks.assign(self.conn, self.w, 1, pending="resume", reviewer_type="altro", **kw)
+        self.assertEqual(self.row(1)["reviewer_type"], "altro")
+
+    def test_take_pending_by_number(self):
+        for n in (1, 2):
+            tasks.assign(self.conn, self.w, n, implementer=f"tg-1-t{n}",
+                         agent_type="tollgate:implementer", pending="resume", now=T0)
+        self.assertEqual(tasks.take_pending(self.conn, self.w, agent_type="tollgate:implementer",
+                                            resume=True, number=2), 2)
+        self.assertEqual(self.row(1)["pending"], "resume")
+        self.assertIsNone(self.row(2)["pending"])
+        self.assertIsNone(tasks.take_pending(self.conn, self.w, agent_type="tollgate:implementer",
+                                             resume=True, number=2))
+        self.assertEqual(tasks.take_pending(self.conn, self.w, agent_type="tollgate:implementer",
+                                            resume=True), 1)
+
+    def test_set_verdict_keeps_state(self):
+        for e in ("start", "report_done"):
+            tasks.task_event(self.conn, self.w, 1, e, now=T0)
+        tasks.set_review_prep(self.conn, self.w, 1, sha="abc", code="K1")
+        findings = [{"severity": "major", "file": "a.py", "line": 3, "rule": "R-1", "text": "x"}]
+        tasks.set_verdict(self.conn, self.w, 1, outcome="changes", findings=findings, now=T0)
+        row = self.row(1)
+        self.assertEqual((row["state"], row["verdict"], row["fix_rounds"]),
+                         ("review", "changes", 0))
+        self.assertEqual(json.loads(row["review_findings"]), findings)
+        last = [e for e in events.export_events(self.conn, 0) if e["type"] == "task_change"][-1]
+        self.assertEqual(last["data"]["verdict"], "changes")
+        with self.assertRaises(ValueError):
+            tasks.set_verdict(self.conn, self.w, 1, outcome="boh", findings=[], now=T0)
+
+    def test_review_prep_clears_verdict_and_fix_clears_review_ids(self):
+        for e in ("start", "report_done"):
+            tasks.task_event(self.conn, self.w, 1, e, now=T0)
+        tasks.set_review_prep(self.conn, self.w, 1, sha="abc", code="K1")
+        tasks.set_verdict(self.conn, self.w, 1, outcome="changes",
+                          findings=[{"text": "x"}], now=T0)
+        tasks.set_review_prep(self.conn, self.w, 1, sha="def", code="K2")
+        row = self.row(1)
+        self.assertEqual((row["review_sha"], row["review_code"], row["verdict"],
+                          row["review_findings"]), ("def", "K2", None, "[]"))
+        tasks.set_verdict(self.conn, self.w, 1, outcome="changes", findings=[], now=T0)
+        tasks.task_event(self.conn, self.w, 1, "fix", now=T0)
+        row = self.row(1)
+        self.assertEqual((row["review_sha"], row["review_code"], row["verdict"]),
+                         (None, None, "changes"))
+
+    def test_reserve_and_clear(self):
+        tasks.assign(self.conn, self.w, 1, implementer="tg-1-t1",
+                     agent_type="tollgate:implementer", pending="launch", now=T0)
+        tasks.reserve(self.conn, self.w, 1, now=T0)
+        self.assertEqual(self.row(1)["reserved_at"], clock.fmt(T0))
+        tasks.clear_reservation(self.conn, self.w, 1)
+        self.assertIsNone(self.row(1)["reserved_at"])
+        tasks.reserve(self.conn, self.w, 1, now=T0)
+        tasks.take_pending(self.conn, self.w, agent_type="tollgate:implementer", resume=False)
+        self.assertIsNone(self.row(1)["reserved_at"])
+
+    def test_set_skills_required(self):
+        tasks.set_skills_required(self.conn, self.w, 1, ["a", "b"])
+        self.assertEqual(json.loads(self.row(1)["skills_required"]), ["a", "b"])

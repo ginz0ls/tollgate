@@ -28,8 +28,10 @@ def _act(conn, state, ctx, d):
 def _subagent_start(conn, state, ctx, d):
     task = d.get("task")
     if d.get("take_pending") and d.get("work") is not None:
-        task = tasks.take_pending(conn, d["work"], agent_type=d["type"],
-                                  resume=bool(d.get("resume"))) or task
+        # Una ripresa sa già di quale task è: cerca solo quello (più task dello stesso tipo).
+        resume = bool(d.get("resume"))
+        task = tasks.take_pending(conn, d["work"], agent_type=d["type"], resume=resume,
+                                  number=task if resume else None) or task
     subagents.start(conn, agent_id=d["agent_id"], type_=d["type"], session=ctx.event.session,
                     work=d.get("work"), task=task, base_sha=d.get("base_sha"),
                     fingerprint=d.get("fingerprint"), now=ctx.now,

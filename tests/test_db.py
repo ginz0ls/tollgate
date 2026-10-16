@@ -137,7 +137,8 @@ class MigrationV2Test(unittest.TestCase):
         conn = db.open_db(self.ts.state)
         try:
             self.assertEqual(conn.execute(
-                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "2")
+                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0],
+                str(db.latest_version()))
             cols = {r[1] for r in conn.execute("PRAGMA table_info(subagents)")}
             self.assertTrue({"last_seen", "vetoes", "report"} <= cols)
             self.assertIn("pending", {r[1] for r in conn.execute("PRAGMA table_info(tasks)")})
@@ -147,6 +148,43 @@ class MigrationV2Test(unittest.TestCase):
         finally:
             conn.close()
         self.assertTrue(list(self.ts.state.backup_dir.glob("tollgate-*-migrazione-2.db")))
+
+
+class MigrationV3Test(unittest.TestCase):
+    def setUp(self):
+        self.ts = TempState()
+
+    def tearDown(self):
+        self.ts.cleanup()
+
+    def test_from_v2_adds_task_columns_keeps_rows_and_backup(self):
+        saved = db.MIGRATIONS[:]
+        try:
+            db.MIGRATIONS[:] = saved[:2]
+            conn = db.open_db(self.ts.state)
+            insert_work(conn)
+            conn.execute("INSERT INTO tasks (work, number, kind, source, state, verdict) "
+                         "VALUES (1, 1, 'plan', 'plan', 'review', 'changes')")
+            conn.close()
+        finally:
+            db.MIGRATIONS[:] = saved
+        conn = db.open_db(self.ts.state)
+        try:
+            self.assertEqual(conn.execute(
+                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "3")
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(tasks)")}
+            self.assertTrue({"review_sha", "review_findings", "reserved_at"} <= cols)
+            row = conn.execute("SELECT * FROM tasks").fetchone()
+            self.assertEqual((row["number"], row["verdict"], row["review_findings"],
+                              row["review_sha"], row["reserved_at"]),
+                             (1, "changes", "[]", None, None))
+        finally:
+            conn.close()
+        self.assertTrue(list(self.ts.state.backup_dir.glob("tollgate-*-migrazione-3.db")))
+
+    def test_fresh_db_makes_no_copy(self):
+        db.open_db(self.ts.state).close()
+        self.assertEqual(list(self.ts.state.backup_dir.glob("*migrazione-3*")), [])
 
 
 _FROZEN = datetime(2026, 10, 9, 12, 0, 0, 123456, tzinfo=timezone.utc)

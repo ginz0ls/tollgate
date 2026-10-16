@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import sqlite3
 
-from . import db
+from . import clock, db
 from .events import record_event
 
 STATES = ("pending", "running", "review", "done", "blocked")
@@ -22,6 +22,7 @@ _TRANSITIONS = {
 }
 TASK_EVENTS = tuple(sorted({e for _, e in _TRANSITIONS}))
 _VERDICT = {"fix": "changes", "approved": "approved"}
+VERDICTS = ("approved", "changes")
 
 
 class TaskTransitionError(Exception):
@@ -72,7 +73,10 @@ def task_event(conn, work: int, number: int, event: str, *, now, session=None) -
             raise TaskTransitionError(f"task {number}: {event} non ammesso da {row['state']}")
         fix_rounds = row["fix_rounds"] + (1 if event == "fix" else 0)
         verdict = _VERDICT.get(event, row["verdict"])
-        conn.execute("UPDATE tasks SET state = ?, fix_rounds = ?, verdict = ? "
+        # Un giro di correzione invalida la revisione precedente: il verdetto resta (lo storico),
+        # ma `review_sha` torna vuoto finché `review-prepare` non ne prepara una nuova.
+        reset = ", review_code = NULL, review_sha = NULL" if event == "fix" else ""
+        conn.execute(f"UPDATE tasks SET state = ?, fix_rounds = ?, verdict = ?{reset} "
                      "WHERE work = ? AND number = ?", (new, fix_rounds, verdict, work, number))
         _log(conn, get_task(conn, work, number), now=now, session=session)
     return new
@@ -97,24 +101,71 @@ def assign(conn, work: int, number: int, *, implementer: str, agent_type: str, p
         raise ValueError(f"pending sconosciuto: {pending}")
     with db.tx(conn):
         get_task(conn, work, number)
-        conn.execute("UPDATE tasks SET implementer = ?, agent_type = ?, reviewer_type = ?, "
+        conn.execute("UPDATE tasks SET implementer = ?, agent_type = ?, "
+                     "reviewer_type = coalesce(?, reviewer_type), "
                      "pending = ? WHERE work = ? AND number = ?",
                      (implementer, agent_type, reviewer_type, pending, work, number))
         _log(conn, get_task(conn, work, number), now=now, session=session)
 
 
-def take_pending(conn, work: int, *, agent_type: str, resume: bool) -> int | None:
-    """Associa un subagente che parte (o riprende) al task in sospeso del suo tipo."""
+def take_pending(conn, work: int, *, agent_type: str, resume: bool,
+                 number: int | None = None) -> int | None:
+    """Associa un subagente che parte (o riprende) al task in sospeso del suo tipo. Con `number`
+    guarda solo quel task (la ripresa sa già di chi è). Azzera anche la prenotazione del lancio."""
     want = "resume" if resume else "launch"
     with db.tx(conn):
         row = conn.execute("SELECT number FROM tasks WHERE work = ? AND pending = ? "
-                           "AND agent_type = ? ORDER BY number LIMIT 1",
-                           (work, want, agent_type)).fetchone()
+                           "AND agent_type = ? AND (? IS NULL OR number = ?) "
+                           "ORDER BY number LIMIT 1",
+                           (work, want, agent_type, number, number)).fetchone()
         if row is None:
             return None
-        conn.execute("UPDATE tasks SET pending = NULL WHERE work = ? AND number = ?",
-                     (work, row["number"]))
+        conn.execute("UPDATE tasks SET pending = NULL, reserved_at = NULL "
+                     "WHERE work = ? AND number = ?", (work, row["number"]))
         return row["number"]
+
+
+def reserve(conn, work: int, number: int, *, now) -> None:
+    """Prenota il lancio: un secondo `Agent` sullo stesso task entro 120 s è negato (decisione 12)."""
+    with db.tx(conn):
+        get_task(conn, work, number)
+        conn.execute("UPDATE tasks SET reserved_at = ? WHERE work = ? AND number = ?",
+                     (clock.fmt(now), work, number))
+
+
+def clear_reservation(conn, work: int, number: int) -> None:
+    with db.tx(conn):
+        conn.execute("UPDATE tasks SET reserved_at = NULL WHERE work = ? AND number = ?",
+                     (work, number))
+
+
+def set_skills_required(conn, work: int, number: int, skills: list[str]) -> None:
+    with db.tx(conn):
+        get_task(conn, work, number)
+        conn.execute("UPDATE tasks SET skills_required = ? WHERE work = ? AND number = ?",
+                     (json.dumps(skills), work, number))
+
+
+def set_review_prep(conn, work: int, number: int, *, sha: str, code: str) -> None:
+    """`review-prepare`: sha e codice della revisione; un verdetto precedente non vale più."""
+    with db.tx(conn):
+        get_task(conn, work, number)
+        conn.execute("UPDATE tasks SET review_sha = ?, review_code = ?, verdict = NULL, "
+                     "review_findings = '[]' WHERE work = ? AND number = ?",
+                     (sha, code, work, number))
+
+
+def set_verdict(conn, work: int, number: int, *, outcome: str, findings: list[dict], now,
+                session=None) -> None:
+    """Verdetto del revisore: lo stato del task non cambia (lo muove `task done` o `--fix`)."""
+    if outcome not in VERDICTS:
+        raise ValueError(f"esito del verdetto sconosciuto: {outcome}")
+    with db.tx(conn):
+        get_task(conn, work, number)
+        conn.execute("UPDATE tasks SET verdict = ?, review_findings = ? "
+                     "WHERE work = ? AND number = ?",
+                     (outcome, json.dumps(findings, ensure_ascii=False), work, number))
+        _log(conn, get_task(conn, work, number), now=now, session=session)
 
 
 def add_commit(conn, work: int, number: int, sha: str) -> None:

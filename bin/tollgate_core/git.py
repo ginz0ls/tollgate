@@ -284,6 +284,12 @@ def text_at(repo, ref: str, path: str) -> str | None:
     return _text(show(repo, ref, path))
 
 
+def blob_text(repo, sha: str) -> str | None:
+    """Testo di un blob dal suo SHA; None se manca dal database degli oggetti o è binario."""
+    r = _proc(repo, ["cat-file", "blob", sha])
+    return _text(r.stdout) if r.returncode == 0 else None
+
+
 def worktree_text(repo, path: str) -> str | None:
     try:
         return _text((Path(repo) / path).read_bytes())

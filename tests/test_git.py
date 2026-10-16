@@ -142,6 +142,21 @@ class GitTest(unittest.TestCase):
         git.is_clean(self.repo, [])
         self.assertEqual((idx.read_bytes(), idx.stat().st_mtime_ns), before)
 
+    def test_blob_text_reads_stored_blob_and_none_for_missing(self):
+        sha = g(self.repo, "rev-parse", "HEAD:src/a.py")
+        self.assertEqual(git.blob_text(self.repo, sha), "uno\ndue\n")
+        loose = g(self.repo, "hash-object", "src/a.py")  # non scritto: stesso blob, già presente
+        self.assertEqual(loose, sha)
+        (self.repo / "nuovo.txt").write_text("mai scritto\n")
+        unwritten = g(self.repo, "hash-object", "nuovo.txt")
+        self.assertIsNone(git.blob_text(self.repo, unwritten))
+        self.assertIsNone(git.blob_text(self.repo, "not-a-sha"))
+
+    def test_blob_text_binary_is_none(self):
+        (self.repo / "b.bin").write_bytes(b"a\0b")
+        g(self.repo, "add", "b.bin")
+        self.assertIsNone(git.blob_text(self.repo, g(self.repo, "rev-parse", ":b.bin")))
+
     def test_timeout_becomes_git_error(self):
         slow = subprocess.TimeoutExpired(cmd=["git"], timeout=10)
         with patch("tollgate_core.git.subprocess.run", side_effect=slow):
