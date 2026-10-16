@@ -86,6 +86,15 @@ class ResolveTest(ApplyCase):
         with self.assertRaisesRegex(actapply.ActApplyError, "blocco"):
             self.apply(a3)
 
+    def test_resolve_refuses_non_ascii_digits(self):
+        fl = self.make()
+        self.open_block()
+        a = self.act("tollgate:resolve", "² nota")
+        with self.assertRaisesRegex(actapply.ActApplyError, "non è un blocco aperto"):
+            self.apply()
+        self.assertEqual(self.state_of(a), "consumed")
+        self.assertEqual(self.work()["phase"], "blocked")
+
     def test_resolve_refuses_block_of_other_work(self):
         fl = self.make()
         other = phases.create_work(fl.conn, repo_key="github.com/o/altro", issue=9, level="L1",

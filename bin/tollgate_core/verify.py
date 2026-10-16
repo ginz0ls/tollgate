@@ -15,7 +15,7 @@ from tollgate_analysis import profiles as prof
 from tollgate_analysis.junit import Junit, JunitError, parse_junit
 
 from . import clock, db, git, receipts, sessions
-from .config import Config, ConfigError, load_config
+from .config import Config, ConfigError, load_config, output_excludes
 from .paths import State, ensure_dirs
 
 TIMEOUT_EXIT = 124
@@ -151,7 +151,7 @@ def _verify(state, cwd, *, related: bool, now, environ) -> tuple[int, list[str]]
             cfg = load_config(state, root, base, env=environ)
         except ConfigError as e:
             return 1, [f"tollgate verify: {e}"]
-        exclude = cfg.get("review.output_dirs") + [".tollgate-run/"]
+        exclude = output_excludes(cfg)
         if not git.is_clean(root, exclude):
             return 1, ["tollgate verify: worktree non pulito: committa prima di verificare"]
         sha = git.head(root)

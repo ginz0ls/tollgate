@@ -6,6 +6,7 @@ dell'applicatore: un rifiuto dell'applicatore non lo lascia pronto per un second
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from pathlib import Path
 
@@ -41,20 +42,15 @@ def _resolve(conn, state, work, act, args, now, session) -> str:
         return ("implementatori interrotti: " + ", ".join(stopped)) if stopped \
             else "nessun implementatore in corso da interrompere"
     block = None
-    if act["target"].isdigit():
+    if re.fullmatch(r"[0-9]+", act["target"]):
         block = conn.execute("SELECT id FROM blocks WHERE id = ? AND work = ? "
                              "AND closed IS NULL", (int(act["target"]), work["id"])).fetchone()
     if block is None:
         raise ActApplyError(f"blocco {act['target']}: non è un blocco aperto di questo lavoro")
     note = " ".join(args[1:]).strip() or "risolto dall'utente"
     phase = phases.close_block(conn, state, block["id"], note, now=now, session=session)
-    unblocked = []
-    if phase != "blocked":
-        for t in conn.execute("SELECT number FROM tasks WHERE work = ? AND state = 'blocked' "
-                              "ORDER BY number", (work["id"],)).fetchall():
-            tasks.task_event(conn, work["id"], t["number"], "unblocked", now=now,
-                             session=session)
-            unblocked.append(t["number"])
+    unblocked = tasks.unblock_all(conn, work["id"], now=now, session=session) \
+        if phase != "blocked" else []
     msg = f"blocco {block['id']} chiuso; fase {phase}"
     if unblocked:
         msg += "; task di nuovo pending: " + ", ".join(str(n) for n in unblocked)

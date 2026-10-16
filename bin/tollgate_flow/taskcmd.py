@@ -203,7 +203,7 @@ def _ensure_clean(state, work, wt: Path, hint: str) -> None:
         cfg = config.load_config(state, main, work["work_base_sha"] or git.default_ref(main))
     except config.ConfigError as e:
         raise TaskError(f"configurazione non valida: {e}") from e
-    if not git.is_clean(wt, list(cfg.get("review.output_dirs")) + [".tollgate-run/"]):
+    if not git.is_clean(wt, config.output_excludes(cfg)):
         raise TaskError(hint)
 
 

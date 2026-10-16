@@ -1,6 +1,7 @@
 import itertools
 import json
 import unittest
+from unittest import mock
 
 from tests.helpers import TempState
 from tollgate_core import clock, db, events, phases, tasks
@@ -207,3 +208,35 @@ class TaskCmdSupportTest(unittest.TestCase):
     def test_set_skills_required(self):
         tasks.set_skills_required(self.conn, self.w, 1, ["a", "b"])
         self.assertEqual(json.loads(self.row(1)["skills_required"]), ["a", "b"])
+
+
+class UnblockAllTest(unittest.TestCase):
+    def setUp(self):
+        self.t = TempState()
+        self.conn = db.open_db(self.t.state)
+        self.w = phases.create_work(self.conn, repo_key="github.com/o/r", issue=1, level="L1",
+                                    now=T0)
+        for n in (1, 2, 3):
+            tasks.add_task(self.conn, self.w, n, source=f"plan:{n}", now=T0)
+        for n in (1, 3):
+            self.conn.execute("UPDATE tasks SET state = 'blocked' WHERE work = ? AND number = ?",
+                              (self.w, n))
+
+    def tearDown(self):
+        self.conn.close()
+        self.t.cleanup()
+
+    def states(self):
+        return [tasks.get_task(self.conn, self.w, n)["state"] for n in (1, 2, 3)]
+
+    def test_unblocks_every_blocked_task(self):
+        self.assertEqual(tasks.unblock_all(self.conn, self.w, now=T0), [1, 3])
+        self.assertEqual(self.states(), ["pending", "pending", "pending"])
+        self.assertEqual(tasks.unblock_all(self.conn, self.w, now=T0), [])
+
+    def test_failure_midway_leaves_no_mixed_state(self):
+        with mock.patch.object(tasks, "_log", side_effect=[None, RuntimeError("boom")]):
+            with self.assertRaises(RuntimeError):
+                tasks.unblock_all(self.conn, self.w, now=T0)
+        self.assertEqual(self.states(), ["blocked", "pending", "blocked"])
+        self.assertFalse(self.conn.in_transaction)

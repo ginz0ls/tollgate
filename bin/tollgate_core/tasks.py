@@ -82,6 +82,18 @@ def task_event(conn, work: int, number: int, event: str, *, now, session=None) -
     return new
 
 
+def unblock_all(conn, work: int, *, now, session=None) -> list[int]:
+    """Ogni task `blocked` del lavoro torna `pending` (evento `unblocked`) in una sola
+    transazione: o tutti o nessuno. Dà i numeri sbloccati."""
+    with db.tx(conn):
+        numbers = [r["number"] for r in conn.execute(
+            "SELECT number FROM tasks WHERE work = ? AND state = 'blocked' ORDER BY number",
+            (work,)).fetchall()]
+        for n in numbers:
+            task_event(conn, work, n, "unblocked", now=now, session=session)
+    return numbers
+
+
 def add_skill_used(conn, work: int, number: int, skill: str) -> None:
     with db.tx(conn):
         used = json.loads(get_task(conn, work, number)["skills_used"])
