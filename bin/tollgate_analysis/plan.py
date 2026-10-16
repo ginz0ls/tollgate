@@ -26,7 +26,6 @@ class PlanTask:
     files: list[str] = field(default_factory=list)
     must_haves: list[str] | None = None
     test_files: list[str] = field(default_factory=list)
-    test_files: list[str] = field(default_factory=list)
 
 
 @dataclass

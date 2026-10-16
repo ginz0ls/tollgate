@@ -1,5 +1,7 @@
 import json
+import sqlite3
 import unittest
+from unittest import mock
 
 from tests.flowkit import FlowLab
 from tests.hookkit import DEFAULT_TOML
@@ -161,6 +163,33 @@ class TaskStartTest(TaskCase):
         fl.git("commit", "-qam", "piano 2", repo=fl.wt)
         path, _ = self.start()
         self.assertNotIn("modificato dopo", path.read_text())
+
+
+class AtomicityTest(TaskCase):
+    def test_failing_assign_leaves_pending_task_untouched(self):
+        self.make()
+        before = self.row()["skills_required"]
+        with mock.patch.object(tasks, "assign", side_effect=sqlite3.OperationalError("boom")):
+            with self.assertRaises(taskcmd.TaskError):
+                self.start()
+        row = self.row()
+        self.assertEqual((row["state"], row["pending"], row["implementer"], row["fix_rounds"],
+                          row["skills_required"]), ("pending", None, None, 0, before))
+        self.start()  # ritentabile
+        self.assertEqual(self.row()["state"], "running")
+
+    def test_failing_assign_leaves_review_task_untouched_on_fix(self):
+        self.make()
+        self.start()
+        self.to_changes()
+        with mock.patch.object(tasks, "assign", side_effect=sqlite3.OperationalError("boom")):
+            with self.assertRaises(taskcmd.TaskError):
+                self.start(fix=True)
+        row = self.row()
+        self.assertEqual((row["state"], row["fix_rounds"], row["verdict"], row["review_sha"]),
+                         ("review", 0, "changes", "abc"))
+        self.start(fix=True)
+        self.assertEqual(self.row()["fix_rounds"], 1)
 
 
 class FixRoundsTest(TaskCase):

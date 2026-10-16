@@ -150,10 +150,12 @@ def _task_start(state, conn, cwd: Path, number: int, *, fix: bool, claude_dir: P
     except OSError as e:
         raise TaskError(f"scrittura del brief {path} non riuscita: {e}") from e
 
-    tasks.set_skills_required(conn, work["id"], number, present)
-    tasks.task_event(conn, work["id"], number, "fix" if fix else "start", now=now)
-    tasks.assign(conn, work["id"], number, implementer=name, agent_type=routing.implementer,
-                 pending=pending, reviewer_type=routing.reviewer, now=now)
+    # Un'unica transazione: se `assign` fallisce il task resta com'era (pending, o review).
+    with db.tx(conn):
+        tasks.set_skills_required(conn, work["id"], number, present)
+        tasks.task_event(conn, work["id"], number, "fix" if fix else "start", now=now)
+        tasks.assign(conn, work["id"], number, implementer=name, agent_type=routing.implementer,
+                     pending=pending, reviewer_type=routing.reviewer, now=now)
     summary = (f"task {number}: {routing.implementer} name={name}"
                + (f" model: {hint}" if hint else "") + f" {pending}")
     return path, summary
