@@ -54,7 +54,7 @@ def compute_stats(conn, *, now: datetime, work: int | None = None,
         end = clock.parse(closing[-1]["at"]) if closing else now
         start = max(first, since) if since is not None else first
     else:
-        scope = [e for e in every if e["work"] is not None]
+        scope = every
         start, end = since, now
     switches = [e for e in every if e["type"] in ("off", "on")]
     inside = [e for e in scope if since_s is None or e["at"] >= since_s]

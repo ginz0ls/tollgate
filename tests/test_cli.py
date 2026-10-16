@@ -13,7 +13,7 @@ from tollgate_core import clock, db, events, phases
 T0 = clock.parse("2026-10-08T10:00:00.000000Z")
 
 
-class CliTest(unittest.TestCase):
+class CliBase(unittest.TestCase):
     def setUp(self):
         self.t = TempState()
         self.repo = make_repo(Path(tempfile.mkdtemp()) / "r")
@@ -36,6 +36,8 @@ class CliTest(unittest.TestCase):
         conn.close()
         return w
 
+
+class CliTest(CliBase):
     def test_no_args_prints_help(self):
         r = self.run_cli()
         self.assertEqual(r.returncode, 0)
@@ -107,3 +109,31 @@ class CliTest(unittest.TestCase):
         r = self.run_cli("db", "restore")
         self.assertEqual(r.returncode, 1)
         self.assertIn("integro", r.stderr)
+
+
+class StatusReadOnlyTest(CliBase):
+    def test_status_without_db_creates_nothing(self):
+        before = sorted(p.name for p in self.t.dir.iterdir())
+        r = self.run_cli("status", cwd=self.repo)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("nessun lavoro attivo", r.stdout)
+        self.assertEqual(sorted(p.name for p in self.t.dir.iterdir()), before)
+        self.assertFalse(self.t.state.db_path.exists())
+        j = self.run_cli("status", "--json", cwd=self.repo)
+        self.assertEqual(json.loads(j.stdout), [])
+        self.assertFalse(self.t.state.db_path.exists())
+
+    def test_status_reports_stopped_by(self):
+        w = self.seed()
+        conn = db.open_db(self.t.state)
+        phases.open_block(conn, self.t.state, w, "needs_you",
+                          "giri di correzione esauriti sul task 2", now=T0)
+        conn.close()
+        r = self.run_cli("status", cwd=self.repo)
+        self.assertIn("tetto: giri di correzione", r.stdout)
+        (item,) = json.loads(self.run_cli("status", "--json", cwd=self.repo).stdout)
+        self.assertEqual(len(item["stopped_by"]), 1)
+
+    def test_note_requires_checkpoint(self):
+        r = self.run_cli("status", "--note", "x", cwd=self.repo)
+        self.assertNotEqual(r.returncode, 0)

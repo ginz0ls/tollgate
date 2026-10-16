@@ -48,6 +48,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd")
     st = sub.add_parser("status", help="stato dei lavori attivi (sola lettura)")
     st.add_argument("--json", action="store_true", help="uscita in JSON")
+    st.add_argument("--checkpoint", action="store_true",
+                    help="scrive il checkpoint nel worktree del lavoro (6.3)")
+    st.add_argument("--note", metavar="TESTO", help="nota da aggiungere al checkpoint")
     sp = sub.add_parser("stats", help="statistiche dagli eventi, in JSON")
     sp.add_argument("--since", type=_date, metavar="AAAA-MM-GG")
     sp.add_argument("--work", type=int, metavar="N", help="numero dell'issue nel repo corrente")
@@ -100,6 +103,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _status(conn, key: str | None) -> list[dict]:
+    from tollgate_flow import checkpoint
     sql, params = "SELECT * FROM work_items WHERE phase <> 'closed'", []
     if key:
         sql += " AND repo_key = ?"
@@ -114,7 +118,8 @@ def _status(conn, key: str | None) -> list[dict]:
         out.append({"issue": w["issue"], "repo_key": w["repo_key"], "level": w["level"],
                     "level_cap": w["level_cap"], "phase": w["phase"],
                     "phase_before_block": w["phase_before_block"], "branch": w["branch"],
-                    "blocks": blocks, "tasks": counts})
+                    "blocks": blocks, "tasks": counts,
+                    "stopped_by": checkpoint.stopped_by(conn, w["id"])})
     return out
 
 
@@ -131,6 +136,8 @@ def _print_status(items: list[dict]) -> None:
             print("  task: " + ", ".join(f"{n} {s}" for s, n in sorted(it["tasks"].items())))
         for b in it["blocks"]:
             print(f"  blocco {b['id']} ({b['type']}): {b['reason']}")
+        for s in it["stopped_by"]:
+            print(f"  {s}")
 
 
 def _restore(state) -> int:
@@ -170,6 +177,8 @@ def main(argv: list[str]) -> int:
         sys.stdout.write(r.stdout)
         sys.stderr.write(r.stderr)
         return r.exit
+    if args.cmd == "status" and args.note is not None and not args.checkpoint:
+        parser.error("--note si usa con --checkpoint")
     state = resolve_state()
     try:
         if args.cmd == "db":
@@ -221,6 +230,19 @@ def main(argv: list[str]) -> int:
             print(waiver_cli.open_block_cmd(state, Path.cwd(), type_=args.type,
                                             reason=args.reason))
             return 0
+        if args.cmd == "status":
+            if args.checkpoint:
+                from tollgate_flow import checkpoint
+                try:
+                    print(f"checkpoint scritto: "
+                          f"{checkpoint.write_checkpoint(state, Path.cwd(), note=args.note)}")
+                except checkpoint.CheckpointError as e:
+                    print(f"tollgate: {e}", file=sys.stderr)
+                    return 1
+            elif not state.db_path.exists():
+                # sola lettura: senza DB non si crea nulla
+                print("[]" if args.json else "nessun lavoro attivo")
+                return 0
         conn = db.open_db(state)
         try:
             if args.cmd == "status":

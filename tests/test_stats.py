@@ -92,6 +92,21 @@ class StatsTest(unittest.TestCase):
         self.assertEqual(stats.compute_stats(self.conn, now=h(10), since=h(4.65))["fix_rounds"], 2)
 
 
+class GlobalTest(unittest.TestCase):
+    def test_vetoes_without_work_counted(self):
+        t = TempState()
+        self.addCleanup(t.cleanup)
+        conn = db.open_db(t.state)
+        self.addCleanup(conn.close)
+        events.record_event(conn, "veto", {"event": "pre_bash", "rule": "scope", "reason": "x"},
+                            now=h(1))
+        events.record_event(conn, "block_opened", {"id": 1, "type": "needs_you"}, now=h(2))
+        s = stats.compute_stats(conn, now=h(3))
+        self.assertEqual(s["vetoes"], {"total": 1, "by_rule": {"scope": 1}})
+        self.assertEqual((s["blocks"], s["needs_you"]), (1, 1))
+        self.assertEqual(s["phase_hours"], {})
+
+
 class OffWindowTest(unittest.TestCase):
     def setUp(self):
         self.t = TempState()
