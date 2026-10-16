@@ -68,6 +68,10 @@ def build_parser() -> argparse.ArgumentParser:
     ts = tsub.add_parser("start", help="assegna il task a un implementatore e scrive il brief")
     ts.add_argument("number", type=int, metavar="K")
     ts.add_argument("--fix", action="store_true", help="giro di correzione dopo un verdetto")
+    tr = tsub.add_parser("review-prepare", help="prepara diff e brief del revisore del task")
+    tr.add_argument("number", type=int, metavar="K")
+    td = tsub.add_parser("done", help="chiude il task approvato dal revisore")
+    td.add_argument("number", type=int, metavar="K")
     hp = sub.add_parser("hook", help="solo per hooks/run: adattatore per Claude Code")
     hp.add_argument("event", metavar="evento")
     vp = sub.add_parser("verify", help="esegue i comandi del gate e registra le ricevute (8.1)")
@@ -181,12 +185,18 @@ def main(argv: list[str]) -> int:
         if args.cmd == "task":
             from tollgate_flow import taskcmd
             try:
-                path, summary = taskcmd.task_start(state, Path.cwd(), args.number, fix=args.fix,
-                                                   claude_dir=Path.home() / ".claude")
+                if args.task_cmd == "review-prepare":
+                    print(taskcmd.review_prepare(state, Path.cwd(), args.number))
+                elif args.task_cmd == "done":
+                    print(taskcmd.task_done(state, Path.cwd(), args.number))
+                else:
+                    path, summary = taskcmd.task_start(state, Path.cwd(), args.number,
+                                                       fix=args.fix,
+                                                       claude_dir=Path.home() / ".claude")
+                    print(f"{path}\n{summary}")
             except taskcmd.TaskError as e:
                 print(f"tollgate: {e}", file=sys.stderr)
                 return 1
-            print(f"{path}\n{summary}")
             return 0
         if args.cmd == "waiver":
             from . import waiver_cli

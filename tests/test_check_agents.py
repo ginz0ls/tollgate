@@ -90,6 +90,45 @@ class PreAgentTest(unittest.TestCase):
                     self.assertIn("contesto", r.stdout)
 
 
+class ReservationTest(unittest.TestCase):
+    def setUp(self):
+        self.lab = Lab()
+        with_scope(self.lab)
+        tasks.assign(self.lab.conn, self.lab.work, 1, implementer="tg-7-t1", agent_type=IMPL,
+                     pending="launch", now=self.lab.now)
+
+    def tearDown(self):
+        self.lab.close()
+
+    def reserved(self):
+        return tasks.get_task(self.lab.conn, self.lab.work, 1)["reserved_at"]
+
+    def test_second_launch_in_same_message_denied(self):
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1")).exit, 0)
+        self.assertIsNotNone(self.reserved())
+        r = self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1"))
+        self.assertEqual(r.exit, 2)
+        self.assertIn("lancio già in corso per il task 1", r.stderr)
+
+    def test_reservation_expires_after_120s(self):
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1")).exit, 0)
+        t0 = self.lab.now
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1"),
+                                       now=t0 + timedelta(seconds=100)).exit, 2)
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1"),
+                                       now=t0 + timedelta(seconds=121)).exit, 0)
+
+    def test_subagent_start_clears_reservation(self):
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1")).exit, 0)
+        start(self.lab, "a1")
+        self.assertIsNone(self.reserved())
+        self.assertIsNone(tasks.get_task(self.lab.conn, self.lab.work, 1)["pending"])
+
+    def test_rejected_launch_does_not_reserve(self):
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "nome-sbagliato")).exit, 2)
+        self.assertIsNone(self.reserved())
+
+
 class ResumeTaskTest(unittest.TestCase):
     def setUp(self):
         self.lab = Lab()

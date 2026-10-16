@@ -94,6 +94,10 @@ _OPS = {
                                                                  session=x.event.session),
     "task": lambda c, s, x, d: tasks.task_event(c, d["work"], d["number"], d["event"],
                                                 now=x.now, session=x.event.session),
+    "task_reserve": lambda c, s, x, d: tasks.reserve(c, d["work"], d["number"], now=x.now),
+    "task_verdict": lambda c, s, x, d: tasks.set_verdict(
+        c, d["work"], d["number"], outcome=d["outcome"], findings=d["findings"], now=x.now,
+        session=x.event.session),
     "task_commit": lambda c, s, x, d: tasks.add_commit(c, d["work"], d["number"], d["sha"]),
     "skill_used": lambda c, s, x, d: tasks.add_skill_used(c, d["work"], d["number"], d["skill"]),
     "commit": _commit,

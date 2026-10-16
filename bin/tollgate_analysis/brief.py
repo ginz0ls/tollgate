@@ -99,6 +99,7 @@ class ReviewBrief:
     concerns: str
     reviewer_skills: list[str]
     standard: bool
+    no_changes: bool = False
 
 
 STANDARD = [
@@ -117,6 +118,9 @@ def review_brief(b: ReviewBrief) -> str:
            f"Intervallo revisionato: `{b.base}..{b.head}`.",
            f"Brief dell'implementatore: `{b.brief_path}`. Diff: `{b.diff_path}`.",
            "Sei in sola lettura: non modificare nessun file.", DATA_NOTE]
+    if b.no_changes:
+        out += ["", "Nessuna modifica: verifica che il task sia già soddisfatto dal codice "
+                    "esistente."]
     if b.lines > b.lines_warn:
         out += ["", f"AVVISO DIMENSIONE: il task cambia {b.lines} righe (soglia {b.lines_warn}, "
                     f"massimo {b.lines_max}): valuta se andava diviso."]

@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import json
 
-from tollgate_core import subagents
+from tollgate_core import clock, subagents
 from tollgate_hooks.model import deny, inject, record
 
 from ._common import governing_work
 
 CHECK = {"api": 1, "events": ["pre_agent"], "component": None, "order": 20}
+RESERVATION_S = 120
 
 
 def context_pct(ctx, session: str):
@@ -74,4 +75,8 @@ def decide(event, ctx):
     if ti.get("run_in_background"):
         return out + [deny("l'implementatore si lancia in primo piano: i task sono in sequenza",
                            rule="writer")]
-    return out
+    # Decisione 12: due `Agent` nello stesso messaggio vedono lo stesso task in sospeso.
+    if t["reserved_at"] and \
+            (ctx.now - clock.parse(t["reserved_at"])).total_seconds() < RESERVATION_S:
+        return out + [deny(f"lancio già in corso per il task {t['number']}", rule="writer")]
+    return out + [record("task_reserve", work=work["id"], number=t["number"])]

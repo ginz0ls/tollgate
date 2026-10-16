@@ -71,6 +71,38 @@ def output_excludes(ctx) -> list[str]:
     return list(ctx.cfg("review.output_dirs")) + [".tollgate-run/"]
 
 
+def fingerprint_changed(ctx, row, wt: Path) -> bool:
+    """Stesse esclusioni di subagent_start, che ha preso l'impronta di partenza."""
+    return bool(row["fingerprint"]) and \
+        git.fingerprint(wt, ctx.cfg("review.output_dirs")) != row["fingerprint"]
+
+
+def tampered_records(row, work) -> list:
+    """7.3: il subagente di sola lettura ha cambiato file, il suo verdetto non vale."""
+    return [record("subagent_finish", agent_id=row["id"], state="tampered"),
+            record("block", work=work["id"], type="needs_you",
+                   reason=f"il subagente di sola lettura {row['type']} ha cambiato "
+                          f"file: il suo verdetto non vale (7.3)")]
+
+
+def awaiting_review(ctx, row):
+    """`(lavoro, task)` se il subagente è il revisore di un task in `review` con una revisione
+    preparata per il codice corrente (`review-prepare` ha scritto sha e codice); altrimenti None.
+    Dopo un `--fix` sha e codice sono vuoti: un revisore che chiude non è «in attesa»."""
+    if row["work"] is not None:
+        work = ctx.db.execute("SELECT * FROM work_items WHERE id = ?", (row["work"],)).fetchone()
+    else:
+        work = governing_work(ctx, ctx.event.cwd)
+    if work is None:
+        return None
+    task = ctx.db.execute(
+        "SELECT * FROM tasks WHERE work = ? AND state = 'review' AND reviewer_type = ? "
+        "AND review_code IS NOT NULL AND review_sha IS NOT NULL "
+        "AND (? IS NULL OR number = ?) ORDER BY number LIMIT 1",
+        (work["id"], row["type"], row["task"], row["task"])).fetchone()
+    return None if task is None else (work, task)
+
+
 def repo_key_of(repo) -> str | None:
     url = git.origin_url(repo) if repo else None
     return repo_key(url) if url else None

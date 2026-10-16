@@ -23,15 +23,15 @@ class ImplReport:
         return not self.missing and not self.unknown_status
 
 
-def _candidates(text: str) -> list[dict]:
-    """Oggetti JSON con la chiave `status`, dal fondo del testo verso l'inizio."""
+def json_candidates(text: str, key: str) -> list[dict]:
+    """Oggetti JSON con la chiave `key`, dal fondo del testo verso l'inizio."""
     dec = json.JSONDecoder()
     out: list[dict] = []
     pos = text.rfind("{")
     while pos >= 0:
         try:
             obj, _ = dec.raw_decode(text, pos)
-            if isinstance(obj, dict) and "status" in obj:
+            if isinstance(obj, dict) and key in obj:
                 out.append(obj)
         except json.JSONDecodeError:
             pass
@@ -41,7 +41,7 @@ def _candidates(text: str) -> list[dict]:
 
 def _last_json(text: str) -> dict | None:
     """Preferisce l'oggetto che contiene tutti i campi REQUIRED; altrimenti l'ultimo."""
-    cands = _candidates(text)
+    cands = json_candidates(text, "status")
     for c in cands:
         if all(k in c for k in REQUIRED):
             return c

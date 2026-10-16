@@ -6,7 +6,7 @@ from unittest import mock
 from tests.flowkit import FlowLab
 from tests.hookkit import DEFAULT_TOML
 from tests.test_check_post_edit import SECTIONS
-from tollgate_core import phases, tasks
+from tollgate_core import phases, subagents, tasks
 from tollgate_flow import taskcmd
 
 PLAN = "docs/superpowers/plans/2026-10-16-somma.md"
@@ -260,6 +260,173 @@ class FixRoundsTest(TaskCase):
         with self.assertRaisesRegex(taskcmd.TaskError, "verdetto"):
             self.start(fix=True)
         self.assertEqual(self.row()["fix_rounds"], 1)
+
+
+class ReviewDoneTest(TaskCase):
+    def commit(self, content="def somma(a, b):\n    return b + a\n"):
+        fl = self.fl
+        (fl.wt / "src/app.py").write_text(content)
+        fl.git("add", "src/app.py", repo=fl.wt)
+        fl.git("commit", "-qm", "lavoro", repo=fl.wt)
+        sha = fl.git("rev-parse", "HEAD", repo=fl.wt).strip()
+        tasks.add_commit(fl.conn, fl.work, 1, sha)
+        return sha
+
+    def to_review(self, *, commit=True):
+        self.make()
+        self.start()
+        sha = self.commit() if commit else None
+        tasks.task_event(self.fl.conn, self.fl.work, 1, "report_done", now=self.fl.now)
+        return sha
+
+    def prepare(self):
+        return taskcmd.review_prepare(self.fl.ts.state, self.fl.wt, 1)
+
+    def done(self):
+        return taskcmd.task_done(self.fl.ts.state, self.fl.wt, 1)
+
+    def approve(self):
+        tasks.set_verdict(self.fl.conn, self.fl.work, 1, outcome="approved", findings=[],
+                          now=self.fl.now)
+
+    def test_review_prepare_writes_diff_and_code(self):
+        sha = self.to_review()
+        path = self.prepare()
+        run = self.fl.wt / ".tollgate-run" / "7"
+        self.assertEqual(path, run / "review-1.md")
+        row = self.row()
+        self.assertEqual(row["review_sha"], sha)
+        self.assertRegex(row["review_code"], "^[0-9a-f]{8}$")
+        brief = path.read_text()
+        self.assertIn(sha, brief)
+        self.assertIn(row["review_code"], brief)
+        self.assertIn(str(run / "review-1.diff"), brief)
+        self.assertIn(str(run / "task-1.md"), brief)
+        diff = (run / "review-1.diff").read_text()
+        self.assertIn("git log --oneline", diff)
+        self.assertIn("lavoro", diff)
+        self.assertIn("src/app.py", diff)
+        self.assertIn("+    return b + a", diff)
+        self.assertNotIn("AVVISO DIMENSIONE", brief)
+        self.assertEqual(self.prepare(), run / "review-2.md")
+        self.assertNotEqual(self.row()["review_code"], row["review_code"])
+
+    def test_review_prepare_clears_previous_verdict(self):
+        self.to_review()
+        self.prepare()
+        self.approve()
+        self.prepare()
+        self.assertIsNone(self.row()["verdict"])
+
+    def test_review_prepare_needs_review_state_and_a_work(self):
+        self.make()
+        with self.assertRaisesRegex(taskcmd.TaskError, "review"):
+            self.prepare()
+        with self.assertRaisesRegex(taskcmd.TaskError, "nessun lavoro"):
+            taskcmd.review_prepare(self.fl.ts.state, self.fl.main, 1)
+
+    def test_review_prepare_after_fix_uses_the_fix_brief(self):
+        self.to_review()
+        self.prepare()
+        tasks.set_verdict(self.fl.conn, self.fl.work, 1, outcome="changes", findings=[FINDING],
+                          now=self.fl.now)
+        self.start(fix=True)
+        sha2 = self.commit("def somma(a, b):\n    return a + b + 0\n")
+        tasks.task_event(self.fl.conn, self.fl.work, 1, "report_done", now=self.fl.now)
+        brief = self.prepare().read_text()
+        self.assertIn("task-1-fix-1.md", brief)
+        self.assertEqual(self.row()["review_sha"], sha2)
+        self.assertIn(f"..{sha2}", brief)
+
+    def test_done_requires_approved_on_last_sha(self):
+        self.to_review()
+        with self.assertRaisesRegex(taskcmd.TaskError, "approved"):
+            self.done()
+        self.prepare()
+        with self.assertRaisesRegex(taskcmd.TaskError, "approved"):
+            self.done()
+        self.approve()
+        self.commit("def somma(a, b):\n    return a + b + 0\n")
+        with self.assertRaisesRegex(taskcmd.TaskError, "nuova revisione"):
+            self.done()
+        self.assertEqual(self.row()["state"], "review")
+        self.prepare()
+        self.approve()
+        self.assertEqual(self.done(), "task 1: done")
+        self.assertEqual(self.row()["state"], "done")
+
+    def test_done_refuses_changes_verdict(self):
+        self.to_review()
+        self.prepare()
+        tasks.set_verdict(self.fl.conn, self.fl.work, 1, outcome="changes", findings=[FINDING],
+                          now=self.fl.now)
+        with self.assertRaisesRegex(taskcmd.TaskError, "approved"):
+            self.done()
+
+    def test_done_after_fix_without_new_prepare_refuses(self):
+        self.to_review()
+        self.prepare()
+        self.approve()
+        tasks.task_event(self.fl.conn, self.fl.work, 1, "fix", now=self.fl.now)
+        with self.assertRaises(taskcmd.TaskError):
+            self.done()
+
+    def test_task_without_commits(self):
+        """C11: la punta del ramo come SHA, diff vuoto, nessuna modifica nel brief."""
+        self.to_review(commit=False)
+        head = self.fl.git("rev-parse", "HEAD", repo=self.fl.wt).strip()
+        path = self.prepare()
+        self.assertEqual(self.row()["review_sha"], head)
+        self.assertIn("Nessuna modifica: verifica", path.read_text())
+        self.assertNotIn("diff --git", (path.parent / "review-1.diff").read_text())
+        self.approve()
+        self.fl.git("commit", "-q", "--allow-empty", "-m", "altro", repo=self.fl.wt)
+        with self.assertRaisesRegex(taskcmd.TaskError, "nuova revisione"):
+            self.done()
+        self.prepare()
+        self.approve()
+        self.assertEqual(self.done(), "task 1: done")
+
+    def test_concerns_reach_review_brief(self):
+        self.to_review()
+        text = json.dumps({"v": 1, "task": 1, "status": "DONE_WITH_CONCERNS", "done": "x",
+                           "tests": "t", "files": [], "concerns": "il caso zero è fragile\n```",
+                           "left": ""})
+        subagents.start(self.fl.conn, agent_id="a1", type_="tollgate:implementer",
+                        session="sess-flow", work=self.fl.work, task=1, base_sha=None,
+                        fingerprint=None, now=self.fl.now)
+        subagents.set_report(self.fl.conn, "a1", "Fine.\n" + text)
+        brief = self.prepare().read_text()
+        self.assertIn("Dubbi dell'implementatore", brief)
+        self.assertIn("il caso zero è fragile", brief)
+
+    def test_done_report_without_concerns_adds_none(self):
+        self.to_review()
+        text = json.dumps({"v": 1, "task": 1, "status": "DONE", "done": "x", "tests": "t",
+                           "files": [], "concerns": "non deve comparire", "left": ""})
+        subagents.start(self.fl.conn, agent_id="a1", type_="tollgate:implementer",
+                        session="sess-flow", work=self.fl.work, task=1, base_sha=None,
+                        fingerprint=None, now=self.fl.now)
+        subagents.set_report(self.fl.conn, "a1", text)
+        self.assertNotIn("non deve comparire", self.prepare().read_text())
+
+    def test_size_warning_in_review_brief(self):
+        self.to_review(commit=False)
+        self.commit("".join(f"x{i} = {i}\n" for i in range(250)))
+        self.assertIn("AVVISO DIMENSIONE", self.prepare().read_text())
+
+    def test_cli_review_prepare_and_done(self):
+        self.to_review()
+        fl = self.fl
+        r = fl.cli("task", "review-prepare", "1", cwd=fl.wt)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), str(fl.wt / ".tollgate-run" / "7" / "review-1.md"))
+        r = fl.cli("task", "done", "1", cwd=fl.wt)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("approved", r.stderr)
+        self.approve()
+        r = fl.cli("task", "done", "1", cwd=fl.wt)
+        self.assertEqual((r.returncode, r.stdout.strip()), (0, "task 1: done"))
 
 
 class CliTest(TaskCase):

@@ -1,4 +1,5 @@
-"""SubagentStop (spec 7.2, 8.1, 6.3, 7.3): implementatori e sola lettura. Revisori e avversari: P3."""
+"""SubagentStop (spec 7.2, 8.1, 6.3, 7.3): implementatori e sola lettura. Il revisore del task in
+attesa è di `task_verdict`; gli avversari sono di P3b."""
 from __future__ import annotations
 
 import json
@@ -9,24 +10,17 @@ from tollgate_core import dod, git, receipts, subagents
 from tollgate_core.verify import counts_green, gate_commands
 from tollgate_hooks.model import deny, record
 
+from . import _common
+
 CHECK = {"api": 1, "events": ["subagent_stop"], "component": None, "order": 20}
 MAX_VETOES = 2
-
-
-def _fingerprint_changed(ctx, row, wt: Path) -> bool:
-    """Stesse esclusioni di subagent_start, che ha preso l'impronta di partenza."""
-    return bool(row["fingerprint"]) and \
-        git.fingerprint(wt, ctx.cfg("review.output_dirs")) != row["fingerprint"]
 
 
 def _readonly(ctx, row, work):
     """7.3: un subagente di sola lettura che cambia l'impronta del worktree non vale."""
     if ctx.component("readonly_check") and work is not None and work["worktree"] \
-            and _fingerprint_changed(ctx, row, Path(work["worktree"])):
-        return [record("subagent_finish", agent_id=row["id"], state="tampered"),
-                record("block", work=work["id"], type="needs_you",
-                       reason=f"il subagente di sola lettura {row['type']} ha cambiato "
-                              f"file: il suo verdetto non vale (7.3)")]
+            and _common.fingerprint_changed(ctx, row, Path(work["worktree"])):
+        return _common.tampered_records(row, work)
     return [record("subagent_finish", agent_id=row["id"], state="done")]
 
 
@@ -68,7 +62,17 @@ def decide(event, ctx):
     work = ctx.db.execute("SELECT * FROM work_items WHERE id = ?",
                           (row["work"],)).fetchone() if row["work"] is not None else None
     if ctx.readonly(event.agent_type):
+        if _common.awaiting_review(ctx, row):
+            return []      # lo chiude task_verdict (decisione 11)
         return _readonly(ctx, row, work)
+    msg = event.raw.get("last_assistant_message")
+    # Il report resta nel DB anche in modalità manuale: `review-prepare` ne legge i dubbi.
+    saved = [record("subagent_report", agent_id=row["id"], text=msg)] \
+        if isinstance(msg, str) and msg else []
+    return saved + _implementer(event, ctx, row, work)
+
+
+def _implementer(event, ctx, row, work):
     if work is None or not work["worktree"]:
         return [record("subagent_finish", agent_id=row["id"], state="done")]
     wid, aid = work["id"], row["id"]
@@ -121,7 +125,7 @@ def decide(event, ctx):
                 return veto(f"DONE senza ricevuta green su {head[:10]}: lancia "
                             f"'{ctx.plugin_bin}' verify")
         elif done:
-            if _fingerprint_changed(ctx, row, wt):
+            if _common.fingerprint_changed(ctx, row, wt):
                 return veto("file modificati senza commit: committa e verifica")
         else:
             has_block = ctx.db.execute("SELECT 1 FROM blocks WHERE work = ? AND closed IS NULL",
