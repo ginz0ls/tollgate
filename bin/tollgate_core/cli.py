@@ -231,6 +231,14 @@ def main(argv: list[str]) -> int:
                                             reason=args.reason))
             return 0
         if args.cmd == "status":
+            if not state.db_path.exists():
+                # sola lettura: senza DB non si crea nulla
+                if args.checkpoint:
+                    print("tollgate: nessun lavoro attivo per questa cartella: lancia il "
+                          "comando dal worktree del lavoro", file=sys.stderr)
+                    return 1
+                print("[]" if args.json else "nessun lavoro attivo")
+                return 0
             if args.checkpoint:
                 from tollgate_flow import checkpoint
                 try:
@@ -239,9 +247,6 @@ def main(argv: list[str]) -> int:
                 except checkpoint.CheckpointError as e:
                     print(f"tollgate: {e}", file=sys.stderr)
                     return 1
-            elif not state.db_path.exists():
-                # sola lettura: senza DB non si crea nulla
-                print("[]" if args.json else "nessun lavoro attivo")
                 return 0
         conn = db.open_db(state)
         try:

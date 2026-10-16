@@ -137,3 +137,12 @@ class StatusReadOnlyTest(CliBase):
     def test_note_requires_checkpoint(self):
         r = self.run_cli("status", "--note", "x", cwd=self.repo)
         self.assertNotEqual(r.returncode, 0)
+        self.assertIn("--note si usa con --checkpoint", r.stderr)
+
+    def test_checkpoint_without_db_creates_nothing(self):
+        before = sorted(p.name for p in self.t.dir.iterdir())
+        r = self.run_cli("status", "--checkpoint", cwd=self.repo)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("nessun lavoro attivo", r.stderr)
+        self.assertEqual(sorted(p.name for p in self.t.dir.iterdir()), before)
+        self.assertFalse(self.t.state.db_path.exists())

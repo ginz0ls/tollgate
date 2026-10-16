@@ -40,6 +40,18 @@ class CheckpointCase(unittest.TestCase):
         self.assertEqual(self.fl.git("status", "--porcelain", repo=self.fl.wt).strip(), "")
         self.assertEqual(list(path.parent.glob("*.tmp")), [])
 
+    def test_cli_checkpoint_prints_only_path(self):
+        self.add(1, "start")
+        r = self.fl.cli("status", "--checkpoint", "--note", "da cli", cwd=self.fl.wt)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), f"checkpoint scritto: {self.cp_path()}")
+        self.assertIn("da cli", self.cp_path().read_text(encoding="utf-8"))
+
+    def test_cli_checkpoint_outside_work_refused(self):
+        r = self.fl.cli("status", "--checkpoint")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("nessun lavoro attivo", r.stderr)
+
     def test_next_step_sequence(self):
         def step():
             return checkpoint.next_step(self.conn, self.work)
@@ -103,7 +115,7 @@ class CheckpointCase(unittest.TestCase):
             self.write(f"nota {i}\nseconda riga {i}")
         r = self.fl.hook(start_payload(self.fl.lab, "sess-flow", cwd=self.fl.wt))
         ctx = context_of(r)
-        self.assertIn("prossimo passo", ctx)
+        self.assertTrue(ctx.splitlines()[-1].startswith("prossimo passo"), ctx)
         self.assertLessEqual(len(ctx.splitlines()), 10)
         self.assertLessEqual(len(ctx), 1500)
 
