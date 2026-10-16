@@ -54,8 +54,10 @@ def _check_state(row, number: int, fix: bool) -> None:
         raise TaskError(f"task {number} è {row['state']}, non in review: --fix serve dopo un "
                         "verdetto del revisore")
     if row["verdict"] != "changes":
+        hint = f"; il task è approvato: lancia `task done {number}`" \
+            if row["verdict"] == "approved" else ""
         raise TaskError(f"task {number}: serve un verdetto «changes» del revisore "
-                        f"(verdetto attuale: {row['verdict'] or 'nessuno'})")
+                        f"(verdetto attuale: {row['verdict'] or 'nessuno'}){hint}")
     if row["review_sha"] is None:
         raise TaskError(f"task {number}: il verdetto è di una revisione già superata, serve "
                         "un nuovo verdetto del revisore")
@@ -159,7 +161,8 @@ def _task_start(state, conn, cwd: Path, number: int, *, fix: bool, claude_dir: P
         tasks.assign(conn, work["id"], number, implementer=name, agent_type=routing.implementer,
                      pending=pending, reviewer_type=routing.reviewer, now=now)
     summary = (f"task {number}: {routing.implementer} name={name}"
-               + (f" model: {hint}" if hint else "") + f" {pending}")
+               + (f" model: {hint}" if hint else "") + f" {pending}"
+               + f" revisore: {routing.reviewer}")
     return path, summary
 
 
@@ -244,6 +247,18 @@ def review_prepare(state, cwd: Path, number: int, *, now=None) -> Path:
         conn.close()
 
 
+def reviewer_type(state, cwd: Path, number: int) -> str:
+    """Tipo di revisore scelto da `task start` (decisione 15): serve a lanciare quello giusto."""
+    conn = _open(state)
+    try:
+        _, row = _work_and_task(conn, Path(cwd), number)
+        return row["reviewer_type"] or prof.DEFAULT_REVIEWER
+    except sqlite3.Error as e:
+        raise TaskError(str(e)) from e
+    finally:
+        conn.close()
+
+
 def _review_prepare(state, conn, cwd: Path, number: int) -> Path:
     work, row = _work_and_task(conn, cwd, number)
     if row["state"] != "review":
@@ -299,8 +314,11 @@ def task_done(state, cwd: Path, number: int, *, now=None) -> str:
     try:
         work, row = _work_and_task(conn, Path(cwd), number)
         if row["state"] != "review" or row["verdict"] != "approved":
+            hint = f"; il verdetto è «changes»: lancia `task start {number} --fix`" \
+                if row["state"] == "review" and row["verdict"] == "changes" else ""
             raise TaskError(f"task {number}: serve un verdetto «approved» del revisore "
-                            f"(stato {row['state']}, verdetto {row['verdict'] or 'nessuno'})")
+                            f"(stato {row['state']}, verdetto {row['verdict'] or 'nessuno'})"
+                            f"{hint}")
         wt = Path(work["worktree"])
         _ensure_clean(state, work, wt, f"task {number}: modifiche non committate nel worktree, "
                                        "il verdetto non le copre: serve una nuova revisione")

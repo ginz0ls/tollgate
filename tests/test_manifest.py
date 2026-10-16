@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import unittest
 
 from tests.helpers import ROOT
@@ -153,7 +154,28 @@ class ManifestTest(unittest.TestCase):
         for field in ("v", "task", "sha", "code", "outcome", "spec_compliance", "findings",
                       "severity", "file", "line", "rule", "text"):
             self.assertRegex(rev, rf'"{field}"', field)
-        self.assertRegex(rev, r'"approved" \| "changes"')
+        blocks = re.findall(r"```json\n(.*?)\n```", rev, re.S)
+        outcomes = {json.loads(b)["outcome"] for b in blocks}
+        self.assertEqual(outcomes, {"approved", "changes"})
+        for b in re.findall(r"```json\n(.*?)\n```", impl, re.S):
+            self.assertEqual(json.loads(b)["status"], "DONE")
+
+    def test_execute_follows_registered_verdict_and_checkpoint(self):
+        text = (ROOT / "skills" / "execute" / "SKILL.md").read_text()
+        self.assertIn("revisore: <tipo>", text)
+        self.assertIn("mai un tipo fisso", text)
+        self.assertLess(text.index("task done k`:"), text.index("task start k --fix`, che"))
+        self.assertIn("conta quello registrato", text)
+        self.assertIn("status --checkpoint", text)
+        self.assertIn("prossimo passo", text)
+        for state in ("pending", "running", "review", "blocked"):
+            self.assertIn(f"| `{state}`", text)
+        self.assertIn("/tollgate:resolve", text)
+
+    def test_start_l1_is_reentrant(self):
+        text = (ROOT / "skills" / "start" / "SKILL.md").read_text()
+        self.assertIn("rientrante", text)
+        self.assertIn("Non chiedere un secondo `/clear`", text)
 
     def test_wrapper_executable(self):
         self.assertTrue(os.access(ROOT / "hooks" / "run", os.X_OK))

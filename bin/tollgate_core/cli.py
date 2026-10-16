@@ -200,6 +200,7 @@ def main(argv: list[str]) -> int:
             try:
                 if args.task_cmd == "review-prepare":
                     print(taskcmd.review_prepare(state, Path.cwd(), args.number))
+                    print(f"revisore: {taskcmd.reviewer_type(state, Path.cwd(), args.number)}")
                 elif args.task_cmd == "done":
                     print(taskcmd.task_done(state, Path.cwd(), args.number))
                 else:

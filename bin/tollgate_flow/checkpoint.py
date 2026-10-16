@@ -40,6 +40,12 @@ def next_step(conn, work: int) -> str:
     row = conn.execute("SELECT * FROM tasks WHERE work = ? AND state <> 'done' "
                        "ORDER BY number LIMIT 1", (work,)).fetchone()
     if row is None:
+        phase = conn.execute("SELECT phase FROM work_items WHERE id = ?", (work,)).fetchone()[0]
+        if phase == "plan":
+            return ("scrivi il piano con superpowers:writing-plans (intestazioni di 7.5), "
+                    "committalo, poi /tollgate:execute")
+        if phase in ("spec_audit", "approval"):
+            return f"fase {phase}: percorso L2, arriva con P3c"
         return "/tollgate:finish"
     k, state = row["number"], row["state"]
     if state == "pending":

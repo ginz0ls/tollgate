@@ -10,9 +10,10 @@ disable-model-invocation: true
 
 1. Leggi `~/.claude/settings.json` e non modificare il file: è protetto e la modifica la fa l'utente.
 2. Guarda `statusLine.command`:
-   - se esiste già un comando, proponi `"statusLine": {"type": "command", "command": "<radice>/statusline/ctx '<comando attuale>'"}`, con il comando attuale come **una stringa tra apici singoli**;
-   - se non esiste una statusline, proponi `"command": "<radice>/statusline/ctx <radice>/statusline/statusline.sh"`.
-   Se il comando attuale contiene apici singoli, avvisa l'utente di doverli proteggere.
+   - se esiste già un comando, proponi `"statusLine": {"type": "command", "command": "\"<radice>/statusline/ctx\" '<comando attuale>'"}`, con il comando attuale come **una stringa tra apici singoli**;
+   - se non esiste una statusline, proponi `"command": "\"<radice>/statusline/ctx\" \"<radice>/statusline/statusline.sh\""`.
+   La radice va **sempre tra virgolette**: il percorso può contenere spazi. Se il comando attuale contiene apici singoli, avvisa l'utente di doverli proteggere.
+   La radice nella cache del plugin contiene la versione: la riga va riaggiornata a ogni aggiornamento del plugin.
 3. Mostra la riga da incollare, indica dove va (`~/.claude/settings.json`, chiave `statusLine`) e di' che la modifica è sua. Se `statusLine.command` ha già `statusline/ctx`, di' che non serve fare nulla.
 
 Non eseguire altri comandi e non scrivere in `~/.claude/`.

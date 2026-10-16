@@ -83,6 +83,19 @@ class CheckpointCase(unittest.TestCase):
         tasks.task_event(self.conn, self.work, 2, "approved", now=T0)
         self.assertIn("/tollgate:finish", step())
 
+    def test_next_step_in_phases_without_tasks(self):
+        def step(phase):
+            self.conn.execute("UPDATE work_items SET phase = ? WHERE id = ?", (phase, self.work))
+            self.conn.commit()
+            return checkpoint.next_step(self.conn, self.work)
+
+        got = step("plan")
+        for needle in ("superpowers:writing-plans", "7.5", "committalo", "/tollgate:execute"):
+            self.assertIn(needle, got)
+        for phase in ("spec_audit", "approval"):
+            self.assertIn("P3c", step(phase))
+        self.assertIn("/tollgate:finish", step("execution"))
+
     def test_notes_kept_last_five(self):
         self.add(1)
         for i in range(1, 8):

@@ -83,6 +83,7 @@ class TaskStartTest(TaskCase):
         for part in ("tollgate:implementer", "tg-7-t1", "launch"):
             self.assertIn(part, summary)
         self.assertNotIn("\n", summary)
+        self.assertIn("revisore: tollgate:task-reviewer", summary)
         self.assertNotIn("model: inherit", summary)
         self.assertIn("verify", brief)
 
@@ -132,6 +133,7 @@ class TaskStartTest(TaskCase):
         self.assertEqual((row["agent_type"], row["reviewer_type"]),
                          ("probe:web-dev", "probe:web-reviewer"))
         self.assertIn("probe:web-dev", summary)
+        self.assertIn("revisore: probe:web-reviewer", summary)
         self.assertIn("tg-7-t2", path.read_text())
 
     def test_absent_skill_removed_from_required(self):
@@ -468,12 +470,37 @@ class ReviewDoneTest(TaskCase):
         self.commit("".join(f"x{i} = {i}\n" for i in range(250)))
         self.assertIn("AVVISO DIMENSIONE", self.prepare().read_text())
 
+    def test_done_refusal_with_changes_points_to_fix(self):
+        self.to_review()
+        self.prepare()
+        tasks.set_verdict(self.fl.conn, self.fl.work, 1, outcome="changes", findings=[FINDING],
+                          now=self.fl.now)
+        with self.assertRaises(taskcmd.TaskError) as cm:
+            self.done()
+        self.assertIn("task start 1 --fix", str(cm.exception))
+
+    def test_fix_refusal_with_approved_points_to_done(self):
+        self.to_review()
+        self.prepare()
+        self.approve()
+        with self.assertRaises(taskcmd.TaskError) as cm:
+            self.start(fix=True)
+        self.assertIn("task done 1", str(cm.exception))
+
+    def test_reviewer_type_is_read_from_db(self):
+        self.to_review()
+        self.prepare()
+        self.assertEqual(taskcmd.reviewer_type(self.fl.ts.state, self.fl.wt, 1),
+                         "tollgate:task-reviewer")
+
     def test_cli_review_prepare_and_done(self):
         self.to_review()
         fl = self.fl
         r = fl.cli("task", "review-prepare", "1", cwd=fl.wt)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(r.stdout.strip(), str(fl.wt / ".tollgate-run" / "7" / "review-1.md"))
+        self.assertEqual(r.stdout.strip().splitlines(),
+                         [str(fl.wt / ".tollgate-run" / "7" / "review-1.md"),
+                          "revisore: tollgate:task-reviewer"])
         r = fl.cli("task", "done", "1", cwd=fl.wt)
         self.assertEqual(r.returncode, 1)
         self.assertIn("approved", r.stderr)

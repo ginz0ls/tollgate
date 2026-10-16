@@ -55,11 +55,17 @@ Se il brief elenca più file, ciascuno con la sua modifica, controlla file per f
 
 Il tuo ultimo messaggio comincia con il verdetto di aderenza, poi i rilievi con `file:riga`, nessun preambolo e nessuna narrazione del procedimento. Termina con **un solo blocco JSON** (nessun altro oggetto con la chiave `outcome` nel messaggio), con `sha` e `code` copiati alla lettera dal brief di revisione:
 
+Un esempio per esito (sostituisci `N`, `sha` e `code` con i valori del brief; il blocco che consegni contiene un solo oggetto):
+
 ```json
-{"v": 1, "task": 0, "sha": "…", "code": "…", "outcome": "approved" | "changes", "spec_compliance": ["missing" | "extra"], "findings": [{"severity": "…", "file": "…", "line": 0, "rule": "…", "text": "…"}]}
+{"v": 1, "task": 3, "sha": "…", "code": "…", "outcome": "approved", "spec_compliance": [], "findings": []}
 ```
 
-- `outcome` è `approved` oppure `changes`.
+```json
+{"v": 1, "task": 3, "sha": "…", "code": "…", "outcome": "changes", "spec_compliance": ["missing"], "findings": [{"severity": "major", "file": "src/app.py", "line": 12, "rule": "Task 3, passo 2", "text": "…"}]}
+```
+
+- `outcome` è `"approved"` oppure `"changes"` (uno solo dei due); l'esito che conta è quello che tollgate ricalcola da `spec_compliance` e dalle gravità.
 - `spec_compliance` è una lista vuota se il task è aderente; altrimenti contiene `"missing"` e/o `"extra"`.
 - `severity` è una tra `blocker`, `major`, `moderate`, `minor`; `line` è un intero.
 - Il verdetto vale solo con lo `sha` e il `code` del brief; con valori diversi, o con un JSON assente o malformato, riceve un veto e riscrivi. Se hai cambiato un file, il verdetto non è valido.
