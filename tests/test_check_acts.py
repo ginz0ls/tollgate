@@ -1,6 +1,7 @@
 import json
 import unittest
 
+from tests.helpers import ROOT
 from tests.hookkit import DROP, SESSION, Lab, sample
 from tollgate_core import git
 
@@ -126,6 +127,42 @@ class ActsTest(unittest.TestCase):
         text = json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"]
         self.assertIn("atto ricevuto (approve waiver w-7-1)", text)
         self.assertNotIn("registrato", text)
+
+
+class ProgramLineTest(unittest.TestCase):
+    def setUp(self):
+        self.lab = Lab()
+        self.line = f"tollgate: programma {ROOT / 'bin' / 'tollgate'}"
+
+    def tearDown(self):
+        self.lab.close()
+
+    def text(self, name, args=""):
+        r = expand(self.lab, name, args)
+        return json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"]
+
+    def test_every_tollgate_command_gets_program_line(self):
+        for name, args in (("tollgate:start", "7"), ("tollgate:execute", ""),
+                           ("tollgate:status", ""), ("tollgate:setup", ""),
+                           ("tollgate:init", ""), ("tollgate:finish", ""),
+                           ("tollgate:approve", "waiver w-7-1"),
+                           ("tollgate:resolve", "")):
+            with self.subTest(name=name):
+                self.assertIn(self.line, self.text(name, args))
+
+    def test_act_keeps_received_line_and_adds_program(self):
+        text = self.text("tollgate:approve", "waiver w-7-1")
+        self.assertIn("atto ricevuto (approve waiver w-7-1)", text)
+        self.assertIn("programma", text)
+
+    def test_refused_act_still_gets_program_line(self):
+        text = self.text("tollgate:resolve", "")
+        self.assertIn("non registrato", text)
+        self.assertIn(self.line, text)
+
+    def test_other_commands_get_nothing(self):
+        r = expand(self.lab, "altro:start", "")
+        self.assertNotIn("programma", r.stdout)
 
 
 if __name__ == "__main__":

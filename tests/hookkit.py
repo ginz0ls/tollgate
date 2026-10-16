@@ -54,20 +54,28 @@ def sample(name, **changes):
 
 class Lab:
     def __init__(self, *, level="L1", phase="execution", toml=DEFAULT_TOML, files=None,
-                 bind=True, work=True):
+                 bind=True, work=True, session=SESSION, issue=7, origin_url=None):
+        self.session = session
         self.ts = TempState()
         self.tmp = Path(tempfile.mkdtemp(prefix="tollgate lab "))
         self.main, self.origin, self.base = make_origin_repo(self.tmp, files or DEFAULT_FILES,
                                                              toml)
-        self.wt = self.tmp / "wt 7"
-        git(self.main, "worktree", "add", "-q", "-b", "tg/7-demo", str(self.wt))
+        key_source = str(self.origin)
+        if origin_url:
+            # remote.origin.url resta l'URL finto; il fetch va al repo nudo (insteadOf)
+            git(self.main, "config", "remote.origin.url", origin_url)
+            git(self.main, "config", f"url.{self.origin}.insteadOf", origin_url)
+            key_source = origin_url
+        self.wt = self.tmp / f"wt {issue}"
+        git(self.main, "worktree", "add", "-q", "-b", f"tg/{issue}-demo", str(self.wt))
         self.conn = db.open_db(self.ts.state)
         self.work = None
         self.now = T0 + timedelta(minutes=1)
         if work:
             self.work = phases.create_work(
-                self.conn, repo_key=repo_key(str(self.origin)), issue=7, level=level, now=T0,
-                session=SESSION if bind else None, branch="tg/7-demo", worktree=str(self.wt),
+                self.conn, repo_key=repo_key(key_source), issue=issue, level=level, now=T0,
+                session=session if bind else None, branch=f"tg/{issue}-demo",
+                worktree=str(self.wt),
                 work_base_sha=self.base, gate_mode="protected")
             self.goto(phase)
 
@@ -87,7 +95,7 @@ class Lab:
                                env=self.ts.env(), now=self.now, plugin_root=ROOT)
 
     def _base(self, name, agent_id, cwd, **kw):
-        extra = {"session_id": SESSION, "cwd": str(cwd or self.wt)}
+        extra = {"session_id": self.session, "cwd": str(cwd or self.wt)}
         if agent_id:
             extra.update(agent_id=agent_id, agent_type=kw.pop("agent_type",
                                                               "tollgate:implementer"))

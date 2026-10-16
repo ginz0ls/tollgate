@@ -22,8 +22,17 @@ def decide(event, ctx):
     if "expansion_type" in event.raw and event.raw["expansion_type"] != "slash_command":
         return []
     type_ = name.split(":", 1)[1]
-    if type_ in ("off", "on") or type_ not in acts.ACT_TYPES:
+    if type_ in ("off", "on"):
         return []
+    # Decisione 3: il percorso del programma arriva con ogni /tollgate:*, atto o no.
+    program = f"tollgate: programma {ctx.plugin_bin}"
+    if type_ not in acts.ACT_TYPES:
+        return [inject(program)]
+    out = _act(event, ctx, type_)
+    return out[:-1] + [inject(f"{out[-1].text}\n{program}")]
+
+
+def _act(event, ctx, type_):
     raw_args = str(event.raw.get("command_args") or "")
     try:
         args = shlex.split(raw_args)

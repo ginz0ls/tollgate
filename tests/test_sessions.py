@@ -1,3 +1,4 @@
+import json
 import unittest
 from datetime import datetime, timedelta, timezone
 
@@ -45,6 +46,69 @@ class SessionsTest(unittest.TestCase):
         self.assertTrue((self.ts.dir / sessions.BOUND_DIR / "s1").is_file())
         sessions.mark_bound(self.ts.state, "../fuori")
         self.assertFalse((self.ts.dir / "fuori").exists())
+
+
+class CliSessionTest(unittest.TestCase):
+    def setUp(self):
+        self.ts = TempState()
+        self.state = self.ts.state
+        self.cwd = self.ts.dir / "repo dir"
+        self.cwd.mkdir()
+
+    def tearDown(self):
+        self.ts.cleanup()
+
+    def note(self, session, sub="start", cwd=None, ago=5):
+        sessions.note_cli_call(self.state, session, str(cwd or self.cwd), [sub, "7"],
+                               now=T0 - timedelta(seconds=ago))
+
+    def find(self, sub="start", cwd=None, now=T0):
+        return sessions.cli_session(self.state, cwd or self.cwd, sub, now=now)
+
+    def test_cli_session_found(self):
+        self.note("s1")
+        self.assertEqual(self.find(), "s1")
+        # la cartella si confronta risolta: un collegamento alla stessa cartella vale
+        link = self.ts.dir / "link"
+        link.symlink_to(self.cwd)
+        self.assertEqual(self.find(cwd=link), "s1")
+
+    def test_cli_session_ambiguous_or_stale_refuses(self):
+        self.note("s1")
+        self.note("s2")
+        with self.assertRaisesRegex(sessions.CliSessionError, "più sessioni"):
+            self.find()
+        with self.assertRaisesRegex(sessions.CliSessionError, "sessione non riconosciuta"):
+            self.find(now=T0 + timedelta(seconds=sessions.CLI_WINDOW_S))
+        with self.assertRaisesRegex(sessions.CliSessionError, "sessione non riconosciuta"):
+            self.find(sub="act")
+        other = self.ts.dir / "altra"
+        other.mkdir()
+        with self.assertRaisesRegex(sessions.CliSessionError, "sessione non riconosciuta"):
+            self.find(cwd=other)
+
+    def test_stale_signal_121_seconds(self):
+        self.note("s1", ago=121)
+        with self.assertRaisesRegex(sessions.CliSessionError, "sessione non riconosciuta"):
+            self.find()
+
+    def test_note_cli_call_rejects_unsafe_session(self):
+        self.note("../x")
+        self.assertFalse((self.ts.dir / "x.json").exists())
+        self.assertFalse((self.ts.dir / sessions.CLI_DIR).exists())
+
+    def test_two_subcommands_of_same_session_both_valid(self):
+        self.note("s1", "start")
+        self.note("s1", "act")
+        self.assertEqual(self.find("start"), "s1")
+        self.assertEqual(self.find("act"), "s1")
+        data = json.loads((self.ts.dir / "cli" / "s1.json").read_text())
+        self.assertEqual(data["start"]["argv"], ["start", "7"])
+        self.assertEqual(sorted(data["act"]), ["argv", "at", "cwd"])
+
+    def test_note_never_raises_on_unwritable_state(self):
+        (self.ts.dir / sessions.CLI_DIR).write_text("file, non cartella")
+        self.note("s1")  # nessuna eccezione
 
 
 if __name__ == "__main__":

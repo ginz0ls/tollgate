@@ -64,6 +64,8 @@ _OPS = {
     "event": lambda c, s, x, d: events.record_event(c, d["type"], d.get("data"), now=x.now,
                                                     session=x.event.session, work=d.get("work")),
     "bind": _bind,
+    "cli_call": lambda c, s, x, d: sessions.note_cli_call(s, x.event.session, d["cwd"],
+                                                          d["argv"], now=x.now),
     "act": _act,
     "expire_acts": lambda c, s, x, d: acts.expire_stale(c, now=x.now, session=x.event.session),
     "block": lambda c, s, x, d: phases.open_block(c, s, d["work"], d["type"], d["reason"],

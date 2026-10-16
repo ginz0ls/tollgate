@@ -3,7 +3,7 @@ import unittest
 
 from tests.helpers import BIN
 
-FORBIDDEN = ("tollgate_core", "tollgate_hooks", "tollgate_checks")
+FORBIDDEN = ("tollgate_core", "tollgate_flow", "tollgate_hooks", "tollgate_checks")
 
 
 def _forbidden(name: str) -> bool:

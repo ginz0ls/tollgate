@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import timedelta
 from pathlib import Path
@@ -10,6 +11,8 @@ from . import clock, db
 from .paths import State, ensure_dirs
 
 BOUND_DIR = "bound"
+CLI_DIR = "cli"
+CLI_WINDOW_S = 120
 _SAFE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
@@ -54,3 +57,57 @@ def mark_bound(state: State, session: str) -> None:
     d = state.root / BOUND_DIR
     d.mkdir(mode=0o700, exist_ok=True)
     (d / session).touch()
+
+
+class CliSessionError(Exception):
+    pass
+
+
+def _read_signals(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def note_cli_call(state: State, session: str, cwd: str, argv: list[str], *, now) -> None:
+    """Segnale per la CLI (decisione 2): `cli/<sessione>.json`, una voce per sottocomando.
+    Non solleva mai: un segnale mancante lo scopre la CLI, un hook non deve fallire."""
+    if not _SAFE.match(session) or not argv:
+        return
+    try:
+        ensure_dirs(state)
+        d = state.root / CLI_DIR
+        d.mkdir(mode=0o700, exist_ok=True)
+        target = d / f"{session}.json"
+        data = _read_signals(target)
+        data[argv[0]] = {"cwd": str(cwd), "argv": list(argv), "at": clock.fmt(now)}
+        tmp = d / f".{session}.json.{os.getpid()}.tmp"
+        tmp.write_text(json.dumps(data), encoding="utf-8")
+        os.replace(tmp, target)
+    except OSError:
+        return
+
+
+def cli_session(state: State, cwd, subcommand: str, *, now) -> str:
+    """La sessione che ha lanciato il sottocomando: segnale recente, stessa cartella risolta,
+    stesso sottocomando (decisione 2). Zero candidate o più d'una: errore."""
+    here = Path(cwd).resolve()
+    limit = clock.fmt(now - timedelta(seconds=CLI_WINDOW_S))
+    found = []
+    d = state.root / CLI_DIR
+    for f in sorted(d.glob("*.json")) if d.is_dir() else []:
+        entry = _read_signals(f).get(subcommand)
+        if not isinstance(entry, dict) or not isinstance(entry.get("at"), str) \
+                or not isinstance(entry.get("cwd"), str) or not _SAFE.match(f.stem):
+            continue
+        if entry["at"] > limit and Path(entry["cwd"]).resolve() == here:
+            found.append(f.stem)
+    if not found:
+        raise CliSessionError("sessione non riconosciuta: lancia il comando da Claude Code "
+                              "con tollgate acceso")
+    if len(found) > 1:
+        raise CliSessionError("più sessioni di Claude Code hanno lanciato questo comando "
+                              "da questa cartella: ripeti il comando")
+    return found[0]
