@@ -44,19 +44,18 @@ def fetch(repo) -> bool:
         return False
 
 
-def worktree_add(repo, path, *, branch: str, start_point: str | None, new_branch: bool) -> None:
-    """Nuovo ramo da `start_point` (senza ramo a monte, C18) o ramo esistente."""
+def worktree_add(repo, path, *, branch: str, start_point: str | None, new_branch: bool,
+                 force: bool = False) -> None:
+    """Nuovo ramo da `start_point` (senza ramo a monte, C18) o ramo esistente. `force` solo per
+    un percorso già registrato ma sparito (crash): non tocca le registrazioni degli altri."""
+    extra = ["--force"] if force else []
     if new_branch:
         if not start_point:
             raise GitWriteError("serve il punto di partenza per un ramo nuovo")
-        _checked(repo, "worktree", "add", "--no-track", "-b", branch, str(path), start_point)
+        _checked(repo, "worktree", "add", *extra, "--no-track", "-b", branch, str(path),
+                 start_point)
     else:
-        _checked(repo, "worktree", "add", str(path), branch)
-
-
-def worktree_prune(repo) -> None:
-    """Toglie le registrazioni dei worktree la cui cartella non esiste più (crash, rm)."""
-    _checked(repo, "worktree", "prune")
+        _checked(repo, "worktree", "add", *extra, str(path), branch)
 
 
 def rebase_in_progress(wt) -> bool:

@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -452,9 +453,9 @@ class ResumeTest(StartCase):
         return r
 
     def test_resume_recreates_missing_worktree(self):
+        """Crash: la cartella sparisce ma la registrazione di git resta."""
         fl = self.make()
-        fl.git("worktree", "remove", "--force", str(fl.wt))
-        self.assertFalse(fl.wt.exists())
+        shutil.rmtree(fl.wt)
         r = self.resume(fl)
         self.assertEqual(fl.git("rev-parse", "--abbrev-ref", "HEAD", repo=fl.wt), "tg/7-demo")
         self.assertIn("ricreato sul ramo tg/7-demo", out(r))
@@ -462,6 +463,62 @@ class ResumeTest(StartCase):
                          f"prossimo passo: EnterWorktree {fl.wt}")
         self.assertEqual(len(self.rows(fl)), 1)
         self.assertTrue((fl.ts.dir / "bound" / SESSION).is_file())
+
+    def test_resume_recreates_worktree_with_registration_removed(self):
+        fl = self.make()
+        fl.git("worktree", "remove", "--force", str(fl.wt))
+        self.resume(fl)
+        self.assertEqual(fl.git("rev-parse", "--abbrev-ref", "HEAD", repo=fl.wt), "tg/7-demo")
+
+    def test_resume_keeps_other_missing_worktrees_registered(self):
+        fl = self.make()
+        other = fl.tmp / "altro wt"
+        fl.git("worktree", "add", "-q", "-b", "altro-ramo", str(other))
+        other.rename(fl.tmp / "altro wt spostato")
+        shutil.rmtree(fl.wt)
+        self.resume(fl)
+        self.assertIn(str(other), fl.git("worktree", "list", "--porcelain"))
+
+    def test_resume_recreated_worktree_rewrites_issue_file(self):
+        fl = self.make()
+        shutil.rmtree(fl.wt)
+        self.resume(fl)
+        text = (fl.wt / ".tollgate-run" / "7" / "issue.md").read_text()
+        self.assertIn("DATO NON FIDATO", text)
+        self.assertIn("corpo dell'issue", text)
+
+    def test_resume_recreated_worktree_without_gh_warns_about_issue_file(self):
+        fl = self.make()
+        self.gh(fl, issues={"1": issue(1)})
+        shutil.rmtree(fl.wt)
+        r = self.resume(fl)
+        self.assertIn("issue.md non ricreato", out(r))
+
+    def test_resume_existing_worktree_leaves_issue_file_alone(self):
+        fl = self.make()
+        r = self.resume(fl)
+        self.assertNotIn("issue.md", out(r))
+        self.assertFalse((fl.wt / ".tollgate-run").exists())
+
+    def test_resume_failed_recreation_refuses_with_warnings(self):
+        fl = self.make()
+        (fl.main / "blocco").write_text("x")
+        fl.conn.execute("UPDATE work_items SET worktree = ?",
+                        (str(fl.main / "blocco" / "wt"),))
+        fl.conn.commit()
+        shutil.rmtree(fl.wt)
+        (fl.main / "sporco.txt").write_text("x\n")
+        r = self.resume(fl, code=1)
+        self.assertIn("rifiuto: ricreazione del worktree", out(r))
+        self.assertIn("il checkout principale ha modifiche non committate", out(r))
+
+    def test_resume_runs_housekeeping(self):
+        fl = self.make()
+        sessions.mark_bound(fl.ts.state, "morta")
+        self.assertTrue((fl.ts.dir / "bound" / "morta").exists())
+        self.resume(fl)
+        self.assertFalse((fl.ts.dir / "bound" / "morta").exists())
+        self.assertTrue((fl.ts.dir / "bound" / SESSION).exists())
 
     def test_resume_without_branch_starts_from_base(self):
         fl = self.make()
@@ -550,6 +607,8 @@ class ResumeTest(StartCase):
         self.assertIn("intento e-", out(r))
         self.assertIn("--confirm", out(r))
         self.resume(fl, "--confirm")
+        self.assertEqual(fl.conn.execute("SELECT state FROM intents").fetchone()[0],
+                         "requested")
 
     def test_reopen_execution_from_review(self):
         fl = self.make()

@@ -105,14 +105,16 @@ def _restore_worktree(main, row, wt: Path, notes: _Notes) -> str | None:
     Ritorna il motivo del fallimento."""
     branch = row["branch"]
     try:
-        gitw.worktree_prune(main)
         wt.parent.mkdir(parents=True, exist_ok=True)
+        # Dopo un crash la cartella manca ma git ricorda ancora il percorso: solo allora --force.
+        registered = wt.resolve() in {p for p, _ in git.worktrees(main)}
         if branch in git.local_branches(main):
-            gitw.worktree_add(main, wt, branch=branch, start_point=None, new_branch=False)
+            gitw.worktree_add(main, wt, branch=branch, start_point=None, new_branch=False,
+                              force=registered)
             notes.warnings.append(f"worktree {wt} ricreato sul ramo {branch}")
         else:
             gitw.worktree_add(main, wt, branch=branch, start_point=row["work_base_sha"],
-                              new_branch=True)
+                              new_branch=True, force=registered)
             notes.warnings.append(f"worktree {wt} e ramo {branch} ricreati dalla base "
                                   f"{row['work_base_sha'][:10]}: i commit locali erano persi")
     except (gitw.GitWriteError, git.GitError, OSError) as e:
@@ -147,10 +149,12 @@ def _resume(state, conn, main, ref, cfg, row, session, *, fetched, confirm, reop
 
     branch = row["branch"]
     wt = Path(row["worktree"]) if row["worktree"] else gitw.worktree_dir(main, branch)
-    if not wt.exists():
+    recreated = not wt.exists()
+    if recreated:
         why = _restore_worktree(main, row, wt, notes)
         if why:
-            return _refuse(why)
+            return StartResult(REFUSED, [*[f"avviso: {w}" for w in notes.warnings],
+                                         f"rifiuto: {why}"])
     steps = _Steps()
     if str(wt) != row["worktree"]:
         steps.run("percorso del worktree",
@@ -181,6 +185,14 @@ def _resume(state, conn, main, ref, cfg, row, session, *, fetched, confirm, reop
     steps.run("segnalino della sessione", lambda: sessions.mark_bound(state, session))
     steps.run("info/exclude", lambda: gitw.add_excludes(main, EXCLUDES))
 
+    if recreated:
+        # I file non tracciati di .tollgate-run/ sono andati persi con la cartella.
+        try:
+            iss = gh.issue(state, main, issue)
+            steps.run("testo dell'issue", lambda: _write_issue(wt, iss, issue))
+        except gh.GhError as e:
+            notes.warnings.append(f"issue.md non ricreato (issue non leggibile: {e}): brief e "
+                                  "altri file di .tollgate-run/ vanno rigenerati")
     phase = row["phase"]
     if phase in ("review", "pr_open"):
         if reopen_execution:
@@ -189,6 +201,7 @@ def _resume(state, conn, main, ref, cfg, row, session, *, fetched, confirm, reop
         else:
             notes.warnings.append(f"fase {phase}: per correggere rilancia con "
                                   "--reopen-execution")
+    notes.warnings.extend(housekeeping.run(conn, state, cfg, now=now))
     notes.warnings.extend(f"registrazione incompleta: {x}" for x in steps.failed)
     cur = phases.get_work(conn, work)
     lines = [*[f"avviso: {w}" for w in notes.warnings],
