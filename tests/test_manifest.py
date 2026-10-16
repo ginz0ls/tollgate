@@ -4,6 +4,22 @@ import unittest
 
 from tests.helpers import ROOT
 
+ATTRIBUTION = ("Derivato da superpowers/skills/subagent-driven-development (MIT, © 2025 Jesse "
+               "Vincent); vedi LICENSES/superpowers-MIT.txt")
+
+
+def frontmatter(path) -> dict[str, str]:
+    """Parser minimo del frontmatter: solo righe `chiave: valore`."""
+    lines = path.read_text().split("\n")
+    assert lines[0] == "---", f"{path}: frontmatter assente"
+    out = {}
+    for line in lines[1:]:
+        if line == "---":
+            return out
+        key, _, value = line.partition(": ")
+        out[key] = value.strip().strip('"')
+    raise AssertionError(f"{path}: frontmatter non chiuso")
+
 
 class ManifestTest(unittest.TestCase):
     def test_hooks_json(self):
@@ -45,6 +61,99 @@ class ManifestTest(unittest.TestCase):
             text = (ROOT / "skills" / name / "SKILL.md").read_text()
             self.assertRegex(text, r"(?m)^disable-model-invocation: true$")
             self.assertRegex(text, rf"(?m)^name: {name}$")
+
+    def test_agents_frontmatter(self):
+        impl = ROOT / "agents" / "implementer.md"
+        fm = frontmatter(impl)
+        self.assertEqual(fm["name"], "implementer")
+        self.assertEqual(fm["model"], "inherit")
+        self.assertEqual(fm["maxTurns"], "60")
+        self.assertEqual([t.strip() for t in fm["tools"].split(",")],
+                         ["Read", "Edit", "Write", "Bash", "Grep", "Glob", "Skill"])
+        self.assertTrue(fm["description"])
+        rev = ROOT / "agents" / "task-reviewer.md"
+        fm = frontmatter(rev)
+        self.assertEqual(fm["name"], "task-reviewer")
+        self.assertEqual(fm["model"], "sonnet")
+        tools = [t.strip() for t in fm["tools"].split(",")]
+        self.assertEqual(tools, ["Read", "Grep", "Glob", "Bash"])
+        self.assertNotIn("Edit", tools)
+        self.assertNotIn("Write", tools)
+        for path in (impl, rev):
+            self.assertIn(ATTRIBUTION, path.read_text())
+
+    def test_user_only_skills(self):
+        for name in ("approve", "resolve", "setup", "off", "on"):
+            text = (ROOT / "skills" / name / "SKILL.md").read_text()
+            self.assertRegex(text, r"(?m)^disable-model-invocation: true$", name)
+            self.assertRegex(text, rf"(?m)^name: {name}$")
+        for name in ("start", "execute", "status"):
+            text = (ROOT / "skills" / name / "SKILL.md").read_text()
+            self.assertNotIn("disable-model-invocation", text, name)
+            self.assertRegex(text, rf"(?m)^name: {name}$")
+            self.assertRegex(text, r"(?m)^description: \S")
+
+    def test_skills_use_quoted_program(self):
+        for name in ("start", "execute", "status", "approve", "resolve", "setup"):
+            text = (ROOT / "skills" / name / "SKILL.md").read_text()
+            self.assertIn('"${CLAUDE_PLUGIN_ROOT}/bin/tollgate"', text, name)
+            self.assertIn("tollgate: programma", text, name)
+
+    def test_execute_forbids_sdd_as_executor(self):
+        text = (ROOT / "skills" / "execute" / "SKILL.md").read_text()
+        self.assertIn("/tollgate:finish", text)
+        self.assertIn("mai subagent-driven-development", text)
+        self.assertIn(ATTRIBUTION, text)
+        start = (ROOT / "skills" / "start" / "SKILL.md").read_text()
+        self.assertIn("/tollgate:execute", start)
+
+    def test_start_skill_covers_exit_codes_and_levels(self):
+        text = (ROOT / "skills" / "start" / "SKILL.md").read_text()
+        for needle in ("--confirm", "EnterWorktree", "cd <percorso> && claude",
+                       "status --checkpoint", "writing-plans", "brainstorming"):
+            self.assertIn(needle, text)
+        self.assertRegex(text, r"(?m)^argument-hint: \"#N \[L1\|L2\]\"$")
+
+    def test_setup_skill_does_not_write_settings(self):
+        text = (ROOT / "skills" / "setup" / "SKILL.md").read_text()
+        self.assertIn("statusLine.command", text)
+        self.assertIn("statusline/ctx", text)
+        self.assertIn("non modificare", text)
+
+    def test_plugin_and_marketplace_json(self):
+        p = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())
+        self.assertEqual(p["author"], {"name": "sAInapse"})
+        self.assertEqual(p["license"], "MIT")
+        for dep in p["dependencies"]:
+            self.assertNotIn("version", dep)
+        m = json.loads((ROOT / ".claude-plugin" / "marketplace.json").read_text())
+        self.assertEqual(m["name"], "sainapse")
+        self.assertEqual(m["owner"], {"name": "sAInapse"})
+        self.assertTrue(m["description"])
+        self.assertEqual(m["allowCrossMarketplaceDependenciesOn"], ["claude-plugins-official"])
+        (entry,) = m["plugins"]
+        self.assertEqual((entry["name"], entry["source"]), ("tollgate", "./"))
+        self.assertTrue(entry["description"])
+        self.assertEqual(entry["author"], {"name": "sAInapse"})
+
+    def test_license_files(self):
+        own = (ROOT / "LICENSE").read_text()
+        self.assertTrue(own.startswith("MIT License"))
+        self.assertIn("Copyright (c) 2026 sAInapse", own)
+        theirs = (ROOT / "LICENSES" / "superpowers-MIT.txt").read_text()
+        self.assertIn("MIT License", theirs)
+        self.assertIn("Copyright (c) 2025 Jesse Vincent", theirs)
+
+    def test_brief_fields_match_agent_text(self):
+        from tollgate_analysis.report import REQUIRED
+        impl = (ROOT / "agents" / "implementer.md").read_text()
+        for field in (*REQUIRED, "must_have", "size_reason"):
+            self.assertRegex(impl, rf'"{field}"', field)
+        rev = (ROOT / "agents" / "task-reviewer.md").read_text()
+        for field in ("v", "task", "sha", "code", "outcome", "spec_compliance", "findings",
+                      "severity", "file", "line", "rule", "text"):
+            self.assertRegex(rev, rf'"{field}"', field)
+        self.assertRegex(rev, r'"approved" \| "changes"')
 
     def test_wrapper_executable(self):
         self.assertTrue(os.access(ROOT / "hooks" / "run", os.X_OK))

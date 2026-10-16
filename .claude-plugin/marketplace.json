@@ -1,0 +1,14 @@
+{
+  "name": "sainapse",
+  "owner": {"name": "sAInapse"},
+  "description": "Plugin di sAInapse per Claude Code.",
+  "plugins": [
+    {
+      "name": "tollgate",
+      "source": "./",
+      "description": "Dall'issue GitHub alla PR verificata: guardrail locali per Claude Code e gate su GitHub.",
+      "author": {"name": "sAInapse"}
+    }
+  ],
+  "allowCrossMarketplaceDependenciesOn": ["claude-plugins-official"]
+}
