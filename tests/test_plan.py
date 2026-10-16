@@ -1,6 +1,8 @@
+import hashlib
 import unittest
 
 from tollgate_analysis import plan
+from tests.helpers import ROOT
 
 SECTIONS = ["Fatti verificati", "Decisioni", "Interfacce", "Must-have", "Scope",
             "Punti di arresto", "Rischi"]
@@ -131,6 +133,14 @@ class TaskTextTest(unittest.TestCase):
                 r = check(make(files=[line, "- Test: `tests/test_a.py`"]))
                 self.assertEqual(r.scope, ["a.py", "b.py", "tests/test_a.py"])
 
+    def test_comments_after_files_are_not_files(self):
+        for line, want in [("- Modify: `a.py` (vedi `docs/x.md`)", ["a.py"]),
+                           ("- Create: `b.py` — usa `old()`", ["b.py"]),
+                           ("- Create: `a.py`, `b.py` (nuovi, `x`) e `c.py`", ["a.py", "b.py", "c.py"]),
+                           ("- Modify: src/a.py — nuovo, `x`", ["src/a.py"])]:
+            with self.subTest(line=line):
+                self.assertEqual(check(make(files=[line])).scope, want)
+
     def test_tilde_and_long_fences(self):
         for opener, closer in [("~~~", "~~~"), ("````", "````"), ("~~~~", "~~~~~")]:
             with self.subTest(opener=opener):
@@ -154,6 +164,32 @@ class TaskTextTest(unittest.TestCase):
 
     def test_existing_cases_unchanged(self):
         self.assertTrue(check(make()).ok)
+
+    def test_real_plans_keep_their_scope(self):
+        """Scope calcolato con il parser al commit 65f31ba (P0, P1) o verificato a mano: nel
+        P2-guardrail le voci in più sono file veri di righe con più file (prima persi)."""
+        want = {"2026-10-08-tollgate-p0-verifiche.md": (17, "fa281f7e7fedf2b3"),
+                "2026-10-08-tollgate-p1-fondamenta.md": (27, "e9dbccdd90d08661"),
+                "2026-10-09-tollgate-p2-guardrail.md": (104, "0a9e0f1424be7d88")}
+        for name, (count, digest) in want.items():
+            with self.subTest(plan=name):
+                r = plan.check_plan((ROOT / "docs/superpowers/plans" / name).read_text(),
+                                    required_sections=[], max_scope_files=10**6,
+                                    must_have_tests=False, level="L0", profiles={},
+                                    active_always=[])
+                self.assertEqual(r.problems, [])
+                self.assertEqual(len(r.scope), count)
+                self.assertEqual(hashlib.sha256("\n".join(r.scope).encode()).hexdigest()[:16],
+                                 digest)
+
+    def test_p3a_plan_stays_valid_without_comment_files(self):
+        r = plan.check_plan((ROOT / "docs/superpowers/plans/"
+                             "2026-10-16-tollgate-p3a-avvio-e-task.md").read_text(),
+                            required_sections=[], max_scope_files=10**6, must_have_tests=False,
+                            level="L0", profiles={}, active_always=[])
+        self.assertEqual(r.problems, [])
+        for spurious in ("size.task_lines", "_GENERATED", "size.GENERATED", "/tollgate:*"):
+            self.assertNotIn(spurious, r.scope)
 
 
 if __name__ == "__main__":

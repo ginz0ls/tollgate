@@ -19,7 +19,8 @@ class TaskLinesTest(unittest.TestCase):
         self.assertEqual(size.task_lines(changes, {"package-lock.json"}), 10)
 
     def test_generated_patterns(self):
-        self.assertEqual(len(size.GENERATED), 4)
+        self.assertEqual(size.GENERATED, ["**/*.min.js", "**/*.generated.*", "**/__snapshots__/**",
+                                          "**/dist/**"])
 
 
 if __name__ == "__main__":

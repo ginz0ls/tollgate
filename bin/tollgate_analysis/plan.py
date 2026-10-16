@@ -14,10 +14,9 @@ _FILE = re.compile(r"^\s*[-*]\s*(Create|Modify|Test):\s*(.+?)\s*$")
 _TASK_MH = re.compile(r"^\s*\**Must-have\**:\**\s*(.+?)\s*$")
 _MH = re.compile(r"^\s*(?:[-*]\s*)?\**(M\d+)\**\.\**\s*(.+?)\s*$")
 _FENCE_OPEN = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
-_PAREN = re.compile(r"\([^)]*\)")
+_PAREN_AT = re.compile(r"(?:\s*\([^)]*\))?")
 _HEADING = re.compile(r"^#{2,3} ")
 _RANGE = re.compile(r":\d+(?:-\d+)?$")
-_TICK = re.compile(r"`([^`]+)`")
 
 
 @dataclass
@@ -53,14 +52,27 @@ def _file_value(raw: str) -> str:
     return value[2:] if value.startswith("./") else value
 
 
+_ITEM = re.compile(r"`([^`]+)`|([^\s,`]+)")
+_SEP = re.compile(r"\s*(?:,|\s(?:e|and)\s)\s*")
+
+
 def _file_values(raw: str) -> list[str]:
-    """Una riga `Create:` porta uno o più file: tra apici inversi, oppure separati da virgole
-    (le parentesi di commento, che possono contenere virgole, si scartano)."""
-    ticked = _TICK.findall(raw)
-    if ticked:
-        return [_file_value(v) for v in ticked]
-    parts = (p.split() for p in _PAREN.sub("", raw).split(","))
-    return [_file_value(p[0]) for p in parts if p]
+    """Una riga `Create:` porta uno o più file: l'elenco iniziale, di voci tra apici inversi o
+    nude separate da virgole (o «e»). Si ferma al primo testo che non è una voce dell'elenco
+    (trattino lungo, prosa); una parentesi di commento dopo una voce si salta."""
+    out: list[str] = []
+    pos = 0
+    while True:
+        m = _ITEM.match(raw, pos)
+        if not m:
+            break
+        out.append(_file_value(m.group(1) or m.group(2)))
+        pos = _PAREN_AT.match(raw, m.end()).end()
+        sep = _SEP.match(raw, pos)
+        if not sep:
+            break
+        pos = sep.end()
+    return out
 
 
 class _Fences:
