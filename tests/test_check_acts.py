@@ -160,6 +160,11 @@ class ProgramLineTest(unittest.TestCase):
         self.assertIn("non registrato", text)
         self.assertIn(self.line, text)
 
+    def test_off_and_on_get_no_program_line(self):
+        for name in ("tollgate:off", "tollgate:on"):
+            with self.subTest(name=name):
+                self.assertNotIn("programma", expand(self.lab, name, "").stdout)
+
     def test_other_commands_get_nothing(self):
         r = expand(self.lab, "altro:start", "")
         self.assertNotIn("programma", r.stdout)

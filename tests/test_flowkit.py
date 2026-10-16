@@ -3,9 +3,13 @@ import subprocess
 import unittest
 from pathlib import Path
 
+from types import SimpleNamespace
+
 from tests.flowkit import FAKEGH, GATE_FILES, ORIGIN_URL, SESSION, FlowLab
 from tests.helpers import git
-from tollgate_core import VERSION, sessions
+from tollgate_core import VERSION, git as core_git, sessions
+from tollgate_core.paths import repo_key
+from tollgate_checks._common import orphan_tg
 
 
 class FlowLabTest(unittest.TestCase):
@@ -76,6 +80,17 @@ class FlowLabTest(unittest.TestCase):
         self.assertEqual(self.gh("repo", "create").returncode, 1)
         self.fl.set_gh(auth=False)
         self.assertEqual(self.gh("auth", "status").returncode, 1)
+
+    def test_work_repo_key_matches_origin_url_and_hook_finds_it(self):
+        other = FlowLab(issue=9)
+        try:
+            row = other.conn.execute("SELECT repo_key FROM work_items").fetchone()
+            self.assertEqual(row[0], repo_key(core_git.origin_url(other.main)))
+            # il ramo tg/9-* del worktree ha un lavoro attivo per la chiave del repo: non è orfano
+            self.assertIsNone(orphan_tg(SimpleNamespace(db=other.conn), other.wt))
+            self.assertEqual(other.bash("git status").exit, 0)
+        finally:
+            other.close()
 
     def test_issue_param_creates_bound_work(self):
         other = FlowLab(issue=9)

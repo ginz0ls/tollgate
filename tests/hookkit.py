@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from tests.helpers import ROOT, TempState, git, make_origin_repo
-from tollgate_core import db, phases
+from tollgate_core import db, git as core_git, phases
 from tollgate_core.paths import repo_key
 from tollgate_hooks import runner
 
@@ -60,12 +60,12 @@ class Lab:
         self.tmp = Path(tempfile.mkdtemp(prefix="tollgate lab "))
         self.main, self.origin, self.base = make_origin_repo(self.tmp, files or DEFAULT_FILES,
                                                              toml)
-        key_source = str(self.origin)
         if origin_url:
             # remote.origin.url resta l'URL finto; il fetch va al repo nudo (insteadOf)
             git(self.main, "config", "remote.origin.url", origin_url)
             git(self.main, "config", f"url.{self.origin}.insteadOf", origin_url)
-            key_source = origin_url
+        # la chiave del repo è ovunque repo_key(git.origin_url(repo)) (get-url espande insteadOf)
+        key_source = core_git.origin_url(self.main)
         self.wt = self.tmp / f"wt {issue}"
         git(self.main, "worktree", "add", "-q", "-b", f"tg/{issue}-demo", str(self.wt))
         self.conn = db.open_db(self.ts.state)
