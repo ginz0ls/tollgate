@@ -893,5 +893,24 @@
       "content": "tre"
     },
     "tool_use_id": "toolu_01LmCFa99bc5KJsZcBjAqi82"
+  },
+  "PreToolUse-NotebookEdit": {
+    "session_id": "962b189c-96cf-4b6a-be04-9bc377da67ac",
+    "transcript_path": "/home/USER/.claude/projects/-tmp-tollgate-p3a/962b189c-96cf-4b6a-be04-9bc377da67ac.jsonl",
+    "cwd": "/tmp/tollgate-p3a",
+    "prompt_id": "26cc3c12-ec77-4cab-92e2-7d866b8b8ef0",
+    "permission_mode": "acceptEdits",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PreToolUse",
+    "tool_name": "NotebookEdit",
+    "tool_input": {
+      "notebook_path": "/tmp/tollgate-p3a/n.ipynb",
+      "new_source": "print(\"hello\")",
+      "cell_type": "code",
+      "edit_mode": "insert"
+    },
+    "tool_use_id": "toolu_0191TBQathJ7CUZnjguyp6TL"
   }
 }
