@@ -12,7 +12,7 @@ from tests.flowkit import ORIGIN_URL, SESSION, FlowLab
 from tests.helpers import BIN
 from tests.hookkit import DEFAULT_TOML
 from tollgate_core import VERSION, clock, events, phases, sessions
-from tollgate_flow import housekeeping
+from tollgate_flow import gitw, housekeeping
 
 SENTINEL_TITLE = "tollgate: merge non verificato"
 
@@ -357,6 +357,45 @@ class StartNewTest(StartCase):
         self.assertIn("ripresa", out(r))
         self.assertEqual(len(self.rows(fl)), 1)
 
+
+    def test_failed_add_never_deletes_a_preexisting_branch(self):
+        """Corsa: il ramo compare dopo local_branches, worktree add fallisce perché esiste."""
+        fl = self.make()
+        base = fl.git("rev-parse", "origin/main")
+        fl.git("branch", "tg/7-aggiungi-export-csv", base)
+        fl.git("checkout", "-q", "tg/7-aggiungi-export-csv")
+        (fl.main / "mio.txt").write_text("lavoro altrui\n")
+        fl.git("add", "mio.txt")
+        fl.git("commit", "-qm", "commit proprio")
+        fl.git("checkout", "-q", "main")
+        mine = fl.git("rev-parse", "tg/7-aggiungi-export-csv")
+        wt = fl.main / ".claude" / "worktrees" / "tg-7-aggiungi-export-csv"
+        with self.assertRaises(gitw.GitWriteError):
+            gitw.worktree_add(fl.main, wt, branch="tg/7-aggiungi-export-csv",
+                              start_point=base, new_branch=True)
+        self.assertFalse(gitw.delete_branch(fl.main, "tg/7-aggiungi-export-csv", base))
+        self.assertEqual(fl.git("rev-parse", "tg/7-aggiungi-export-csv"), mine)
+
+    def test_delete_branch_removes_branch_still_at_start_point(self):
+        fl = self.make()
+        base = fl.git("rev-parse", "origin/main")
+        fl.git("branch", "tg/7-x", base)
+        self.assertTrue(gitw.delete_branch(fl.main, "tg/7-x", base))
+        self.assertEqual(fl.git("branch", "--list", "tg/*"), "")
+
+    def test_mkdir_failure_never_deletes_branches(self):
+        fl = self.make(files={".claude/worktrees": "un file dove serve una cartella\n"})
+        from unittest import mock
+        from tollgate_flow import start as flow_start
+        sessions.note_cli_call(fl.ts.state, SESSION, str(fl.main), ["start", "7"],
+                               now=clock.now())
+        with mock.patch.dict(os.environ, fl.env()), \
+                mock.patch.object(gitw, "delete_branch") as delete:
+            r = flow_start.start(fl.ts.state, fl.main, 7, level=None, confirm=False,
+                                 reopen_execution=False, claude_dir=fl.home / ".claude")
+        self.assertEqual(r.code, 1, r.lines)
+        self.assertIn("creazione del worktree", "\n".join(r.lines))
+        delete.assert_not_called()
 
     def test_worktree_add_failure_refuses(self):
         fl = self.make()

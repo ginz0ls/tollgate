@@ -217,10 +217,16 @@ def _create(state, conn, main, ref, base_sha, cfg, iss, issue, key, session, lev
         return _refuse(f"{wt} esiste già: rimuovilo o scegli un altro lavoro")
     try:
         wt.parent.mkdir(parents=True, exist_ok=True)
-        gitw.worktree_add(main, wt, branch=branch, start_point=base_sha, new_branch=True)
-    except (gitw.GitWriteError, OSError) as e:
-        gitw.delete_branch(main, branch)  # il ramo nuovo non deve restare: farebbe scattare «adopt»
+    except OSError as e:
         return _refuse(f"creazione del worktree {wt} (ramo {branch}) non riuscita: {e}")
+    try:
+        gitw.worktree_add(main, wt, branch=branch, start_point=base_sha, new_branch=True)
+    except gitw.GitWriteError as e:
+        # Il ramo nuovo non deve restare (farebbe scattare «adopt»), ma si toglie solo se punta
+        # ancora al punto di partenza: un ramo preesistente con altri commit non si tocca.
+        left = "" if gitw.delete_branch(main, branch, base_sha) else \
+            f"; il ramo {branch} è stato lasciato: toglilo a mano se è residuo"
+        return _refuse(f"creazione del worktree {wt} (ramo {branch}) non riuscita: {e}{left}")
     try:
         work = phases.create_work(conn, repo_key=key, issue=issue, level=lvl, now=now,
                                   session=session, branch=branch, worktree=str(wt),

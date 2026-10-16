@@ -54,12 +54,14 @@ def worktree_add(repo, path, *, branch: str, start_point: str | None, new_branch
         _checked(repo, "worktree", "add", str(path), branch)
 
 
-def delete_branch(repo, branch: str) -> None:
-    """Toglie un ramo locale appena creato da un `worktree add` fallito. Mai un'eccezione."""
+def delete_branch(repo, branch: str, expected_sha: str) -> bool:
+    """Toglie `branch` solo se punta ancora a `expected_sha` (atomico: `update-ref -d` con il
+    vecchio valore fallisce se il ramo punta altrove). Mai `branch -D`. Vero se tolto."""
     try:
-        _run(repo, "branch", "-D", branch)
+        return _run(repo, "update-ref", "-d", f"refs/heads/{branch}",
+                    expected_sha).returncode == 0
     except GitWriteError:
-        pass
+        return False
 
 
 def add_excludes(repo, lines: list[str]) -> None:
