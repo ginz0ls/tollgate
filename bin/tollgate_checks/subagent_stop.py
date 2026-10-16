@@ -2,17 +2,15 @@
 from __future__ import annotations
 
 import json
-import posixpath
 from pathlib import Path
 
-from tollgate_analysis import globs, report
+from tollgate_analysis import report, size
 from tollgate_core import dod, git, receipts, subagents
 from tollgate_core.verify import counts_green, gate_commands
 from tollgate_hooks.model import deny, record
 
 CHECK = {"api": 1, "events": ["subagent_stop"], "component": None, "order": 20}
 MAX_VETOES = 2
-_GENERATED = ["**/*.min.js", "**/*.generated.*", "**/__snapshots__/**", "**/dist/**"]
 
 
 def _fingerprint_changed(ctx, row, wt: Path) -> bool:
@@ -33,10 +31,7 @@ def _readonly(ctx, row, work):
 
 
 def _task_lines(ctx, wt: Path, base: str, head: str) -> int:
-    lockfiles = set(ctx.cfg("scope.lockfiles"))
-    return sum(c.added + c.removed for c in git.changes(wt, base, head=head)
-               if posixpath.basename(c.path) not in lockfiles
-               and not globs.match_any(_GENERATED, c.path))
+    return size.task_lines(git.changes(wt, base, head=head), set(ctx.cfg("scope.lockfiles")))
 
 
 def _skill_missing(task) -> list[str]:

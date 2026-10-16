@@ -12,7 +12,10 @@ _SECTION = re.compile(r"^## (.+?)\s*$")
 _TASK = re.compile(r"^### Task (\d+)\b[:.]?\s*(.*)$")
 _FILE = re.compile(r"^\s*[-*]\s*(Create|Modify|Test):\s*(.+?)\s*$")
 _TASK_MH = re.compile(r"^\s*\**Must-have\**:\**\s*(.+?)\s*$")
-_MH = re.compile(r"^\s*(?:[-*]\s*)?(M\d+)\.\s*(.+?)\s*$")
+_MH = re.compile(r"^\s*(?:[-*]\s*)?\**(M\d+)\**\.\**\s*(.+?)\s*$")
+_FENCE_OPEN = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
+_PAREN = re.compile(r"\([^)]*\)")
+_HEADING = re.compile(r"^#{2,3} ")
 _RANGE = re.compile(r":\d+(?:-\d+)?$")
 _TICK = re.compile(r"`([^`]+)`")
 
@@ -46,10 +49,39 @@ class PlanCheck:
 
 
 def _file_value(raw: str) -> str:
-    m = _TICK.search(raw)
-    value = (m.group(1) if m else raw.split()[0]).strip()
-    value = _RANGE.sub("", value)
+    value = _RANGE.sub("", raw.strip())
     return value[2:] if value.startswith("./") else value
+
+
+def _file_values(raw: str) -> list[str]:
+    """Una riga `Create:` porta uno o più file: tra apici inversi, oppure separati da virgole
+    (le parentesi di commento, che possono contenere virgole, si scartano)."""
+    ticked = _TICK.findall(raw)
+    if ticked:
+        return [_file_value(v) for v in ticked]
+    parts = (p.split() for p in _PAREN.sub("", raw).split(","))
+    return [_file_value(p[0]) for p in parts if p]
+
+
+class _Fences:
+    """Recinti di codice (CommonMark): apre ``` o ~~~ (3 o più); chiude solo lo stesso carattere,
+    con lunghezza almeno pari e nient'altro sulla riga."""
+
+    def __init__(self) -> None:
+        self.marker: str | None = None
+
+    def inside(self, line: str) -> bool:
+        """True se la riga è un recinto (di apertura o chiusura) o sta dentro uno."""
+        m = _FENCE_OPEN.match(line)
+        if self.marker is None:
+            if m and not (m.group(1)[0] == "`" and "`" in m.group(2)):
+                self.marker = m.group(1)
+                return True
+            return False
+        if m and m.group(1)[0] == self.marker[0] and len(m.group(1)) >= len(self.marker) \
+                and not m.group(2).strip():
+            self.marker = None
+        return True
 
 
 def _parse(text: str):
@@ -57,12 +89,9 @@ def _parse(text: str):
     tasks: list[PlanTask] = []
     mh_lines: list[str] = []
     current_section, task = None, None
-    fence = False
+    fences = _Fences()
     for line in text.splitlines():
-        if line.lstrip().startswith("```"):
-            fence = not fence
-            continue
-        if fence:
+        if fences.inside(line):
             continue
         m = _SECTION.match(line)
         if m:
@@ -80,7 +109,7 @@ def _parse(text: str):
         if task is not None:
             fm = _FILE.match(line)
             if fm:
-                task.files.append(_file_value(fm.group(2)))
+                task.files.extend(_file_values(fm.group(2)))
                 continue
             mm = _TASK_MH.match(line)
             if mm:
@@ -89,6 +118,27 @@ def _parse(text: str):
         if current_section == "Must-have" and task is None:
             mh_lines.append(line)
     return sections, tasks, mh_lines
+
+
+def task_text(text: str, number: int) -> str | None:
+    """Il testo di `### Task <number>` fino all'intestazione `##` o `###` successiva, esclusa.
+    Le intestazioni dentro i recinti non chiudono il task."""
+    fences = _Fences()
+    out: list[str] | None = None
+    for line in text.splitlines():
+        if fences.inside(line):
+            if out is not None:
+                out.append(line)
+            continue
+        if out is not None:
+            if _HEADING.match(line):
+                break
+            out.append(line)
+            continue
+        m = _TASK.match(line)
+        if m and int(m.group(1)) == number:
+            out = [line]
+    return "\n".join(out).rstrip() if out is not None else None
 
 
 def _must_haves(lines: list[str]) -> list[MustHave]:
@@ -127,6 +177,9 @@ def check_plan(text: str, *, required_sections, max_scope_files: int, must_have_
     if len(scope) > max_scope_files:
         problems.append(f"scope di {len(scope)} file, oltre il massimo di {max_scope_files}")
     must_haves = _must_haves(mh_lines)
+    for kind, ids in (("", [m.id for m in must_haves]), ("task ", [t.number for t in tasks])):
+        for i in dict.fromkeys(i for i in ids if ids.count(i) > 1):
+            problems.append(f"{kind}{i} duplicato")
     if must_have_tests and level in ("L1", "L2"):
         if not must_haves:
             problems.append("nessun must-have nella sezione «## Must-have»")

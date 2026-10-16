@@ -33,5 +33,54 @@ class ProfilesTest(unittest.TestCase):
         self.assertEqual(profiles.min_level(["web", "admin"], PROFILES), "L1")
 
 
+class RoutingTest(unittest.TestCase):
+    PROF = {
+        "web": {"kind": "vertical", "paths": ["web/**"], "skills": ["ui-ux-pro-max"],
+                "agent": "probe:implementer-frontend", "reviewer": "probe:reviewer-frontend",
+                "cross": ["a11y"]},
+        "api": {"kind": "vertical", "paths": ["api/**"], "skills": ["c"],
+                "agent": "probe:implementer-backend", "reviewer": "probe:reviewer-backend"},
+        "lib": {"kind": "vertical", "paths": ["lib/**"], "skills": ["l1", "l2", "l3", "l4"]},
+        "a11y": {"kind": "cross", "paths": ["web/**"], "reviewer_skills": ["axe"]},
+    }
+
+    def test_single_vertical_uses_its_agents(self):
+        r = profiles.task_routing(["web/a.tsx"], self.PROF)
+        self.assertEqual((r.implementer, r.reviewer), ("probe:implementer-frontend",
+                                                      "probe:reviewer-frontend"))
+        self.assertEqual(r.skills, ["ui-ux-pro-max"])
+        self.assertFalse(r.split_candidate)
+
+    def test_different_agents_fall_back_and_split(self):
+        r = profiles.task_routing(["web/a.tsx", "api/b.py"], self.PROF)
+        self.assertEqual((r.implementer, r.reviewer),
+                         (profiles.DEFAULT_IMPLEMENTER, profiles.DEFAULT_REVIEWER))
+        self.assertEqual(r.skills, ["ui-ux-pro-max", "c"])
+        self.assertTrue(r.split_candidate)
+
+    def test_cross_reviewer_skills(self):
+        r = profiles.task_routing(["web/a.tsx"], self.PROF)
+        self.assertIn("axe", r.reviewer_skills)
+
+    def test_skill_cap(self):
+        r = profiles.task_routing(["lib/a.py"], self.PROF)
+        self.assertEqual(r.skills, ["l1", "l2", "l3"])
+        self.assertTrue(r.split_candidate)
+
+    def test_no_profile_is_generic(self):
+        r = profiles.task_routing(["x/a.py"], self.PROF)
+        self.assertEqual((r.implementer, r.reviewer, r.skills, r.reviewer_skills,
+                          r.split_candidate),
+                         (profiles.DEFAULT_IMPLEMENTER, profiles.DEFAULT_REVIEWER, [], [], False))
+        self.assertEqual(profiles.task_routing([], {}).implementer, profiles.DEFAULT_IMPLEMENTER)
+
+    def test_single_declared_agent_among_verticals(self):
+        prof = {"a": {"paths": ["a/**"], "agent": "p:x"}, "b": {"paths": ["b/**"]}}
+        r = profiles.task_routing(["a/1", "b/2"], prof)
+        self.assertEqual(r.implementer, "p:x")
+        self.assertEqual(r.reviewer, profiles.DEFAULT_REVIEWER)
+        self.assertFalse(r.split_candidate)
+
+
 if __name__ == "__main__":
     unittest.main()
