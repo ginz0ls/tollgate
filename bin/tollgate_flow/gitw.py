@@ -54,6 +54,23 @@ def worktree_add(repo, path, *, branch: str, start_point: str | None, new_branch
         _checked(repo, "worktree", "add", str(path), branch)
 
 
+def worktree_prune(repo) -> None:
+    """Toglie le registrazioni dei worktree la cui cartella non esiste più (crash, rm)."""
+    _checked(repo, "worktree", "prune")
+
+
+def rebase_in_progress(wt) -> bool:
+    """Un rebase interrotto (`sync`) lascia `rebase-merge` o `rebase-apply` nella cartella git
+    privata del worktree."""
+    gitdir = Path(git.run(wt, "rev-parse", "--absolute-git-dir").strip())
+    return (gitdir / "rebase-merge").exists() or (gitdir / "rebase-apply").exists()
+
+
+def is_dirty(wt, exclude=()) -> bool:
+    """Modifiche non committate (o file nuovi) fuori da `exclude`."""
+    return not git.is_clean(wt, exclude)
+
+
 def delete_branch(repo, branch: str, expected_sha: str) -> bool:
     """Toglie `branch` solo se punta ancora a `expected_sha` (atomico: `update-ref -d` con il
     vecchio valore fallisce se il ramo punta altrove). Mai `branch -D`. Vero se tolto."""

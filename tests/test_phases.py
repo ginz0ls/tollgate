@@ -93,6 +93,13 @@ class WorkTest(unittest.TestCase):
             self.new()
         self.assertEqual(phases.find_active(self.conn, "github.com/o/r", 7)["id"], w)
 
+    def test_set_worktree(self):
+        w = self.new("L0", worktree="/tmp/a")
+        phases.set_worktree(self.conn, w, "/tmp/b", now=T0)
+        self.assertEqual(phases.get_work(self.conn, w)["worktree"], "/tmp/b")
+        with self.assertRaises(ValueError):
+            phases.set_worktree(self.conn, 999, "/tmp/c", now=T0)
+
     def test_set_phase_records_and_backs_up(self):
         w = self.new()
         phases.set_phase(self.conn, self.t.state, w, "execution", "advance", now=T0)

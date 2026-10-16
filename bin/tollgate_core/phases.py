@@ -110,6 +110,14 @@ def bind_session(conn, work: int, session: str, *, now) -> None:
                          (json.dumps(sessions), clock.fmt(now), work))
 
 
+def set_worktree(conn, work: int, path, *, now) -> None:
+    """Il percorso del worktree cambia quando la ripresa lo ricrea altrove."""
+    with db.tx(conn):
+        get_work(conn, work)
+        conn.execute("UPDATE work_items SET worktree = ?, updated = ? WHERE id = ?",
+                     (str(path), clock.fmt(now), work))
+
+
 def _change_phase(conn, work: int, frm: str, to: str, cause: str, now, session) -> None:
     conn.execute("UPDATE work_items SET phase = ?, updated = ? WHERE id = ?",
                  (to, clock.fmt(now), work))

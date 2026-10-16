@@ -11,7 +11,7 @@ from pathlib import Path
 from tests.flowkit import ORIGIN_URL, SESSION, FlowLab
 from tests.helpers import BIN
 from tests.hookkit import DEFAULT_TOML
-from tollgate_core import VERSION, clock, events, phases, sessions
+from tollgate_core import VERSION, clock, effects, events, phases, sessions, subagents, tasks
 from tollgate_flow import gitw, housekeeping
 
 SENTINEL_TITLE = "tollgate: merge non verificato"
@@ -350,14 +350,6 @@ class StartNewTest(StartCase):
         r = fl.cli("start", "sette")
         self.assertEqual(r.returncode, 2)
 
-    def test_resume_is_not_available_yet(self):
-        fl = self.make(issue=7)
-        r = fl.cli("start", "7")
-        self.assertEqual(r.returncode, 1, out(r))
-        self.assertIn("ripresa", out(r))
-        self.assertEqual(len(self.rows(fl)), 1)
-
-
     def test_failed_add_never_deletes_a_preexisting_branch(self):
         """Corsa: il ramo compare dopo local_branches, worktree add fallisce perché esiste."""
         fl = self.make()
@@ -439,6 +431,163 @@ class StartNewTest(StartCase):
         self.assertIn("registrazione incompleta: info/exclude", r.stdout)
         (row,) = self.rows(fl)
         self.assertTrue((Path(row["worktree"]) / ".tollgate-run" / "7" / "issue.md").is_file())
+
+
+class ResumeTest(StartCase):
+    def make(self, **kw):
+        return super().make(issue=7, **kw)
+
+    def ago(self, minutes):
+        return clock.now() - timedelta(minutes=minutes)
+
+    def implementer(self, fl, session, agent="a1"):
+        tasks.add_task(fl.conn, fl.work, 1, source="plan", now=clock.now())
+        tasks.task_event(fl.conn, fl.work, 1, "start", now=clock.now())
+        subagents.start(fl.conn, agent_id=agent, type_="tollgate:implementer", session=session,
+                        work=fl.work, task=1, base_sha=None, fingerprint=None, now=clock.now())
+
+    def resume(self, fl, *args, code=0):
+        r = fl.cli("start", "7", *args)
+        self.assertEqual(r.returncode, code, out(r))
+        return r
+
+    def test_resume_recreates_missing_worktree(self):
+        fl = self.make()
+        fl.git("worktree", "remove", "--force", str(fl.wt))
+        self.assertFalse(fl.wt.exists())
+        r = self.resume(fl)
+        self.assertEqual(fl.git("rev-parse", "--abbrev-ref", "HEAD", repo=fl.wt), "tg/7-demo")
+        self.assertIn("ricreato sul ramo tg/7-demo", out(r))
+        self.assertEqual(r.stdout.strip().splitlines()[-1],
+                         f"prossimo passo: EnterWorktree {fl.wt}")
+        self.assertEqual(len(self.rows(fl)), 1)
+        self.assertTrue((fl.ts.dir / "bound" / SESSION).is_file())
+
+    def test_resume_without_branch_starts_from_base(self):
+        fl = self.make()
+        fl.git("worktree", "remove", "--force", str(fl.wt))
+        fl.git("branch", "-D", "tg/7-demo")
+        r = self.resume(fl)
+        base = self.rows(fl)[0]["work_base_sha"]
+        self.assertEqual(fl.git("rev-parse", "tg/7-demo"), base)
+        self.assertEqual(fl.git("rev-parse", "HEAD", repo=fl.wt), base)
+        self.assertIn("ricreati dalla base", out(r))
+
+    def test_resume_updates_changed_worktree_path(self):
+        fl = self.make()
+        fl.conn.execute("UPDATE work_items SET worktree = NULL")
+        fl.conn.commit()
+        fl.git("worktree", "remove", "--force", str(fl.wt))
+        self.resume(fl)
+        new = Path(self.rows(fl)[0]["worktree"])
+        self.assertEqual(new, fl.main / ".claude" / "worktrees" / "tg-7-demo")
+        self.assertEqual(fl.git("rev-parse", "--abbrev-ref", "HEAD", repo=new), "tg/7-demo")
+
+    def test_resume_dirty_worktree_proposes_commit(self):
+        fl = self.make()
+        (fl.wt / "src" / "nuovo.py").write_text("x = 1\n")
+        r = self.resume(fl)
+        self.assertIn("modifiche non committate", out(r))
+        self.assertIn("commit di lavoro in corso", out(r))
+        self.assertIn("?? src/nuovo.py", fl.git("status", "--porcelain", repo=fl.wt))
+
+    def test_resume_offline_and_dirty_main_are_warnings(self):
+        fl = self.make()
+        fl.origin.rename(fl.origin.with_name(fl.origin.name + "-gone"))
+        (fl.main / "sporco.txt").write_text("x\n")
+        r = self.resume(fl)
+        self.assertIn("senza rete", out(r))
+        self.assertIn("il checkout principale ha modifiche non committate", out(r))
+
+    def test_resume_prerequisites_and_default_states_are_warnings(self):
+        fl = self.make()
+        (fl.home / ".claude" / "plugins" / "installed_plugins.json").unlink()
+        self.gh(fl, ctx_state="failure", auth=False)
+        r = self.resume(fl)
+        self.assertIn("Superpowers non risulta installato", out(r))
+        self.assertIn("gh non è autenticato", out(r))
+        self.assertIn("tollgate/guard sul predefinito è failure", out(r))
+
+    def test_two_live_sessions_need_confirmation(self):
+        fl = self.make()
+        phases.bind_session(fl.conn, fl.work, "sess-B", now=clock.now())
+        sessions.touch(fl.conn, "sess-B", now=self.ago(1))
+        r = self.resume(fl, code=3)
+        self.assertIn("sess-B", out(r))
+        self.assertIn("--confirm", out(r))
+        self.resume(fl, "--confirm")
+        self.assertEqual(json.loads(self.rows(fl)[0]["sessions"]), [SESSION, "sess-B"])
+
+    def test_dead_other_session_needs_no_confirmation(self):
+        fl = self.make()
+        phases.bind_session(fl.conn, fl.work, "sess-B", now=clock.now())
+        sessions.touch(fl.conn, "sess-B", now=self.ago(180))
+        self.resume(fl)
+
+    def test_second_session_does_not_interrupt_live_implementer(self):
+        fl = self.make()
+        phases.bind_session(fl.conn, fl.work, "sess-B", now=clock.now())
+        sessions.touch(fl.conn, "sess-B", now=self.ago(1))
+        self.implementer(fl, "sess-B")
+        self.resume(fl, "--confirm")
+        self.assertEqual(subagents.get(fl.conn, "a1")["state"], "running")
+        self.assertEqual(tasks.get_task(fl.conn, fl.work, 1)["state"], "running")
+
+    def test_dead_session_implementer_interrupted_task_pending(self):
+        fl = self.make()
+        sessions.touch(fl.conn, "sess-B", now=self.ago(180))
+        self.implementer(fl, "sess-B")
+        r = self.resume(fl)
+        self.assertEqual(subagents.get(fl.conn, "a1")["state"], "interrupted")
+        self.assertEqual(tasks.get_task(fl.conn, fl.work, 1)["state"], "pending")
+        self.assertIn("a1", out(r))
+
+    def test_pending_intent_needs_confirmation(self):
+        fl = self.make()
+        effects.request(fl.conn, key=effects.effect_key("gh issue comment 7", fl.work, None),
+                        command="gh issue comment 7", work=fl.work, sha=None, now=clock.now())
+        r = self.resume(fl, code=3)
+        self.assertIn("intento e-", out(r))
+        self.assertIn("--confirm", out(r))
+        self.resume(fl, "--confirm")
+
+    def test_reopen_execution_from_review(self):
+        fl = self.make()
+        fl.goto("review")
+        r = self.resume(fl)
+        self.assertIn("fase review: per correggere rilancia con --reopen-execution", out(r))
+        self.assertEqual(self.rows(fl)[0]["phase"], "review")
+        self.resume(fl, "--reopen-execution")
+        self.assertEqual(self.rows(fl)[0]["phase"], "execution")
+        last = fl.conn.execute("SELECT data FROM events WHERE type = 'phase_change' "
+                               "ORDER BY seq DESC LIMIT 1").fetchone()
+        self.assertEqual(json.loads(last["data"])["cause"], "start")
+
+    def test_reopen_execution_from_pr_open(self):
+        fl = self.make()
+        fl.goto("pr_open")
+        r = self.resume(fl)
+        self.assertIn("fase pr_open: per correggere rilancia con --reopen-execution", out(r))
+        self.resume(fl, "--reopen-execution")
+        self.assertEqual(self.rows(fl)[0]["phase"], "execution")
+
+    def test_rebase_in_progress_warns(self):
+        fl = self.make()
+        wt = fl.wt
+        app = wt / "src" / "app.py"
+        app.write_text("def somma(a, b):\n    return 1\n")
+        fl.git("commit", "-q", "-am", "ramo", repo=wt)
+        fl.git("checkout", "-q", "-b", "altro", "HEAD~1", repo=wt)
+        app.write_text("def somma(a, b):\n    return 2\n")
+        fl.git("commit", "-q", "-am", "altro", repo=wt)
+        fl.git("checkout", "-q", "tg/7-demo", repo=wt)
+        r = subprocess.run(["git", "-C", str(wt), "-c", "user.name=t",
+                            "-c", "user.email=t@example.com", "rebase", "altro"],
+                           capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+        r = self.resume(fl)
+        self.assertIn(f"git -C {wt} rebase --abort", out(r))
+        self.assertTrue(gitw.rebase_in_progress(wt))
 
 
 class HousekeepingTest(StartCase):

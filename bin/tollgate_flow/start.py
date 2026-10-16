@@ -5,13 +5,15 @@ incompleta (la riga esiste: la ripresa la completa). Il testo dell'issue non ent
 in un comando né negli argomenti di git: finisce solo in `.tollgate-run/<N>/issue.md`."""
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from tollgate_analysis import level as levels, naming
-from tollgate_core import (VERSION, active, clock, config, db, git, phases, sessions)
+from tollgate_core import (VERSION, active, clock, config, db, git, phases, sessions,
+                           subagents)
 from tollgate_core.paths import State, repo_key
 
 from . import gh, gitw, housekeeping, prereq
@@ -33,6 +35,24 @@ class StartResult:
 class _Notes:
     warnings: list[str] = field(default_factory=list)
     confirms: list[str] = field(default_factory=list)
+
+
+FAILED = object()
+
+
+class _Steps:
+    """Registrazioni che non si fermano a vicenda: una che fallisce finisce in `failed`."""
+
+    def __init__(self):
+        self.failed: list[str] = []
+
+    def run(self, what, fn):
+        try:
+            return fn()
+        except (gitw.GitWriteError, OSError, sqlite3.Error, db.DbError, phases.TransitionError,
+                git.GitError) as e:
+            self.failed.append(f"{what}: {e}")
+            return FAILED
 
 
 def _refuse(*reasons: str) -> StartResult:
@@ -66,10 +86,116 @@ def _write_issue(wt: Path, iss: gh.Issue, n: int) -> Path:
     return path
 
 
-def _resume(row) -> StartResult:
-    """Ripresa di un lavoro attivo (12.4): la riempie il Task 4."""
-    return _refuse(f"il lavoro #{row['issue']} è già attivo e la ripresa non è ancora "
-                   "disponibile")
+def _other_live_sessions(conn, row, session, cfg, now) -> list[str]:
+    return [s for s in json.loads(row["sessions"]) if s != session
+            and sessions.alive(conn, s, now=now, stale_minutes=cfg.get("review.stale_minutes"))]
+
+
+def _pending_intents(conn, work: int) -> list[str]:
+    out = []
+    for r in conn.execute("SELECT * FROM intents WHERE work = ? AND state = 'requested' "
+                          "ORDER BY id", (work,)):
+        data = json.loads(r["data"] or "{}")
+        out.append(f"intento {data.get('id') or r['id']} ({r['action']}) richiesto il {r['at']}")
+    return out
+
+
+def _restore_worktree(main, row, wt: Path, notes: _Notes) -> str | None:
+    """Ricrea il worktree mancante sul ramo del lavoro, o sulla base se manca anche il ramo.
+    Ritorna il motivo del fallimento."""
+    branch = row["branch"]
+    try:
+        gitw.worktree_prune(main)
+        wt.parent.mkdir(parents=True, exist_ok=True)
+        if branch in git.local_branches(main):
+            gitw.worktree_add(main, wt, branch=branch, start_point=None, new_branch=False)
+            notes.warnings.append(f"worktree {wt} ricreato sul ramo {branch}")
+        else:
+            gitw.worktree_add(main, wt, branch=branch, start_point=row["work_base_sha"],
+                              new_branch=True)
+            notes.warnings.append(f"worktree {wt} e ramo {branch} ricreati dalla base "
+                                  f"{row['work_base_sha'][:10]}: i commit locali erano persi")
+    except (gitw.GitWriteError, git.GitError, OSError) as e:
+        return f"ricreazione del worktree {wt} (ramo {branch}) non riuscita: {e}"
+    return None
+
+
+def _resume(state, conn, main, ref, cfg, row, session, *, fetched, confirm, reopen_execution,
+            claude_dir, now) -> StartResult:
+    """Ripresa di un lavoro attivo (12.4). Rete assente, gh non raggiungibile, stati non verdi,
+    checkout principale sporco e prerequisiti sono avvisi. Il worktree sporco e il rebase in
+    corso sono solo segnalati con la proposta: niente operazioni distruttive sul lavoro
+    dell'utente."""
+    issue, work = row["issue"], row["id"]
+    notes = _Notes()
+    notes.warnings.extend(cfg.warnings)
+    if not fetched:
+        notes.warnings.append("senza rete: riparto dallo stato locale (git fetch origin non "
+                              "è riuscito)")
+    notes.warnings.extend(_prerequisites(state, main, ref, claude_dir, notes))
+    _check_main_clean(main, notes)
+    _check_default_states(state, main, ref, notes, strict=False)
+    notes.confirms.extend(_pending_intents(conn, work))
+    notes.confirms.extend(f"la sessione {s} è viva sullo stesso lavoro"
+                          for s in _other_live_sessions(conn, row, session, cfg, now))
+    if notes.confirms and not confirm:
+        return StartResult(NEEDS_CONFIRM, [
+            *[f"avviso: {w}" for w in notes.warnings],
+            *[f"conferma: {c}" for c in notes.confirms],
+            "per procedere ripeti il comando con --confirm"])
+    notes.warnings.extend(f"confermato: {c}" for c in notes.confirms)
+
+    branch = row["branch"]
+    wt = Path(row["worktree"]) if row["worktree"] else gitw.worktree_dir(main, branch)
+    if not wt.exists():
+        why = _restore_worktree(main, row, wt, notes)
+        if why:
+            return _refuse(why)
+    steps = _Steps()
+    if str(wt) != row["worktree"]:
+        steps.run("percorso del worktree",
+                  lambda: phases.set_worktree(conn, work, wt, now=now))
+    try:
+        if gitw.rebase_in_progress(wt):
+            notes.warnings.append(f"rebase in corso in {wt}: per annullarlo lancia "
+                                  f"`git -C {wt} rebase --abort` (tollgate non lo esegue)")
+        if gitw.is_dirty(wt, EXCLUDES):
+            notes.warnings.append(f"il worktree {wt} ha modifiche non committate: valuta un "
+                                  "commit di lavoro in corso (tollgate non lo crea)")
+    except git.GitError as e:
+        notes.warnings.append(f"stato del worktree non leggibile: {e}")
+
+    stale = cfg.get("review.stale_minutes")
+    for sub in subagents.running(conn, work=work):
+        if sub["session"] and sub["session"] != session and not sessions.alive(
+                conn, sub["session"], now=now, stale_minutes=stale):
+            steps.run(f"interruzione del subagente {sub['id']}",
+                      lambda sub=sub: subagents.interrupt(conn, sub["id"], now=now,
+                                                          session=session))
+            notes.warnings.append(f"subagente {sub['id']} di una sessione non viva: "
+                                  "interrotto, il suo task torna in attesa")
+
+    steps.run("legame della sessione", lambda: phases.bind_session(conn, work, session,
+                                                                   now=now))
+    steps.run("radici attive", lambda: active.register(state, main, extra=[wt], force=True))
+    steps.run("segnalino della sessione", lambda: sessions.mark_bound(state, session))
+    steps.run("info/exclude", lambda: gitw.add_excludes(main, EXCLUDES))
+
+    phase = row["phase"]
+    if phase in ("review", "pr_open"):
+        if reopen_execution:
+            steps.run("ritorno a execution", lambda: phases.set_phase(
+                conn, state, work, "execution", "start", now=now, session=session))
+        else:
+            notes.warnings.append(f"fase {phase}: per correggere rilancia con "
+                                  "--reopen-execution")
+    notes.warnings.extend(f"registrazione incompleta: {x}" for x in steps.failed)
+    cur = phases.get_work(conn, work)
+    lines = [*[f"avviso: {w}" for w in notes.warnings],
+             f"lavoro #{issue} ripreso: livello {cur['level']}, fase {cur['phase']}, "
+             f"ramo {branch}",
+             f"prossimo passo: EnterWorktree {wt}"]
+    return StartResult(INCOMPLETE if steps.failed else OK, lines, wt, work)
 
 
 def _prerequisites(state, main, ref, claude_dir, notes: _Notes) -> list[str]:
@@ -96,26 +222,39 @@ def _prerequisites(state, main, ref, claude_dir, notes: _Notes) -> list[str]:
     return problems
 
 
-def _checks(state, main, ref, cfg, iss: gh.Issue, notes: _Notes) -> None:
+def _check_main_clean(main, notes: _Notes) -> None:
     try:
         if not git.is_clean(main, [".claude/worktrees"]):
             notes.warnings.append("il checkout principale ha modifiche non committate: "
                                   "tollgate non lo usa")
     except git.GitError as e:
         notes.warnings.append(f"stato del checkout principale non leggibile: {e}")
-    if iss.state != "OPEN":
-        notes.confirms.append(f"l'issue #{iss.number} è chiusa: serve conferma")
+
+
+def _check_default_states(state, main, ref, notes: _Notes, *, strict: bool) -> None:
+    """Stati obbligatori sul predefinito: non verdi chiedono conferma (`strict`) o avvisano."""
     sha = git.resolve_ref(main, ref)
     try:
         states = gh.commit_state(state, main, sha)
     except gh.GhError as e:
         notes.warnings.append(f"stati del ramo predefinito non leggibili: {e}")
-    else:
-        if not states:
-            notes.warnings.append("stati di tollgate assenti sul predefinito")
-        for context, value in sorted(states.items()):
-            if value != "success":
-                notes.confirms.append(f"{context} sul predefinito è {value}: serve conferma")
+        return
+    if not states:
+        notes.warnings.append("stati di tollgate assenti sul predefinito")
+    for context, value in sorted(states.items()):
+        if value != "success":
+            text = f"{context} sul predefinito è {value}"
+            if strict:
+                notes.confirms.append(f"{text}: serve conferma")
+            else:
+                notes.warnings.append(text)
+
+
+def _checks(state, main, ref, cfg, iss: gh.Issue, notes: _Notes) -> None:
+    _check_main_clean(main, notes)
+    if iss.state != "OPEN":
+        notes.confirms.append(f"l'issue #{iss.number} è chiusa: serve conferma")
+    _check_default_states(state, main, ref, notes, strict=True)
     if cfg.get("gate.mode") == "detect":
         notes.warnings.append("modalità rilevazione: il merge non è impedito")
         try:
@@ -173,7 +312,9 @@ def start(state: State, cwd: Path, issue: int, *, level: str | None, confirm: bo
     try:
         row = phases.find_active(conn, key, issue)
         if row is not None:
-            return _resume(row)
+            return _resume(state, conn, main, ref, cfg, row, session, fetched=fetched,
+                           confirm=confirm, reopen_execution=reopen_execution,
+                           claude_dir=claude_dir, now=now)
         if not fetched:
             return _refuse("senza rete non si avvia un lavoro nuovo (git fetch origin non "
                            "è riuscito)")
@@ -235,19 +376,15 @@ def _create(state, conn, main, ref, base_sha, cfg, iss, issue, key, session, lev
         return _refuse(f"{e} (creati nel frattempo il ramo {branch} e il worktree {wt}: "
                        "rimuovili a mano)")
     # La riga esiste: una registrazione che fallisce non ferma le altre (la ripresa le completa).
-    incomplete = []
-
-    def step(what, fn):
-        try:
-            return fn()
-        except (gitw.GitWriteError, OSError, sqlite3.Error, db.DbError) as e:
-            incomplete.append(f"{what}: {e}")
-
-    step("copia di sicurezza del database", lambda: db.backup(conn, state, "start"))
-    step("radici attive", lambda: active.register(state, main, extra=[wt], force=True))
-    step("segnalino della sessione", lambda: sessions.mark_bound(state, session))
-    step("info/exclude", lambda: gitw.add_excludes(main, EXCLUDES))
-    issue_file = step("testo dell'issue", lambda: _write_issue(wt, iss, issue))
+    steps = _Steps()
+    steps.run("copia di sicurezza del database", lambda: db.backup(conn, state, "start"))
+    steps.run("radici attive", lambda: active.register(state, main, extra=[wt], force=True))
+    steps.run("segnalino della sessione", lambda: sessions.mark_bound(state, session))
+    steps.run("info/exclude", lambda: gitw.add_excludes(main, EXCLUDES))
+    issue_file = steps.run("testo dell'issue", lambda: _write_issue(wt, iss, issue))
+    if issue_file is FAILED:
+        issue_file = None
+    incomplete = steps.failed
     notes.warnings.extend(housekeeping.run(conn, state, cfg, now=now))
     notes.warnings.extend(f"registrazione incompleta: {x}" for x in incomplete)
     row = phases.get_work(conn, work)
