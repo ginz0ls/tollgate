@@ -184,15 +184,27 @@ def _work_and_task(conn, cwd: Path, number: int):
 
 
 def _range(wt: Path, row) -> tuple[str, str]:
-    """Dal genitore del primo commit del task all'ultimo. Senza commit (C11): la punta del
-    ramo, con un diff vuoto."""
+    """Dal genitore del primo commit del task alla punta del ramo: un commit fuori da
+    `tasks.commits` (del coordinatore) entra nella revisione. Senza commit (C11): diff vuoto."""
+    head = git.head(wt)
+    if head is None:
+        raise TaskError("il worktree non ha commit")
     commits = json.loads(row["commits"])
     if not commits:
-        head = git.head(wt)
-        if head is None:
-            raise TaskError("il worktree non ha commit")
         return head, head
-    return git.resolve_ref(wt, f"{commits[0]}^") or git.EMPTY_TREE, commits[-1]
+    return git.resolve_ref(wt, f"{commits[0]}^") or git.EMPTY_TREE, head
+
+
+def _ensure_clean(state, work, wt: Path, hint: str) -> None:
+    """Le modifiche non committate non sono coperte da nessuna revisione. Restano fuori le
+    cartelle di output e `.tollgate-run/`."""
+    main = git.main_worktree(wt)
+    try:
+        cfg = config.load_config(state, main, work["work_base_sha"] or git.default_ref(main))
+    except config.ConfigError as e:
+        raise TaskError(f"configurazione non valida: {e}") from e
+    if not git.is_clean(wt, list(cfg.get("review.output_dirs")) + [".tollgate-run/"]):
+        raise TaskError(hint)
 
 
 def _concerns(conn, work, row) -> str:
@@ -243,6 +255,8 @@ def _review_prepare(state, conn, cwd: Path, number: int) -> Path:
         cfg = config.load_config(state, main, work["work_base_sha"] or git.default_ref(main))
     except config.ConfigError as e:
         raise TaskError(f"configurazione non valida: {e}") from e
+    _ensure_clean(state, work, wt, "modifiche non committate nel worktree: committa o scarta le "
+                                   "modifiche prima della revisione")
     base, head = _range(wt, row)
     changes = git.changes(wt, base, head=head)
     plan_text = _plan_text(wt, work)
@@ -287,11 +301,12 @@ def task_done(state, cwd: Path, number: int, *, now=None) -> str:
         if row["state"] != "review" or row["verdict"] != "approved":
             raise TaskError(f"task {number}: serve un verdetto «approved» del revisore "
                             f"(stato {row['state']}, verdetto {row['verdict'] or 'nessuno'})")
-        commits = json.loads(row["commits"])
-        last = commits[-1] if commits else git.head(Path(work["worktree"]))
-        if row["review_sha"] is None or row["review_sha"] != last:
+        wt = Path(work["worktree"])
+        _ensure_clean(state, work, wt, f"task {number}: modifiche non committate nel worktree, "
+                                       "il verdetto non le copre: serve una nuova revisione")
+        if row["review_sha"] is None or row["review_sha"] != git.head(wt):
             raise TaskError(f"task {number}: serve una nuova revisione, il verdetto non copre "
-                            "l'ultimo commit")
+                            "la punta del ramo")
         tasks.task_event(conn, work["id"], number, "approved", now=now)
         return f"task {number}: done"
     except (sqlite3.Error, tasks.TaskTransitionError, git.GitError) as e:

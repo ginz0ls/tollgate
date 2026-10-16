@@ -49,8 +49,34 @@ class ParseTest(unittest.TestCase):
         bad = {k: v for k, v in GOOD.items() if k != "rule"}
         v = parse(block(verdict(outcome="changes", findings=[bad, GOOD])))
         self.assertEqual((v.findings, v.dropped, v.outcome), ([GOOD], 1, "changes"))
-        v = parse(block(verdict(outcome="changes", findings=[bad])))
-        self.assertEqual((v.findings, v.dropped, v.outcome), ([], 1, "approved"))
+
+    def test_changes_with_only_dropped_blocking_findings_is_invalid(self):
+        """Decisione del controller: un blocker scartato non diventa un approved."""
+        for bad in ({k: v for k, v in GOOD.items() if k != "rule"}, dict(GOOD, line="2"),
+                    dict(GOOD, severity="critical"), "testo"):
+            v = parse(block(verdict(outcome="changes", findings=[bad])))
+            self.assertFalse(v.valid, bad)
+            self.assertIsNone(v.outcome)
+            self.assertIn("rilievo bloccante senza file, riga o regola: riscrivilo",
+                          v.problems)
+        minor = dict(GOOD, severity="minor")
+        v = parse(block(verdict(outcome="changes", findings=[minor, dict(GOOD, rule="")])))
+        self.assertFalse(v.valid)
+
+    def test_dropped_minor_finding_does_not_invalidate(self):
+        bad_minor = {"severity": "minor", "text": "senza prova"}
+        v = parse(block(verdict(outcome="changes", findings=[bad_minor])))
+        self.assertEqual((v.valid, v.outcome, v.dropped), (True, "approved", 1))
+
+    def test_dropped_blocker_with_a_valid_blocker_stays_changes(self):
+        bad = {k: v for k, v in GOOD.items() if k != "rule"}
+        v = parse(block(verdict(outcome="changes", findings=[bad, GOOD])))
+        self.assertEqual((v.valid, v.outcome, v.dropped), (True, "changes", 1))
+
+    def test_changes_with_dropped_blocker_kept_without_standard(self):
+        bad = {k: v for k, v in GOOD.items() if k != "rule"}
+        v = parse(block(verdict(outcome="changes", findings=[bad])), standard=False)
+        self.assertEqual((v.valid, v.outcome), (True, "changes"))
 
     def test_finding_with_bad_severity_or_line_dropped(self):
         for bad in (dict(GOOD, severity="critical"), dict(GOOD, line="2"), dict(GOOD, line=True),

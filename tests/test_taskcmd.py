@@ -275,6 +275,8 @@ class ReviewDoneTest(TaskCase):
     def to_review(self, *, commit=True):
         self.make()
         self.start()
+        self.fl.git("add", PLAN, repo=self.fl.wt)
+        self.fl.git("commit", "-qm", "piano", repo=self.fl.wt)
         sha = self.commit() if commit else None
         tasks.task_event(self.fl.conn, self.fl.work, 1, "report_done", now=self.fl.now)
         return sha
@@ -354,6 +356,57 @@ class ReviewDoneTest(TaskCase):
         self.approve()
         self.assertEqual(self.done(), "task 1: done")
         self.assertEqual(self.row()["state"], "done")
+
+    def test_done_refuses_commit_outside_task_commits(self):
+        """Un commit fatto con git (non registrato in tasks.commits) dopo l'approved."""
+        self.to_review()
+        self.prepare()
+        self.approve()
+        self.fl.git("commit", "-q", "--allow-empty", "-m", "del coordinatore", repo=self.fl.wt)
+        with self.assertRaisesRegex(taskcmd.TaskError, "nuova revisione"):
+            self.done()
+        self.assertEqual(self.row()["state"], "review")
+
+    def test_done_refuses_soft_reset(self):
+        self.to_review()
+        self.commit("def somma(a, b):\n    return a + b + 0\n")
+        tasks.task_event(self.fl.conn, self.fl.work, 1, "fix", now=self.fl.now)
+        tasks.task_event(self.fl.conn, self.fl.work, 1, "report_done", now=self.fl.now)
+        self.prepare()
+        self.approve()
+        self.fl.git("reset", "-q", "--soft", "HEAD~1", repo=self.fl.wt)
+        self.fl.git("commit", "-qm", "altro", repo=self.fl.wt)
+        with self.assertRaisesRegex(taskcmd.TaskError, "nuova revisione"):
+            self.done()
+
+    def test_done_refuses_uncommitted_changes(self):
+        self.to_review()
+        self.prepare()
+        self.approve()
+        (self.fl.wt / "src/app.py").write_text("modificato\n")
+        with self.assertRaisesRegex(taskcmd.TaskError, "non committate"):
+            self.done()
+        self.fl.git("checkout", "--", "src/app.py", repo=self.fl.wt)
+        (self.fl.wt / "src/nuovo.py").write_text("x\n")
+        with self.assertRaisesRegex(taskcmd.TaskError, "non committate"):
+            self.done()
+        (self.fl.wt / "src/nuovo.py").unlink()
+        self.assertEqual(self.done(), "task 1: done")
+
+    def test_review_prepare_refuses_dirty_worktree(self):
+        self.to_review()
+        (self.fl.wt / "src/app.py").write_text("modificato\n")
+        with self.assertRaisesRegex(taskcmd.TaskError,
+                                    "committa o scarta le modifiche prima della revisione"):
+            self.prepare()
+        self.assertIsNone(self.row()["review_sha"])
+
+    def test_review_prepare_uses_head_as_sha(self):
+        self.to_review()
+        self.fl.git("commit", "-q", "--allow-empty", "-m", "fuori", repo=self.fl.wt)
+        head = self.fl.git("rev-parse", "HEAD", repo=self.fl.wt).strip()
+        self.prepare()
+        self.assertEqual(self.row()["review_sha"], head)
 
     def test_done_refuses_changes_verdict(self):
         self.to_review()

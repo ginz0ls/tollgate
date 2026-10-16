@@ -37,6 +37,12 @@ def _finding_ok(f) -> bool:
             and _is_int(f.get("line")))
 
 
+def _may_block(f) -> bool:
+    """Un rilievo scartato che poteva essere bloccante: gravità non dichiarata `moderate` o
+    `minor` (anche illeggibile) conta come bloccante, in modo fail-closed."""
+    return not (isinstance(f, dict) and f.get("severity") in ("moderate", "minor"))
+
+
 def parse_task_verdict(text: str | None, *, task: int, sha: str, code: str,
                        standard: bool) -> TaskVerdict:
     cands = json_candidates(text or "", "outcome")
@@ -68,5 +74,10 @@ def parse_task_verdict(text: str | None, *, task: int, sha: str, code: str,
     outcome = declared
     if standard:
         blocking = bool(spec) or any(f["severity"] in BLOCKING for f in findings)
+        lost = [f for f in raw if not _finding_ok(f) and _may_block(f)]
+        if declared == "changes" and not blocking and lost:
+            # Un `changes` il cui rilievo bloccante è senza prova non diventa `approved`.
+            return TaskVerdict(False, ["rilievo bloccante senza file, riga o regola: "
+                                       "riscrivilo"], None, declared)
         outcome = "changes" if blocking else "approved"
     return TaskVerdict(True, [], outcome, declared, findings, len(raw) - len(findings))

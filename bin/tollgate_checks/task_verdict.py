@@ -38,7 +38,7 @@ def decide(event, ctx):
                                     standard=ctx.component("reviewer_standard"))
     if v.valid:
         return [record("task_verdict", work=work["id"], number=task["number"],
-                       outcome=v.outcome, findings=v.findings),
+                       outcome=v.outcome, findings=v.findings, dropped=v.dropped),
                 record("subagent_finish", agent_id=aid, state="done", declared_status=v.outcome,
                        tokens=tokens)]
     why = "; ".join(v.problems)

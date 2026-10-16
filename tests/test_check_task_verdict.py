@@ -97,6 +97,17 @@ class VerdictTest(Base):
         self.stop(text=self.minor())
         self.assertEqual(self.task()["verdict"], "approved")
 
+    def test_dropped_blocker_vetoes_and_dropped_count_in_event(self):
+        bad = {"severity": "blocker", "file": "src/app.py", "text": "senza riga e regola"}
+        r = self.stop(text=self.verdict(outcome="changes", findings=[bad]))
+        self.assertEqual(r.exit, 2)
+        self.assertIn("rilievo bloccante senza file, riga o regola", r.stderr)
+        self.assertIsNone(self.task()["verdict"])
+        self.assertEqual(self.stop(text=self.verdict(
+            outcome="changes", findings=[dict(GOOD, severity="minor"), {"severity": "minor", "text": "x"}])).exit, 0)
+        changes = [e for e in self.lab.events("task_change") if e["verdict"] == "approved"]
+        self.assertEqual(changes[-1]["dropped"], 1)
+
     def test_valid_verdict_after_a_veto(self):
         self.assertEqual(self.stop(text="approvo, tutto a posto").exit, 2)
         self.assertEqual(self.stop(text=self.verdict()).exit, 0)

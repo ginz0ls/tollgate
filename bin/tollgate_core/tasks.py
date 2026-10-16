@@ -42,10 +42,10 @@ def next_number(conn, work: int) -> int:
                         (work,)).fetchone()[0]
 
 
-def _log(conn, row, *, now, session) -> None:
+def _log(conn, row, *, now, session, **extra) -> None:
     record_event(conn, "task_change",
                  {"number": row["number"], "kind": row["kind"], "state": row["state"],
-                  "fix_rounds": row["fix_rounds"], "verdict": row["verdict"]},
+                  "fix_rounds": row["fix_rounds"], "verdict": row["verdict"], **extra},
                  now=now, session=session, work=row["work"])
 
 
@@ -156,7 +156,7 @@ def set_review_prep(conn, work: int, number: int, *, sha: str, code: str) -> Non
 
 
 def set_verdict(conn, work: int, number: int, *, outcome: str, findings: list[dict], now,
-                session=None) -> None:
+                session=None, dropped: int = 0) -> None:
     """Verdetto del revisore: lo stato del task non cambia (lo muove `task done` o `--fix`)."""
     if outcome not in VERDICTS:
         raise ValueError(f"esito del verdetto sconosciuto: {outcome}")
@@ -165,7 +165,7 @@ def set_verdict(conn, work: int, number: int, *, outcome: str, findings: list[di
         conn.execute("UPDATE tasks SET verdict = ?, review_findings = ? "
                      "WHERE work = ? AND number = ?",
                      (outcome, json.dumps(findings, ensure_ascii=False), work, number))
-        _log(conn, get_task(conn, work, number), now=now, session=session)
+        _log(conn, get_task(conn, work, number), now=now, session=session, dropped=dropped)
 
 
 def add_commit(conn, work: int, number: int, sha: str) -> None:
