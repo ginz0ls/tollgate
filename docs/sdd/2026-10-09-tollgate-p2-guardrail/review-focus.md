@@ -1,0 +1,8 @@
+## Review Focus
+
+1. **Comandi Bash che `shlex` non sa leggere** (virgolette non chiuse, heredoc, `$(...)` annidati, righe continuate con `\`): il controllo non deve andare in crash né lasciar passare in silenzio. Con un comando illeggibile in un lavoro attivo si cercano comunque per testo le parole pericolose (`push`, `--force`, `reset --hard`, `--no-verify`, `TOLLGATE_`). Test in Task 7 (`test_unparsable_falls_back_to_text`) e in Task 16.
+2. **Input degli hook malformato o con campi mancanti** (JSON troncato, `tool_input` senza `file_path`, `cwd` inesistente): un hook di controllo esce con 2 e un messaggio chiaro; uno informativo esce con 0. Test in Task 12 (`test_malformed_input_*`).
+3. **Percorsi con spazi, collegamenti simbolici e file che non esistono ancora** (il repo stesso è in `.../Plugin IT workflow/`; un Write crea `src/nuova/cartella/x.py`): il repo di appartenenza si trova risalendo alla prima cartella esistente; il confronto con il worktree usa percorsi risolti. Test in Task 9 (`test_toplevel_of_missing_path`) e Task 15 (`test_write_new_dir_out_of_scope`).
+4. **File binari e testo non UTF-8 nel diff** (un'immagine nei test, un file Latin-1): test-guard e livello non vanno in crash; un binario porta il lavoro almeno a L1. Test in Task 5 (`test_binary_is_not_l0`) e Task 6 (`test_binary_and_latin1_do_not_crash`).
+5. **Due hook nello stesso istante** (due subagenti in sola lettura e il coordinatore): `session_seen` e `subagents.last_seen` si aggiornano senza `database is locked`. Lo copre il `busy_timeout` di P1; qui un test con due processi che fanno girare il runner insieme. Test in Task 12 (`test_concurrent_hooks`).
+
