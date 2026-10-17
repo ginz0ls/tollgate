@@ -135,6 +135,32 @@ class RegisteredPlanCommitTest(unittest.TestCase):
         self.assertEqual(r.exit, 2)
         self.assertIn(self.PLAN, r.stderr)
 
+    def commit_plan(self):
+        git(self.lab.wt, "add", "-A")
+        git(self.lab.wt, "commit", "-qm", "piano")
+
+    def test_deleted_registered_plan_is_denied(self):
+        self.commit_plan()
+        self.plan.unlink()
+        self.assertEqual(self.lab.bash(COMMIT).exit, 2)
+
+    def test_renamed_registered_plan_is_denied(self):
+        self.commit_plan()
+        moved = self.lab.wt / "docs/superpowers/plans/rinominato.md"
+        self.plan.rename(moved)
+        r = self.lab.bash(COMMIT)
+        self.assertEqual(r.exit, 2)
+        self.assertIn(self.PLAN, r.stderr)
+
+    def test_symlink_in_place_of_registered_plan_is_denied(self):
+        target = self.lab.wt / "altro.md"
+        target.write_text("# piano\n")
+        self.plan.unlink()
+        self.plan.symlink_to(target)
+        r = self.lab.bash(COMMIT)
+        self.assertEqual(r.exit, 2)
+        self.assertIn(self.PLAN, r.stderr)
+
     def test_committed_registered_plan_does_not_open_a_block(self):
         git(self.lab.wt, "add", "-A")
         git(self.lab.wt, "commit", "-qm", "piano")

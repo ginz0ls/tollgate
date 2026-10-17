@@ -1,9 +1,11 @@
 import json
+import shlex
 import sqlite3
 import unittest
 from unittest import mock
 
 from tests.flowkit import FlowLab
+from tests.helpers import BIN
 from tests.hookkit import DEFAULT_TOML
 from tests.test_check_post_edit import SECTIONS
 from tollgate_core import phases, subagents, tasks
@@ -86,6 +88,8 @@ class TaskStartTest(TaskCase):
         self.assertIn("revisore: tollgate:task-reviewer", summary)
         self.assertNotIn("model: inherit", summary)
         self.assertIn("verify", brief)
+        self.assertIn(f"python3 {shlex.quote(str(BIN / 'tollgate'))} verify", brief)
+        self.assertIn(" ", str(BIN))  # il checkout di prova ha spazi nel percorso
 
     def test_task_without_must_have_line_links_all(self):
         self.make()

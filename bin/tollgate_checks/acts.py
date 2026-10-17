@@ -5,6 +5,7 @@ import shlex
 from pathlib import Path
 
 from tollgate_core import acts, git
+from tollgate_core.paths import program_command
 from tollgate_hooks.model import inject, record
 
 CHECK = {"api": 1, "events": ["prompt_expansion"], "component": None, "order": 10}
@@ -25,7 +26,7 @@ def decide(event, ctx):
     if type_ in ("off", "on"):
         return []
     # Decisione 3: il percorso del programma arriva con ogni /tollgate:*, atto o no.
-    program = f'tollgate: programma python3 "{ctx.plugin_bin}"'
+    program = f"tollgate: programma {program_command(ctx.plugin_bin)}"
     if type_ not in acts.ACT_TYPES:
         return [inject(program)]
     out = _act(event, ctx, type_)

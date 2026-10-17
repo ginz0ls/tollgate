@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
@@ -10,6 +11,12 @@ from typing import Mapping
 STATE_ENV = "TOLLGATE_STATE"
 SENTINEL = ".tollgate-test"
 TEST_ENVS = ("TOLLGATE_STATE", "TOLLGATE_GH", "TOLLGATE_TEST_CONFIG")
+
+
+def program_command(bin_path) -> str:
+    """Il comando che il modello lancia per il programma: `python3` seguito dal percorso quotato.
+    Un percorso con spazi come nome del comando è rifiutato da Claude Code in un worktree."""
+    return f"python3 {shlex.quote(str(bin_path))}"
 
 
 @dataclass(frozen=True)

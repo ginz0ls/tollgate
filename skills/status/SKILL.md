@@ -3,7 +3,7 @@ name: status
 description: Mostra lo stato dei lavori tollgate attivi (fase, livello, task, blocchi) in sola lettura, e le statistiche di un lavoro su richiesta.
 ---
 
-**Programma:** `python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"`: l'interprete seguito dal percorso, sempre tra virgolette (il percorso può contenere spazi; senza `python3` davanti Claude Code rifiuta in un worktree un percorso con spazi). Se la variabile non risulta espansa nel testo, usa la forma `python3 "<percorso>"` della riga `tollgate: programma` del contesto. Se risponde «tollgate richiede Python >= 3.11», riprova con `python3.11` al posto di `python3`. Nel seguito `<programma>` indica questo percorso.
+**Programma:** `python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"`: l'interprete seguito dal percorso, sempre tra virgolette (il percorso può contenere spazi; senza `python3` davanti Claude Code rifiuta in un worktree un percorso con spazi). Se la variabile non risulta espansa nel testo, usa il comando `python3 <percorso>` della riga `tollgate: programma` del contesto. Se risponde «tollgate richiede Python >= 3.11», riprova con `python3.11` al posto di `python3`. Nel seguito `<programma>` indica il comando intero, cioè l'interprete più il percorso (`python3 "…/bin/tollgate"`), non il solo percorso.
 
 Lancia `<programma> status` e riferisci l'output all'utente: per ogni lavoro attivo la fase, il livello, i task per stato, i blocchi aperti e l'eventuale tetto che ha fermato il lavoro. È di sola lettura: non crea nulla e non cambia fase. Con `--json` l'uscita è strutturata.
 

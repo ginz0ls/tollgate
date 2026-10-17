@@ -1,9 +1,10 @@
 import json
+import shlex
 import unittest
 from datetime import timedelta
 
 from tests.hookkit import DEFAULT_TOML, SESSION, T0, Lab, sample
-from tests.helpers import git
+from tests.helpers import ROOT, git
 from tests.test_check_writes import with_scope
 from tollgate_core import phases, subagents, tasks
 
@@ -181,6 +182,9 @@ class StartAndResumeTest(unittest.TestCase):
     def test_start_associates_task_and_keeps_base_on_resume(self):
         r = start(self.lab, "a1")
         self.assertIn("verify", r.stdout)
+        program = f"python3 {shlex.quote(str(ROOT / 'bin' / 'tollgate'))}"
+        self.assertIn(f"{program} verify", r.stdout)
+        self.assertIn(f"{program} block open test_spec_conflict", r.stdout)
         row = subagents.get(self.lab.conn, "a1")
         self.assertEqual((row["task"], row["agent_base_sha"]), (1, self.lab.base))
         self.assertIsNone(tasks.get_task(self.lab.conn, self.lab.work, 1)["pending"])

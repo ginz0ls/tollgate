@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from tollgate_core import git, subagents
+from tollgate_core.paths import program_command
 from tollgate_hooks.model import inject, record
 
 from ._common import governing_work
@@ -30,8 +31,9 @@ def decide(event, ctx):
         out.append(inject(
             f"tollgate: sei un subagente che scrive nel lavoro #{work['issue']}. Lavora solo sui "
             f"file dello scope del task, con TDD. Prima di DONE: committa, poi lancia "
-            f"'{ctx.plugin_bin}' verify e controlla che la ricevuta sia green. Chiudi con il "
+            f"{program_command(ctx.plugin_bin)} verify e controlla che la ricevuta sia green. "
+            f"Chiudi con il "
             f"report JSON di 18.5 (v, task, status, done, tests, files, must_have, concerns, "
             f"left, size_reason). Se un test contraddice la specifica: "
-            f"'{ctx.plugin_bin}' block open test_spec_conflict --reason \"…\" e BLOCKED."))
+            f"{program_command(ctx.plugin_bin)} block open test_spec_conflict --reason \"…\" e BLOCKED."))
     return out

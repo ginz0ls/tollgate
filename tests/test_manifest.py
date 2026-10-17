@@ -100,6 +100,9 @@ class ManifestTest(unittest.TestCase):
             self.assertIn('python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"', text, name)
             self.assertNotIn('"<programma>"', text, name)
             self.assertIn("python3.11", text, name)
+            self.assertNotIn("indica questo percorso", text, name)
+            if name != "setup":
+                self.assertIn("indica il comando intero", text, name)
             self.assertIn("tollgate: programma", text, name)
 
     def test_execute_forbids_sdd_as_executor(self):

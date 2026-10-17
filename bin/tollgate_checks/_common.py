@@ -267,7 +267,7 @@ def level_records(ctx, work) -> list:
 def _is_registered_plan(work, wt: Path, path: str, head_ref: str | None) -> bool:
     """Il piano registrato, tale e quale (stesso blob di `plan_sha`): è bloccato, ma committarlo
     non lo modifica (lo fa il coordinatore dopo la registrazione)."""
-    if path != work["plan_path"] or not work["plan_sha"]:
+    if path != work["plan_path"] or not work["plan_sha"] or (wt / path).is_symlink():
         return False
     try:
         sha = git.blob_sha(wt, path) if head_ref is None \

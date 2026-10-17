@@ -1,10 +1,11 @@
 import json
+import shlex
 import tempfile
 import unittest
 from pathlib import Path
 
 from tests.hookkit import DEFAULT_TOML, SESSION, Lab, sample
-from tests.helpers import git
+from tests.helpers import ROOT, git
 from tests.test_check_writes import with_scope
 from tollgate_analysis import profiles as prof
 from tollgate_core import git as tg_git, phases, receipts, scope, subagents, tasks
@@ -66,7 +67,9 @@ class Base(unittest.TestCase):
 class ReceiptGateTest(Base):
     def test_done_without_receipt_two_vetoes_then_needs_you(self):
         self.commit()
-        self.assertEqual(self.stop(text=report()).exit, 2)
+        r = self.stop(text=report())
+        self.assertEqual(r.exit, 2)
+        self.assertIn(f"python3 {shlex.quote(str(ROOT / 'bin' / 'tollgate'))} verify", r.stderr)
         self.assertEqual(self.stop(text=report()).exit, 2)
         r = self.stop(text=report())
         self.assertEqual(r.exit, 0)

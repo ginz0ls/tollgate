@@ -3,15 +3,17 @@
 # Percorso: skill -> CLI -> hook -> agenti, su un repo locale. Nessuna rete verso GitHub,
 # nessun push, nessun plugin installato. Tutto sotto /tmp/tollgate-p3a/flow.
 #
-# Uso: bash spikes/run-p3a-flow.sh [prepara|passo1|passo2|passo3|tutto]   (predefinito: tutto)
+# Uso: [PLUGIN_REAL_PATH=1] bash spikes/run-p3a-flow.sh [prepara|passo1|passo2|passo3|tutto]
+# (predefinito: tutto). Il push dello script va al repo nudo locale, mai a GitHub.
 set -uo pipefail
 
 PLUGIN_REAL="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || exit 1
 FLOW=/tmp/tollgate-p3a/flow
-# Il percorso reale del plugin può contenere spazi, e in una sessione isolata in un worktree Claude Code
-# rifiuta un comando il cui nome è un percorso con spazi tra virgolette ("computed at runtime"):
-# la prova passa dal link senza spazi $FLOW/plugin (vedi il rapporto, limiti).
-PLUGIN="$FLOW/plugin"
+# Per impostazione predefinita il plugin passa dal link senza spazi $FLOW/plugin. Con
+# PLUGIN_REAL_PATH=1 si usa il percorso reale del worktree, con i suoi spazi (caso D2: in una
+# sessione isolata in un worktree Claude Code rifiuta un comando il cui nome e' un percorso con
+# spazi tra virgolette, per questo le skill scrivono `python3 "<percorso>"`).
+if [ "${PLUGIN_REAL_PATH:-0}" = 1 ]; then PLUGIN="$PLUGIN_REAL"; else PLUGIN="$FLOW/plugin"; fi
 REPO="$FLOW/repo"          # checkout principale (cwd di claude -p)
 BARE="$FLOW/origin.git"    # repo nudo locale, dietro l'URL finto
 STATE="$FLOW/state"
@@ -26,13 +28,13 @@ export TOLLGATE_STATE="$STATE"
 export TOLLGATE_GH="$PLUGIN/tests/fakegh.py"
 export TOLLGATE_FAKEGH_DATA="$GH_DATA"
 export TOLLGATE_FAKEGH_LOG="$LOGS/fakegh.log"
-TG=("$PLUGIN/bin/tollgate")
+TG=(python3 "$PLUGIN/bin/tollgate")
 
 prepara() {
   case "$FLOW" in /tmp/tollgate-p3a/flow) ;; *) echo "percorso inatteso: $FLOW" >&2; return 1 ;; esac
   rm -rf "$FLOW"
   mkdir -p "$LOGS" "$STATE" || return 1
-  ln -s "$PLUGIN_REAL" "$PLUGIN" || return 1
+  [ "$PLUGIN" = "$PLUGIN_REAL" ] || ln -s "$PLUGIN_REAL" "$PLUGIN" || return 1
   : > "$STATE/.tollgate-test"
   git init -q --bare -b main "$BARE" || return 1
   git init -q -b main "$REPO" || return 1

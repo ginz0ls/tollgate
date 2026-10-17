@@ -4,6 +4,7 @@ import unittest
 from tests.helpers import ROOT
 from tests.hookkit import DROP, SESSION, Lab, sample
 from tollgate_core import git
+from tollgate_core.paths import program_command
 
 
 def expand(lab, name, args, session=SESSION, cwd=None):
@@ -132,7 +133,7 @@ class ActsTest(unittest.TestCase):
 class ProgramLineTest(unittest.TestCase):
     def setUp(self):
         self.lab = Lab()
-        self.line = f'tollgate: programma python3 "{ROOT / "bin" / "tollgate"}"'
+        self.line = f"tollgate: programma {program_command(ROOT / 'bin' / 'tollgate')}"
 
     def tearDown(self):
         self.lab.close()

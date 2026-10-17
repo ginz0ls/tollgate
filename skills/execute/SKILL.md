@@ -7,7 +7,7 @@ Derivato da superpowers/skills/subagent-driven-development (MIT, © 2025 Jesse V
 
 Sei il coordinatore: scegli, lanci, leggi i verdetti. Non scrivi codice dei task tu.
 
-**Programma:** `python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"`: l'interprete seguito dal percorso, sempre tra virgolette (il percorso può contenere spazi; senza `python3` davanti Claude Code rifiuta in un worktree un percorso con spazi). Se la variabile non risulta espansa nel testo, usa la forma `python3 "<percorso>"` della riga `tollgate: programma` del contesto. Se risponde «tollgate richiede Python >= 3.11», riprova con `python3.11` al posto di `python3`. Nel seguito `<programma>` indica questo percorso. Lancia i comandi dal worktree del lavoro.
+**Programma:** `python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"`: l'interprete seguito dal percorso, sempre tra virgolette (il percorso può contenere spazi; senza `python3` davanti Claude Code rifiuta in un worktree un percorso con spazi). Se la variabile non risulta espansa nel testo, usa il comando `python3 <percorso>` della riga `tollgate: programma` del contesto. Se risponde «tollgate richiede Python >= 3.11», riprova con `python3.11` al posto di `python3`. Nel seguito `<programma>` indica il comando intero, cioè l'interprete più il percorso (`python3 "…/bin/tollgate"`), non il solo percorso. Lancia i comandi dal worktree del lavoro.
 
 **Regole ferme:** mai subagent-driven-development, mai implementatori `general-purpose`: l'unico che scrive in `execution` è l'agente scelto da `task start`, e i hook negano il resto. I subagenti non lanciano né comandi `task` né `status --checkpoint`: li lanci tu.
 

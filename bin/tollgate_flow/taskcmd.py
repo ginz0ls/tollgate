@@ -6,13 +6,13 @@ from __future__ import annotations
 
 import json
 import secrets
-import shlex
 import sqlite3
 from pathlib import Path
 
 from tollgate_analysis import (brief as briefs, naming, plan as planmod, profiles as prof,
                                report, size)
 from tollgate_core import clock, config, db, git, phases, sessions, tasks
+from tollgate_core.paths import program_command
 
 from . import prereq
 
@@ -144,7 +144,7 @@ def _task_start(state, conn, cwd: Path, number: int, *, fix: bool, claude_dir: P
         issue=work["issue"], task=number, name=name, agent_type=routing.implementer,
         model_hint=hint, task_text=text, scope=task.files,
         related_tests=_related_tests(task, must_haves), must_haves=must_haves, skills=present,
-        absent_skills=absent, verify_cmd=f"{shlex.quote(str(db.BIN_PATH))} verify",
+        absent_skills=absent, verify_cmd=f"{program_command(db.BIN_PATH)} verify",
         fix_findings=json.loads(row["review_findings"]) if fix else [], fix_round=round_)
     file_name = f"task-{number}-fix-{round_}.md" if fix else f"task-{number}.md"
     path = wt / ".tollgate-run" / str(work["issue"]) / file_name

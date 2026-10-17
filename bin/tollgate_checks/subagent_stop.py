@@ -7,6 +7,7 @@ from pathlib import Path
 
 from tollgate_analysis import report, size
 from tollgate_core import dod, git, receipts, subagents
+from tollgate_core.paths import program_command
 from tollgate_core.verify import counts_green, gate_commands
 from tollgate_hooks.model import deny, record
 
@@ -123,7 +124,7 @@ def _implementer(event, ctx, row, work):
         if done and commits:
             if not _receipt_ok(ctx, work, head, wt):
                 return veto(f"DONE senza ricevuta green su {head[:10]}: lancia "
-                            f"'{ctx.plugin_bin}' verify")
+                            f"{program_command(ctx.plugin_bin)} verify")
         elif done:
             if _common.fingerprint_changed(ctx, row, wt):
                 return veto("file modificati senza commit: committa e verifica")
@@ -131,9 +132,9 @@ def _implementer(event, ctx, row, work):
             has_block = ctx.db.execute("SELECT 1 FROM blocks WHERE work = ? AND closed IS NULL",
                                        (wid,)).fetchone() is not None
             if not has_block and not receipts.any_since(ctx.db, wid, row["started"]):
-                return veto(f"con {rep.status} serve una ricevuta ('{ctx.plugin_bin}' verify) "
-                            f"oppure un blocco ('{ctx.plugin_bin}' block open <tipo> "
-                            f"--reason …)")
+                prog = program_command(ctx.plugin_bin)
+                return veto(f"con {rep.status} serve una ricevuta ({prog} verify) "
+                            f"oppure un blocco ({prog} block open <tipo> --reason …)")
     if done and task is not None:
         missing = _skill_missing(task)
         if missing:

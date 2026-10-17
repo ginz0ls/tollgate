@@ -4,7 +4,7 @@ description: Propone la modifica di statusLine.command per avvolgere la statusli
 disable-model-invocation: true
 ---
 
-**Programma:** `python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"`: l'interprete seguito dal percorso, sempre tra virgolette (il percorso può contenere spazi; senza `python3` davanti Claude Code rifiuta in un worktree un percorso con spazi). Se la variabile non risulta espansa nel testo, usa la forma `python3 "<percorso>"` della riga `tollgate: programma` del contesto. Se risponde «tollgate richiede Python >= 3.11», riprova con `python3.11` al posto di `python3`. Per `<radice>` ricava la radice del plugin da quel percorso (la cartella che contiene `bin/`).
+**Programma:** `python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"`: l'interprete seguito dal percorso, sempre tra virgolette (il percorso può contenere spazi; senza `python3` davanti Claude Code rifiuta in un worktree un percorso con spazi). Se la variabile non risulta espansa nel testo, usa il comando `python3 <percorso>` della riga `tollgate: programma` del contesto. Se risponde «tollgate richiede Python >= 3.11», riprova con `python3.11` al posto di `python3`. Per `<radice>` ricava la radice del plugin da quel percorso (la cartella che contiene `bin/`).
 
 `statusline/ctx` è un involucro: legge l'input JSON della statusline, scrive la percentuale di contesto usata per sessione e poi esegue il comando di statusline che gli passi, con lo stesso input. La guardia del contesto di tollgate (avviso e stop) ne dipende.
 

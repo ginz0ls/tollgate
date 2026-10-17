@@ -8,8 +8,16 @@ from pathlib import Path
 from tests.helpers import BIN, TempState
 from tollgate_core import VERSION, clock
 from tollgate_core.paths import (
-    default_state_root, ensure_dirs, repo_key, resolve_state, test_env,
+    default_state_root, ensure_dirs, program_command, repo_key, resolve_state, test_env,
 )
+
+
+class ProgramCommandTest(unittest.TestCase):
+    def test_python_then_quoted_path_with_spaces(self):
+        import shlex
+        cmd = program_command('/a b/c d/bin/tollgate')
+        self.assertEqual(shlex.split(cmd), ['python3', '/a b/c d/bin/tollgate'])
+        self.assertTrue(cmd.startswith('python3 '))
 
 
 class StateTest(unittest.TestCase):
