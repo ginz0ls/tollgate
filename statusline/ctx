@@ -12,26 +12,34 @@ if [ -n "${TOLLGATE_STATE:-}" ] && [ -f "${TOLLGATE_STATE}/.tollgate-test" ]; th
 fi
 
 write_ctx() {
-  local sid pct parsed
+  local sid pct parsed ip
   if command -v python3 >/dev/null 2>&1; then
+    # Una sola riga "<sid> <pct>", con sid già validato: nessun valore può spezzarsi su più righe.
     parsed="$(printf '%s' "$INPUT" | python3 -c '
-import json, sys
+import json, re, sys
 d = json.load(sys.stdin)
+sid = d.get("session_id")
+if not isinstance(sid, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", sid):
+    sys.exit(0)
 v = (d.get("context_window") or {}).get("used_percentage")
-ok = isinstance(v, (int, float)) and not isinstance(v, bool)
-print(d.get("session_id") if isinstance(d.get("session_id"), str) else "")
-print(json.dumps(v) if ok else "null")
+ok = isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 100
+print(sid, json.dumps(v) if ok else "null")
 ' 2>/dev/null)" || return 0
-    sid="$(printf '%s\n' "$parsed" | sed -n 1p)"
-    pct="$(printf '%s\n' "$parsed" | sed -n 2p)"
+    [ -n "$parsed" ] || return 0
+    sid="${parsed%% *}"
+    pct="${parsed#* }"
   else
     sid="$(printf '%s' "$INPUT" | tr -d '\n' | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
-    pct="$(printf '%s' "$INPUT" | tr -d '\n' | sed -n 's/.*"used_percentage"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\(\.[0-9]*\)\{0,1\}\).*/\1/p')"
-    [ -n "$pct" ] || pct=null
+    pct="$(printf '%s' "$INPUT" | tr -d '\n' | sed -n 's/.*"used_percentage"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\(\.[0-9]*\)\{0,1\}\)\([^0-9.eE]\|$\).*/\1/p')"
+    ip="${pct%%.*}"
+    # fuori da 0-100 (o assente) -> null; 100.0 resta valido
+    if [ -z "$pct" ] || [ "${#ip}" -gt 3 ] || [ "$((10#$ip))" -gt 100 ] \
+       || { [ "$((10#$ip))" -eq 100 ] && [ "$pct" != "$ip" ] && [ -n "$(printf '%s' "${pct#*.}" | tr -d 0)" ]; }; then
+      pct=null
+    fi
   fi
   [ -n "$sid" ] || return 0
   case "$sid" in *[!A-Za-z0-9_-]*) return 0 ;; esac
-  case "$pct" in null | [0-9]* ) ;; *) pct=null ;; esac
   mkdir -p "$STATE/ctx" || return 0
   local tmp="$STATE/ctx/.$sid.$$.tmp"
   printf '{"used_pct": %s}\n' "$pct" > "$tmp" && mv -f "$tmp" "$STATE/ctx/$sid.json" || rm -f "$tmp"

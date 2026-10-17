@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -52,6 +53,40 @@ class CtxTest(unittest.TestCase):
         self.run_ctx(payload(pct=None))
         self.assertEqual(self.written(), {"used_pct": None})
 
+    def test_null_when_out_of_range(self):
+        for bad in (-1, 100.5, 1e20, 1000):
+            with self.subTest(pct=bad):
+                self.run_ctx(payload(pct=bad))
+                self.assertEqual(self.written(), {"used_pct": None})
+        self.run_ctx('{"session_id": "s1", "context_window": {"used_percentage": 1e+20}}')
+        self.assertEqual(self.written(), {"used_pct": None})
+        self.run_ctx(payload(pct=100))
+        self.assertEqual(self.written(), {"used_pct": 100})
+
+    def test_without_python_uses_sed(self):
+        bindir = Path(tempfile.mkdtemp(prefix="tollgate-bin-"))
+        self.addCleanup(lambda: shutil.rmtree(bindir, ignore_errors=True))
+        for name in ("bash", "sh", "cat", "sed", "tr", "mkdir", "mv", "rm", "printf"):
+            (bindir / name).symlink_to(shutil.which(name))
+        env = {"PATH": str(bindir), "TOLLGATE_STATE": str(self.ts.dir), "HOME": self.home}
+
+        def run(text, *args):
+            return subprocess.run([str(bindir / "bash"), str(CTX), *args], env=env, input=text,
+                                  capture_output=True, text=True)
+
+        for sid, pct, want in (("s1", 33.5, 33.5), ("s2", 100, 100), ("s3", None, None),
+                               ("s4", 150, None), ("s5", -3, None)):
+            with self.subTest(session=sid, pct=pct):
+                r = run(payload(sid, pct), "cat")
+                self.assertEqual(r.stdout, payload(sid, pct))
+                self.assertEqual(self.written(sid), {"used_pct": want})
+        run('{"session_id": "s6", "context_window": {"used_percentage": 1e+20}}')
+        self.assertEqual(self.written("s6"), {"used_pct": None})
+        r = run(payload("a\nb", 5), "cat")
+        self.assertEqual(r.stdout, payload("a\nb", 5))
+        self.assertEqual(sorted(p.name for p in (self.ts.dir / "ctx").iterdir()),
+                         [f"s{i}.json" for i in range(1, 7)])
+
     def test_null_when_not_a_number(self):
         self.run_ctx(json.dumps({"session_id": "s1",
                                  "context_window": {"used_percentage": "42"}}))
@@ -75,7 +110,7 @@ class CtxTest(unittest.TestCase):
         self.assertFalse((self.ts.dir / "ctx").exists())
 
     def test_unsafe_session_ignored(self):
-        for bad in ("../x", "a/b", "", "a b", "a.json"):
+        for bad in ("../x", "a/b", "", "a b", "a.json", "a\nb", "a\n77\n"):
             with self.subTest(session=bad):
                 r = self.run_ctx(payload(session=bad), "cat")
                 self.assertEqual(r.stdout, payload(session=bad))
@@ -93,7 +128,7 @@ class CtxTest(unittest.TestCase):
 
     def test_state_without_sentinel_not_used(self):
         other = Path(tempfile.mkdtemp(prefix="tollgate-nosentinel-"))
-        self.addCleanup(lambda: __import__("shutil").rmtree(other, ignore_errors=True))
+        self.addCleanup(lambda: shutil.rmtree(other, ignore_errors=True))
         env = dict(os.environ, TOLLGATE_STATE=str(other))
         self.run_ctx(payload(), env=env)
         self.assertFalse((other / "ctx").exists())
