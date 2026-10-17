@@ -1,8 +1,10 @@
 import unittest
 
+from tests.helpers import git
 from tests.hookkit import DEFAULT_FILES, Lab
 from tests.test_check_writes import with_scope, write_waiver
 from tollgate_analysis import waivers
+from tollgate_core import phases, scope
 
 FILES = dict(DEFAULT_FILES, **{
     "src/__tests__/a.test.js": "describe('a', () => {\n  it('x', () => {\n"
@@ -104,6 +106,41 @@ class CommitTest(unittest.TestCase):
             self.assertIn("plan", r.stderr)
         finally:
             lab.close()
+
+
+class RegisteredPlanCommitTest(unittest.TestCase):
+    """Il piano registrato è bloccato (6.2), ma committarlo tale e quale non lo modifica: la skill
+    `start` fa committare il piano al coordinatore dopo la registrazione."""
+    PLAN = "docs/superpowers/plans/p.md"
+
+    def setUp(self):
+        self.lab = Lab(files=FILES)
+        self.plan = self.lab.wt / self.PLAN
+        self.plan.parent.mkdir(parents=True)
+        self.plan.write_text("# piano\n")
+        sha = git(self.lab.wt, "hash-object", "--", self.PLAN)
+        scope.register_plan(self.lab.conn, self.lab.ts.state, self.lab.work, plan_path=self.PLAN,
+                            plan_sha=sha, scope_paths=["src/app.py"], plan_tasks=[(1, [])],
+                            advance=False, now=self.lab.now)
+
+    def tearDown(self):
+        self.lab.close()
+
+    def test_unchanged_registered_plan_can_be_committed(self):
+        self.assertEqual(self.lab.bash(COMMIT).exit, 0)
+
+    def test_changed_registered_plan_is_out_of_scope(self):
+        self.plan.write_text("# piano cambiato\n")
+        r = self.lab.bash(COMMIT)
+        self.assertEqual(r.exit, 2)
+        self.assertIn(self.PLAN, r.stderr)
+
+    def test_committed_registered_plan_does_not_open_a_block(self):
+        git(self.lab.wt, "add", "-A")
+        git(self.lab.wt, "commit", "-qm", "piano")
+        r = self.lab.bash("git commit -qm piano", post=True)
+        self.assertEqual(r.exit, 0, r.stderr)
+        self.assertEqual(phases.get_work(self.lab.conn, self.lab.work)["phase"], "execution")
 
 
 if __name__ == "__main__":

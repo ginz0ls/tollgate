@@ -264,6 +264,19 @@ def level_records(ctx, work) -> list:
             inject(f"tollgate: il lavoro sale a {new} (percorsi sensibili o soglie).")]
 
 
+def _is_registered_plan(work, wt: Path, path: str, head_ref: str | None) -> bool:
+    """Il piano registrato, tale e quale (stesso blob di `plan_sha`): è bloccato, ma committarlo
+    non lo modifica (lo fa il coordinatore dopo la registrazione)."""
+    if path != work["plan_path"] or not work["plan_sha"]:
+        return False
+    try:
+        sha = git.blob_sha(wt, path) if head_ref is None \
+            else git.run(wt, "rev-parse", f"{head_ref}:{path}").strip()
+    except git.GitError:
+        return False
+    return sha == work["plan_sha"]
+
+
 def commit_violations(ctx, work, wt: Path, base_ref: str, head_ref: str | None,
                       changes) -> list:
     """Violazioni di test-guard e scope su `changes` (da `base_ref` a `head_ref`; `None` è il
@@ -289,7 +302,8 @@ def commit_violations(ctx, work, wt: Path, base_ref: str, head_ref: str | None,
     if ctx.component("scope_check") and work["level"] != "L0" and work["plan_sha"]:
         scope = ctx.scope(work)
         for c in changes:
-            if c.path not in scope and not scope_exempt(ctx, work, c.path, scope):
+            if c.path not in scope and not scope_exempt(ctx, work, c.path, scope) \
+                    and not _is_registered_plan(work, wt, c.path, head_ref):
                 out.append(Violation("out_of_scope", c.path, "file fuori dallo scope del piano",
                                      "scope"))
     return unresolved(out, ctx.waiver_file(work))
