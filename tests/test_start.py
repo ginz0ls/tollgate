@@ -384,40 +384,42 @@ class StartNewTest(StartCase):
             return flow_start.start(fl.ts.state, fl.main, 7, level=None, confirm=False,
                                     reopen_execution=False, claude_dir=fl.home / ".claude")
 
-    def test_failed_add_keeps_branch_used_by_another_worktree(self):
-        """Corsa: l'altra sessione ha creato ramo e worktree, il nostro `add` fallisce."""
+    def other_session_takes_the_branch(self, fl, *, with_worktree):
+        """Corsa: tra i controlli e la creazione del ramo (la prima scrittura di git di
+        `_create`) un'altra sessione crea `tg/7-aggiungi-export-csv`."""
         from unittest import mock
-        fl = self.make()
+        branch = "tg/7-aggiungi-export-csv"
         base = fl.git("rev-parse", "origin/main")
-        real = gitw.worktree_add
         other = fl.main / ".claude" / "worktrees" / "altra-sessione"
+        real, done = gitw._run, []
 
-        def other_session_wins(repo, path, **kw):
-            real(repo, other, branch=kw["branch"], start_point=kw["start_point"], new_branch=True)
-            raise gitw.GitWriteError("git worktree add: perso la corsa")
+        def run(repo, *args, **kw):
+            if not done and args[0] in ("worktree", "update-ref") and "-d" not in args:
+                done.append(1)
+                if with_worktree:
+                    fl.git("worktree", "add", "-q", "-b", branch, str(other), base)
+                else:
+                    fl.git("branch", branch, base)
+            return real(repo, *args, **kw)
 
-        with mock.patch.object(gitw, "worktree_add", side_effect=other_session_wins):
+        with mock.patch.object(gitw, "_run", side_effect=run):
             r = self.start_direct(fl)
+        self.assertEqual(done, [1])
         self.assertEqual(r.code, 1, r.lines)
-        self.assertEqual(fl.git("rev-parse", "tg/7-aggiungi-export-csv"), base)
-        self.assertEqual(fl.git("-C", str(other), "rev-parse", "HEAD"), base)
-        self.assertIn("non è stato toccato", "\n".join(r.lines))
+        self.assertEqual(fl.git("rev-parse", branch), base)
+        self.assertIn("ramo locale", "\n".join(r.lines))
+        self.assertIn("/tollgate:adopt #7", "\n".join(r.lines))
         self.assertEqual(self.rows(fl), [])
+        return other, base
 
-    def test_failed_add_keeps_branch_that_existed_before_the_add(self):
-        """Corsa: il ramo compare dopo `local_branches` ma prima di `add`, ancora alla base."""
-        from unittest import mock
+    def test_branch_taken_by_another_session_with_its_worktree_is_never_deleted(self):
         fl = self.make()
-        base = fl.git("rev-parse", "origin/main")
-        fl.git("branch", "tg/7-aggiungi-export-csv", base)
-        with mock.patch.object(flow_start_naming(), "branch_name",
-                               return_value="tg/7-aggiungi-export-csv"), \
-                mock.patch("tollgate_flow.start._existing_branches", return_value=[]):
-            r = self.start_direct(fl)
-        self.assertEqual(r.code, 1, r.lines)
-        self.assertEqual(fl.git("rev-parse", "tg/7-aggiungi-export-csv"), base)
-        self.assertIn("non è stato toccato", "\n".join(r.lines))
-        self.assertEqual(self.rows(fl), [])
+        other, base = self.other_session_takes_the_branch(fl, with_worktree=True)
+        self.assertEqual(fl.git("-C", str(other), "rev-parse", "HEAD"), base)
+
+    def test_branch_taken_by_another_session_without_worktree_is_never_deleted(self):
+        fl = self.make()
+        self.other_session_takes_the_branch(fl, with_worktree=False)
 
     def test_create_work_database_error_names_branch_and_worktree(self):
         import sqlite3

@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 import re
@@ -196,3 +197,35 @@ class ManifestTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BareProgramInMessagesTest(unittest.TestCase):
+    """I testi che il modello legge come istruzione non scrivono `tollgate <sottocomando>` nudo:
+    `tollgate` non è nel PATH e un percorso con spazi non regge come nome di comando. Si usa
+    `paths.program_command`. Le docstring e le etichette di errore («tollgate verify: …») non
+    contano."""
+    BARE = re.compile(r"(?<![\w/:.\-])tollgate (?:verify|block|task|status|act|start|waiver|"
+                      r"approve|finish|init|setup|sync|adopt|cleanup|abandon|resolve)\b(?!:)")
+
+    @staticmethod
+    def docstrings(tree):
+        out = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef,
+                                 ast.ClassDef)) and node.body:
+                first = node.body[0]
+                if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant):
+                    out.add(id(first.value))
+        return out
+
+    def test_no_bare_program_in_string_literals(self):
+        hits = []
+        for path in sorted((ROOT / "bin").rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            skip = self.docstrings(tree)
+            for node in ast.walk(tree):
+                if (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                        and id(node) not in skip):
+                    for m in self.BARE.finditer(node.value):
+                        hits.append(f"{path.relative_to(ROOT)}:{node.lineno}: {m.group(0)}")
+        self.assertEqual(hits, [])

@@ -12,7 +12,7 @@ from tollgate_analysis.testguard import Violation
 from tollgate_analysis.waivers import unresolved
 from tollgate_analysis.protected import is_protected
 from tollgate_core import config, git, subagents
-from tollgate_core.paths import repo_key
+from tollgate_core.paths import program_command, repo_key
 from tollgate_hooks.adapter import edit_path
 from tollgate_hooks.model import inject, record
 
@@ -189,14 +189,14 @@ def locked_docs(work) -> set[str]:
     return out
 
 
-def waiver_hint(v) -> str:
+def waiver_hint(v, ctx) -> str:
     target = f"--test {' --test '.join(v.ids)} " if v.ids else ""
-    return (f"tollgate waiver add {v.waiver_type} {v.path} {target}"
+    return (f"{program_command(ctx.plugin_bin)} waiver add {v.waiver_type} {v.path} {target}"
             f"--choice … --why … --cost …")
 
 
-def explain(violations) -> str:
-    lines = [f"- {v.path}: {v.detail} (deroga: {waiver_hint(v)})" for v in violations]
+def explain(violations, ctx) -> str:
+    lines = [f"- {v.path}: {v.detail} (deroga: {waiver_hint(v, ctx)})" for v in violations]
     return "\n".join(lines)
 
 

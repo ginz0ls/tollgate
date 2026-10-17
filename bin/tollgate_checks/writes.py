@@ -81,5 +81,5 @@ def decide(event, ctx):
             v = Violation("out_of_scope", rel_w, "file fuori dallo scope del piano", "scope")
             left = unresolved([v], ctx.waiver_file(work))
             if left:
-                return [deny("file fuori scope:\n" + explain(left), rule="scope")]
+                return [deny("file fuori scope:\n" + explain(left, ctx), rule="scope")]
     return []

@@ -39,6 +39,6 @@ def decide(event, ctx):
         left = commit_violations(ctx, work, wt, head, None, changes)
         if left:
             return out + [deny("commit negato, violazioni senza deroga:\n"
-                               + explain(left), rule="commit")]
+                               + explain(left, ctx), rule="commit")]
         return out
     return []

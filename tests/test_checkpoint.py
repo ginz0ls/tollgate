@@ -3,7 +3,8 @@ import unittest
 from tests.flowkit import FlowLab
 from tests.hookkit import T0
 from tests.test_check_session import context_of, start_payload
-from tollgate_core import phases, tasks
+from tollgate_core import db, phases, tasks
+from tollgate_core.paths import program_command
 from tollgate_flow import checkpoint
 
 
@@ -59,6 +60,7 @@ class CheckpointCase(unittest.TestCase):
         self.add(1)
         self.add(2)
         self.assertIn("task start 1", step())
+        self.assertIn(f"{program_command(db.BIN_PATH)} task start 1", step())
         self.assertNotIn("--fix", step())
         tasks.task_event(self.conn, self.work, 1, "start", now=T0)
         self.set_task(1, implementer="impl-7-1")

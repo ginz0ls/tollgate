@@ -70,6 +70,16 @@ def is_dirty(wt, exclude=()) -> bool:
     return not git.is_clean(wt, exclude)
 
 
+def create_branch(repo, branch: str, sha: str) -> bool:
+    """Crea `branch` a `sha` in modo atomico: il vecchio valore vuoto di `update-ref` vuol dire
+    «il ref non deve esistere». Falso se esiste già (di un altro: non si tocca) o se git fallisce.
+    Non imposta un ramo a monte."""
+    try:
+        return _run(repo, "update-ref", f"refs/heads/{branch}", sha, "").returncode == 0
+    except GitWriteError:
+        return False
+
+
 def delete_branch(repo, branch: str, expected_sha: str) -> bool:
     """Toglie `branch` solo se punta ancora a `expected_sha` (atomico: `update-ref -d` con il
     vecchio valore fallisce se il ramo punta altrove). Mai `branch -D`. Vero se tolto."""

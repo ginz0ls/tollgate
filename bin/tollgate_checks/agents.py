@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 
 from tollgate_core import clock, subagents
+from tollgate_core.paths import program_command
 from tollgate_hooks.model import deny, inject, record
 
 from ._common import governing_work
@@ -40,8 +41,9 @@ def decide(event, ctx):
     if ctx.component("context_guard"):
         pct = context_pct(ctx, event.session)
         if pct is not None and pct >= ctx.cfg("context.stop_pct"):
+            prog = program_command(ctx.plugin_bin)
             return [deny(f"contesto al {pct:.0f}%: nessun nuovo subagente. Scrivi il checkpoint "
-                         f"(tollgate status --checkpoint) e fai /clear (6.3)", rule="context")]
+                         f"({prog} status --checkpoint) e fai /clear (6.3)", rule="context")]
         if pct is not None and pct >= ctx.cfg("context.warn_pct"):
             out.append(inject(f"tollgate: contesto al {pct:.0f}%; a "
                               f"{ctx.cfg('context.stop_pct')}% servirà checkpoint e /clear."))
@@ -65,7 +67,8 @@ def decide(event, ctx):
         hint = (f"; il task {pending[0]['number']} aspetta {pending[0]['agent_type']}"
                 if pending else "")
         return out + [deny(f"in execution l'unico subagente che scrive è l'implementatore scelto "
-                           f"da tollgate task start: {atype} non ha un task start in sospeso"
+                           f"da {program_command(ctx.plugin_bin)} task start: {atype} non ha "
+                           f"un task start in sospeso"
                            f"{hint}. Usa /tollgate:execute (6.3)", rule="writer")]
     t = cand[0]
     if ti.get("name") != t["implementer"]:

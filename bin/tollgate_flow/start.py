@@ -367,21 +367,20 @@ def _create(state, conn, main, ref, base_sha, cfg, iss, issue, key, session, lev
         wt.parent.mkdir(parents=True, exist_ok=True)
     except OSError as e:
         return _refuse(f"creazione del worktree {wt} (ramo {branch}) non riuscita: {e}")
-    existing_now = git.local_branches(main)
+    # Il ramo si crea con un'operazione atomica: se esiste già è di un altro (una sessione
+    # concorrente) e non si tocca mai. Quello creato qui è nostro e, se l'add fallisce, si toglie.
+    if not gitw.create_branch(main, branch, base_sha):
+        if branch in git.local_branches(main):
+            return _refuse(f"ramo locale {branch} per #{issue}, creato nel frattempo da un'altra "
+                           f"sessione: adottalo con /tollgate:adopt #{issue}")
+        return _refuse(f"creazione del ramo {branch} non riuscita")
     try:
-        gitw.worktree_add(main, wt, branch=branch, start_point=base_sha, new_branch=True)
+        gitw.worktree_add(main, wt, branch=branch, start_point=None, new_branch=False)
     except gitw.GitWriteError as e:
-        # Il ramo nuovo non deve restare (farebbe scattare «adopt»), ma è nostro solo se non
-        # esisteva già e nessun worktree lo usa: `update-ref -d` non guarda i worktree, e un
-        # ramo preso da un `start` concorrente resterebbe senza storia (HEAD su un ref sparito).
-        in_use = branch in existing_now or any(b == branch for _, b in git.worktrees(main))
-        if in_use:
-            left = (f"; il ramo {branch} esiste già o è in uso da un altro worktree: "
-                    "non è stato toccato")
-        elif gitw.delete_branch(main, branch, base_sha):
-            left = ""
-        else:
-            left = f"; il ramo {branch} è stato lasciato: toglilo a mano se è residuo"
+        # Il ramo nuovo non deve restare (farebbe scattare «adopt»): si toglie solo se punta
+        # ancora al punto di partenza.
+        left = "" if gitw.delete_branch(main, branch, base_sha) else \
+            f"; il ramo {branch} è stato lasciato: toglilo a mano se è residuo"
         return _refuse(f"creazione del worktree {wt} (ramo {branch}) non riuscita: {e}{left}")
     try:
         work = phases.create_work(conn, repo_key=key, issue=issue, level=lvl, now=now,

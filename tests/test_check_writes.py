@@ -2,11 +2,11 @@ import os
 import unittest
 from unittest import mock
 
-from tests.helpers import git as g
+from tests.helpers import BIN, git as g
 from tests.hookkit import DEFAULT_TOML, Lab
 from tollgate_analysis import waivers
 from tollgate_core import git as core_git, phases, scope
-from tollgate_core.paths import repo_key
+from tollgate_core.paths import program_command, repo_key
 
 IMPL = "a-impl"
 
@@ -38,7 +38,7 @@ class ExecutionL1Test(unittest.TestCase):
         self.assertEqual(self.lab.pre_edit(self.lab.wt / "src/app.py", agent_id=IMPL).exit, 0)
         r = self.lab.pre_edit(self.lab.wt / "src/altro.py", agent_id=IMPL)
         self.assertEqual(r.exit, 2)
-        self.assertIn("tollgate waiver add scope src/altro.py", r.stderr)
+        self.assertIn(f"{program_command(BIN / 'tollgate')} waiver add scope src/altro.py", r.stderr)
         write_waiver(self.lab, ("scope", "src/altro.py"))
         self.assertEqual(self.lab.pre_edit(self.lab.wt / "src/altro.py", agent_id=IMPL).exit, 0)
 

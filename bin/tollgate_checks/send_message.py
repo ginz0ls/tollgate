@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from tollgate_core import subagents
+from tollgate_core.paths import program_command
 from tollgate_hooks.model import deny
 
 from ._common import governing_work
@@ -38,7 +39,8 @@ def decide(event, ctx):
         (task["pending"] == "resume" and task["agent_type"] == target["type"])
         or (task["state"] == "running" and target["declared_status"] == "NEEDS_CONTEXT"))
     if not ok:
-        return [deny(f"ripresa di {to} negata: serve tollgate task start {target['task']} --fix, "
+        return [deny(f"ripresa di {to} negata: serve {program_command(ctx.plugin_bin)} task start "
+                     f"{target['task']} --fix, "
                      f"oppure una risposta a NEEDS_CONTEXT (6.3)", rule="writer")]
     out = []
     if ctx.component("single_writer"):

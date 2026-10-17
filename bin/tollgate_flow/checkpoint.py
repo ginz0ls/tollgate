@@ -9,6 +9,7 @@ import sqlite3
 from pathlib import Path
 
 from tollgate_core import clock, db, sessions
+from tollgate_core.paths import program_command
 from tollgate_core.tasks import STATES
 
 from . import gitw
@@ -48,18 +49,19 @@ def next_step(conn, work: int) -> str:
             return f"fase {phase}: percorso L2, arriva con P3c"
         return "/tollgate:finish"
     k, state = row["number"], row["state"]
+    prog = program_command(db.BIN_PATH)
     if state == "pending":
-        return f"task {k} pending: tollgate task start {k}"
+        return f"task {k} pending: {prog} task start {k}"
     if state == "running":
         who = row["implementer"] or "del task"
         return f"task {k} running: attendi o riprendi l'implementatore {who}"
     if state == "blocked":
         return f"task {k} blocked: /tollgate:resolve"
     if row["verdict"] == "approved":
-        return f"task {k} in review, approvato: tollgate task done {k}"
+        return f"task {k} in review, approvato: {prog} task done {k}"
     if row["verdict"] == "changes" and row["review_sha"] is not None:
-        return f"task {k} in review, da correggere: tollgate task start {k} --fix"
-    return f"task {k} in review: tollgate task review-prepare {k}"
+        return f"task {k} in review, da correggere: {prog} task start {k} --fix"
+    return f"task {k} in review: {prog} task review-prepare {k}"
 
 
 def _previous_notes(path: Path) -> list[list[str]]:

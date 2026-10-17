@@ -59,7 +59,7 @@ def decide(event, ctx):
         parent = git.resolve_ref(wt, f"{sha}^") or git.EMPTY_TREE
         left = commit_violations(ctx, work, wt, parent, sha, git.commit_changes(wt, sha))
         if left:
-            problems.append(f"commit {sha[:10]}:\n" + explain(left))
+            problems.append(f"commit {sha[:10]}:\n" + explain(left, ctx))
     out = level_records(ctx, work) + out
     if problems:
         text = "\n".join(problems)
