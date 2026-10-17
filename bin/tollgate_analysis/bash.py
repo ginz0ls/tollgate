@@ -49,7 +49,7 @@ _SHELL_LINE = re.compile(r"(?:^|[\s;&|(])(?:bash|sh|zsh|dash|ksh)(?=[\s;&|)]|$)"
 
 
 # Segnaposto per `$(...)` e backtick: niente spazi, così `X=$(cmd)` resta un'assegnazione.
-_SUBST_TOKEN = "_TG_SUBST_"
+SUBST_TOKEN = "_TG_SUBST_"
 
 
 def _skip_heredoc_bodies(text: str, start: int, pending: list[tuple[str, bool]],
@@ -128,13 +128,13 @@ def _scan(text: str, i: int, nested: bool) -> tuple[str, list[str], int]:
             if j < 0:
                 raise BashParseError("backtick non chiuso")
             inners.append(text[i + 1:j])
-            out.append(_SUBST_TOKEN)
+            out.append(SUBST_TOKEN)
             i = j + 1
             continue
         if text.startswith("$(", i):
             _, _, end = _scan(text, i + 2, True)
             inners.append(text[i + 2:end - 1])
-            out.append(_SUBST_TOKEN)
+            out.append(SUBST_TOKEN)
             i = end
             continue
         if not in_dq:
@@ -828,10 +828,26 @@ def is_tollgate_hook(cmd: Cmd) -> bool:
     return False
 
 
+def script_index(argv: list[str]) -> int | None:
+    """Posizione dello script in `python3 [opzioni] script ...`, saltando le opzioni
+    dell'interprete (`-B`, `-W error`, `-X dev`). None se non è un interprete python, se non c'è
+    uno script o se il codice arriva da `-c`/`-m`."""
+    if not argv or not os.path.basename(argv[0]).startswith("python"):
+        return None
+    i = 1
+    while i < len(argv) and argv[i].startswith("-") and argv[i] != "-":
+        opt = argv[i]
+        if opt[:2] in ("-c", "-m"):
+            return None
+        i += 2 if opt in ("-W", "-X") else 1
+    return i if i < len(argv) else None
+
+
 def uses_tollgate_bin(cmd: Cmd, plugin_bin: str) -> bool:
     a = cmd.argv
     target = os.path.realpath(plugin_bin)
-    cands = a[:1] + (a[1:2] if a and os.path.basename(a[0]).startswith("python") else [])
+    k = script_index(a)
+    cands = a[:1] + ([a[k]] if k is not None else [])
     return any(os.path.realpath(_norm(cmd.cwd, x)) == target for x in cands)
 
 

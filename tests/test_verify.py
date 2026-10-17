@@ -3,6 +3,7 @@ import io
 import os
 import shutil
 import sqlite3
+import subprocess
 import tempfile
 import textwrap
 import time
@@ -227,6 +228,35 @@ class VerifyRunTest(unittest.TestCase):
         r = self._receipts()[0]
         self.assertEqual((r["state"], r["exit"]), ("red", 124))
 
+    @staticmethod
+    def _wait_gone(pid, seconds=10.0):
+        """Vero quando il processo non esiste più o è uno zombie (morto, non ancora raccolto)."""
+        deadline = time.monotonic() + seconds
+        while True:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                return True
+            try:
+                stat = Path(f"/proc/{pid}/stat").read_text()
+                if stat.rpartition(")")[2].split()[0] == "Z":
+                    return True
+            except (OSError, IndexError):
+                pass
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.05)
+
+    def test_wait_gone_treats_a_zombie_as_dead(self):
+        proc = subprocess.Popen(["sleep", "30"])
+        try:
+            self.assertFalse(self._wait_gone(proc.pid, seconds=0.2))
+            proc.kill()  # morto ma non raccolto (wait non chiamato): resta uno zombie
+            self.assertTrue(self._wait_gone(proc.pid, seconds=5))
+        finally:
+            proc.kill()
+            proc.wait()
+
     def test_background_child_killed_after_success(self):
         # anche a fine normale nessun figlio in background deve sopravvivere
         pidfile = self.tmp / "figlio.pid"
@@ -235,9 +265,7 @@ class VerifyRunTest(unittest.TestCase):
         try:
             verify.run_verify(self.ts.state, self.wt, now=T0, environ=env)
             pid = int(pidfile.read_text())
-            time.sleep(0.3)
-            with self.assertRaises(ProcessLookupError):
-                os.kill(pid, 0)
+            self.assertTrue(self._wait_gone(pid), f"il figlio {pid} è ancora vivo")
         finally:
             if pid is not None:
                 try:

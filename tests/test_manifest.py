@@ -165,6 +165,14 @@ class ManifestTest(unittest.TestCase):
         for b in re.findall(r"```json\n(.*?)\n```", impl, re.S):
             self.assertEqual(json.loads(b)["status"], "DONE")
 
+    def test_agents_and_skills_never_write_a_bare_program_name(self):
+        """`tollgate` non è nel PATH: ai subagenti serve la forma del brief (decisione 3)."""
+        bare = re.compile(r"(?<![\w/:.\"'-])tollgate (?:verify|block|task|status|act|start|"
+                          r"waiver|approve|finish|init)\b")
+        for path in (*(ROOT / "agents").glob("*.md"), *(ROOT / "skills").glob("*/SKILL.md")):
+            with self.subTest(path=path.name):
+                self.assertEqual(bare.findall(path.read_text()), [])
+
     def test_execute_follows_registered_verdict_and_checkpoint(self):
         text = (ROOT / "skills" / "execute" / "SKILL.md").read_text()
         self.assertIn("revisore: <tipo>", text)

@@ -49,6 +49,46 @@ class CliCallsTest(unittest.TestCase):
             with self.subTest(cmd=cmd):
                 self.assertEqual(self.lab.bash(cmd, agent_id="ag-1").exit, 2)
 
+    def test_interpreter_options_before_the_script(self):
+        for cmd in (f'python3 -B "{PROGRAM}" start 7', f"python3 -W error -B '{PROGRAM}' start 7",
+                    f"python3 -X dev '{PROGRAM}' start 7"):
+            with self.subTest(cmd=cmd):
+                self.signal.unlink(missing_ok=True)
+                self.assertEqual(self.lab.bash(cmd).exit, 0)
+                self.assertEqual(self.signals()["start"]["argv"], ["start", "7"])
+        for cmd in (f'python3 -B "{PROGRAM}" task done 1', f"python3 -W error '{PROGRAM}' act apply",
+                    f"python3 -B -X dev '{PROGRAM}' status --checkpoint"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.lab.bash(cmd, agent_id="ag-1").exit, 2)
+        self.assertEqual(self.lab.bash(f'python3 -B "{PROGRAM}" verify', agent_id="ag-1").exit, 0)
+
+    def test_subagent_cannot_hide_the_program_in_an_expansion(self):
+        for cmd in (f'p="{PROGRAM}"; python3 "$p" task done 1',
+                    f'P="{PROGRAM}" python3 $P act apply',
+                    f'python3 "$(echo {PROGRAM})" task done 1',
+                    f"python3 `echo '{PROGRAM}'` start 7",
+                    f'p="{PROGRAM}"; "$p" task done 1',
+                    f'python3 -B "$p" status --checkpoint'):
+            with self.subTest(cmd=cmd):
+                r = self.lab.bash(cmd, agent_id="ag-1")
+                self.assertEqual(r.exit, 2)
+        for cmd in (f'p="{PROGRAM}"; python3 "$p" verify', 'python3 -c "print(1)"',
+                    'python3 "$x" tasks', 'echo "$HOME" start'):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.lab.bash(cmd, agent_id="ag-1").exit, 0)
+        self.assertFalse(self.signal.exists())
+
+    def test_subagent_unparsable_command_naming_the_program_is_denied(self):
+        self.assertEqual(
+            self.lab.bash(f"python3 '{PROGRAM}' task done 1 \"unchiuso", agent_id="ag-1").exit, 2)
+        self.assertEqual(self.lab.bash('echo "unchiuso', agent_id="ag-1").exit, 0)
+        self.assertEqual(
+            self.lab.bash(f"python3 '{PROGRAM}' status --checkpoint \"unchiuso",
+                          agent_id="ag-1").exit, 2)
+        self.assertEqual(
+            self.lab.bash(f"python3 '{PROGRAM}' verify \"unchiuso", agent_id="ag-1").exit, 0)
+        self.assertEqual(self.lab.bash(f"python3 '{PROGRAM}' start 7 \"unchiuso").exit, 0)
+
     def test_other_subcommands_leave_no_signal(self):
         for cmd in (f"'{PROGRAM}' verify", f"'{PROGRAM}' task start 1",
                     f"'{PROGRAM}' status", "git status"):

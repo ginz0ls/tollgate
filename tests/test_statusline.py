@@ -136,7 +136,7 @@ class CtxTest(unittest.TestCase):
 
     def test_context_guard_reads_it(self):
         lab = Lab()
-        self.addCleanup(lab.ts.cleanup)
+        self.addCleanup(lab.close)
         self.run_ctx(payload(session=SESSION, pct=60), env=lab.ts.env())
         r = lab.hook(agent_payload(lab, "Explore"))
         self.assertEqual(r.exit, 2)

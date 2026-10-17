@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -23,6 +24,11 @@ def issue(n=7, title="Aggiungi export CSV", **kw):
             "labels": [], "author_association": "OWNER"}
     data.update(kw)
     return data
+
+
+def flow_start_naming():
+    from tollgate_flow import start as flow_start
+    return flow_start.naming
 
 
 def out(r):
@@ -369,6 +375,62 @@ class StartNewTest(StartCase):
         self.assertFalse(gitw.delete_branch(fl.main, "tg/7-aggiungi-export-csv", base))
         self.assertEqual(fl.git("rev-parse", "tg/7-aggiungi-export-csv"), mine)
 
+    def start_direct(self, fl):
+        from unittest import mock
+        from tollgate_flow import start as flow_start
+        sessions.note_cli_call(fl.ts.state, SESSION, str(fl.main), ["start", "7"],
+                               now=clock.now())
+        with mock.patch.dict(os.environ, fl.env()):
+            return flow_start.start(fl.ts.state, fl.main, 7, level=None, confirm=False,
+                                    reopen_execution=False, claude_dir=fl.home / ".claude")
+
+    def test_failed_add_keeps_branch_used_by_another_worktree(self):
+        """Corsa: l'altra sessione ha creato ramo e worktree, il nostro `add` fallisce."""
+        from unittest import mock
+        fl = self.make()
+        base = fl.git("rev-parse", "origin/main")
+        real = gitw.worktree_add
+        other = fl.main / ".claude" / "worktrees" / "altra-sessione"
+
+        def other_session_wins(repo, path, **kw):
+            real(repo, other, branch=kw["branch"], start_point=kw["start_point"], new_branch=True)
+            raise gitw.GitWriteError("git worktree add: perso la corsa")
+
+        with mock.patch.object(gitw, "worktree_add", side_effect=other_session_wins):
+            r = self.start_direct(fl)
+        self.assertEqual(r.code, 1, r.lines)
+        self.assertEqual(fl.git("rev-parse", "tg/7-aggiungi-export-csv"), base)
+        self.assertEqual(fl.git("-C", str(other), "rev-parse", "HEAD"), base)
+        self.assertIn("non è stato toccato", "\n".join(r.lines))
+        self.assertEqual(self.rows(fl), [])
+
+    def test_failed_add_keeps_branch_that_existed_before_the_add(self):
+        """Corsa: il ramo compare dopo `local_branches` ma prima di `add`, ancora alla base."""
+        from unittest import mock
+        fl = self.make()
+        base = fl.git("rev-parse", "origin/main")
+        fl.git("branch", "tg/7-aggiungi-export-csv", base)
+        with mock.patch.object(flow_start_naming(), "branch_name",
+                               return_value="tg/7-aggiungi-export-csv"), \
+                mock.patch("tollgate_flow.start._existing_branches", return_value=[]):
+            r = self.start_direct(fl)
+        self.assertEqual(r.code, 1, r.lines)
+        self.assertEqual(fl.git("rev-parse", "tg/7-aggiungi-export-csv"), base)
+        self.assertIn("non è stato toccato", "\n".join(r.lines))
+        self.assertEqual(self.rows(fl), [])
+
+    def test_create_work_database_error_names_branch_and_worktree(self):
+        import sqlite3
+        from unittest import mock
+        fl = self.make()
+        with mock.patch.object(phases, "create_work", side_effect=sqlite3.OperationalError("locked")):
+            r = self.start_direct(fl)
+        text = "\n".join(r.lines)
+        self.assertEqual(r.code, 1, text)
+        self.assertIn("tg/7-aggiungi-export-csv", text)
+        self.assertIn("rimuovili a mano", text)
+        self.assertIn("locked", text)
+
     def test_delete_branch_removes_branch_still_at_start_point(self):
         fl = self.make()
         base = fl.git("rev-parse", "origin/main")
@@ -645,7 +707,8 @@ class ResumeTest(StartCase):
                            capture_output=True, text=True)
         self.assertNotEqual(r.returncode, 0)
         r = self.resume(fl)
-        self.assertIn(f"git -C {wt} rebase --abort", out(r))
+        self.assertIn(" ", str(wt))
+        self.assertIn(f"git -C {shlex.quote(str(wt))} rebase --abort", out(r))
         self.assertTrue(gitw.rebase_in_progress(wt))
 
 

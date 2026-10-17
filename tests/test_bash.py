@@ -516,3 +516,18 @@ class TextDangerFallbackTest(unittest.TestCase):
                 self.assertEqual(bash.text_danger(text), label)
         self.assertIsNone(bash.text_danger("bash <<EOF\nls -la\n"))
         self.assertIsNone(bash.text_danger("bash <<EOF\nrm file.txt\n"))
+
+
+class ScriptIndexTest(unittest.TestCase):
+    def test_skips_interpreter_options(self):
+        for argv, k in ((["python3", "s.py", "x"], 1), (["python3", "-B", "s.py"], 2),
+                        (["python3.11", "-W", "error", "-B", "s.py"], 4),
+                        (["python3", "-X", "dev", "s.py"], 3)):
+            with self.subTest(argv=argv):
+                self.assertEqual(bash.script_index(argv), k)
+
+    def test_no_script(self):
+        for argv in (["git", "status"], ["python3"], ["python3", "-B"],
+                     ["python3", "-c", "print(1)"], ["python3", "-m", "http.server"], []):
+            with self.subTest(argv=argv):
+                self.assertIsNone(bash.script_index(argv))
