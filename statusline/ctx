@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Involucro della statusline (spec 11.3, decisione 21). Uso: statusline/ctx [comando di shell...]
+# Scrive <stato>/ctx/<session_id>.json = {"used_pct": N|null}, che la guardia del contesto legge,
+# poi esegue il comando avvolto con lo stesso stdin e ne restituisce l'uscita.
+# Mai fallire: un errore di parsing o di scrittura non lascia file e non ferma la statusline.
+INPUT="$(cat; printf x)"
+INPUT="${INPUT%x}"
+
+STATE="${HOME}/.local/state/tollgate"
+if [ -n "${TOLLGATE_STATE:-}" ] && [ -f "${TOLLGATE_STATE}/.tollgate-test" ]; then
+  STATE="$TOLLGATE_STATE"
+fi
+
+write_ctx() {
+  local sid pct parsed
+  if command -v python3 >/dev/null 2>&1; then
+    parsed="$(printf '%s' "$INPUT" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+v = (d.get("context_window") or {}).get("used_percentage")
+ok = isinstance(v, (int, float)) and not isinstance(v, bool)
+print(d.get("session_id") if isinstance(d.get("session_id"), str) else "")
+print(json.dumps(v) if ok else "null")
+' 2>/dev/null)" || return 0
+    sid="$(printf '%s\n' "$parsed" | sed -n 1p)"
+    pct="$(printf '%s\n' "$parsed" | sed -n 2p)"
+  else
+    sid="$(printf '%s' "$INPUT" | tr -d '\n' | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+    pct="$(printf '%s' "$INPUT" | tr -d '\n' | sed -n 's/.*"used_percentage"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\(\.[0-9]*\)\{0,1\}\).*/\1/p')"
+    [ -n "$pct" ] || pct=null
+  fi
+  [ -n "$sid" ] || return 0
+  case "$sid" in *[!A-Za-z0-9_-]*) return 0 ;; esac
+  case "$pct" in null | [0-9]* ) ;; *) pct=null ;; esac
+  mkdir -p "$STATE/ctx" || return 0
+  local tmp="$STATE/ctx/.$sid.$$.tmp"
+  printf '{"used_pct": %s}\n' "$pct" > "$tmp" && mv -f "$tmp" "$STATE/ctx/$sid.json" || rm -f "$tmp"
+}
+
+write_ctx 2>/dev/null || true
+
+[ "$#" -gt 0 ] || exit 0
+printf '%s' "$INPUT" | sh -c "$*"
