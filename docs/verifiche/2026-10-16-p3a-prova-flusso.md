@@ -49,3 +49,11 @@ Il piano veniva registrato e la fase passava a `execution`, ma il commit del pia
 - Un solo task, livello L1, nessun giro di correzione, nessun veto del revisore, nessun `needs_you`: i percorsi `--fix`, `/clear` con ripresa dal checkpoint, `SendMessage` e il blocco da budget non sono stati esercitati.
 - Il piano provato è quello scritto da `superpowers:writing-plans`, non il file di controllo (passo 2, vedi sopra).
 - Una sola esecuzione riuscita (più una non riuscita prima della correzione di D1): il comportamento del modello varia da una esecuzione all'altra.
+
+## Giro di correzione 1 (decisioni del controller)
+
+Commit: `tollgate P3a: fix round 1 del Task 13 (programma via python3, uncounted nell'implementer, D6 senza difetto)`.
+
+- **D2, deciso e applicato.** Il programma nelle skill è `python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"` (interprete + percorso tra virgolette; `<programma>` indica la coppia), con il ripiego «riprova con `python3.11`» se la CLI risponde «tollgate richiede Python >= 3.11». La riga `tollgate: programma` di `UserPromptExpansion` (`bin/tollgate_checks/acts.py`) ora è `python3 "<bin>"`. `cli_calls` già riconosceva la forma `python3 <bin/tollgate>`; un nuovo test la fissa con un percorso con spazi (segnale per `start` e `act`, divieto ai subagenti). La forma con `python3` davanti è quella provata ammessa in D2. Non riprovata con `claude -p`, come da decisione.
+- **D4, deciso e applicato.** `agents/implementer.md`: una ricevuta `uncounted` con uscita 0 è normale quando non c'è un report e `allow_no_tests` è acceso; non è un motivo per `DONE_WITH_CONCERNS`.
+- **D6, nessun difetto.** I due `task_change` `running` vengono da due scritture volute, nella stessa transazione di `task start`: `tasks.task_event(... "start")` (pending a running) e `tasks.assign(...)` (decisione 7: scrive implementatore, tipo di agente e `pending`; `_log` emette un `task_change` con gli stessi campi visibili, che non mostrano né `implementer` né `pending`). Non è una doppia scrittura dello stato. Nessuna modifica.

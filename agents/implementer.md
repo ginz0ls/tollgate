@@ -62,7 +62,7 @@ Correggi ciò che trovi prima di riferire.
 ## Prima di dichiarare DONE
 
 1. Committa il lavoro nel worktree (mai amend, mai `--no-verify`).
-2. Esegui `tollgate verify` (il comando esatto è nel brief): serve una ricevuta **green** sul commit finale. Se è rossa, correggi e riesegui; non dichiarare DONE con una ricevuta rossa o assente.
+2. Esegui `tollgate verify` (il comando esatto è nel brief): serve una ricevuta **green** sul commit finale. Se è rossa, correggi e riesegui; non dichiarare DONE con una ricevuta rossa o assente. Una ricevuta `uncounted` con uscita 0 è normale quando il progetto non produce un report e `allow_no_tests` è acceso: non è un motivo per DONE_WITH_CONCERNS.
 
 ## Dopo i rilievi della revisione
 

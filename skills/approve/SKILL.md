@@ -5,11 +5,11 @@ disable-model-invocation: true
 argument-hint: "level <L> <motivo> | waiver <id> | effect <id>"
 ---
 
-**Programma:** `"${CLAUDE_PLUGIN_ROOT}/bin/tollgate"`, sempre tra virgolette (il percorso può contenere spazi). Se la variabile non risulta espansa nel testo, usa il percorso della riga `tollgate: programma` del contesto. Nel seguito `<programma>` indica questo percorso.
+**Programma:** `python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"`: l'interprete seguito dal percorso, sempre tra virgolette (il percorso può contenere spazi; senza `python3` davanti Claude Code rifiuta in un worktree un percorso con spazi). Se la variabile non risulta espansa nel testo, usa la forma `python3 "<percorso>"` della riga `tollgate: programma` del contesto. Se risponde «tollgate richiede Python >= 3.11», riprova con `python3.11` al posto di `python3`. Nel seguito `<programma>` indica questo percorso.
 
 L'atto è già registrato dal hook quando l'utente ha digitato il comando. Guarda il primo argomento:
 
-- **`level <L> <motivo>`**: lancia dal worktree `"<programma>" act apply` e riferisci l'esito (tetto fissato, livello risultante). Se rifiuta (per esempio la fase corrente non esiste nella sequenza del livello di arrivo), riporta il motivo così com'è.
+- **`level <L> <motivo>`**: lancia dal worktree `<programma> act apply` e riferisci l'esito (tetto fissato, livello risultante). Se rifiuta (per esempio la fase corrente non esiste nella sequenza del livello di arrivo), riporta il motivo così com'è.
 - **`waiver`** e **`effect`**: l'approvazione vale già, perché dal DB. Dillo all'utente e **non lanciare nulla**.
 - **Ogni altro oggetto** (`spec`, `plan`, `finding`, `rebase`…): rispondi «arriva con /tollgate:finish (P3b) o con il percorso L2 (P3c)» e non lanciare nulla.
 

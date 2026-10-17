@@ -6,14 +6,14 @@ argument-hint: "#N [L1|L2]"
 
 Argomenti: `#N` (numero dell'issue) e, facoltativo, `L1` o `L2`. Senza livello lo sceglie la CLI.
 
-**Programma:** `"${CLAUDE_PLUGIN_ROOT}/bin/tollgate"`, sempre tra virgolette (il percorso può contenere spazi). Se la variabile non risulta espansa nel testo, usa il percorso della riga `tollgate: programma` del contesto. Nel seguito `<programma>` indica questo percorso.
+**Programma:** `python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"`: l'interprete seguito dal percorso, sempre tra virgolette (il percorso può contenere spazi; senza `python3` davanti Claude Code rifiuta in un worktree un percorso con spazi). Se la variabile non risulta espansa nel testo, usa la forma `python3 "<percorso>"` della riga `tollgate: programma` del contesto. Se risponde «tollgate richiede Python >= 3.11», riprova con `python3.11` al posto di `python3`. Nel seguito `<programma>` indica questo percorso.
 
 ## 1. Avvio
 
 Lancia dal **checkout principale** (non da un worktree), con Bash:
 
 ```
-"<programma>" start <N> [--level L1|L2]
+<programma> start <N> [--level L1|L2]
 ```
 
 Leggi il codice d'uscita e l'output:
@@ -36,7 +36,7 @@ La riga `lavoro #N … livello L, fase F` dell'output dice dove sei. In ripresa 
 - **L0** (fase `execution`): implementa tu, in questa sessione, ciò che l'issue chiede, in TDD (`superpowers:test-driven-development`). I guardrail locali sono attivi; chiudere il lavoro è di `/tollgate:finish`.
 - **L1** (fase `plan`): la skill è rientrante, perché dopo il `/clear` il suo testo non c'è più.
   - Se il contesto è già pulito (lavoro appena creato, sessione nuova, nulla da salvare), vai direttamente a `superpowers:writing-plans`.
-  - Altrimenti scrivi il checkpoint con `"<programma>" status --checkpoint` e di' all'utente: «fai `/clear`; a sessione pulita SessionStart ti mostrerà il prossimo passo (scrivere il piano con `superpowers:writing-plans`), oppure rilancia `/tollgate:start #N`». Non chiedere un secondo `/clear` se l'hai già chiesto.
+  - Altrimenti scrivi il checkpoint con `<programma> status --checkpoint` e di' all'utente: «fai `/clear`; a sessione pulita SessionStart ti mostrerà il prossimo passo (scrivere il piano con `superpowers:writing-plans`), oppure rilancia `/tollgate:start #N`». Non chiedere un secondo `/clear` se l'hai già chiesto.
   - Invoca `superpowers:writing-plans` sull'issue. Il piano deve avere le intestazioni di secondo livello richieste da `plan-check` (7.5): `## Fatti verificati`, `## Decisioni`, `## Interfacce`, `## Must-have` (ogni voce `M<n>. <proprietà> — test: <identificativo>`), `## Scope`, `## Punti di arresto`, `## Rischi`. Dopo che il piano è scritto e passa `plan-check`, **committalo** (il coordinatore committa spec e piano), poi passa a `/tollgate:execute`.
 - **L2** (fase `spec_audit`): invoca `superpowers:brainstorming` per arrivare alla spec, poi **fermati dopo la spec**: l'audit e l'approvazione sono del percorso L2 (P3c). Non invocare `writing-plans`: in `spec_audit` la scrittura del piano è negata.
 

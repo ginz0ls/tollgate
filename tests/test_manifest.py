@@ -97,7 +97,9 @@ class ManifestTest(unittest.TestCase):
     def test_skills_use_quoted_program(self):
         for name in ("start", "execute", "status", "approve", "resolve", "setup"):
             text = (ROOT / "skills" / name / "SKILL.md").read_text()
-            self.assertIn('"${CLAUDE_PLUGIN_ROOT}/bin/tollgate"', text, name)
+            self.assertIn('python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"', text, name)
+            self.assertNotIn('"<programma>"', text, name)
+            self.assertIn("python3.11", text, name)
             self.assertIn("tollgate: programma", text, name)
 
     def test_execute_forbids_sdd_as_executor(self):

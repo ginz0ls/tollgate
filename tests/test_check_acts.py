@@ -132,7 +132,7 @@ class ActsTest(unittest.TestCase):
 class ProgramLineTest(unittest.TestCase):
     def setUp(self):
         self.lab = Lab()
-        self.line = f"tollgate: programma {ROOT / 'bin' / 'tollgate'}"
+        self.line = f'tollgate: programma python3 "{ROOT / "bin" / "tollgate"}"'
 
     def tearDown(self):
         self.lab.close()

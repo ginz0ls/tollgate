@@ -25,7 +25,7 @@ def decide(event, ctx):
     if type_ in ("off", "on"):
         return []
     # Decisione 3: il percorso del programma arriva con ogni /tollgate:*, atto o no.
-    program = f"tollgate: programma {ctx.plugin_bin}"
+    program = f'tollgate: programma python3 "{ctx.plugin_bin}"'
     if type_ not in acts.ACT_TYPES:
         return [inject(program)]
     out = _act(event, ctx, type_)
