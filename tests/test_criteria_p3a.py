@@ -72,7 +72,7 @@ class TaskCycleEndToEndTest(unittest.TestCase):
     def row(self):
         return tasks.get_task(self.fl.conn, self.fl.work, 1)
 
-    def test_task_cycle_end_to_end(self):                        # criteri 4 e 38
+    def test_task_cycle_end_to_end(self):                        # criterio 4 (ramo generico, senza profili verticali)
         fl, wt = self.fl, self.wt
         plan = wt / PLAN
         plan.parent.mkdir(parents=True, exist_ok=True)

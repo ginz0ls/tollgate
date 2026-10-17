@@ -16,7 +16,7 @@ from tollgate_core.config import ConfigError, ConfigNotFound, load_config
 from tollgate_core.phases import TransitionError
 from tollgate_core.tasks import TaskTransitionError
 from tollgate_core.events import record_event
-from tollgate_core.paths import resolve_state
+from tollgate_core.paths import program_command, resolve_state
 
 from . import adapter, apply as applier, registry
 from .context import Ctx, ReadDb
@@ -47,7 +47,7 @@ class _Unverifiable(Exception):
 
 
 def _footer(state_root: Path) -> str:
-    return (f"Programma: {db.BIN_PATH}. Per spegnere tollgate: /tollgate:off, "
+    return (f"Programma: {program_command(db.BIN_PATH)}. Per spegnere tollgate: /tollgate:off, "
             f"oppure dal terminale: touch {state_root / 'OFF'}")
 
 

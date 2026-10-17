@@ -79,6 +79,14 @@ class WrapperTest(unittest.TestCase):
             time.sleep(0.05)
         return False
 
+    def wait_alive(self, pattern, seconds=10.0):
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            if self.proc_alive(pattern):
+                return True
+            time.sleep(0.05)
+        return False
+
     def json_msg(self, r):
         """stdout dei rami off/on: un solo oggetto JSON con i due campi di UserPromptExpansion."""
         out = json.loads(r.stdout)
@@ -322,8 +330,7 @@ class WrapperTest(unittest.TestCase):
                               stderr=subprocess.PIPE, text=True, env=env, cwd=str(repo)) as p:
             p.stdin.write(json.dumps(payload))
             p.stdin.close()
-            time.sleep(0.5)
-            alive = self.proc_alive("^sleep 87$")
+            alive = self.wait_alive("^sleep 87$")
             p.wait(timeout=30)
         self.assertTrue(alive)
         self.assertFalse(self.proc_alive("^sleep 902$"))

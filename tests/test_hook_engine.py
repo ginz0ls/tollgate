@@ -9,7 +9,7 @@ from pathlib import Path
 
 from tests.hookkit import DEFAULT_TOML, SESSION, Lab, sample
 from tests.helpers import ROOT, TempState
-from tollgate_core import db
+from tollgate_core import db, paths
 from tollgate_hooks import adapter, registry, runner
 from tollgate_hooks.model import Event, deny, inject, record
 
@@ -146,6 +146,13 @@ class AdapterTest(unittest.TestCase):
                 self.assertEqual(adapter.INJECT_MODE[ev], "context")
         self.assertEqual(adapter.render("SubagentStop", None, "x"), (0, "", ""))
         self.assertEqual(adapter.render("SubagentStop", "no", None)[:1], (2,))
+
+
+class FooterTest(unittest.TestCase):
+    def test_footer_names_the_program_as_the_model_runs_it(self):
+        text = runner._footer(Path("/stato"))
+        self.assertIn(f"Programma: {paths.program_command(db.BIN_PATH)}.", text)
+        self.assertIn("touch /stato/OFF", text)
 
 
 class RunnerTest(unittest.TestCase):
