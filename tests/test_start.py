@@ -26,11 +26,6 @@ def issue(n=7, title="Aggiungi export CSV", **kw):
     return data
 
 
-def flow_start_naming():
-    from tollgate_flow import start as flow_start
-    return flow_start.naming
-
-
 def out(r):
     return r.stdout + r.stderr
 

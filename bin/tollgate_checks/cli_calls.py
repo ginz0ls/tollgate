@@ -50,9 +50,14 @@ def _coordinator_only(sub: str | None, args: list[str]) -> bool:
     return sub in _COORDINATOR_ONLY or (sub == "status" and "--checkpoint" in args)
 
 
-def _deny_subagent(sub: str | None):
-    return deny(f"tollgate {sub} è un comando del coordinatore: un subagente non lo lancia. "
-                "Riporta al coordinatore (BLOCKED o NEEDS_CONTEXT).", rule="coordinator_only")
+def _deny_subagent(sub: str | None, certain: bool):
+    text = (f"tollgate {sub} è un comando del coordinatore: un subagente non lo lancia. "
+            "Riporta al coordinatore (BLOCKED o NEEDS_CONTEXT).")
+    if not certain:
+        text += (" Il programma qui è una variabile o un'espansione e non si può riconoscere: se "
+                 "non stai lanciando tollgate, scrivi il percorso dello script in modo letterale, "
+                 "senza variabile né $(…).")
+    return deny(text, rule="coordinator_only")
 
 
 def decide(event, ctx):
@@ -77,7 +82,7 @@ def decide(event, ctx):
         sub = _subcommand(args)
         if event.agent_id:
             if _coordinator_only(sub, args):
-                return [_deny_subagent(sub)]
+                return [_deny_subagent(sub, certain)]
             continue
         if certain and sub in _SIGNALLED:
             out.append(record("cli_call", cwd=bash.effective_dir(c), argv=args[args.index(sub):]))

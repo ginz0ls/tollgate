@@ -195,17 +195,24 @@ class ManifestTest(unittest.TestCase):
         self.assertTrue(os.access(ROOT / "hooks" / "run", os.X_OK))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class BareProgramInMessagesTest(unittest.TestCase):
     """I testi che il modello legge come istruzione non scrivono `tollgate <sottocomando>` nudo:
     `tollgate` non è nel PATH e un percorso con spazi non regge come nome di comando. Si usa
     `paths.program_command`. Le docstring e le etichette di errore («tollgate verify: …») non
     contano."""
-    BARE = re.compile(r"(?<![\w/:.\-])tollgate (?:verify|block|task|status|act|start|waiver|"
-                      r"approve|finish|init|setup|sync|adopt|cleanup|abandon|resolve)\b(?!:)")
+    # Sottocomandi del parser della CLI, più quelli dei piani a venire; `hook` resta fuori:
+    # compare in testi che non sono istruzioni («tollgate hook lo lancia solo hooks/run»).
+    FUTURE = ("open-pr", "gate", "finish", "init", "setup", "sync", "adopt", "cleanup",
+              "abandon", "resolve", "approve")
+
+    @classmethod
+    def bare(cls):
+        from tollgate_core import cli
+        parser = cli.build_parser()
+        action = next(a for a in parser._actions if a.dest == "cmd")
+        names = {*action.choices, *cls.FUTURE} - {"hook"}
+        alt = "|".join(re.escape(n) for n in sorted(names))
+        return re.compile(rf"(?<![\w/:.\-])tollgate (?:{alt})\b(?!:)")
 
     @staticmethod
     def docstrings(tree):
@@ -219,6 +226,7 @@ class BareProgramInMessagesTest(unittest.TestCase):
         return out
 
     def test_no_bare_program_in_string_literals(self):
+        bare = self.bare()
         hits = []
         for path in sorted((ROOT / "bin").rglob("*.py")):
             tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -226,6 +234,10 @@ class BareProgramInMessagesTest(unittest.TestCase):
             for node in ast.walk(tree):
                 if (isinstance(node, ast.Constant) and isinstance(node.value, str)
                         and id(node) not in skip):
-                    for m in self.BARE.finditer(node.value):
+                    for m in bare.finditer(node.value):
                         hits.append(f"{path.relative_to(ROOT)}:{node.lineno}: {m.group(0)}")
         self.assertEqual(hits, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

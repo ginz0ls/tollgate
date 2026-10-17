@@ -78,6 +78,15 @@ class CliCallsTest(unittest.TestCase):
                 self.assertEqual(self.lab.bash(cmd, agent_id="ag-1").exit, 0)
         self.assertFalse(self.signal.exists())
 
+    def test_uncertain_program_denial_says_what_to_do(self):
+        r = self.lab.bash(f'p="{PROGRAM}"; python3 "$p" task done 1', agent_id="ag-1")
+        self.assertEqual(r.exit, 2)
+        self.assertIn("percorso dello script in modo letterale", r.stderr)
+        self.assertIn("senza variabile né $(…)", r.stderr)
+        r = self.lab.bash(f"python3 '{PROGRAM}' task done 1", agent_id="ag-1")
+        self.assertEqual(r.exit, 2)
+        self.assertNotIn("in modo letterale", r.stderr)
+
     def test_subagent_unparsable_command_naming_the_program_is_denied(self):
         self.assertEqual(
             self.lab.bash(f"python3 '{PROGRAM}' task done 1 \"unchiuso", agent_id="ag-1").exit, 2)
