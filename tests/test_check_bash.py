@@ -70,6 +70,13 @@ class BoundSessionTest(unittest.TestCase):
         self.assertEqual(self.code("rm -rf .", agent_id="a1"), 2)
         self.assertEqual(self.code(f"rm -rf '{self.lab.main}/build'", agent_id="a1"), 2)
 
+    def test_rm_rf_outside_message_suggests_alternative(self):
+        r = self.lab.bash("rm -rf /tmp/qualcosa", agent_id="a1")
+        self.assertEqual(r.exit, 2, r.stderr)
+        self.assertIn("usa un percorso dentro il worktree, oppure chiedi all'utente di eseguirlo",
+                      r.stderr)
+        self.assertNotIn("rm -r senza", r.stderr)
+
     def test_unparsable_dangerous_text(self):
         self.assertEqual(self.code("echo 'x; git push --force"), 2)
         self.assertEqual(self.code("echo 'ciao"), 0)

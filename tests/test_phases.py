@@ -132,6 +132,16 @@ class WorkTest(unittest.TestCase):
         with self.assertRaises(TransitionError):
             phases.set_level(self.conn, w, "L1", now=T0)
 
+    def test_bind_and_set_level_refuse_closed(self):
+        w = self.new()
+        phases.set_phase(self.conn, self.t.state, w, "closed", "abandoned", now=T0)
+        with self.assertRaisesRegex(TransitionError, "chiuso"):
+            phases.bind_session(self.conn, w, "s2", now=T0)
+        with self.assertRaisesRegex(TransitionError, "chiuso"):
+            phases.set_level(self.conn, w, "L2", now=T0)
+        row = phases.get_work(self.conn, w)
+        self.assertEqual((json.loads(row["sessions"]), row["level"]), (["s1"], "L1"))
+
     def test_closed_then_new_work(self):
         w = self.new()
         phases.set_phase(self.conn, self.t.state, w, "closed", "abandoned", now=T0)

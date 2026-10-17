@@ -227,6 +227,24 @@ class VerifyRunTest(unittest.TestCase):
         r = self._receipts()[0]
         self.assertEqual((r["state"], r["exit"]), ("red", 124))
 
+    def test_background_child_killed_after_success(self):
+        # anche a fine normale nessun figlio in background deve sopravvivere
+        pidfile = self.tmp / "figlio.pid"
+        env = self._env(self._cfg(f'sleep 30 & echo $! > "{pidfile}"; echo ok'))
+        pid = None
+        try:
+            verify.run_verify(self.ts.state, self.wt, now=T0, environ=env)
+            pid = int(pidfile.read_text())
+            time.sleep(0.3)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(pid, 0)
+        finally:
+            if pid is not None:
+                try:
+                    os.kill(pid, 9)  # solo il figlio avviato da questo test, per PID
+                except ProcessLookupError:
+                    pass
+
     def test_timeout_is_written_to_log(self):
         env = self._env(self._cfg("sleep 7", timeout_s=1))
         verify.run_verify(self.ts.state, self.wt, now=T0, environ=env)

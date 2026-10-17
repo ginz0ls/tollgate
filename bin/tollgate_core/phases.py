@@ -103,7 +103,10 @@ def create_work(conn, *, repo_key: str, issue: int, level: str, now, session=Non
 
 def bind_session(conn, work: int, session: str, *, now) -> None:
     with db.tx(conn):
-        sessions = json.loads(get_work(conn, work)["sessions"])
+        row = get_work(conn, work)
+        if row["phase"] == "closed":
+            raise TransitionError("il lavoro è chiuso")
+        sessions = json.loads(row["sessions"])
         if session not in sessions:
             sessions.append(session)
             conn.execute("UPDATE work_items SET sessions = ?, updated = ? WHERE id = ?",
@@ -153,7 +156,10 @@ def set_level(conn, work: int, level: str, *, now, session=None) -> None:
     if level not in LEVELS:
         raise ValueError(f"livello sconosciuto: {level}")
     with db.tx(conn):
-        current = get_work(conn, work)["level"]
+        row = get_work(conn, work)
+        if row["phase"] == "closed":
+            raise TransitionError("il lavoro è chiuso")
+        current = row["level"]
         if LEVELS.index(level) < LEVELS.index(current):
             raise TransitionError("il livello si abbassa solo con un atto dell'utente (tetto)")
         if level != current:

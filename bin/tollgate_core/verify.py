@@ -107,6 +107,10 @@ def _run_one(spec: CommandSpec, *, root: Path, files: list[str], env: dict, time
             proc.wait()
             exit_code = TIMEOUT_EXIT
             timed_out = True
+        finally:
+            # anche a fine normale: nessun figlio in background sopravvive al comando
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(proc.pid, signal.SIGKILL)
     duration = time.monotonic() - t0
     if timed_out:
         with open(log, "a", encoding="utf-8") as fh:

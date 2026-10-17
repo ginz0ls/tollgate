@@ -170,7 +170,8 @@ def _rm_rf(ctx, c: bash.Cmd, repo: Path | None, work) -> tuple[str, str] | None:
     for t in bash.rm_rf_targets(c):
         p = Path(t).resolve()
         if not any(_inside(p, r) for r in roots):
-            return "destructive", f"rm -rf fuori dal repo e dal worktree: {t}"
+            return "destructive", (f"rm -rf fuori dal repo e dal worktree: {t}; usa un percorso dentro il "
+                                    "worktree, oppure chiedi all'utente di eseguirlo")
         if p in roots:
             return "destructive", f"rm -rf della radice del repo o del worktree: {t}"
     return None

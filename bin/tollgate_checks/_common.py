@@ -189,14 +189,14 @@ def locked_docs(work) -> set[str]:
     return out
 
 
-def waiver_hint(v, issue) -> str:
+def waiver_hint(v) -> str:
     target = f"--test {' --test '.join(v.ids)} " if v.ids else ""
     return (f"tollgate waiver add {v.waiver_type} {v.path} {target}"
             f"--choice … --why … --cost …")
 
 
-def explain(violations, issue) -> str:
-    lines = [f"- {v.path}: {v.detail} (deroga: {waiver_hint(v, issue)})" for v in violations]
+def explain(violations) -> str:
+    lines = [f"- {v.path}: {v.detail} (deroga: {waiver_hint(v)})" for v in violations]
     return "\n".join(lines)
 
 
