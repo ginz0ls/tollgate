@@ -114,7 +114,7 @@ def _check(state, conn, cwd: Path, now, environ) -> CheckResult:
     found = [v for v in violations.diff_violations(cfg, conn, work, wt, base, sha,
                                                    git.changes(wt, base, head=sha),
                                                    components=comps)
-             if not _own_document(work, v)]
+             if not _own_document(wt, work, v)]
     external = {"guard_scope": not found}
     if found:
         shown = [f"{v.kind} {v.path}" for v in found[:MAX_LISTED]]
@@ -160,12 +160,24 @@ def _check(state, conn, cwd: Path, now, environ) -> CheckResult:
     return CheckResult(OK if green else RED, lines, items)
 
 
-def _own_document(work, v) -> bool:
-    """Spec, piano e file di `reviews/<N>/` (approvazioni e report, scritti da CLI e hook) sono
-    nel diff di un lavoro L2 ma non sono nello scope del piano: non sono scope violato."""
-    return v.kind == "out_of_scope" and (
-        v.path in (work["spec_path"], work["plan_path"])
-        or v.path.startswith(f"{approvals_mod.REVIEWS_DIR}/{work['issue']}/"))
+def _own_document(wt: Path, work, v) -> bool:
+    """Esenti dallo scope in un lavoro L2: i file di `reviews/<N>/` (approvazioni e report,
+    scritti da CLI e hook) e la spec approvata, cioè con il blob in HEAD uguale allo `sha` di
+    `spec-approval.md`. Il piano non è mai esente qui: lo è solo se è il blob registrato
+    (`is_registered_plan`, dentro `diff_violations`)."""
+    if v.kind != "out_of_scope":
+        return False
+    if v.path.startswith(f"{approvals_mod.REVIEWS_DIR}/{work['issue']}/"):
+        return True
+    if not work["spec_path"] or v.path != work["spec_path"]:
+        return False
+    header = approvals_mod.parse_approval(
+        git.text_at(wt, "HEAD", approvals_mod.approval_paths(work["issue"])[0]) or "")
+    try:
+        blob = git.run(wt, "rev-parse", f"HEAD:{v.path}").strip()
+    except git.GitError:
+        return False
+    return header is not None and header["kind"] == "spec-approval" and header["sha"] == blob
 
 
 def _saved(work, sha: str) -> CheckResult:

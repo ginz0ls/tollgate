@@ -238,6 +238,49 @@ class LevelsTest(FinishCheckCase):
         self.assertEqual([i.key for i in r.items], list(dod.ITEMS_BY_LEVEL["L2"]))
         self.assertEqual(self.item(r, "specialists").ok, None)
 
+    SPEC = "docs/superpowers/specs/2026-10-16-somma-design.md"
+    HEADER = "---\nschema_version: 1\nkind: {}\npath: {}\nsha: \"{}\"\n---\n"
+
+    def l2_lab(self):
+        """L2 in execution con spec e approvazioni committate e coerenti con HEAD."""
+        fl = self.lab()
+        fl.conn.execute("UPDATE work_items SET level = 'L2', spec_path = ? WHERE id = ?",
+                        (self.SPEC, fl.work))
+        fl.commit(self.SPEC, "# spec\n", "spec")
+        self.approve(fl)
+        return fl
+
+    def approve(self, fl):
+        """Riscrive i due file di approvazione con gli sha di HEAD."""
+        for kind, doc in (("spec-approval", self.SPEC), ("plan-approval", PLAN)):
+            path = f"docs/superpowers/reviews/7/{kind}.md"
+            text = self.HEADER.format(kind, doc, git(fl.wt, "rev-parse", f"HEAD:{doc}"))
+            if not (fl.wt / path).exists() or (fl.wt / path).read_text() != text:
+                fl.commit(path, text, kind)
+
+    def test_l2_approved_spec_and_reviews_files_exempt(self):
+        fl = self.l2_lab()
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.OK, r.lines)
+        self.assertTrue(self.item(r, "guard_scope").ok)
+
+    def test_l2_modified_plan_after_registration_is_out_of_scope(self):
+        fl = self.l2_lab()
+        fl.commit(PLAN, plan_text(tasks=1) + "\n- Create: `src/extra.py`\n", "piano ritoccato")
+        self.approve(fl)
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.RED, r.lines)
+        self.assertFalse(self.item(r, "guard_scope").ok)
+        self.assertIn(PLAN, " ".join(r.lines))
+
+    def test_l2_spec_changed_after_approval_is_out_of_scope(self):
+        fl = self.l2_lab()
+        fl.commit(self.SPEC, "# spec cambiata\n", "spec ritoccata")
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.RED, r.lines)
+        self.assertFalse(self.item(r, "guard_scope").ok)
+        self.assertIn(self.SPEC, " ".join(r.lines))
+
     def test_must_have_manual_listed_in_report(self):
         text = plan_text(tasks=1).replace("M2. Zero — test: tests.test_app::test_zero",
                                           "M2. Colore — test: manuale")
