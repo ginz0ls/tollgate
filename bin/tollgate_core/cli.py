@@ -10,7 +10,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import VERSION, clock, db, events, phases, stats, verify
+from . import VERSION, clock, db, events, git, phases, stats, verify
 from .paths import repo_key, resolve_state
 
 
@@ -79,6 +79,9 @@ def build_parser() -> argparse.ArgumentParser:
     asub = ap.add_subparsers(dest="act_cmd", required=True)
     aa = asub.add_parser("apply", help="applica un atto registrato (resolve, approve level)")
     aa.add_argument("act_id", nargs="?", metavar="ID", help="senza id: l'ultimo atto pending")
+    fp = sub.add_parser("finish", help="chiusura del lavoro (6.4)")
+    fsub = fp.add_subparsers(dest="finish_cmd", required=True)
+    fsub.add_parser("check", help="copia locale del gate: la DoD voce per voce; verde = review")
     hp = sub.add_parser("hook", help="solo per hooks/run: adattatore per Claude Code")
     hp.add_argument("event", metavar="evento")
     vp = sub.add_parser("verify", help="esegue i comandi del gate e registra le ricevute (8.1)")
@@ -170,6 +173,12 @@ def _hook_argv(argv: list[str], cmd: str) -> list[str]:
     return argv[argv.index(cmd):]
 
 
+def _external_errors() -> tuple[type[Exception], ...]:
+    """Errori di git e di gh nei sottocomandi del flusso: un messaggio, mai un traceback."""
+    from tollgate_flow import gh, gitw
+    return (gh.GhError, git.GitError, gitw.GitWriteError)
+
+
 def main(argv: list[str]) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -227,6 +236,11 @@ def main(argv: list[str]) -> int:
                 print(f"tollgate: {e}", file=sys.stderr)
                 return 1
             return 0
+        if args.cmd == "finish":
+            from tollgate_flow import finishcheck
+            result = finishcheck.check(state, Path.cwd())
+            print("\n".join(result.lines))
+            return result.code
         if args.cmd == "waiver":
             from . import waiver_cli
             print(waiver_cli.add_waiver(state, Path.cwd(), type_=args.type, file=args.file,
@@ -283,5 +297,10 @@ def main(argv: list[str]) -> int:
         return 1
     except sqlite3.Error as e:
         print(f"tollgate: errore del database: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        if not isinstance(e, _external_errors()):
+            raise
+        print(f"tollgate: {e}", file=sys.stderr)
         return 1
     return 0
