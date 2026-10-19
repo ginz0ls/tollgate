@@ -110,6 +110,33 @@ class CliSessionTest(unittest.TestCase):
         (self.ts.dir / sessions.CLI_DIR).write_text("file, non cartella")
         self.note("s1")  # nessuna eccezione
 
+    def test_signal_consumed_once(self):
+        self.note("s1")
+        self.assertEqual(sessions.cli_session(self.state, self.cwd, "start", now=T0,
+                                              argv=["start", "7"]), "s1")
+        with self.assertRaisesRegex(sessions.CliSessionError, "sessione non riconosciuta"):
+            sessions.cli_session(self.state, self.cwd, "start", now=T0, argv=["start", "7"])
+
+    def test_signal_without_argv_is_not_consumed(self):
+        self.note("s1")
+        self.assertEqual(self.find(), "s1")
+        self.assertEqual(self.find(), "s1")
+
+    def test_consume_keeps_other_subcommands(self):
+        self.note("s1", "start")
+        self.note("s1", "act")
+        sessions.cli_session(self.state, self.cwd, "start", now=T0, argv=["start", "7"])
+        data = json.loads((self.ts.dir / "cli" / "s1.json").read_text())
+        self.assertEqual(sorted(data), ["act"])
+        self.assertEqual(self.find("act"), "s1")
+
+    def test_argv_mismatch_refused(self):
+        self.note("s1")
+        with self.assertRaisesRegex(sessions.CliSessionError, "sessione non riconosciuta"):
+            sessions.cli_session(self.state, self.cwd, "start", now=T0, argv=["start", "8"])
+        # il rifiuto non toglie la voce
+        self.assertEqual(self.find(), "s1")
+
 
 if __name__ == "__main__":
     unittest.main()

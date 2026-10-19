@@ -23,19 +23,27 @@ class ImplReport:
         return not self.missing and not self.unknown_status
 
 
+MAX_SCAN_CHARS = 65536
+MAX_DECODES = 500
+
+
 def json_candidates(text: str, key: str) -> list[dict]:
-    """Oggetti JSON con la chiave `key`, dal fondo del testo verso l'inizio."""
+    """Oggetti JSON con la chiave `key`, dal fondo del testo verso l'inizio. Esamina solo la coda
+    di MAX_SCAN_CHARS caratteri e al più MAX_DECODES aperture di `{` (decisione 23)."""
     dec = json.JSONDecoder()
     out: list[dict] = []
-    pos = text.rfind("{")
-    while pos >= 0:
+    lo = max(0, len(text) - MAX_SCAN_CHARS)
+    pos = text.rfind("{", lo)
+    decodes = 0
+    while pos >= lo and decodes < MAX_DECODES:
+        decodes += 1
         try:
             obj, _ = dec.raw_decode(text, pos)
             if isinstance(obj, dict) and key in obj:
                 out.append(obj)
         except json.JSONDecodeError:
             pass
-        pos = text.rfind("{", 0, pos)
+        pos = text.rfind("{", lo, pos)
     return out
 
 

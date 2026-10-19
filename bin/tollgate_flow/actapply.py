@@ -106,7 +106,8 @@ def _pick(conn, work, act_id, session, now):
     return row
 
 
-def apply_act(state, cwd, act_id: str | None, *, now=None) -> str:
+def apply_act(state, cwd, act_id: str | None, *, now=None,
+              argv: list[str] | None = None) -> str:
     now = now or clock.now()
     try:
         conn = db.open_db(state)
@@ -114,7 +115,7 @@ def apply_act(state, cwd, act_id: str | None, *, now=None) -> str:
         raise ActApplyError(str(e)) from e
     try:
         try:
-            session = sessions.cli_session(state, cwd, "act", now=now)
+            session = sessions.cli_session(state, cwd, "act", now=now, argv=argv)
         except sessions.CliSessionError as e:
             raise ActApplyError(str(e)) from e
         work = sessions.work_for_path(conn, cwd)

@@ -1,7 +1,7 @@
 """PreToolUse Bash: chiamate al programma `tollgate` (decisioni 2 e 22).
 
 La CLI gira dentro Bash e non riceve il session_id: per `start` e `act`, i soli sottocomandi
-che leggono la sessione, il controllo lascia un segnale (operazione `cli_call`). Un subagente
+che leggono la sessione (e quelli di chiusura di P3b), il controllo lascia un segnale (operazione `cli_call`). Un subagente
 non può lanciare i comandi del coordinatore."""
 from __future__ import annotations
 
@@ -12,8 +12,9 @@ from tollgate_analysis import bash
 from tollgate_hooks.model import deny, record
 
 CHECK = {"api": 1, "events": ["pre_bash"], "component": None, "order": 5}
-_SIGNALLED = ("start", "act")
-_COORDINATOR_ONLY = ("start", "task", "act")
+_SIGNALLED = ("start", "act", "finish", "sync", "adopt", "cleanup", "abandon")
+_COORDINATOR_ONLY = ("start", "task", "act", "finish", "review", "sync", "adopt", "cleanup",
+                     "abandon")
 
 
 def _undecidable(token: str) -> bool:
@@ -71,7 +72,9 @@ def decide(event, ctx):
         if event.agent_id and "tollgate" in raw and (words & {*_COORDINATOR_ONLY, "--checkpoint"}):
             return [deny("comando non analizzabile che nomina tollgate con un sottocomando del "
                          "coordinatore: un subagente non lo lancia. Riporta al coordinatore "
-                         "(BLOCKED o NEEDS_CONTEXT).", rule="coordinator_only")]
+                         "(BLOCKED o NEEDS_CONTEXT). Se non stai lanciando tollgate, scrivi il "
+                         "comando in modo letterale, senza variabili né $(…)",
+                         rule="coordinator_only")]
         return []
     out = []
     for c in cmds:

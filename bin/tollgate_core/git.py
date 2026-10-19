@@ -313,12 +313,16 @@ def excluded(rel: str, exclude) -> bool:
     return any(rel == e.rstrip("/") or rel.startswith(e.rstrip("/") + "/") for e in exclude)
 
 
+CACHE_DIRS = ("__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache")
+
+
 def fingerprint(repo, exclude) -> str:
-    """Impronta dei file tracciati e non tracciati non ignorati (7.3), esclusi output_dirs."""
+    """Impronta dei file tracciati e non tracciati non ignorati (7.3), esclusi output_dirs e le
+    cartelle di cache a qualunque profondità (decisione 22)."""
     h = hashlib.sha256()
     files = run(repo, "ls-files", "-co", "--exclude-standard", "-z").split("\0")
     for rel in sorted({f for f in files if f}):
-        if excluded(rel, exclude):
+        if excluded(rel, exclude) or any(seg in CACHE_DIRS for seg in rel.split("/")):
             continue
         try:
             digest = hashlib.sha1((Path(repo) / rel).read_bytes()).hexdigest()

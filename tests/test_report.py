@@ -1,5 +1,6 @@
 import json
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -94,6 +95,14 @@ class ReportTest(unittest.TestCase):
             self.assertEqual(report.transcript_tokens(f.name), 2)
         finally:
             Path(f.name).unlink()
+
+    def test_json_candidates_capped(self):
+        good = json.dumps(GOOD)
+        t0 = time.monotonic()
+        found = report.json_candidates("{" * 200000 + good, "status")
+        self.assertLess(time.monotonic() - t0, 1.0)
+        self.assertEqual(found, [GOOD])
+        self.assertEqual(report.json_candidates(good + "x" * 70000, "status"), [])
 
 
 if __name__ == "__main__":

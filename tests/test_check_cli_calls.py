@@ -127,6 +127,35 @@ class CliCallsTest(unittest.TestCase):
         (self.lab.ts.dir / "cli").write_text("file, non cartella")
         self.assertEqual(self.lab.bash(f"'{PROGRAM}' start 7").exit, 0)
 
+    def test_p3b_subcommands_signalled(self):
+        for cmd, sub, argv in ((f"'{PROGRAM}' finish open-pr", "finish", ["finish", "open-pr"]),
+                               (f"'{PROGRAM}' sync", "sync", ["sync"]),
+                               (f"'{PROGRAM}' adopt 7", "adopt", ["adopt", "7"]),
+                               (f"'{PROGRAM}' cleanup --confirm", "cleanup",
+                                ["cleanup", "--confirm"]),
+                               (f"'{PROGRAM}' abandon 7", "abandon", ["abandon", "7"]),
+                               (f"'{PROGRAM}' finish check", "finish", ["finish", "check"])):
+            with self.subTest(cmd=cmd):
+                self.signal.unlink(missing_ok=True)
+                self.assertEqual(self.lab.bash(cmd).exit, 0)
+                self.assertEqual(self.signals()[sub]["argv"], argv)
+        self.signal.unlink(missing_ok=True)
+        self.assertEqual(self.lab.bash(f"'{PROGRAM}' review prepare").exit, 0)
+        self.assertFalse(self.signal.exists())
+
+    def test_subagent_denied_p3b_commands(self):
+        for cmd in (f"'{PROGRAM}' finish check", f"'{PROGRAM}' review prepare",
+                    f"'{PROGRAM}' sync", f"'{PROGRAM}' adopt 7", f"'{PROGRAM}' cleanup",
+                    f"'{PROGRAM}' abandon 7"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.lab.bash(cmd, agent_id="ag-1").exit, 2)
+        self.assertFalse(self.signal.exists())
+
+    def test_parse_failure_message_explains(self):
+        r = self.lab.bash(f"python3 '{PROGRAM}' task done 1 \"unchiuso", agent_id="ag-1")
+        self.assertEqual(r.exit, 2)
+        self.assertIn("modo letterale", r.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

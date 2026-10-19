@@ -129,6 +129,11 @@ class ActsTest(unittest.TestCase):
         self.assertIn("atto ricevuto (approve waiver w-7-1)", text)
         self.assertNotIn("registrato", text)
 
+    def test_abandon_act_has_no_work(self):
+        expand(self.lab, "tollgate:abandon", "#9")
+        a = self.acts()[0]
+        self.assertEqual((a["type"], a["target"], a["work"]), ("abandon", "9", None))
+
 
 class ProgramLineTest(unittest.TestCase):
     def setUp(self):

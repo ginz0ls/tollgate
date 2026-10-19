@@ -70,7 +70,7 @@ def _act(event, ctx, type_):
         if not args or not args[0].lstrip("#").isdigit():
             return _refuse(f"{type_} vuole il numero dell'issue (#N)")
         target = args[0].lstrip("#")
-    if type_ in ("adopt", "cleanup"):
+    if type_ in ("adopt", "cleanup", "abandon"):
         work_id = None
     typed = str(event.raw.get("prompt") or f"/{name} {raw_args}".strip())
     label = " ".join(x for x in (type_, obj, target) if x)

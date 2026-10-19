@@ -165,6 +165,11 @@ def _stats(conn, args) -> int:
     return 0
 
 
+def _hook_argv(argv: list[str], cmd: str) -> list[str]:
+    """Gli argomenti dal sottocomando in poi, come li registra l'hook di PreToolUse."""
+    return argv[argv.index(cmd):]
+
+
 def main(argv: list[str]) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -192,7 +197,8 @@ def main(argv: list[str]) -> int:
             result = flow_start.start(state, Path.cwd(), args.issue, level=args.level,
                                       confirm=args.confirm,
                                       reopen_execution=args.reopen_execution,
-                                      claude_dir=Path.home() / ".claude")
+                                      claude_dir=Path.home() / ".claude",
+                                      argv=_hook_argv(argv, args.cmd))
             print("\n".join(result.lines))
             return result.code
         if args.cmd == "task":
@@ -215,7 +221,8 @@ def main(argv: list[str]) -> int:
         if args.cmd == "act":
             from tollgate_flow import actapply
             try:
-                print(actapply.apply_act(state, Path.cwd(), args.act_id))
+                print(actapply.apply_act(state, Path.cwd(), args.act_id,
+                                              argv=_hook_argv(argv, args.cmd)))
             except actapply.ActApplyError as e:
                 print(f"tollgate: {e}", file=sys.stderr)
                 return 1

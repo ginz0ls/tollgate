@@ -110,9 +110,25 @@ def note_cli_call(state: State, session: str, cwd: str, argv: list[str], *, now)
         return
 
 
-def cli_session(state: State, cwd, subcommand: str, *, now) -> str:
+def _consume_signal(path: Path, subcommand: str) -> None:
+    """Toglie dal file la sola voce del sottocomando (tmp + os.replace, come `note_cli_call`).
+    Un errore di scrittura non fa fallire la chiamata."""
+    try:
+        data = _read_signals(path)
+        data.pop(subcommand, None)
+        tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        tmp.write_text(json.dumps(data), encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError:
+        return
+
+
+def cli_session(state: State, cwd, subcommand: str, *, now,
+                argv: list[str] | None = None) -> str:
     """La sessione che ha lanciato il sottocomando: segnale recente, stessa cartella risolta,
-    stesso sottocomando (decisione 2). Zero candidate o più d'una: errore."""
+    stesso sottocomando (decisione 2). Con `argv` la voce vale solo se `argv` coincide e si toglie
+    dal file (un secondo lancio senza hook non eredita la sessione); senza `argv` è una lettura
+    che non consuma. Zero candidate o più d'una: errore."""
     here = Path(cwd).resolve()
     limit = clock.fmt(now - timedelta(seconds=CLI_WINDOW_S))
     found = []
@@ -122,12 +138,17 @@ def cli_session(state: State, cwd, subcommand: str, *, now) -> str:
         if not isinstance(entry, dict) or not isinstance(entry.get("at"), str) \
                 or not isinstance(entry.get("cwd"), str) or not _SAFE.match(f.stem):
             continue
+        if argv is not None and entry.get("argv") != argv:
+            continue
         if entry["at"] > limit and Path(entry["cwd"]).resolve() == here:
-            found.append(f.stem)
+            found.append((f.stem, f))
     if not found:
         raise CliSessionError("sessione non riconosciuta: lancia il comando da Claude Code "
                               "con tollgate acceso")
     if len(found) > 1:
         raise CliSessionError("più sessioni di Claude Code hanno lanciato questo comando "
                               "da questa cartella: ripeti il comando")
-    return found[0]
+    session, path = found[0]
+    if argv is not None:
+        _consume_signal(path, subcommand)
+    return session

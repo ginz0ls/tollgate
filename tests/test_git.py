@@ -224,5 +224,28 @@ class GitTest(unittest.TestCase):
         self.assertFalse(sentinel.exists())
 
 
+class FingerprintTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="tollgate fp "))
+        self.repo = make_repo(self.tmp / "repo")
+        (self.repo / "src").mkdir()
+        (self.repo / "src" / "a.py").write_text("uno\n")
+        g(self.repo, "add", "-A")
+        g(self.repo, "commit", "-qm", "base")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_cache_dirs_ignored(self):
+        f0 = git.fingerprint(self.repo, [])
+        for d in git.CACHE_DIRS:
+            cache = self.repo / "tests" / d
+            cache.mkdir(parents=True)
+            (cache / "x.pyc").write_bytes(b"\0\1")
+        self.assertEqual(git.fingerprint(self.repo, []), f0)
+        (self.repo / "src" / "a.py").write_text("due\n")
+        self.assertNotEqual(git.fingerprint(self.repo, []), f0)
+
+
 if __name__ == "__main__":
     unittest.main()

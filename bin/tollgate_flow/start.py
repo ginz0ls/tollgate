@@ -284,7 +284,8 @@ def _existing_branches(state, main, n: int) -> list[str]:
 
 
 def start(state: State, cwd: Path, issue: int, *, level: str | None, confirm: bool,
-          reopen_execution: bool, claude_dir: Path, now=None) -> StartResult:
+          reopen_execution: bool, claude_dir: Path, now=None,
+          argv: list[str] | None = None) -> StartResult:
     now = now or clock.now()
     top = git.toplevel(cwd)
     if top is None:
@@ -311,7 +312,7 @@ def start(state: State, cwd: Path, issue: int, *, level: str | None, confirm: bo
     except gitw.GitWriteError as e:
         return _refuse(f"scrittura della configurazione git non riuscita: {e}")
     try:
-        session = sessions.cli_session(state, cwd, "start", now=now)
+        session = sessions.cli_session(state, cwd, "start", now=now, argv=argv)
     except sessions.CliSessionError as e:
         return _refuse(str(e))
 
