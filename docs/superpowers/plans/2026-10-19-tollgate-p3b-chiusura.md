@@ -209,8 +209,9 @@ Il codice di P3b chiama `gh` in forme non ancora provate (spec 16: «`gh` vero»
 **Files:**
 - Modify: `bin/tollgate_core/db.py`, `bin/tollgate_core/phases.py`, `bin/tollgate_core/acts.py`, `bin/tollgate_core/dod.py`, `bin/tollgate_core/events.py`, `bin/tollgate_core/stats.py`, `bin/tollgate_hooks/context.py` (`approved_waivers` delega a `acts`)
 - Create: `bin/tollgate_core/reviews.py`, `bin/tollgate_core/intents.py`
+- Modify: `bin/tollgate_analysis/verdicts.py` (`is_blocking`), `bin/tollgate_core/git.py` (`patch_id`)
 - Modify: `tests/flowkit.py`
-- Test: `tests/test_db.py`, `tests/test_reviews.py`, `tests/test_intents.py`, `tests/test_phases.py`, `tests/test_dod.py`, `tests/test_acts.py`, `tests/test_stats.py`
+- Test: `tests/test_db.py`, `tests/test_reviews.py`, `tests/test_intents.py`, `tests/test_phases.py`, `tests/test_dod.py`, `tests/test_acts.py`, `tests/test_stats.py`, `tests/test_verdicts.py`, `tests/test_git.py`
 
 **Interfaces:**
 - Produces in `db.py`: `SCHEMA_V4` (decisione 1), `MIGRATIONS` fino a 4.
@@ -261,7 +262,7 @@ Il codice di P3b chiama `gh` in forme non ancora provate (spec 16: «`gh` vero»
   - `test_non_blocking_rule_is_note` (rilievo `major` con `rule` `R-WEB-2` in `known_rules` ma fuori da `blocking_rules` → confermato ma `ok`);
   - `test_is_blocking` (passo del piano → sì; `R-` in `blocking_rules` → sì; nota e non bloccante → no; sconosciuta → sì);
   - `test_downgrade_and_dismiss` (`set_decision` su un `rejected` → `ValueError`; `downgraded:minor` → `blocking_open` vuoto).
-- [ ] **Step 5: Test** `test_dod.py`: `test_downgraded_to_major_still_blocks` (rinviato P1), `test_dismissed_passes`, `test_findings_only_latest_cycle` (ciclo 1 con un `major` confermato, ciclo 2 `ok` → con `findings_cycle=2` la voce è vera), `test_skip_items`, `test_unverified_receipt_counts_with_allow`, `test_specialists_item`. `test_acts.py::test_approved_waivers_any_state`. `test_stats.py::test_off_periods_overlap`.
+- [ ] **Step 5: Test** `test_dod.py`: `test_downgraded_to_major_still_blocks` (rinviato P1), `test_dismissed_passes`, `test_findings_only_latest_cycle` (ciclo 1 con un `major` confermato, ciclo 2 `ok` → con `findings_cycle=2` la voce è vera), `test_skip_items`, `test_unverified_receipt_counts_with_allow`, `test_specialists_item`. `test_acts.py::test_approved_waivers_any_state`. `test_git.py::PatchIdTest` (`None` con diff vuoto; stesso id dopo un rebase senza conflitti su una base avanzata; id diverso con un contenuto diverso). `test_stats.py::test_off_periods_overlap`.
 - [ ] **Step 6: Fallimento, implementazione, verifica** (`python3 -B -m unittest tests.test_db tests.test_phases tests.test_intents tests.test_reviews tests.test_dod tests.test_acts tests.test_stats`), `tests/run`.
 - [ ] **Step 7: Commit** «tollgate P3b: migrazione 4, cicli di revisione e rilievi, intenti, DoD dei rilievi».
 
@@ -453,7 +454,7 @@ Il codice di P3b chiama `gh` in forme non ancora provate (spec 16: «`gh` vero»
 - Produces in `openpr.py`:
   - `OpenResult(code: int, lines: list[str], url: str | None)`;
   - `open_pr(state, cwd, *, update: bool, now=None, argv=None, via_sync: str | None = None) -> OpenResult`. `via_sync` è l'id dell'atto `sync` già consumato da `sync`: sostituisce l'atto `finish` (decisione 17).
-  - `facts(conn, state, work, cfg, wt, head) -> dict`: i campi di 18.1 (decisione 11), usati da `open_pr` e da `adopt`.
+  - `facts(conn, state, work, cfg, wt, head) -> dict`: i campi di 18.1 (decisione 11), usati da `open_pr` (`adopt` legge il blocco con `prblock.parse`). `open_pr` ricalcola la DoD con `findings_cycle` = numero dell'ultimo ciclo chiuso su HEAD (o con lo stesso `patch-id`) e `specialists` = specialisti attesi in L2 (decisione 15).
 - Comportamento: decisione 10, nell'ordine scritto lì; i rifiuti escono tutti insieme con le righe `rifiuto: …` e codice 1; con PR chiusa senza merge, `CLOSED_HINT`. Le note e il testo dei rilievi passano da `prbody.neutralize`.
 - CLI: `tollgate finish open-pr [--update]`, sessione con `cli_session(state, cwd, "finish", argv=…)` (serve per `approve pr`).
 
