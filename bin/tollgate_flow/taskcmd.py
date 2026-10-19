@@ -138,7 +138,8 @@ def _task_start(state, conn, cwd: Path, number: int, *, fix: bool, claude_dir: P
             "resume"
     else:
         name, pending = naming.implementer_name(work["issue"], number, round_), "launch"
-    hint = MODEL_HINT if renamed else None
+    # decisione 21: il modello di `[review] models`; dal giro 4 il nuovo implementatore è inherit
+    hint = MODEL_HINT if renamed else cfg.get("review.models").get(routing.implementer)
 
     impl_brief = briefs.ImplBrief(
         issue=work["issue"], task=number, name=name, agent_type=routing.implementer,

@@ -127,6 +127,19 @@ class TaskStartTest(TaskCase):
         self.assertIn("revisore: probe:reviewer-web", summary)
         self.assertIn("tg-7-t2", path.read_text())
 
+    def test_models_override_in_summary(self):
+        self.make(toml=DEFAULT_TOML + '[review]\nmodels = {"tollgate:implementer" = "sonnet"}\n')
+        path, summary = self.start()
+        self.assertIn("model: sonnet", summary)
+        self.assertIn("model: sonnet", path.read_text())
+        for _ in (1, 2, 3):
+            self.to_changes()
+            self.start(fix=True)
+        self.to_changes()
+        path, summary = self.start(fix=True)      # giro 4: nuovo implementatore, resta inherit
+        self.assertIn("model: inherit", summary)
+        self.assertNotIn("sonnet", summary)
+
     def test_absent_skill_removed_from_required(self):
         self.make(toml=WEB_TOML, plan=plan_text("- Create: `web/page.tsx`"))
         # registrazione del piano: i primi 3 dei profili

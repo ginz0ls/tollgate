@@ -82,6 +82,9 @@ def build_parser() -> argparse.ArgumentParser:
     fp = sub.add_parser("finish", help="chiusura del lavoro (6.4)")
     fsub = fp.add_subparsers(dest="finish_cmd", required=True)
     fsub.add_parser("check", help="copia locale del gate: la DoD voce per voce; verde = review")
+    rp = sub.add_parser("review", help="revisione finale (6.4, 8.6)")
+    rsub = rp.add_subparsers(dest="review_cmd", required=True)
+    rsub.add_parser("prepare", help="apre o riprende il ciclo e scrive i brief dei revisori")
     hp = sub.add_parser("hook", help="solo per hooks/run: adattatore per Claude Code")
     hp.add_argument("event", metavar="evento")
     vp = sub.add_parser("verify", help="esegue i comandi del gate e registra le ricevute (8.1)")
@@ -241,6 +244,14 @@ def main(argv: list[str]) -> int:
             result = finishcheck.check(state, Path.cwd())
             print("\n".join(result.lines))
             return result.code
+        if args.cmd == "review":
+            from tollgate_flow import finalreview
+            try:
+                print("\n".join(finalreview.prepare(state, Path.cwd()).lines))
+            except finalreview.ReviewError as e:
+                print(f"tollgate: {e}", file=sys.stderr)
+                return 1
+            return 0
         if args.cmd == "waiver":
             from . import waiver_cli
             print(waiver_cli.add_waiver(state, Path.cwd(), type_=args.type, file=args.file,

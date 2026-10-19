@@ -83,5 +83,50 @@ class ReviewBriefTest(unittest.TestCase):
         self.assertNotIn("salute del codice", brief.review_brief(review()))
 
 
+def final(**kw):
+    base = dict(issue=7, cycle=2, sha="a" * 40, code="c0de1234", base="b" * 40, head="a" * 40,
+                diff_path=".tollgate-run/7/final-2.diff", plan_path="docs/p.md",
+                plan_sha="c" * 40,
+                must_haves=[plan.MustHave("M1", "Somma corretta", ["t::a"])],
+                scope=["src/app.py"], checklists=["controlla il contrasto"],
+                severity={"blocker": "perdita di dati", "major": "fallisce così com'è"},
+                issue_file=".tollgate-run/7/issue.md", role="tollgate:final-reviewer")
+    base.update(kw)
+    return brief.FinalBrief(**base)
+
+
+class FinalBriefTest(unittest.TestCase):
+    def test_final_brief_has_sha_code_rules_and_format(self):
+        out = brief.final_review_brief(final())
+        self.assertIn('"sha": "' + "a" * 40 + '", "code": "c0de1234"', out)
+        self.assertIn('"outcome": "ok" | "needs_fix" | "needs_you"', out)
+        self.assertIn('"confidence"', out)
+        for needle in ("R-", "passo del piano", "asserzioni", "casi speciali", "perdita di dati",
+                       "Somma corretta", "src/app.py", "controlla il contrasto",
+                       "non modificare", "test che scrivono file", "final-reviewer",
+                       "docs/p.md", "c" * 40):
+            self.assertIn(needle, out)
+
+    def test_specialist_role_named_and_text_fenced(self):
+        out = brief.final_review_brief(final(role="probe:final-security",
+                                             checklists=["usa ``` qui"]))
+        self.assertIn("probe:final-security", out)
+        self.assertIn("````\n- usa ``` qui\n````", out)
+
+
+class VerifierBriefTest(unittest.TestCase):
+    def test_verifier_brief_fences_findings(self):
+        f = [{"id": "f-1-1", "severity": "major", "file": "a.py", "line": 3, "rule": "R-1",
+              "text": "usa ``` male"}]
+        out = brief.verifier_brief(brief.VerifierBrief(
+            issue=7, cycle=1, sha="a" * 40, code="c0de", diff_path="d.diff", findings=f))
+        self.assertIn("````\n- f-1-1", out)
+        self.assertIn("usa ``` male", out)
+        self.assertIn('"results"', out)
+        self.assertIn("senza discutere con il revisore", out)
+        self.assertIn("un rilievo senza prova si scarta", out)
+        self.assertIn('"code": "c0de"', out)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -137,3 +137,84 @@ def review_brief(b: ReviewBrief) -> str:
                        '[{"severity": "…", "file": "…", "line": 0, "rule": "…", "text": "…"}]}'
                        % (b.task, b.sha, b.code))]
     return "\n".join(out) + "\n"
+
+
+@dataclass
+class FinalBrief:
+    issue: int
+    cycle: int
+    sha: str
+    code: str
+    base: str
+    head: str
+    diff_path: str
+    plan_path: str
+    plan_sha: str
+    must_haves: list[plan.MustHave]
+    scope: list[str]
+    checklists: list[str]
+    severity: dict
+    issue_file: str
+    role: str
+
+
+FINAL_STANDARD = [
+    "Standard della revisione finale (8.6):",
+    "- Cerca difetti, non confermare il lavoro: il tuo compito è trovare ciò che non va, anche "
+    "se i test sono verdi.",
+    "- Confronta il lavoro con il piano, i must-have e lo scope.",
+    "- Cerca le asserzioni rese più deboli o compensate con asserzioni banali (R3) e i casi "
+    "speciali: valori limite, input vuoti, errori, ripetizioni.",
+    "- Ogni rilievo ha `file`, `line` e `rule`: la regola `R-…` violata oppure il passo del "
+    "piano. Senza, non vale e si scarta.",
+    "- Chiedono modifiche solo i rilievi `blocker` e `major`; `moderate` e `minor` sono note.",
+]
+
+
+def final_review_brief(b: FinalBrief) -> str:
+    out = [f"# Revisione finale del lavoro #{b.issue}, ciclo {b.cycle}", "",
+           f"Sei `{b.role}`. Intervallo revisionato: `{b.base}..{b.head}`. Diff: `{b.diff_path}`.",
+           f"Piano: `{b.plan_path}` (blob `{b.plan_sha}`). Issue: `{b.issue_file}`.",
+           "Sei in sola lettura: non modificare nessun file e non eseguire test che scrivono "
+           "file (rapporti, copertura, cache).", DATA_NOTE, "", *FINAL_STANDARD,
+           "", "## Must-have",
+           _bullets([f"{m.id}. {m.text} — test: {', '.join(m.tests) or 'nessuno'}"
+                     for m in b.must_haves]), "", "## Scope", _bullets(b.scope)]
+    if b.checklists:
+        out += ["", "## Lista di controllo dell'area", _bullets(b.checklists)]
+    out += ["", "## Gravità",
+            "\n".join(f"- `{k}`: {v}" for k, v in b.severity.items()),
+            "", "## Verdetto",
+            "Chiudi con un solo blocco JSON (18.5). `sha` e `code` vanno riportati alla lettera:",
+            "", _block('{"sha": "%s", "code": "%s", "outcome": "ok" | "needs_fix" | '
+                       '"needs_you", "findings": [{"severity": "blocker" | "major" | "moderate" '
+                       '| "minor", "confidence": 0.0, "file": "…", "line": 0, "rule": "R-… | '
+                       'passo del piano", "text": "…"}]}' % (b.sha, b.code))]
+    return "\n".join(out) + "\n"
+
+
+@dataclass
+class VerifierBrief:
+    issue: int
+    cycle: int
+    sha: str
+    code: str
+    diff_path: str
+    findings: list[dict]
+
+
+def verifier_brief(b: VerifierBrief) -> str:
+    out = [f"# Verifica dei rilievi del lavoro #{b.issue}, ciclo {b.cycle}", "",
+           f"Diff: `{b.diff_path}`. Sei in sola lettura: non modificare nessun file e non "
+           "eseguire test che scrivono file.", DATA_NOTE, "",
+           "Conferma o scarta ogni rilievo, senza discutere con il revisore; un rilievo senza "
+           "prova si scarta. Controlla nel codice che il difetto esista davvero.",
+           "", "## Rilievi", _block("\n".join(f"- {f.get('id')} " + _finding(f)[2:]
+                                              for f in b.findings)),
+           "", "## Risultato",
+           "Chiudi con un solo blocco JSON (18.5), un risultato per ogni rilievo. `sha` e `code` "
+           "vanno riportati alla lettera:",
+           "", _block('{"sha": "%s", "code": "%s", "results": [{"id": "f-…", "verification": '
+                      '"confirmed" | "rejected" | "unverified", "reason": "…"}]}'
+                      % (b.sha, b.code))]
+    return "\n".join(out) + "\n"
