@@ -97,7 +97,11 @@ PROFILE_DEFAULTS: dict = {
     "test_related": "", "report": "", "test_globs": [], "skip_markers": [],
     "assert_markers": [], "plan_sections": [], "min_level": "L0", "dod": [], "checklist": "",
     "skills": [], "agent": "", "reviewer": "", "reviewer_skills": [], "final_specialist": "",
+    "rules": [], "blocking_rules": [],
 }
+
+# Chiave del profilo -> forma del nome dell'agente `<plugin>:<forma>-<area>` (decisione 9).
+AGENT_FORMS = {"agent": "implementer", "reviewer": "reviewer", "final_specialist": "final"}
 
 # Chiavi con un tipo che il valore predefinito non descrive.
 _STR_MAP = "mappa di stringhe"
@@ -181,6 +185,16 @@ def _merge_profile(name: str, raw, warnings: list[str]) -> dict:
             warnings.append(f"chiave sconosciuta: {path}")
             continue
         _set_key(prof, key, value, PROFILE_DEFAULTS[key], path, f"profiles.*.{key}")
+    unknown = [r for r in prof["blocking_rules"] if r not in prof["rules"]]
+    if unknown:
+        raise ConfigError(f"profiles.{name}.blocking_rules: {', '.join(unknown)} "
+                          f"non {'è' if len(unknown) == 1 else 'sono'} in profiles.{name}.rules")
+    for key, form in AGENT_FORMS.items():
+        value = prof[key]
+        if value and not re.match(rf"^[^:\s]+:{form}-[a-z0-9-]+$", value):
+            warnings.append(f"profilo {name}: {key} «{value}» non ha la forma "
+                            f"<plugin>:{form}-<area>: uso l'agente generico")
+            prof[key] = ""
     return prof
 
 

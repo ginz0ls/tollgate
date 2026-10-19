@@ -84,3 +84,24 @@ class RoutingTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RulesTest(unittest.TestCase):
+    PROF = {
+        "web": {"rules": ["R-WEB-1", "R-WEB-2"], "blocking_rules": ["R-WEB-1"],
+                "final_specialist": "p:final-web"},
+        "api": {"rules": ["R-API-1"], "blocking_rules": [], "final_specialist": "p:final-web"},
+        "lib": {"final_specialist": ""},
+    }
+
+    def test_rules(self):
+        names = ["web", "api", "lib", "ghost"]
+        self.assertEqual(profiles.blocking_rules(names, self.PROF), {"R-WEB-1"})
+        self.assertEqual(profiles.known_rules(names, self.PROF),
+                         {"R-WEB-1", "R-WEB-2", "R-API-1"})
+        self.assertEqual(profiles.known_rules([], self.PROF), set())
+
+    def test_final_specialists_ordered_unique(self):
+        self.assertEqual(profiles.final_specialists(["lib", "web", "api"], self.PROF),
+                         ["p:final-web"])
+        self.assertEqual(profiles.final_specialists([], self.PROF), [])

@@ -89,3 +89,19 @@ def task_routing(files, profiles: dict[str, dict]) -> Routing:
              or len({a for a in agents if a}) > 1 or len({r for r in reviewers if r}) > 1)
     return Routing(_single(agents, DEFAULT_IMPLEMENTER), _single(reviewers, DEFAULT_REVIEWER),
                    skills[:SKILL_CAP], reviewer_skills[:SKILL_CAP], split)
+
+
+def blocking_rules(names, profiles: dict[str, dict]) -> set[str]:
+    """Regole `[blocca]` dei profili `names` (decisione 8)."""
+    return set(_union(profiles.get(n, {}).get("blocking_rules", []) for n in names))
+
+
+def known_rules(names, profiles: dict[str, dict]) -> set[str]:
+    """Regole dichiarate dai profili `names`: una `R-…` fuori da qui blocca (fail-closed)."""
+    return set(_union(profiles.get(n, {}).get("rules", []) for n in names))
+
+
+def final_specialists(names, profiles: dict[str, dict]) -> list[str]:
+    """Specialisti finali dei profili `names`: non vuoti, in ordine, senza doppioni."""
+    return _union([profiles[n]["final_specialist"]] for n in names
+                  if profiles.get(n, {}).get("final_specialist"))

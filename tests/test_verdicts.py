@@ -22,6 +22,12 @@ def parse(text, standard=True):
     return verdicts.parse_task_verdict(text, task=3, sha=SHA, code=CODE, standard=standard)
 
 
+def parse_rules(text):
+    return verdicts.parse_task_verdict(text, task=3, sha=SHA, code=CODE, standard=True,
+                                       blocking_rules={"R-WEB-1"},
+                                       known_rules={"R-WEB-1", "R-WEB-2"})
+
+
 class ParseTest(unittest.TestCase):
     def test_valid_approved(self):
         v = parse(block(verdict()))
@@ -79,10 +85,46 @@ class ParseTest(unittest.TestCase):
         self.assertEqual((v.valid, v.outcome), (True, "changes"))
 
     def test_finding_with_bad_severity_or_line_dropped(self):
-        for bad in (dict(GOOD, severity="critical"), dict(GOOD, line="2"), dict(GOOD, line=True),
-                    dict(GOOD, file=""), "testo"):
+        minor = dict(GOOD, severity="minor")
+        for bad in (dict(minor, line="2"), dict(minor, line=True), dict(minor, file=""),
+                    dict(GOOD, severity="moderate", line="2")):
             v = parse(block(verdict(findings=[bad])))
-            self.assertEqual((v.valid, v.findings, v.dropped), (True, [], 1), bad)
+            self.assertEqual((v.valid, v.outcome, v.findings, v.dropped),
+                             (True, "approved", [], 1), bad)
+        v = parse(block(verdict(outcome="changes", findings=[dict(GOOD, severity="critical")])))
+        self.assertFalse(v.valid)
+
+    def test_approved_with_dropped_blocker_invalid(self):
+        for bad in (dict(GOOD, line="2"), dict(GOOD, file=""), dict(GOOD, severity="critical"),
+                    "testo"):
+            v = parse(block(verdict(outcome="approved", findings=[bad])))
+            self.assertFalse(v.valid, bad)
+            self.assertIsNone(v.outcome)
+            self.assertIn("rilievo bloccante senza file, riga o regola: riscrivilo", v.problems)
+        v = parse(block(verdict(outcome="approved", findings=[dict(GOOD, line="2")])),
+                  standard=False)
+        self.assertEqual((v.valid, v.outcome), (True, "approved"))
+
+    def test_non_blocking_rule_major_is_approved(self):
+        f = dict(GOOD, rule="R-WEB-2")
+        v = parse_rules(block(verdict(outcome="changes", findings=[f])))
+        self.assertEqual((v.valid, v.outcome, v.findings), (True, "approved", [f]))
+
+    def test_blocking_rule_major_is_changes(self):
+        v = parse_rules(block(verdict(outcome="approved", findings=[dict(GOOD, rule="R-WEB-1")])))
+        self.assertEqual(v.outcome, "changes")
+
+    def test_plan_step_rule_blocks(self):
+        v = parse_rules(block(verdict(findings=[dict(GOOD, rule="Task 2, passo 3")])))
+        self.assertEqual(v.outcome, "changes")
+
+    def test_unknown_rule_blocks(self):
+        v = parse_rules(block(verdict(findings=[dict(GOOD, rule="R-ALTRO-9")])))
+        self.assertEqual(v.outcome, "changes")
+
+    def test_no_declared_rules_every_r_rule_blocks(self):
+        self.assertEqual(parse(block(verdict(findings=[dict(GOOD, rule="R-WEB-2")]))).outcome,
+                         "changes")
 
     def test_spec_compliance_forces_changes(self):
         v = parse(block(verdict(spec_compliance=["missing"])))
@@ -134,3 +176,80 @@ class ParseTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def final(**over):
+    data = {"sha": SHA, "code": CODE, "outcome": "ok", "findings": []}
+    data.update(over)
+    return data
+
+
+class FinalVerdictTest(unittest.TestCase):
+    def parse(self, text):
+        return verdicts.parse_final_verdict(text, sha=SHA, code=CODE)
+
+    def test_valid(self):
+        f = dict(GOOD, confidence=0.8)
+        v = self.parse(block(final(outcome="needs_fix", findings=[f]), before="Esito.\n"))
+        self.assertEqual((v.valid, v.outcome, v.findings, v.rejected), (True, "needs_fix", [f], []))
+
+    def test_final_verdict_matrix(self):
+        cases = {
+            "sha diverso": block(final(sha="altro")),
+            "codice diverso": block(final(code="altro")),
+            "outcome sconosciuto": block(final(outcome="approved")),
+            "outcome non stringa": block(final(outcome=["ok"])),
+            "json assente": "Tutto a posto.",
+            "findings non lista": block(final(findings="nessuno")),
+        }
+        for name, text in cases.items():
+            with self.subTest(name):
+                v = self.parse(text)
+                self.assertFalse(v.valid)
+                self.assertIsNone(v.outcome)
+                self.assertTrue(v.problems)
+        self.assertFalse(self.parse(None).valid)
+
+    def test_finding_without_line_is_rejected_not_lost(self):
+        bad = {k: v for k, v in GOOD.items() if k != "line"}
+        odd = dict(GOOD, severity="critical")
+        v = self.parse(block(final(findings=[GOOD, bad, odd])))
+        self.assertEqual((v.valid, v.findings, v.rejected), (True, [GOOD], [bad, odd]))
+
+    def test_v_not_required_and_last_object_wins(self):
+        text = block(final(outcome="needs_you"), before=block(final()))
+        self.assertEqual(self.parse(text).outcome, "needs_you")
+
+
+class VerifierResultsTest(unittest.TestCase):
+    IDS = {"f-1-1", "f-1-2"}
+
+    def parse(self, text):
+        return verdicts.parse_verifier_results(text, sha=SHA, code=CODE, ids=self.IDS)
+
+    def data(self, results, **over):
+        d = {"sha": SHA, "code": CODE, "results": results}
+        d.update(over)
+        return block(d)
+
+    def test_verifier_results(self):
+        ok = {"id": "f-1-1", "verification": "confirmed", "reason": "vero"}
+        v = self.parse(self.data([ok, {"id": "f-9-9", "verification": "rejected"}]))
+        self.assertEqual((v.valid, v.results, v.problems), (True, [ok], []))
+
+    def test_unknown_ids_only_is_invalid_and_counted(self):
+        v = self.parse(self.data([{"id": "f-9-9", "verification": "rejected"}]))
+        self.assertFalse(v.valid)
+        self.assertIn("1 id sconosciuti", " ".join(v.problems))
+
+    def test_bad_verification_invalid(self):
+        v = self.parse(self.data([{"id": "f-1-1", "verification": "boh"},
+                                  {"id": "f-1-2", "verification": "confirmed"}]))
+        self.assertFalse(v.valid)
+
+    def test_sha_code_results_shape(self):
+        good = [{"id": "f-1-1", "verification": "unverified", "reason": "x"}]
+        for text in (self.data(good, sha="altro"), self.data(good, code="altro"),
+                     self.data("niente"), "senza json", ""):
+            self.assertFalse(self.parse(text).valid, text)
+        self.assertFalse(self.parse(None).valid)

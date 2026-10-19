@@ -117,6 +117,41 @@ class LoadTextTest(unittest.TestCase):
         self.assertEqual(cfg.warnings, [])
 
 
+class ProfileNamesTest(unittest.TestCase):
+    def prof(self, body):
+        return load_config_text(MIN + "[profiles.web]\n" + body)
+
+    def test_bad_reviewer_name_falls_back_with_warning(self):
+        c = self.prof('reviewer = "acme:code-review"\n')
+        self.assertEqual(c.profiles["web"]["reviewer"], "")
+        self.assertIn("profilo web: reviewer «acme:code-review» non ha la forma "
+                      "<plugin>:reviewer-<area>: uso l'agente generico", c.warnings)
+
+    def test_each_key_has_its_own_form(self):
+        c = self.prof('agent = "acme:reviewer-web"\nfinal_specialist = "acme:implementer-web"\n')
+        self.assertEqual((c.profiles["web"]["agent"], c.profiles["web"]["final_specialist"]),
+                         ("", ""))
+        self.assertEqual(len(c.warnings), 2)
+
+    def test_good_names_kept(self):
+        c = self.prof('agent = "acme:implementer-web"\nreviewer = "acme:reviewer-web-ui"\n'
+                      'final_specialist = "acme:final-web"\n')
+        w = c.profiles["web"]
+        self.assertEqual((w["agent"], w["reviewer"], w["final_specialist"]),
+                         ("acme:implementer-web", "acme:reviewer-web-ui", "acme:final-web"))
+        self.assertEqual(c.warnings, [])
+
+    def test_blocking_rules_type(self):
+        with self.assertRaisesRegex(ConfigError, "profiles.web.blocking_rules"):
+            self.prof('blocking_rules = "R-WEB-1"\n')
+
+    def test_blocking_rule_must_be_known(self):
+        with self.assertRaisesRegex(ConfigError, "R-X-1"):
+            self.prof('blocking_rules = ["R-X-1"]\n')
+        c = self.prof('rules = ["R-X-1", "R-X-2"]\nblocking_rules = ["R-X-1"]\n')
+        self.assertEqual(c.profiles["web"]["blocking_rules"], ["R-X-1"])
+
+
 class LoadFromGitTest(unittest.TestCase):
     def setUp(self):
         self.repo = make_repo(Path(tempfile.mkdtemp()) / "r")

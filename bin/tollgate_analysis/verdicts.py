@@ -1,6 +1,7 @@
-"""Verdetto del revisore del task (spec 18.5, 8.6, decisione 10).
+"""Verdetti dei revisori (spec 18.5, 8.6, decisioni 8 e 10): revisore del task, revisione
+finale, verificatore.
 
-Un verdetto che non rispetta il formato, o che non porta lo SHA e il codice del brief di
+Un verdetto del task che non rispetta il formato, o che non porta lo SHA e il codice del brief di
 `review-prepare`, non è valido e non diventa mai `approved`."""
 from __future__ import annotations
 
@@ -43,8 +44,9 @@ def _may_block(f) -> bool:
     return not (isinstance(f, dict) and f.get("severity") in ("moderate", "minor"))
 
 
-def parse_task_verdict(text: str | None, *, task: int, sha: str, code: str,
-                       standard: bool) -> TaskVerdict:
+def parse_task_verdict(text: str | None, *, task: int, sha: str, code: str, standard: bool,
+                       blocking_rules: set[str] = frozenset(),
+                       known_rules: set[str] = frozenset()) -> TaskVerdict:
     cands = json_candidates(text or "", "outcome")
     if not cands:
         return TaskVerdict(False, ["manca il blocco JSON del verdetto (18.5), o è malformato"])
@@ -73,10 +75,13 @@ def parse_task_verdict(text: str | None, *, task: int, sha: str, code: str,
     findings = [f for f in raw if _finding_ok(f)]
     outcome = declared
     if standard:
-        blocking = bool(spec) or any(f["severity"] in BLOCKING for f in findings)
+        blocking = bool(spec) or any(
+            f["severity"] in BLOCKING and is_blocking(f, blocking_rules, known_rules)
+            for f in findings)
         lost = [f for f in raw if not _finding_ok(f) and _may_block(f)]
-        if declared == "changes" and not blocking and lost:
-            # Un `changes` il cui rilievo bloccante è senza prova non diventa `approved`.
+        if not blocking and lost:
+            # Un rilievo bloccante senza prova non fa mai un `approved`, né da un `changes` né
+            # da un `approved` dichiarato (riga 108).
             return TaskVerdict(False, ["rilievo bloccante senza file, riga o regola: "
                                        "riscrivilo"], None, declared)
         outcome = "changes" if blocking else "approved"
@@ -94,3 +99,85 @@ def is_blocking(finding: dict, blocking_rules: set[str], known_rules: set[str]) 
     if not rule.startswith("R-") or rule in blocking_rules:
         return True
     return rule not in known_rules
+
+
+FINAL_OUTCOMES = ("ok", "needs_fix", "needs_you")
+VERIFICATIONS = ("confirmed", "rejected", "unverified")
+
+
+@dataclass
+class FinalVerdict:
+    """Revisione finale (18.5): `findings` hanno la prova di 8.6; gli altri, con la gravità
+    com'è, stanno in `rejected` (non si scartano in silenzio)."""
+    valid: bool
+    problems: list[str] = field(default_factory=list)
+    outcome: str | None = None
+    findings: list[dict] = field(default_factory=list)
+    rejected: list[dict] = field(default_factory=list)
+
+
+@dataclass
+class VerifierResults:
+    valid: bool
+    problems: list[str] = field(default_factory=list)
+    results: list[dict] = field(default_factory=list)
+
+
+def _sha_code_problems(data: dict, sha: str, code: str) -> list[str]:
+    out = []
+    if data.get("sha") != sha:
+        out.append("sha diverso da quello del brief di revisione")
+    if data.get("code") != code:
+        out.append("code diverso da quello del brief di revisione")
+    return out
+
+
+def parse_final_verdict(text: str | None, *, sha: str, code: str) -> FinalVerdict:
+    cands = json_candidates(text or "", "outcome")
+    if not cands:
+        return FinalVerdict(False, ["manca il blocco JSON del verdetto (18.5), o è malformato"])
+    data = cands[0]
+    outcome = data.get("outcome") if isinstance(data.get("outcome"), str) else None
+    problems = _sha_code_problems(data, sha, code)
+    if outcome not in FINAL_OUTCOMES:
+        problems.append("outcome sconosciuto: usa «ok», «needs_fix» o «needs_you» "
+                        f"(trovato {data.get('outcome')!r})")
+    raw = data.get("findings", [])
+    if not isinstance(raw, list):
+        problems.append("findings deve essere una lista")
+    if problems:
+        return FinalVerdict(False, problems)
+    findings = [f for f in raw if _finding_ok(f)]
+    rejected = [f if isinstance(f, dict) else {"text": str(f)} for f in raw if not _finding_ok(f)]
+    return FinalVerdict(True, [], outcome, findings, rejected)
+
+
+def parse_verifier_results(text: str | None, *, sha: str, code: str,
+                           ids: set[str]) -> VerifierResults:
+    cands = json_candidates(text or "", "results")
+    if not cands:
+        return VerifierResults(False, ["manca il blocco JSON dei risultati (18.5), o è "
+                                       "malformato"])
+    data = cands[0]
+    problems = _sha_code_problems(data, sha, code)
+    raw = data.get("results")
+    if not isinstance(raw, list):
+        problems.append("results deve essere una lista")
+        raw = []
+    results, unknown = {}, 0
+    for r in raw:
+        if not isinstance(r, dict) or not isinstance(r.get("id"), str):
+            problems.append("ogni risultato ha un id")
+        elif r["id"] not in ids:
+            unknown += 1
+        elif r.get("verification") not in VERIFICATIONS:
+            problems.append(f"verification sconosciuta per {r['id']}: usa «confirmed», "
+                            f"«rejected» o «unverified» (trovato {r.get('verification')!r})")
+        else:
+            results[r["id"]] = r
+    if not results and not problems:
+        problems.append(f"nessun risultato per i rilievi richiesti ({unknown} id sconosciuti "
+                        "ignorati)" if unknown else "nessun risultato per i rilievi richiesti")
+    if problems:
+        return VerifierResults(False, problems)
+    return VerifierResults(True, [], list(results.values()))

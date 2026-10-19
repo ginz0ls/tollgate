@@ -16,8 +16,8 @@ WEB_TOML = DEFAULT_TOML + """
 [profiles.web]
 paths = ["web/**"]
 skills = ["ghost-skill", "present-skill", "s3", "s4"]
-agent = "probe:web-dev"
-reviewer = "probe:web-reviewer"
+agent = "probe:implementer-web"
+reviewer = "probe:reviewer-web"
 """
 
 
@@ -122,9 +122,9 @@ class TaskStartTest(TaskCase):
         path, summary = self.start(2)
         row = self.row(2)
         self.assertEqual((row["agent_type"], row["reviewer_type"]),
-                         ("probe:web-dev", "probe:web-reviewer"))
-        self.assertIn("probe:web-dev", summary)
-        self.assertIn("revisore: probe:web-reviewer", summary)
+                         ("probe:implementer-web", "probe:reviewer-web"))
+        self.assertIn("probe:implementer-web", summary)
+        self.assertIn("revisore: probe:reviewer-web", summary)
         self.assertIn("tg-7-t2", path.read_text())
 
     def test_absent_skill_removed_from_required(self):

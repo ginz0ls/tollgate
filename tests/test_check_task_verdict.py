@@ -148,6 +148,27 @@ class VerdictTest(Base):
         self.assertIsNone(self.task()["verdict"])
 
 
+class BlockingRulesTest(Base):
+    toml = DEFAULT_TOML + """
+[profiles]
+active = ["web"]
+[profiles.web]
+paths = ["**"]
+rules = ["R-WEB-1", "R-WEB-2"]
+blocking_rules = ["R-WEB-1"]
+"""
+
+    def test_profile_rule_not_blocking(self):
+        f = dict(GOOD, rule="R-WEB-2")
+        self.assertEqual(self.stop(text=self.verdict(outcome="changes", findings=[f])).exit, 0)
+        self.assertEqual(self.task()["verdict"], "approved")
+
+    def test_profile_blocking_rule_blocks(self):
+        f = dict(GOOD, rule="R-WEB-1")
+        self.stop(text=self.verdict(outcome="approved", findings=[f]))
+        self.assertEqual(self.task()["verdict"], "changes")
+
+
 class StandardOffTest(Base):
     toml = DEFAULT_TOML + "[components]\nreviewer_standard = false\n"
 
