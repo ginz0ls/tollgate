@@ -101,6 +101,7 @@ class FinalBriefTest(unittest.TestCase):
         self.assertIn('"sha": "' + "a" * 40 + '", "code": "c0de1234"', out)
         self.assertIn('"outcome": "ok" | "needs_fix" | "needs_you"', out)
         self.assertIn('"confidence"', out)
+        self.assertIn('{"v": 1, "sha"', out)
         for needle in ("R-", "passo del piano", "asserzioni", "casi speciali", "perdita di dati",
                        "Somma corretta", "src/app.py", "controlla il contrasto",
                        "non modificare", "test che scrivono file", "final-reviewer",
@@ -123,6 +124,7 @@ class VerifierBriefTest(unittest.TestCase):
         self.assertIn("````\n- f-1-1", out)
         self.assertIn("usa ``` male", out)
         self.assertIn('"results"', out)
+        self.assertIn('{"v": 1, "sha"', out)
         self.assertIn("senza discutere con il revisore", out)
         self.assertIn("un rilievo senza prova si scarta", out)
         self.assertIn('"code": "c0de"', out)

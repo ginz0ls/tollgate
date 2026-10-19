@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from tollgate_analysis import brief as briefs, plan as planmod, profiles as prof
-from tollgate_core import clock, config, db, git, phases, reviews, scope, sessions
+from tollgate_core import clock, config, db, git, reviews, scope, sessions
 from tollgate_core.paths import program_command
 
 from . import taskcmd
@@ -115,6 +115,7 @@ def _profiles(cfg, wt: Path, base: str, head: str) -> list[str]:
 
 
 def _open(state, conn, work, cfg, wt, base, head, patch, now) -> PrepareResult:
+    must_haves = _must_haves(wt, work, cfg)      # prima di aprire il ciclo: non ne spreca uno
     names = _profiles(cfg, wt, base, head)
     reviewers = [REVIEWER]
     if work["level"] == "L2":
@@ -124,15 +125,15 @@ def _open(state, conn, work, cfg, wt, base, head, patch, now) -> PrepareResult:
     number = reviews.open_cycle(conn, work["id"], sha=head, patch_id=patch,
                                 code=secrets.token_hex(4), reviewers=reviewers, now=now)
     return _resume(state, conn, work, cfg, reviews.latest(conn, work["id"]), wt, base, head,
-                   now, names=names)
+                   now, names=names, must_haves=must_haves)
 
 
 def _launch(cfg, agent: str, path: Path) -> Launch:
     return Launch(agent, path, cfg.get("review.models").get(agent))
 
 
-def _resume(state, conn, work, cfg, cycle, wt: Path, base, head, now, names=None
-            ) -> PrepareResult:
+def _resume(state, conn, work, cfg, cycle, wt: Path, base, head, now, names=None,
+            must_haves=None) -> PrepareResult:
     wid, n = work["id"], cycle["number"]
     run_dir = wt / ".tollgate-run" / str(work["issue"])
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -142,6 +143,8 @@ def _resume(state, conn, work, cfg, cycle, wt: Path, base, head, now, names=None
     result = PrepareResult(stage=cycle["stage"])
     if cycle["stage"] == "review":
         names = names if names is not None else _profiles(cfg, wt, base, head)
+        if must_haves is None:
+            must_haves = _must_haves(wt, work, cfg)
         reported = json.loads(cycle["reported"])
         pending = [r for r in json.loads(cycle["reviewers"]) if r not in reported]
         result.lines.append(f"ciclo {n} della revisione finale (stadio review, SHA "
@@ -151,7 +154,7 @@ def _resume(state, conn, work, cfg, cycle, wt: Path, base, head, now, names=None
                               else f"final-{n}-{_area(agent)}.md")
             path.write_text(briefs.final_review_brief(
                 _final_brief(conn, work, cfg, cycle, wt, base, head, diff, run_dir, agent,
-                             names)), encoding="utf-8")
+                             names, must_haves)), encoding="utf-8")
             result.launches.append(_launch(cfg, agent, path))
         result.lines += [_launch_line(l) for l in result.launches]
         result.lines.append("prossimo passo: lancia i revisori qui sopra (anche in parallelo); "
@@ -187,16 +190,18 @@ def _closing_step(outcome: str) -> str:
     return "prossimo passo: serve una decisione dell'utente (blocco needs_you): /tollgate:resolve"
 
 
-def _final_brief(conn, work, cfg, cycle, wt, base, head, diff, run_dir, agent, names):
-    try:
-        plan_text = taskcmd._plan_text(wt, work)
-        must_haves = planmod.check_plan(
-            plan_text, required_sections=cfg.get("plan.required_sections"),
-            max_scope_files=cfg.get("plan.max_scope_files"), must_have_tests=True,
-            level=work["level"], profiles=cfg.profiles,
-            active_always=cfg.get("profiles.active")).must_haves
-    except taskcmd.TaskError:
-        must_haves = []
+def _must_haves(wt, work, cfg) -> list:
+    """I must-have del piano registrato. Un piano non leggibile ferma `prepare` (`TaskError`
+    diventa `ReviewError`): il revisore deve confrontare il lavoro con il piano."""
+    return planmod.check_plan(
+        taskcmd._plan_text(wt, work), required_sections=cfg.get("plan.required_sections"),
+        max_scope_files=cfg.get("plan.max_scope_files"), must_have_tests=True,
+        level=work["level"], profiles=cfg.profiles,
+        active_always=cfg.get("profiles.active")).must_haves
+
+
+def _final_brief(conn, work, cfg, cycle, wt, base, head, diff, run_dir, agent, names,
+                 must_haves):
     if agent == REVIEWER:
         mine = names
     else:

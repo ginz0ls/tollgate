@@ -128,6 +128,14 @@ class PrepareNewCycleTest(FinalCase):
         self.assertIn("/tollgate:finish", str(cm.exception))
         self.assertIsNone(self.cycle())
 
+    def test_unreadable_plan_refused_before_opening_cycle(self):
+        fl = self.lab()
+        fl.conn.execute("UPDATE work_items SET plan_sha = ? WHERE id = ?", ("0" * 40, fl.work))
+        fl.conn.commit()
+        with self.assertRaises(finalreview.ReviewError):
+            self.prepare()
+        self.assertEqual(reviews.count(fl.conn, fl.work), 0)
+
     def test_wrong_phase_refused(self):
         fl = self.lab()
         phases.set_phase(fl.conn, fl.ts.state, fl.work, "execution", "needs_fix", now=fl.now)

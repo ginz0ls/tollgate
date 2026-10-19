@@ -186,7 +186,7 @@ def final_review_brief(b: FinalBrief) -> str:
             "\n".join(f"- `{k}`: {v}" for k, v in b.severity.items()),
             "", "## Verdetto",
             "Chiudi con un solo blocco JSON (18.5). `sha` e `code` vanno riportati alla lettera:",
-            "", _block('{"sha": "%s", "code": "%s", "outcome": "ok" | "needs_fix" | '
+            "", _block('{"v": 1, "sha": "%s", "code": "%s", "outcome": "ok" | "needs_fix" | '
                        '"needs_you", "findings": [{"severity": "blocker" | "major" | "moderate" '
                        '| "minor", "confidence": 0.0, "file": "…", "line": 0, "rule": "R-… | '
                        'passo del piano", "text": "…"}]}' % (b.sha, b.code))]
@@ -214,7 +214,7 @@ def verifier_brief(b: VerifierBrief) -> str:
            "", "## Risultato",
            "Chiudi con un solo blocco JSON (18.5), un risultato per ogni rilievo. `sha` e `code` "
            "vanno riportati alla lettera:",
-           "", _block('{"sha": "%s", "code": "%s", "results": [{"id": "f-…", "verification": '
+           "", _block('{"v": 1, "sha": "%s", "code": "%s", "results": [{"id": "f-…", "verification": '
                       '"confirmed" | "rejected" | "unverified", "reason": "…"}]}'
                       % (b.sha, b.code))]
     return "\n".join(out) + "\n"
