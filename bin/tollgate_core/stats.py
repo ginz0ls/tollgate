@@ -16,18 +16,35 @@ def _hours(seconds: float) -> float:
     return round(seconds / 3600, 2)
 
 
-def _off_seconds(evts: list[dict], start: datetime | None, end: datetime) -> float:
-    total = 0.0
+def _off_intervals(evts: list[dict]):
+    """Intervalli (da, a) tra `off` e `on`; `a` è None se OFF è ancora attivo."""
     off_at = None
     for e in evts:
         if e["type"] == "off" and off_at is None:
             off_at = clock.parse(e["at"])
         elif e["type"] == "on" and off_at is not None:
-            total += _overlap(off_at, clock.parse(e["at"]), start, end)
+            yield off_at, clock.parse(e["at"])
             off_at = None
     if off_at is not None:
-        total += _overlap(off_at, end, start, end)
-    return total
+        yield off_at, None
+
+
+def _off_seconds(evts: list[dict], start: datetime | None, end: datetime) -> float:
+    return sum(_overlap(a, b or end, start, end) for a, b in _off_intervals(evts))
+
+
+def off_periods(conn, start: datetime, end: datetime) -> list[dict]:
+    """Periodi di OFF tagliati sulla finestra [start, end]: `{"from", "to"}`, con `to` nullo
+    se OFF è ancora attivo (spec 18.1, `off_periods`)."""
+    switches = [e for e in export_events(conn, 0) if e["type"] in ("off", "on")]
+    out = []
+    for a, b in _off_intervals(switches):
+        lo = max(a, start)
+        hi = None if b is None else min(b, end)
+        if lo >= end or (hi is not None and hi <= lo):
+            continue
+        out.append({"from": clock.fmt(lo), "to": None if hi is None else clock.fmt(hi)})
+    return out
 
 
 def _overlap(a: datetime, b: datetime, start: datetime | None, end: datetime) -> float:

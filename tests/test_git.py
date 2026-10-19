@@ -247,5 +247,54 @@ class FingerprintTest(unittest.TestCase):
         self.assertNotEqual(git.fingerprint(self.repo, []), f0)
 
 
+class PatchIdTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="tollgate pid "))
+        self.repo = make_repo(self.tmp / "repo")
+        (self.repo / "src").mkdir()
+        (self.repo / "src" / "a.py").write_text("\n".join(f"riga {i}" for i in range(1, 21)) + "\n")
+        (self.repo / "altro.txt").write_text("uno\n")
+        g(self.repo, "add", "-A")
+        g(self.repo, "commit", "-qm", "base")
+        self.base = g(self.repo, "rev-parse", "HEAD")
+        g(self.repo, "checkout", "-qb", "lavoro")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def edit(self, text, msg="modifica"):
+        p = self.repo / "src" / "a.py"
+        p.write_text(text(p.read_text()))
+        g(self.repo, "commit", "-qam", msg)
+        return g(self.repo, "rev-parse", "HEAD")
+
+    def test_empty_diff_is_none(self):
+        self.assertIsNone(git.patch_id(self.repo, self.base, self.base))
+
+    def test_same_id_after_rebase_on_advanced_base(self):
+        head = self.edit(lambda t: t.replace("riga 15", "riga quindici"))
+        before = git.patch_id(self.repo, self.base, head)
+        self.assertRegex(before, r"^[0-9a-f]{40}$")
+        g(self.repo, "checkout", "-q", "main")
+        (self.repo / "altro.txt").write_text("uno\ndue\n")
+        g(self.repo, "commit", "-qam", "avanza")
+        new_base = g(self.repo, "rev-parse", "HEAD")
+        g(self.repo, "checkout", "-q", "lavoro")
+        g(self.repo, "rebase", "-q", "main")
+        new_head = g(self.repo, "rev-parse", "HEAD")
+        self.assertNotEqual(new_head, head)
+        self.assertEqual(git.patch_id(self.repo, new_base, new_head), before)
+
+    def test_different_content_different_id(self):
+        h1 = self.edit(lambda t: t.replace("riga 15", "riga quindici"))
+        h2 = self.edit(lambda t: t.replace("riga 3", "riga tre"))
+        self.assertNotEqual(git.patch_id(self.repo, self.base, h1),
+                            git.patch_id(self.repo, self.base, h2))
+
+    def test_bad_ref_raises(self):
+        with self.assertRaises(git.GitError):
+            git.patch_id(self.repo, "nonesiste", "HEAD")
+
+
 if __name__ == "__main__":
     unittest.main()

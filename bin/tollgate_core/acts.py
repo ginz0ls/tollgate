@@ -121,3 +121,17 @@ def invalidate_finish(conn, work: int, head_sha: str, *, now, session=None) -> l
                             "AND type = 'finish' AND work = ? AND head_sha <> ? ORDER BY n",
                             (work, head_sha)).fetchall()
         return _expire(conn, rows, now=now, session=session)
+
+
+def approved_waivers(conn, work: int) -> set[str]:
+    """Un `approve waiver` vale in ogni stato dell'atto (decisione 10 di P2)."""
+    return {r[0] for r in conn.execute(
+        "SELECT target FROM acts WHERE type = 'approve' AND object = 'waiver' "
+        "AND work = ? AND target IS NOT NULL", (work,))}
+
+
+def has_approval(conn, work: int, object_: str) -> bool:
+    """Esiste un `approve <object_>` del lavoro, in qualunque stato (pending, consumato,
+    scaduto): serve a `unverified-tests`, che vale dal DB come `waiver`."""
+    return conn.execute("SELECT 1 FROM acts WHERE type = 'approve' AND object = ? AND work = ? "
+                        "LIMIT 1", (object_, work)).fetchone() is not None

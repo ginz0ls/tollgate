@@ -133,7 +133,28 @@ SCHEMA_V3 = [
     "ALTER TABLE tasks ADD COLUMN reserved_at TEXT",
 ]
 
-MIGRATIONS: list[tuple[int, list[str]]] = [(1, SCHEMA_V1), (2, SCHEMA_V2), (3, SCHEMA_V3)]
+# Migrazione 4 (piano P3b, decisione 1): PR, esito di finish check, cicli di revisione.
+SCHEMA_V4 = [
+    "ALTER TABLE work_items ADD COLUMN pr_number INTEGER",
+    "ALTER TABLE work_items ADD COLUMN pr_url TEXT",
+    "ALTER TABLE work_items ADD COLUMN finish_sha TEXT",
+    "ALTER TABLE work_items ADD COLUMN finish_report TEXT",
+    "ALTER TABLE work_items ADD COLUMN extra_review_cycles INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE work_items ADD COLUMN review_unverified INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE review_cycles ADD COLUMN code TEXT",
+    "ALTER TABLE review_cycles ADD COLUMN stage TEXT "
+    "CHECK (stage IS NULL OR stage IN ('review','verify','closed'))",
+    "ALTER TABLE review_cycles ADD COLUMN reviewers TEXT NOT NULL DEFAULT '[]'",
+    "ALTER TABLE review_cycles ADD COLUMN reported TEXT NOT NULL DEFAULT '{}'",
+    "ALTER TABLE review_cycles ADD COLUMN opened TEXT",
+    "ALTER TABLE findings ADD COLUMN rule TEXT",
+    "ALTER TABLE findings ADD COLUMN blocking INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE tasks ADD COLUMN extra_fix_rounds INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE tasks ADD COLUMN task_text TEXT",
+]
+
+MIGRATIONS: list[tuple[int, list[str]]] = [(1, SCHEMA_V1), (2, SCHEMA_V2), (3, SCHEMA_V3),
+                                           (4, SCHEMA_V4)]
 
 
 def latest_version() -> int:

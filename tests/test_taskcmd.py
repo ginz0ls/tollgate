@@ -4,14 +4,12 @@ import sqlite3
 import unittest
 from unittest import mock
 
-from tests.flowkit import FlowLab
+from tests.flowkit import PLAN, FlowLab, plan_text
 from tests.helpers import BIN
 from tests.hookkit import DEFAULT_TOML
-from tests.test_check_post_edit import SECTIONS
 from tollgate_core import phases, subagents, tasks
 from tollgate_flow import taskcmd
 
-PLAN = "docs/superpowers/plans/2026-10-16-somma.md"
 FINDING = {"severity": "major", "file": "src/app.py", "line": 2, "rule": "R-1",
            "text": "manca il caso zero"}
 WEB_TOML = DEFAULT_TOML + """
@@ -21,17 +19,6 @@ skills = ["ghost-skill", "present-skill", "s3", "s4"]
 agent = "probe:web-dev"
 reviewer = "probe:web-reviewer"
 """
-
-
-def plan_text(task2="- Create: `docs/uso.md`"):
-    out = []
-    for s in SECTIONS:
-        body = ("M1. Somma — test: tests.test_app::test_somma\n"
-                "M2. Zero — test: tests.test_app::test_zero") if s == "Must-have" else "x"
-        out += [f"## {s}", body, ""]
-    out += ["### Task 1: Somma", "- Modify: `src/app.py`", "- Test: `tests/test_app.py`",
-            "**Must-have**: M1", "", "### Task 2: Pagina", task2, ""]
-    return "\n".join(out) + "\n"
 
 
 class TaskCase(unittest.TestCase):

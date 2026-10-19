@@ -171,7 +171,8 @@ class MigrationV3Test(unittest.TestCase):
         conn = db.open_db(self.ts.state)
         try:
             self.assertEqual(conn.execute(
-                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "3")
+                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0],
+                str(db.latest_version()))
             cols = {r[1] for r in conn.execute("PRAGMA table_info(tasks)")}
             self.assertTrue({"review_sha", "review_findings", "reserved_at"} <= cols)
             row = conn.execute("SELECT * FROM tasks").fetchone()
@@ -185,6 +186,65 @@ class MigrationV3Test(unittest.TestCase):
     def test_fresh_db_makes_no_copy(self):
         db.open_db(self.ts.state).close()
         self.assertEqual(list(self.ts.state.backup_dir.glob("*migrazione-3*")), [])
+
+
+class MigrationV4Test(unittest.TestCase):
+    def setUp(self):
+        self.ts = TempState()
+
+    def tearDown(self):
+        self.ts.cleanup()
+
+    def test_latest_version_is_4(self):
+        self.assertEqual(db.latest_version(), 4)
+
+    def test_from_v3_adds_columns_keeps_rows_and_backup(self):
+        saved = db.MIGRATIONS[:]
+        try:
+            db.MIGRATIONS[:] = saved[:3]
+            conn = db.open_db(self.ts.state)
+            insert_work(conn)
+            conn.execute("INSERT INTO tasks (work, number, kind, source, state) "
+                         "VALUES (1, 1, 'plan', 'plan', 'done')")
+            conn.execute("INSERT INTO review_cycles (work, number, sha, outcome) "
+                         "VALUES (1, 1, 'abc', 'ok')")
+            conn.execute("INSERT INTO findings (id, work, cycle, severity) "
+                         "VALUES ('f-1-1', 1, 1, 'major')")
+            conn.close()
+        finally:
+            db.MIGRATIONS[:] = saved
+        conn = db.open_db(self.ts.state)
+        try:
+            self.assertEqual(conn.execute(
+                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "4")
+
+            def cols(table):
+                return {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+            self.assertTrue({"pr_number", "pr_url", "finish_sha", "finish_report",
+                             "extra_review_cycles", "review_unverified"} <= cols("work_items"))
+            self.assertTrue({"code", "stage", "reviewers", "reported", "opened"}
+                            <= cols("review_cycles"))
+            self.assertTrue({"rule", "blocking"} <= cols("findings"))
+            self.assertTrue({"extra_fix_rounds", "task_text"} <= cols("tasks"))
+            w = conn.execute("SELECT * FROM work_items").fetchone()
+            self.assertEqual((w["issue"], w["extra_review_cycles"], w["review_unverified"],
+                              w["pr_number"]), (1, 0, 0, None))
+            c = conn.execute("SELECT * FROM review_cycles").fetchone()
+            self.assertEqual((c["sha"], c["outcome"], c["reviewers"], c["reported"], c["stage"]),
+                             ("abc", "ok", "[]", "{}", None))
+            f = conn.execute("SELECT * FROM findings").fetchone()
+            self.assertEqual((f["id"], f["severity"], f["blocking"], f["rule"]),
+                             ("f-1-1", "major", 1, None))
+            t = conn.execute("SELECT * FROM tasks").fetchone()
+            self.assertEqual((t["state"], t["extra_fix_rounds"], t["task_text"]),
+                             ("done", 0, None))
+        finally:
+            conn.close()
+        self.assertTrue(list(self.ts.state.backup_dir.glob("tollgate-*-migrazione-4.db")))
+
+    def test_fresh_db_makes_no_copy(self):
+        db.open_db(self.ts.state).close()
+        self.assertEqual(list(self.ts.state.backup_dir.glob("*migrazione-4*")), [])
 
 
 _FROZEN = datetime(2026, 10, 9, 12, 0, 0, 123456, tzinfo=timezone.utc)

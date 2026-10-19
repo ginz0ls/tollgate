@@ -126,3 +126,46 @@ class OffWindowTest(unittest.TestCase):
         events.record_event(self.conn, "on", {}, now=h(6))
         s = stats.compute_stats(self.conn, now=h(10), since=h(5))
         self.assertEqual(s["off_hours"], 1.0)
+
+
+class OffPeriodsTest(unittest.TestCase):
+    def setUp(self):
+        self.t = TempState()
+        self.conn = db.open_db(self.t.state)
+
+    def tearDown(self):
+        self.conn.close()
+        self.t.cleanup()
+
+    def sw(self, kind, hours):
+        events.record_event(self.conn, kind, {}, now=h(hours))
+
+    def test_no_switch_no_period(self):
+        self.assertEqual(stats.off_periods(self.conn, h(0), h(10)), [])
+
+    def test_off_periods_overlap(self):
+        self.sw("off", 1)
+        self.sw("on", 2)        # tutto dentro
+        self.sw("off", 3)
+        self.sw("on", 6)        # a cavallo dell'inizio della finestra
+        self.sw("off", 8)
+        self.sw("on", 12)       # a cavallo della fine
+        self.sw("off", 13)
+        self.sw("on", 14)       # fuori
+        got = stats.off_periods(self.conn, h(4), h(10))
+        self.assertEqual(got, [{"from": clock.fmt(h(4)), "to": clock.fmt(h(6))},
+                               {"from": clock.fmt(h(8)), "to": clock.fmt(h(10))}])
+        whole = stats.off_periods(self.conn, h(0), h(10))
+        self.assertEqual(whole[0], {"from": clock.fmt(h(1)), "to": clock.fmt(h(2))})
+
+    def test_still_off_has_null_end(self):
+        self.sw("off", 1)
+        self.sw("on", 2)
+        self.sw("off", 5)
+        self.assertEqual(stats.off_periods(self.conn, h(0), h(10)),
+                         [{"from": clock.fmt(h(1)), "to": clock.fmt(h(2))},
+                          {"from": clock.fmt(h(5)), "to": None}])
+        self.assertEqual(stats.off_periods(self.conn, h(6), h(10)),
+                         [{"from": clock.fmt(h(6)), "to": None}])
+        self.assertEqual(stats.off_periods(self.conn, h(0), h(4)),
+                         [{"from": clock.fmt(h(1)), "to": clock.fmt(h(2))}])

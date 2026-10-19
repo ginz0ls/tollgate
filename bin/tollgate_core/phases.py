@@ -80,10 +80,19 @@ def find_latest(conn, repo_key: str, issue: int):
 
 def create_work(conn, *, repo_key: str, issue: int, level: str, now, session=None, branch=None,
                 worktree=None, work_base_sha=None, gate_mode=None, spec_path=None,
-                from_approved_spec: bool = False) -> int:
+                from_approved_spec: bool = False, phase: str | None = None,
+                cause: str = "start") -> int:
+    """`phase` (adopt, spec 12.4) fa partire il lavoro da una fase diversa dalla iniziale: deve
+    stare nella sequenza del livello e non essere `closed`; esclude `from_approved_spec`."""
     if level not in LEVELS:
         raise ValueError(f"livello sconosciuto: {level}")
-    phase = "plan" if (level == "L2" and from_approved_spec) else INITIAL[level]
+    if phase is not None:
+        if from_approved_spec:
+            raise ValueError("phase e from_approved_spec si escludono")
+        if phase == "closed" or phase not in SEQUENCES[level]:
+            raise ValueError(f"fase iniziale non ammessa in {level}: {phase}")
+    else:
+        phase = "plan" if (level == "L2" and from_approved_spec) else INITIAL[level]
     ts = clock.fmt(now)
     with db.tx(conn):
         try:
@@ -96,7 +105,7 @@ def create_work(conn, *, repo_key: str, issue: int, level: str, now, session=Non
         except sqlite3.IntegrityError as e:
             raise WorkExists(f"esiste già un lavoro attivo per {repo_key}#{issue}") from e
         work = cur.lastrowid
-        record_event(conn, "phase_change", {"from": None, "to": phase, "cause": "start"},
+        record_event(conn, "phase_change", {"from": None, "to": phase, "cause": cause},
                      now=now, session=session, work=work)
     return work
 
@@ -119,6 +128,50 @@ def set_worktree(conn, work: int, path, *, now) -> None:
         get_work(conn, work)
         conn.execute("UPDATE work_items SET worktree = ?, updated = ? WHERE id = ?",
                      (str(path), clock.fmt(now), work))
+
+
+def set_base(conn, work: int, sha: str, *, cause: str, now, session=None) -> None:
+    """Riallinea la base del lavoro (sync, approve rebase, spec 6.5)."""
+    with db.tx(conn):
+        row = get_work(conn, work)
+        conn.execute("UPDATE work_items SET work_base_sha = ?, updated = ? WHERE id = ?",
+                     (sha, clock.fmt(now), work))
+        record_event(conn, "base_realigned",
+                     {"from": row["work_base_sha"], "to": sha, "cause": cause},
+                     now=now, session=session, work=work)
+
+
+def set_pr(conn, work: int, number: int | None, url: str | None, *, now) -> None:
+    with db.tx(conn):
+        get_work(conn, work)
+        conn.execute("UPDATE work_items SET pr_number = ?, pr_url = ?, updated = ? "
+                     "WHERE id = ?", (number, url, clock.fmt(now), work))
+
+
+def set_finish(conn, work: int, sha: str | None, report: dict | None, *, now) -> None:
+    """SHA dell'ultimo `finish check` verde e le voci calcolate (JSON)."""
+    with db.tx(conn):
+        get_work(conn, work)
+        conn.execute("UPDATE work_items SET finish_sha = ?, finish_report = ?, updated = ? "
+                     "WHERE id = ?",
+                     (sha, None if report is None else json.dumps(report, ensure_ascii=False),
+                      clock.fmt(now), work))
+
+
+def add_extra_cycles(conn, work: int, n: int, *, now) -> int:
+    """Cicli di revisione concessi oltre i quattro (decisione 13). Dà il nuovo totale."""
+    with db.tx(conn):
+        get_work(conn, work)
+        conn.execute("UPDATE work_items SET extra_review_cycles = extra_review_cycles + ?, "
+                     "updated = ? WHERE id = ?", (n, clock.fmt(now), work))
+        return get_work(conn, work)["extra_review_cycles"]
+
+
+def set_review_unverified(conn, work: int, *, now) -> None:
+    with db.tx(conn):
+        get_work(conn, work)
+        conn.execute("UPDATE work_items SET review_unverified = 1, updated = ? WHERE id = ?",
+                     (clock.fmt(now), work))
 
 
 def _change_phase(conn, work: int, frm: str, to: str, cause: str, now, session) -> None:

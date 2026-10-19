@@ -8,7 +8,7 @@ from pathlib import Path
 from tollgate_analysis import profiles as prof, waivers
 from tollgate_analysis.testguard import DEFAULT_TEST_GLOBS, GuardConfig
 
-from tollgate_core import config, git, scope, sessions
+from tollgate_core import acts, config, git, scope, sessions
 from tollgate_core.config import Config
 from tollgate_core.paths import State
 
@@ -80,9 +80,7 @@ class Ctx:
         """Decisione 10: un approve waiver vale in ogni stato dell'atto."""
         if work is None:
             return set()
-        return {r[0] for r in self.db.execute(
-            "SELECT target FROM acts WHERE type = 'approve' AND object = 'waiver' "
-            "AND work = ? AND target IS NOT NULL", (work["id"],))}
+        return acts.approved_waivers(self.db, work["id"])
 
     def scope(self, work) -> set[str]:
         return scope.paths(self.db, work["id"]) if work is not None else set()

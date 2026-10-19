@@ -81,3 +81,16 @@ def parse_task_verdict(text: str | None, *, task: int, sha: str, code: str,
                                        "riscrivilo"], None, declared)
         outcome = "changes" if blocking else "approved"
     return TaskVerdict(True, [], outcome, declared, findings, len(raw) - len(findings))
+
+
+def is_blocking(finding: dict, blocking_rules: set[str], known_rules: set[str]) -> bool:
+    """Un rilievo blocca se cita un passo del piano (regola che non comincia con `R-`), una
+    regola `[blocca]` del profilo, o una regola `R-…` che nessun profilo attivo dichiara
+    (fail-closed). Non blocca solo con una regola nota e non `[blocca]` (decisione 8)."""
+    rule = finding.get("rule")
+    if not isinstance(rule, str) or not rule.strip():
+        return True
+    rule = rule.strip()
+    if not rule.startswith("R-") or rule in blocking_rules:
+        return True
+    return rule not in known_rules

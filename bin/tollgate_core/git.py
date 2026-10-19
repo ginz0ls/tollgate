@@ -349,3 +349,20 @@ def is_clean(repo, exclude) -> bool:
         if code[0] in "RC":
             skip = True
     return all(excluded(p, exclude) for p in paths)
+
+
+def patch_id(repo, base: str, head: str) -> str | None:
+    """Identità del contenuto di `base..head` (`git patch-id --stable`): non cambia con un
+    rebase senza conflitti su una base avanzata. `None` con il diff vuoto. Niente driver di
+    diff né textconv del repo (M2)."""
+    diff = _proc(repo, ["diff", "--binary", "--no-ext-diff", "--no-textconv", base, head],
+                 timeout=30)
+    if diff.returncode != 0:
+        raise GitError(f"git diff {base} {head}: {diff.stderr.decode('utf-8', 'replace').strip()}")
+    if not diff.stdout.strip():
+        return None
+    out = _proc(repo, ["patch-id", "--stable"], input_=diff.stdout, timeout=30)
+    if out.returncode != 0:
+        raise GitError(f"git patch-id: {out.stderr.decode('utf-8', 'replace').strip()}")
+    first = out.stdout.decode("ascii", "replace").split()
+    return first[0] if first else None

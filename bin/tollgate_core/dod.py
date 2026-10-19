@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 from typing import Mapping
 
-from . import receipts
+from . import receipts, reviews
 from .phases import get_work
 from .verify import counts_green
 
@@ -16,6 +16,7 @@ ITEMS_BY_LEVEL = {
     "L2": ("receipt", "guard_scope", "tasks_approved", "findings", "must_have", "skills",
            "approvals", "specialists"),
 }
+SKIPPED_DETAIL = "dopo la revisione"
 LABELS = {
     "receipt": "Ricevuta green sullo SHA",
     "guard_scope": "test-guard e scope senza violazioni non derogate",
@@ -36,16 +37,18 @@ class DodItem:
     detail: str = ""
 
 
-def receipt_verdict(rows, head_sha: str, allow_no_tests: bool,
-                    required_commands: list[str]) -> tuple[bool, str]:
+def receipt_verdict(rows, head_sha: str, allow_no_tests: bool, required_commands: list[str],
+                    allow_unverified: bool = False) -> tuple[bool, str]:
     """Un solo punto per DoD e SubagentStop: i comandi richiesti del gate ci sono tutti e ogni
-    ricevuta (ultima per comando) conta green."""
+    ricevuta (ultima per comando) conta green. Con `allow_unverified` (un `approve
+    unverified-tests`) anche `unverified` conta green."""
     if not required_commands:
         return False, "nessun comando richiesto"
     if not rows:
         return False, f"nessuna ricevuta su {head_sha}"
     bad = [f"{r['command']}={r['state']}" for r in rows
-           if not counts_green(r["state"], r["exit"], allow_no_tests)]
+           if not (allow_unverified and r["state"] == "unverified")
+           and not counts_green(r["state"], r["exit"], allow_no_tests)]
     have = {r["command"] for r in rows}
     missing = [c for c in required_commands if c not in have]
     if missing:
@@ -53,10 +56,11 @@ def receipt_verdict(rows, head_sha: str, allow_no_tests: bool,
     return (not bad), ", ".join(bad)
 
 
-def _receipt(conn, work: int, head_sha: str, allow_no_tests: bool,
-             required_commands: list[str]) -> tuple[bool, str]:
-    return receipt_verdict(receipts.latest(conn, work, head_sha), head_sha, allow_no_tests,
-                           required_commands)
+def _receipt(conn, work: int, head_sha: str, allow_no_tests: bool, required_commands: list[str],
+             allow_unverified: bool) -> tuple[bool, str]:
+    # La ricevuta `related` è del test correlato (come in SubagentStop): non è un comando del gate.
+    rows = [r for r in receipts.latest(conn, work, head_sha) if r["command"] != "related"]
+    return receipt_verdict(rows, head_sha, allow_no_tests, required_commands, allow_unverified)
 
 
 def _tasks(conn, work: int) -> tuple[bool, str]:
@@ -68,12 +72,25 @@ def _tasks(conn, work: int) -> tuple[bool, str]:
     return (not bad), ("task non chiusi: " + ", ".join(bad)) if bad else ""
 
 
-def _findings(conn, work: int) -> tuple[bool, str]:
-    rows = conn.execute(
-        "SELECT id FROM findings WHERE work = ? AND severity IN ('blocker', 'major') "
-        "AND verification = 'confirmed' AND user_decision IS NULL ORDER BY id",
-        (work,)).fetchall()
+def _findings(conn, work: int, cycle: int | None) -> tuple[bool, str]:
+    """Rilievi confermati e bloccanti di gravità effettiva blocker o major, non archiviati
+    (decisione 15). Con `cycle` solo quel ciclo, altrimenti tutti."""
+    rows = reviews.blocking_open(conn, work, cycle)
     return (not rows), ", ".join(r["id"] for r in rows)
+
+
+def _specialists(conn, work: int, expected: list[str], cycle: int | None) -> tuple[bool, str]:
+    """Ogni specialista finale atteso ha riportato nel ciclo (l'ultimo se `cycle` è None)."""
+    if not expected:
+        return True, ""
+    row = (conn.execute("SELECT reported FROM review_cycles WHERE work = ? AND number = ?",
+                        (work, cycle)).fetchone() if cycle is not None
+           else reviews.latest(conn, work))
+    if row is None:
+        return False, "nessun ciclo di revisione"
+    reported = json.loads(row["reported"])
+    missing = [s for s in expected if s not in reported]
+    return (not missing), ("mancano: " + ", ".join(missing)) if missing else ""
 
 
 def _skills(conn, work: int) -> tuple[bool, str]:
@@ -90,18 +107,29 @@ def _skills(conn, work: int) -> tuple[bool, str]:
 def compute_dod(conn, work: int, *, head_sha: str, allow_no_tests: bool,
                 required_commands: list[str],
                 external: Mapping[str, bool | None] | None = None,
-                profile_items: Mapping[str, bool | None] | None = None) -> list[DodItem]:
+                profile_items: Mapping[str, bool | None] | None = None,
+                allow_unverified: bool = False, findings_cycle: int | None = None,
+                specialists: list[str] | None = None,
+                skip: tuple[str, ...] = ()) -> list[DodItem]:
+    """`findings_cycle` limita i rilievi a un ciclo (decisione 15), `specialists` è l'elenco
+    atteso in L2 (senza, la voce viene da `external`), `skip` salta le voci che si valutano solo
+    dopo la revisione: valgono `None` e `dod_passes` le ignora solo se il chiamante le filtra."""
     external = external or {}
     level = get_work(conn, work)["level"]
     computed = {
-        "receipt": lambda: _receipt(conn, work, head_sha, allow_no_tests,
-                                           required_commands),
+        "receipt": lambda: _receipt(conn, work, head_sha, allow_no_tests, required_commands,
+                                    allow_unverified),
         "tasks_approved": lambda: _tasks(conn, work),
-        "findings": lambda: _findings(conn, work),
+        "findings": lambda: _findings(conn, work, findings_cycle),
         "skills": lambda: _skills(conn, work),
     }
+    if specialists is not None:
+        computed["specialists"] = lambda: _specialists(conn, work, specialists, findings_cycle)
     items = []
     for key in ITEMS_BY_LEVEL[level]:
+        if key in skip:
+            items.append(DodItem(key, LABELS[key], None, SKIPPED_DETAIL))
+            continue
         if key in computed:
             ok, detail = computed[key]()
         else:

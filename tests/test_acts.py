@@ -183,6 +183,38 @@ class ActsTest(unittest.TestCase):
             acts.record_act(self.conn, type_="finish", typed_text="/tollgate:finish",
                             session="s1", work=self.w, now=T0, ttl_minutes=10)
 
+    def test_approved_waivers_any_state(self):
+        self.assertEqual(acts.approved_waivers(self.conn, self.w), set())
+        a = self.waiver(target="w-1-3")
+        self.waiver(target="w-1-4", work=self.w2)
+        self.assertEqual(acts.approved_waivers(self.conn, self.w), {"w-1-3"})
+        acts.consume(self.conn, a, type_="approve", object_="waiver", target="w-1-3",
+                     now=T0 + timedelta(minutes=1), work=self.w, session="s1")
+        self.waiver(target="w-1-5")
+        acts.expire_stale(self.conn, now=T0 + timedelta(hours=2))
+        self.assertEqual(acts.approved_waivers(self.conn, self.w), {"w-1-3", "w-1-5"})
+
+    def test_has_approval_any_state(self):
+        self.assertFalse(acts.has_approval(self.conn, self.w, "unverified-tests"))
+        a = acts.record_act(self.conn, type_="approve", object_="unverified-tests",
+                            typed_text="/tollgate:approve unverified-tests", session="s1",
+                            work=self.w, now=T0, ttl_minutes=10)
+        self.assertTrue(acts.has_approval(self.conn, self.w, "unverified-tests"))
+        self.assertFalse(acts.has_approval(self.conn, self.w2, "unverified-tests"))
+        self.assertFalse(acts.has_approval(self.conn, self.w, "waiver"))
+        acts.expire_stale(self.conn, now=T0 + timedelta(hours=2))
+        self.assertEqual(self.conn.execute("SELECT state FROM acts WHERE act_id = ?",
+                                           (a,)).fetchone()[0], "expired")
+        self.assertTrue(acts.has_approval(self.conn, self.w, "unverified-tests"))
+
+    def test_context_approved_waivers_delegates(self):
+        from tollgate_hooks.context import Ctx
+        self.waiver(target="w-1-3")
+        ctx = Ctx.__new__(Ctx)
+        ctx.db = self.conn
+        self.assertEqual(ctx.approved_waivers({"id": self.w}), {"w-1-3"})
+        self.assertEqual(ctx.approved_waivers(None), set())
+
     def test_one_shot(self):
         self.assertTrue(acts.is_one_shot("finish", None))
         self.assertTrue(acts.is_one_shot("approve", "effect"))

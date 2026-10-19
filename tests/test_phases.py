@@ -281,3 +281,100 @@ class LevelCapTest(unittest.TestCase):
         w = self.new("L1", "execution")
         with self.assertRaises(ValueError):
             phases.set_level_cap(self.conn, w, "L9", "motivo", [], now=T0)
+
+
+class WorkCase(unittest.TestCase):
+    """Base senza test propri: DB temporaneo e `new` per le classi di P3b."""
+
+    def setUp(self):
+        self.t = TempState()
+        self.conn = db.open_db(self.t.state)
+
+    def tearDown(self):
+        self.conn.close()
+        self.t.cleanup()
+
+    def new(self, level="L1", issue=7, **kw):
+        return phases.create_work(self.conn, repo_key="github.com/o/r", issue=issue,
+                                  level=level, now=T0, session="s1", **kw)
+
+
+class CreateWorkPhaseTest(WorkCase):
+    def test_phase_adopt_in_l2(self):
+        w = self.new("L2", phase="execution", cause="adopt")
+        self.assertEqual(phases.get_work(self.conn, w)["phase"], "execution")
+        e = [x for x in events.export_events(self.conn, 0) if x["type"] == "phase_change"]
+        self.assertEqual(e[0]["data"], {"from": None, "to": "execution", "cause": "adopt"})
+
+    def test_default_cause_is_start(self):
+        w = self.new("L1")
+        e = [x for x in events.export_events(self.conn, 0) if x["type"] == "phase_change"]
+        self.assertEqual((e[0]["data"]["to"], e[0]["data"]["cause"]), ("plan", "start"))
+        self.assertEqual(phases.get_work(self.conn, w)["phase"], "plan")
+
+    def test_closed_refused(self):
+        with self.assertRaises(ValueError):
+            self.new("L1", phase="closed")
+
+    def test_phase_outside_sequence_refused(self):
+        with self.assertRaises(ValueError):
+            self.new("L1", phase="spec_audit")
+        with self.assertRaises(ValueError):
+            self.new("L0", phase="plan")
+
+    def test_phase_and_approved_spec_are_exclusive(self):
+        with self.assertRaises(ValueError):
+            self.new("L2", phase="plan", from_approved_spec=True)
+
+    def test_refused_phase_creates_nothing(self):
+        with self.assertRaises(ValueError):
+            self.new("L1", phase="closed")
+        self.assertEqual(self.conn.execute("SELECT count(*) FROM work_items").fetchone()[0], 0)
+
+
+class SetBaseTest(WorkCase):
+    def test_set_base_records_event(self):
+        w = self.new("L1", work_base_sha="aaa")
+        phases.set_base(self.conn, w, "bbb", cause="sync", now=T0, session="s1")
+        self.assertEqual(phases.get_work(self.conn, w)["work_base_sha"], "bbb")
+        e = [x for x in events.export_events(self.conn, 0) if x["type"] == "base_realigned"]
+        self.assertEqual(e[0]["data"], {"from": "aaa", "to": "bbb", "cause": "sync"})
+        self.assertEqual(e[0]["session"], "s1")
+
+
+class ClosingDataTest(WorkCase):
+    def test_set_pr_and_reset(self):
+        w = self.new("L1")
+        phases.set_pr(self.conn, w, 12, "https://github.com/o/r/pull/12", now=T0)
+        row = phases.get_work(self.conn, w)
+        self.assertEqual((row["pr_number"], row["pr_url"]),
+                         (12, "https://github.com/o/r/pull/12"))
+        phases.set_pr(self.conn, w, None, None, now=T0)
+        row = phases.get_work(self.conn, w)
+        self.assertEqual((row["pr_number"], row["pr_url"]), (None, None))
+
+    def test_set_finish_stores_report_as_json(self):
+        w = self.new("L1")
+        phases.set_finish(self.conn, w, "abc", {"receipt": True, "findings": None}, now=T0)
+        row = phases.get_work(self.conn, w)
+        self.assertEqual(row["finish_sha"], "abc")
+        self.assertEqual(json.loads(row["finish_report"]), {"receipt": True, "findings": None})
+        phases.set_finish(self.conn, w, None, None, now=T0)
+        row = phases.get_work(self.conn, w)
+        self.assertEqual((row["finish_sha"], row["finish_report"]), (None, None))
+
+    def test_add_extra_cycles_returns_total(self):
+        w = self.new("L1")
+        self.assertEqual(phases.add_extra_cycles(self.conn, w, 2, now=T0), 2)
+        self.assertEqual(phases.add_extra_cycles(self.conn, w, 1, now=T0), 3)
+        self.assertEqual(phases.get_work(self.conn, w)["extra_review_cycles"], 3)
+
+    def test_set_review_unverified(self):
+        w = self.new("L1")
+        self.assertEqual(phases.get_work(self.conn, w)["review_unverified"], 0)
+        phases.set_review_unverified(self.conn, w, now=T0)
+        self.assertEqual(phases.get_work(self.conn, w)["review_unverified"], 1)
+
+    def test_unknown_work_refused(self):
+        with self.assertRaises(ValueError):
+            phases.set_pr(self.conn, 99, 1, "u", now=T0)

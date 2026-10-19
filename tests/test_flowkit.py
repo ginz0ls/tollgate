@@ -1,13 +1,16 @@
 import json
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
 from types import SimpleNamespace
 
-from tests.flowkit import FAKEGH, GATE_FILES, ORIGIN_URL, SESSION, FlowLab
+from tests.flowkit import (FAKEGH, GATE_FILES, JUNIT_TOML, ORIGIN_URL, PLAN, SESSION,
+                           FlowLab)
 from tests.helpers import git
-from tollgate_core import VERSION, git as core_git, sessions
+from tollgate_analysis.junit import parse_junit
+from tollgate_core import VERSION, git as core_git, phases, sessions
 from tollgate_core.paths import repo_key
 from tollgate_checks._common import orphan_tg
 
@@ -100,6 +103,72 @@ class FlowLabTest(unittest.TestCase):
             self.assertIsNotNone(sessions.bound_work(other.conn, SESSION))
         finally:
             other.close()
+
+
+class FlowKitP3bTest(unittest.TestCase):
+    def test_register_plan_moves_to_execution_with_tasks(self):
+        fl = FlowLab(issue=7, phase="plan")
+        try:
+            fl.register_plan()
+            row = phases.get_work(fl.conn, fl.work)
+            self.assertEqual((row["phase"], row["plan_path"]), ("execution", PLAN))
+            self.assertEqual([r["number"] for r in fl.conn.execute(
+                "SELECT number FROM tasks WHERE work = ? ORDER BY number", (fl.work,))], [1])
+        finally:
+            fl.close()
+
+    def test_register_plan_with_three_tasks(self):
+        fl = FlowLab(issue=7, phase="plan")
+        try:
+            fl.register_plan(tasks=3)
+            self.assertEqual(fl.conn.execute("SELECT count(*) FROM tasks WHERE work = ?",
+                                             (fl.work,)).fetchone()[0], 3)
+        finally:
+            fl.close()
+
+    def test_commit_records_event_and_close_tasks(self):
+        fl = FlowLab(issue=7, phase="plan")
+        try:
+            fl.register_plan(tasks=2)
+            sha = fl.commit("src/app.py", "def somma(a, b):\n    return b + a\n", "somma")
+            self.assertEqual(sha, git(fl.wt, "rev-parse", "HEAD"))
+            self.assertEqual(git(fl.wt, "log", "-1", "--format=%s"), "somma")
+            self.assertEqual(fl.events("commit"), [{"sha": sha}])
+            fl.close_tasks()
+            rows = fl.conn.execute("SELECT state, verdict FROM tasks").fetchall()
+            self.assertEqual([(r["state"], r["verdict"]) for r in rows],
+                             [("done", "approved")] * 2)
+            fl.close_tasks()      # idempotente
+        finally:
+            fl.close()
+
+    def test_junit_fake_writes_report_from_ids(self):
+        fl = FlowLab(toml=JUNIT_TOML)
+        try:
+            self.assertTrue((fl.main / "tools" / "junit_fake.py").exists())
+            (fl.main / "tests").mkdir(exist_ok=True)
+            (fl.main / "tests" / "ids.txt").write_text(
+                "tests.test_app::test_somma ok\ntests.test_app::test_zero fail\n")
+            r = subprocess.run([sys.executable, "-B", "tools/junit_fake.py"], cwd=fl.main,
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 1, r.stderr)
+            junit = parse_junit((fl.main / "reports" / "junit.xml").read_bytes())
+            self.assertEqual(junit.ids_run, ["tests.test_app::test_somma",
+                                             "tests.test_app::test_zero"])
+            self.assertEqual(junit.ids_failed, ["tests.test_app::test_zero"])
+            (fl.main / "tests" / "ids.txt").write_text("tests.test_app::test_somma ok\n")
+            r = subprocess.run([sys.executable, "-B", "tools/junit_fake.py"], cwd=fl.main,
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+        finally:
+            fl.close()
+
+    def test_junit_file_only_for_junit_toml(self):
+        fl = FlowLab()
+        try:
+            self.assertFalse((fl.main / "tools").exists())
+        finally:
+            fl.close()
 
 
 if __name__ == "__main__":
