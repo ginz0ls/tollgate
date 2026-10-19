@@ -386,6 +386,105 @@ class VerifyRunTest(unittest.TestCase):
         self.assertIn("database", " ".join(lines))
 
 
+class RunGateTest(unittest.TestCase):
+    """`run_gate` è il passo di `finish check`: ricevute con `produced_by` dato e JUnit restituiti."""
+    CFG = textwrap.dedent('''
+        schema_version = 1
+        [gate]
+        mode = "protected"
+        [commands]
+        verify = "sh check.sh"
+        gate = ["verify"]
+        report = "junit:reports/junit.xml"
+        env_allow = ["PATH"]
+        [profiles.web]
+        paths = ["web/**"]
+        commands = { lint = "true" }
+        dod = ["lint"]
+    ''')
+    TWO = textwrap.dedent('''
+        mkdir -p reports
+        cat > reports/junit.xml <<EOF
+        <testsuite><testcase classname="t" name="a"/><testcase classname="t" name="b"/></testsuite>
+        EOF
+    ''')
+
+    def setUp(self):
+        self.ts = TempState()
+        self.tmp = Path(tempfile.mkdtemp(prefix="tollgate-gate-"))
+        self.main, _, self.base = make_origin_repo(
+            self.tmp, {"check.sh": self.TWO, ".gitignore": "reports/\n"}, self.CFG)
+        self.wt = self.tmp / "wt"
+        git(self.main, "worktree", "add", "-q", "-b", "tg/7-x", str(self.wt))
+        conn = db.open_db(self.ts.state)
+        self.work = phases.create_work(conn, repo_key=repo_key(str(self.tmp / "origin.git")),
+                                       issue=7, level="L1", now=T0, worktree=str(self.wt),
+                                       branch="tg/7-x", work_base_sha=self.base)
+        conn.close()
+        self.env = {"PATH": "/usr/bin:/bin"}
+
+    def tearDown(self):
+        self.ts.cleanup()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _receipts(self):
+        conn = db.open_db(self.ts.state)
+        try:
+            return [dict(r) for r in conn.execute("SELECT * FROM receipts ORDER BY id")]
+        finally:
+            conn.close()
+
+    def test_run_gate_returns_junit_and_produced_by(self):
+        run = verify.run_gate(self.ts.state, self.wt, produced_by="finish", now=T0,
+                              environ=self.env)
+        self.assertTrue(run.ok, run.lines)
+        self.assertEqual(run.sha, self.base)
+        self.assertEqual(run.states, {"verify": "green"})
+        self.assertEqual(run.junits["verify"].ids_run, ["t::a", "t::b"])
+        r = self._receipts()[0]
+        self.assertEqual((r["command"], r["produced_by"], r["state"]),
+                         ("verify", "finish", "green"))
+
+    def test_dod_command_of_profile_runs(self):
+        (self.wt / "web").mkdir()
+        (self.wt / "web" / "a.ts").write_text("x\n")
+        git(self.wt, "add", "-A")
+        git(self.wt, "commit", "-qm", "web")
+        cfg = config.load_config_text(self.CFG)
+        self.assertEqual([c.name for c in verify.dod_commands(cfg, ["src/a.py"])], [])
+        extra = verify.dod_commands(cfg, ["web/a.ts"])
+        self.assertEqual([c.name for c in extra], ["profile:web:lint"])
+        run = verify.run_gate(self.ts.state, self.wt, produced_by="finish", extra=extra,
+                              now=T0, environ=self.env)
+        self.assertEqual([r["command"] for r in self._receipts()],
+                         ["verify", "profile:web:lint"])
+        self.assertEqual(run.states["profile:web:lint"], "uncounted")
+
+    def test_dod_command_already_in_gate_is_not_repeated(self):
+        cfg = config.load_config_text(self.CFG.replace('dod = ["lint"]',
+                                                       'gate = ["lint"]\ndod = ["lint"]'))
+        self.assertEqual(verify.dod_commands(cfg, ["web/a.ts"]), [])
+
+    def test_no_command_means_not_executed(self):
+        cfg = self.tmp / "cfg.toml"
+        cfg.write_text(self.CFG.replace('gate = ["verify"]', "gate = []"))
+        run = verify.run_gate(self.ts.state, self.wt, produced_by="finish", now=T0,
+                              environ=dict(self.env, TOLLGATE_TEST_CONFIG=str(cfg)))
+        self.assertEqual((run.ok, run.sha), (False, None))
+        self.assertIn("nessun comando", run.lines[0])
+        self.assertEqual(self._receipts(), [])
+
+    def test_not_executed_has_no_sha(self):
+        (self.wt / "sporco.txt").write_text("x")
+        run = verify.run_gate(self.ts.state, self.wt, produced_by="finish", now=T0,
+                              environ=self.env)
+        self.assertFalse(run.ok)
+        self.assertIsNone(run.sha)
+        self.assertIn("worktree non pulito", " ".join(run.lines))
+        self.assertIn("tollgate finish:", run.lines[0])
+        self.assertEqual(self._receipts(), [])
+
+
 class VerifyCliTest(unittest.TestCase):
     def test_sqlite_error_in_cli_is_exit_1_without_traceback(self):
         from tollgate_core import cli

@@ -5,10 +5,9 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from tollgate_analysis import profiles as prof, waivers
-from tollgate_analysis.testguard import DEFAULT_TEST_GLOBS, GuardConfig
+from tollgate_analysis.testguard import GuardConfig
 
-from tollgate_core import acts, config, git, scope, sessions
+from tollgate_core import acts, config, git, scope, sessions, violations
 from tollgate_core.config import Config
 from tollgate_core.paths import State
 
@@ -68,13 +67,7 @@ class Ctx:
             return None
 
     def waiver_file(self, work):
-        if work is None or not work["worktree"]:
-            return None
-        p = Path(work["worktree"]) / waivers.path_for(work["issue"])
-        try:
-            return waivers.parse(p.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return None
+        return violations.waiver_file(work)
 
     def approved_waivers(self, work) -> set[str]:
         """Decisione 10: un approve waiver vale in ogni stato dell'atto."""
@@ -86,19 +79,7 @@ class Ctx:
         return scope.paths(self.db, work["id"]) if work is not None else set()
 
     def guard_config(self, work, files) -> GuardConfig:
-        tg = self.cfg("test_guard")
-        profs = self.config.profiles
-        active = prof.active_profiles(files, profs, self.cfg("profiles.active"))
-        extra = lambda k: [x for n in active for x in profs[n].get(k, [])]  # noqa: E731
-        commands = " ".join(str(v) for v in self.cfg("commands").values())
-        return GuardConfig(
-            test_globs=list(DEFAULT_TEST_GLOBS) + tg["test_globs"] + extra("test_globs"),
-            fixture_globs=tg["fixture_globs"], ci_globs=tg["ci_globs"],
-            verification_globs=tg["verification_globs"],
-            verification_watch=tg["verification_watch"],
-            skip_markers=tg["skip_markers"] + extra("skip_markers"),
-            assert_markers=tg["assert_markers"] + extra("assert_markers"),
-            js_form="jest" if "jest" in commands else "vitest")
+        return violations.guard_config(self.config, files)
 
     def protected_roots(self, repo) -> list[Path]:
         home = Path(os.path.expanduser("~"))

@@ -3,15 +3,12 @@ from __future__ import annotations
 
 import json
 import os
-import posixpath
 import re
 from pathlib import Path
 
-from tollgate_analysis import globs, level as lv, profiles as prof, testguard
-from tollgate_analysis.testguard import Violation
-from tollgate_analysis.waivers import unresolved
+from tollgate_analysis import level as lv, profiles as prof
 from tollgate_analysis.protected import is_protected
-from tollgate_core import config, git, subagents
+from tollgate_core import config, git, subagents, violations
 from tollgate_core.paths import program_command, repo_key
 from tollgate_hooks.adapter import edit_path
 from tollgate_hooks.model import inject, record
@@ -159,34 +156,8 @@ def is_protected_path(ctx, p: Path, repo, work) -> bool:
     return False
 
 
-def is_docs_md(rel: str | None) -> bool:
-    return bool(rel) and rel.startswith("docs/superpowers/") and rel.endswith(".md")
-
-
-# Ordine delle fasi di un lavoro (phases.SEQUENCES): la spec si scrive in spec_audit e il
-# piano in plan. Oltre quelle fasi la spec e il piano sono bloccati (6.2).
-_ORDER = ("spec_audit", "plan", "approval", "execution", "review", "pr_open", "closed")
-
-
-def _rank(phase: str | None) -> int:
-    return _ORDER.index(phase) if phase in _ORDER else len(_ORDER)
-
-
-def locked_docs(work) -> set[str]:
-    """Spec bloccata dopo approve spec, piano bloccato dopo la registrazione dello scope (6.2).
-    Un lavoro in blocco vale la fase precedente al blocco. Un ritorno con reopen riporta la
-    fase alla spec o al piano, e quei file tornano modificabili (l'approvazione resta storica).
-    """
-    phase = work["phase_before_block"] if work["phase"] == "blocked" else work["phase"]
-    out = set()
-    if work["plan_sha"] and work["plan_path"] and _rank(phase) > _rank("plan"):
-        out.add(work["plan_path"])
-    if work["spec_path"] and work["worktree"] and _rank(phase) > _rank("spec_audit"):
-        approval = Path(work["worktree"]) / f"docs/superpowers/reviews/{work['issue']}" \
-                                           "/spec-approval.md"
-        if approval.exists():
-            out.add(work["spec_path"])
-    return out
+is_docs_md = violations.is_docs_md
+locked_docs = violations.locked_docs
 
 
 def waiver_hint(v, ctx) -> str:
@@ -214,20 +185,7 @@ def status_lines(ctx, work) -> list[str]:
 
 
 def scope_exempt(ctx, work, rel: str, scope: set[str]) -> bool:
-    """Esenzioni dallo scope (7.4). I percorsi di `scope` sono nomi letterali (possono
-    contenere `[ ]`): si confrontano per uguaglianza, mai come pattern. Solo `[scope] always`
-    è fatto di pattern."""
-    if rel.startswith(".superpowers/") or rel == f".tollgate/waivers/{work['issue']}.toml":
-        return True
-    if git.excluded(rel, output_excludes(ctx)):
-        return True
-    if is_docs_md(rel) and not rel.startswith("docs/superpowers/reviews/") \
-            and rel not in locked_docs(work):
-        return True
-    if globs.match_any(ctx.cfg("scope.always"), rel):
-        return True
-    manifest = ctx.cfg("scope.lockfiles").get(posixpath.basename(rel))
-    return bool(manifest and posixpath.join(posixpath.dirname(rel), manifest) in scope)
+    return violations.scope_exempt(ctx.config, work, rel, scope)
 
 
 def level_records(ctx, work) -> list:
@@ -264,49 +222,14 @@ def level_records(ctx, work) -> list:
             inject(f"tollgate: il lavoro sale a {new} (percorsi sensibili o soglie).")]
 
 
-def _is_registered_plan(work, wt: Path, path: str, head_ref: str | None) -> bool:
-    """Il piano registrato, tale e quale (stesso blob di `plan_sha`): è bloccato, ma committarlo
-    non lo modifica (lo fa il coordinatore dopo la registrazione)."""
-    if path != work["plan_path"] or not work["plan_sha"] or (wt / path).is_symlink():
-        return False
-    try:
-        sha = git.blob_sha(wt, path) if head_ref is None \
-            else git.run(wt, "rev-parse", f"{head_ref}:{path}").strip()
-    except git.GitError:
-        return False
-    return sha == work["plan_sha"]
+_is_registered_plan = violations.is_registered_plan
 
 
 def commit_violations(ctx, work, wt: Path, base_ref: str, head_ref: str | None,
                       changes) -> list:
-    """Violazioni di test-guard e scope su `changes` (da `base_ref` a `head_ref`; `None` è il
-    working tree), senza le cartelle di output e `.tollgate-run/`. Restano solo quelle non
-    coperte da una deroga, anche in attesa (decisione 9)."""
-    skip = output_excludes(ctx)
-    changes = [c for c in changes if not git.excluded(c.path, skip)]
-    out = []
-    if ctx.component("test_guard"):
-        tg = []
-        for c in changes:
-            base_text = None if c.status == "A" else git.text_at(wt, base_ref,
-                                                                 c.old_path or c.path)
-            if c.status == "D":
-                head_text = None
-            elif head_ref is None:
-                head_text = git.worktree_text(wt, c.path)
-            else:
-                head_text = git.text_at(wt, head_ref, c.path)
-            tg.append(testguard.Change(c.status, c.path, c.old_path, base_text, head_text,
-                                       c.binary))
-        out += testguard.check(tg, ctx.guard_config(work, [c.path for c in changes])).violations
-    if ctx.component("scope_check") and work["level"] != "L0" and work["plan_sha"]:
-        scope = ctx.scope(work)
-        for c in changes:
-            if c.path not in scope and not scope_exempt(ctx, work, c.path, scope) \
-                    and not _is_registered_plan(work, wt, c.path, head_ref):
-                out.append(Violation("out_of_scope", c.path, "file fuori dallo scope del piano",
-                                     "scope"))
-    return unresolved(out, ctx.waiver_file(work))
+    """Violazioni di test-guard e scope su `changes`: la regola è in `core.violations`."""
+    return violations.diff_violations(ctx.config, ctx.db, work, wt, base_ref, head_ref, changes,
+                                      components=ctx.config.data["components"])
 
 
 def budget_cut_records(ctx, agent_id: str, tokens=None) -> list:
