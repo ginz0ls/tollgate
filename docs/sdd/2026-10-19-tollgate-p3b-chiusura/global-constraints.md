@@ -1,0 +1,12 @@
+## Global Constraints
+
+- Solo libreria standard in `bin/` e nei test (spec 3). Python ≥ 3.11 (spec 2). Ogni task chiude con `tests/run` verde (`python3.11` e `python3`).
+- Strati (spec 3, `tests/test_layers.py`): `tollgate_analysis` non importa nulla di tollgate; `tollgate_flow` importa solo `tollgate_core` e `tollgate_analysis`; `tollgate_core` non importa `tollgate_flow`, `tollgate_hooks` né `tollgate_checks`, tranne `tollgate_core/cli.py`; i moduli di `tollgate_checks` non scrivono nel DB, usano `record`.
+- Scritture nel DB solo con le funzioni di `tollgate_core`. `set_phase`, `open_block` e `close_block` si chiamano fuori da una transazione. Errori da gestire: `db.DbError` all'apertura, `sqlite3.Error` durante le operazioni (vincoli 1-5 del piano principale). `compute_dod` riceve sempre `required_commands` (comandi del gate e `dod` dei profili) e `profile_items`.
+- **Programma nei comandi per il modello:** ogni comando scritto in un messaggio della CLI, di un hook, di un brief o di una skill usa `tollgate_core.paths.program_command` (`python3 "<bin>"`); le skill scrivono `python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"`. Mai il percorso nudo (vincolo (2) di P3a per P3b).
+- **Sessione della CLI:** ogni sottocomando che legge la sessione passa dal segnale di `cli_calls` (`sessions.cli_session`). Quelli di P3b sono `finish` (per `open-pr` con `approve pr`), `sync`, `adopt`, `cleanup`, `abandon` (vincolo (1)).
+- La configurazione si legge dalla base del lavoro o dalla punta del ramo predefinito di `origin`, mai dal working tree (spec 3.2). `finish` e `sync` fanno prima `git fetch origin` (spec 3.2).
+- Testo non fidato (issue, rilievi dei revisori, commento del gate): mai in un comando shell né in un argomento di `git` o `gh`. Va su file, in un recinto più lungo di ogni sequenza di backtick (`tollgate_analysis.brief.fence`), marcato come dato. Nel corpo della PR passa da `prbody.neutralize` (menzioni spente, lunghezza massima).
+- Nessuna rete nei test. `gh` nei test è `tests/fakegh.py` con `TOLLGATE_GH` e la sentinella. I test spingono solo verso il repo nudo locale del banco (`FlowLab.origin`), dietro l'URL finto con `insteadOf`. **Nessun test tocca `~/.local/state/tollgate`, `~/.claude/settings.json` o `~/.claude/plugins/`.**
+- I test non lanciano `claude`. Solo il Task 17 lancia `claude -p`, in `/tmp/tollgate-p3b`, con `--plugin-dir`.
+- Identificatori in inglese, testi per l'utente in italiano. Nessun `__pycache__` nel repo (`-B`). Commit dopo ogni task.

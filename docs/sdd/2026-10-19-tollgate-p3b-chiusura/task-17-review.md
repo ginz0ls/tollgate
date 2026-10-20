@@ -1,0 +1,33 @@
+# Revisione Task 17 (313cdac): prova reale del flusso finish -> open-pr
+
+Controlli fatti sui dati reali in `/tmp/tollgate-p3b/flow` (sola lettura): `logs/*.jsonl` (init, tool_use, result), `events.jsonl`, `stats.json`, `status.txt`, `origin-refs.txt`, `fakegh.log`, `fakegh-data.json`, `state/bound`, `state/cli`, `git config` del repo, e `tollgate_analysis.prblock.parse` sul corpo della PR.
+
+### Aderenza
+- ✅ Impianto e cautele dello script: tutto sotto `/tmp/tollgate-p3b/flow` (`prepara` ha il `case` su `$FLOW` prima di `rm -rf`); `--plugin-dir`, `--model sonnet`; `TOLLGATE_STATE` con sentinella `.tollgate-test`; `TOLLGATE_GH` sul finto; `verifica_push` prima di ogni `claude_step` (`spikes/run-p3b-flow.sh` righe ~187-195 e 205); nessun `pkill`/`kill`. Verificato: `remote.origin.url` = URL finto, `insteadOf` sul nudo, `get-url --push origin` = `/tmp/tollgate-p3b/flow/origin.git`; `~/.local/state/tollgate` inesistente; nessuna chiamata a `gh`, `git push`, `curl` o `kill` nei tool_use dei 5 log.
+- ✅ Numeri del rapporto: versione `claude` 2.1.304 e modello `claude-sonnet-5-5` negli init; token 38498+24991+23587=87076 = `stats.json`; veti/blocchi/needs_you 0; ciclo 1 `ok`; costi 0,37+0,17+0,45+0,59+0,18 coerenti con i `result`; ordine degli eventi come descritto; `hooks.log` vuoto.
+- ✅ Esito atteso (4b): PR #1 nel finto `gh` con `Closes #1`; `prblock.parse` restituisce il blocco (L1, `verdict.outcome ok`, `head_sha` 1fb3fe8, ricevuta green 3 test, `dod` tutta vera); fase `pr_open`; `origin-refs.txt`: ramo `tg/1-...` a 1fb3fe8 = HEAD del worktree, `main` intatto a 94bf72e; `pr create --head ... --base main --body-file`.
+- ✅ C1: `tools/unittest_junit.py` e `report` come `JUNIT_TOML`; M1 legato a un test vero (ricevuta con 3 test, `finish check` dà il must-have verde).
+- ✅ Onestà: passo 2 «non eseguito come scritto» (confermato: il modello ha rifiutato di duplicare il piano), 4a «non riuscito» con evidenza (messaggio del hook e rifiuto di `open-pr` presenti nel log), passo 5 «non servito», non esercitati elencati (verificatore, `needs_fix`, tetti, `--update`, sync, adopt, cleanup, abandon, L2). Nessuna correzione di codice, quindi nessun commit+test richiesto dal brief.
+- ⚠️ Causa del 4a: sul codice è confermata solo a metà (vedi I1).
+
+### Punti di forza
+- Rapporto sobrio, con la tabella degli esiti per passo e le fonti grezze; il tentativo fallito resta nel rapporto.
+- Lo script controlla il push prima di ogni passo e non usa il link `plugin` quando si passa il percorso reale (niente `ln` involontari).
+- Il piano di prova passa `plan-check` prima di lanciare il modello.
+- Il modello non ha aggirato il rifiuto di `open-pr` in 4a (nessun `git push`/`gh`): ottima prova della «regola ferma» della skill.
+
+### Rilievi
+
+**Important**
+- I1. `docs/verifiche/2026-10-19-p3b-prova-flusso.md`, D1 (riga «Nell'uso interattivo la sessione è già nel worktree dopo `EnterWorktree`, quindi il caso non si pone»): affermazione non provata, e in parte smentita dal codice. `session.py:21-22` lega la sessione solo se `work_for_path(cwd)` cade nel worktree (`sessions.py:41-49`); `acts.py:42` rifiuta `finish` se la sessione non è legata. Una sessione interattiva nuova (o ripresa) aperta dalla radice del checkout, caso normale il giorno dopo, finisce nello stesso rifiuto, e il testo del rifiuto («vale solo in una sessione legata a un lavoro») non dice come uscirne: ridigitare `/tollgate:finish` nella stessa sessione rifà lo stesso rifiuto (la skill `finish`, riga 11, dice solo «digita `/tollgate:finish`»). Il testo è di P2 (`3c8f44d`), quindi «non è un difetto del codice di P3b» regge; ma il rapporto non deve dichiarare che il caso non si pone. Correzione: riscrivere come ⚠️ non esercitato in sessione interattiva, aggiungere la voce a «non esercitato», e segnalare al controller/Task 18 il vuoto di guida (messaggio o passo della skill che indichi di aprire la sessione dal worktree o di rilanciare da lì). È lo stesso asserto non verificato di D3 di P3a (`2026-10-16-p3a-prova-flusso.md:41`).
+
+**Minor**
+- M1. D1 dice che `claude -p` parte con «un `session_id` nuovo». Nei log: passo1 = `f809819d` (legata da `start`, `state/bound`), passo2/3/4a = `7e8ea5af` (stessa sessione, mai legata, cwd radice), 4b = `36433509` (nuova, legata da SessionStart). Quindi `--continue` non ha ripreso la sessione del passo 1 e i passi 2-4a sono stati tutti in una sessione non legata (l'`execute` funziona senza legame, `finish` no). Va detto con precisione: il rapporto implica una catena `--continue` che in realtà si è spezzata già dopo il passo 1.
+- M2. Il successo di 4b è composito: il revisore finale e il ciclo `ok` vengono da 4a, 4b ha solo registrato l'atto, rilanciato `finish check`/`review prepare` («già superata») e aperto la PR. La catena atto -> check -> revisore -> open-pr in una sola sessione legata non è mai stata esercitata, e quindi nemmeno il lancio dell'agente da una sessione legata. O1 lo dice in parte; va scritto esplicitamente tra i non esercitati, e nella tabella 4b non dovrebbe sembrare un passo completo.
+- M3. Riproducibilità: lo script `passo4` fa solo il tentativo b; il tentativo a (`--continue`, radice) non è nello script e il suo log è stato rinominato a mano in `passo4-a-radice.jsonl` (`exit-codes.txt` ha due righe `passo4` identiche). `tutto` da zero non riprodurrebbe la storia descritta (il revisore sarebbe lanciato nella sessione legata). Annotarlo nel rapporto o parametrizzare lo script.
+- M4. Nel passo 1 il modello ha letto il sorgente del plugin (`Read bin/tollgate_analysis/plan.py`, `grep -rn "plan-check\|plans/" bin lib`, `cat tools/unittest_junit.py`) per scrivere il piano. Non è nel rapporto: la qualità del piano scritto da zero con la sola skill potrebbe essere stata aiutata dal codice, quindi la prova non dice se la skill `start` basta da sola.
+- M5. Cautela residua non citata: `--allowedTools Bash` senza limiti e `gh` vero nel PATH (solo la CLI di tollgate usa `TOLLGATE_GH`). Un `gh pr create` diretto del modello sarebbe andato in rete; l'unico argine è la «regola ferma» della skill e il hook. Nei log non è successo; il rapporto potrebbe dichiarare che la garanzia «nessuna rete» poggia su questo e sui log, non sull'isolamento.
+
+### Valutazione
+**Qualità del task:** Approvato (con rilievo I1 da riportare nel rapporto prima della chiusura del ramo).
+**Motivo:** i dati reali confermano esiti, numeri, cautele e la PR leggibile con `prblock.parse`, e i fallimenti sono dichiarati come tali. L'unico punto Important è un'affermazione non verificata sull'uso interattivo (D1), che va attenuata e passata come vuoto di guida; non cambia il codice di P3b.

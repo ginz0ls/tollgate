@@ -1,0 +1,7 @@
+## Review Focus
+
+1. **`open-pr` interrotto** (push riuscito e `gh pr create` fallito; PR creata e processo morto prima dell'intento `executed`): la ripetizione non crea una seconda PR, aggiorna quella esistente, e l'atto `finish` resta valido fino alla fine. Test: Task 9 `test_interrupted_after_push_no_duplicate_pr`.
+2. **Testo ostile dei revisori nella PR** (rilievo con ```` ``` ````, `@utente`, `-->`, `<!--`, testo di 10.000 caratteri): nessun markdown attivo né menzione, nessuna chiusura anticipata del commento, `prblock.parse(render(b)) == b`. Test: Task 9 `test_hostile_finding_text_neutralized_and_block_roundtrips`.
+3. **Revisore finale fermo per sola lettura** (riga `interrupted` per `stale_minutes` mentre legge): il suo verdetto conta; uno che ha cambiato file no. Test: Task 8 `test_stale_interrupted_reviewer_verdict_counts`.
+4. **`sync` con «Update branch» remoto e predefinito avanzato, poi conflitto o interruzione**: con il conflitto base e fase invariate e `needs_you`; interrotto dopo il rebase, la ripresa completa il riallineamento senza ripetere il rebase; mai un push forzato senza intento. Test: Task 11 `test_remote_merge_then_rebase`, `test_conflict_aborts_and_blocks`, `test_interrupted_sync_completed_by_start`.
+5. **`adopt` con il ramo già in un worktree o solo remoto** (avvio interrotto, DB perso, altra macchina): nessun `--force`, nessun ramo duplicato, il worktree esistente si riusa. Test: Task 12 `test_branch_in_existing_worktree_reused`, `test_remote_only_branch`.
