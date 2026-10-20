@@ -9,6 +9,9 @@ from tests.helpers import ROOT
 ATTRIBUTION = ("Derivato da superpowers/skills/subagent-driven-development (MIT, © 2025 Jesse "
                "Vincent); vedi LICENSES/superpowers-MIT.txt")
 
+FINAL_ATTRIBUTION = ("Derivato da superpowers/skills/requesting-code-review (MIT, © 2025 Jesse "
+                     "Vincent); vedi LICENSES/superpowers-MIT.txt")
+
 
 def frontmatter(path) -> dict[str, str]:
     """Parser minimo del frontmatter: solo righe `chiave: valore`."""
@@ -190,6 +193,93 @@ class ManifestTest(unittest.TestCase):
         text = (ROOT / "skills" / "start" / "SKILL.md").read_text()
         self.assertIn("rientrante", text)
         self.assertIn("Non chiedere un secondo `/clear`", text)
+
+    def test_final_agents_frontmatter(self):
+        rev = ROOT / "agents" / "final-reviewer.md"
+        ver = ROOT / "agents" / "finding-verifier.md"
+        for path, name, model in ((rev, "final-reviewer", "inherit"),
+                                  (ver, "finding-verifier", "sonnet")):
+            fm = frontmatter(path)
+            self.assertEqual(fm["name"], name)
+            self.assertEqual(fm["model"], model)
+            self.assertTrue(fm["description"])
+            tools = [t.strip() for t in fm["tools"].split(",")]
+            self.assertEqual(tools, ["Read", "Grep", "Glob", "Bash"])
+            self.assertNotIn("Edit", tools)
+            self.assertNotIn("Write", tools)
+        self.assertIn(FINAL_ATTRIBUTION, rev.read_text())
+
+    def test_closing_skills_user_only(self):
+        for name in ("sync", "adopt", "abandon", "cleanup"):
+            text = (ROOT / "skills" / name / "SKILL.md").read_text()
+            self.assertRegex(text, r"(?m)^disable-model-invocation: true$", name)
+            self.assertRegex(text, rf"(?m)^name: {name}$")
+        text = (ROOT / "skills" / "finish" / "SKILL.md").read_text()
+        self.assertNotIn("disable-model-invocation", text)
+        self.assertRegex(text, r"(?m)^name: finish$")
+        self.assertRegex(text, r"(?m)^description: \S")
+
+    def test_skills_use_program_command_form(self):
+        """Ogni testo che nomina `bin/tollgate` lo fa nella forma `python3 "…/bin/tollgate"`."""
+        skills = sorted((ROOT / "skills").glob("*/SKILL.md"))
+        self.assertGreaterEqual(len(skills), 13)
+        bare = re.compile(r'(?<!python3 "\$\{CLAUDE_PLUGIN_ROOT\}/)(?<!python3 "…/)'
+                          r'bin/tollgate(?![\w])')
+        for path in skills:
+            text = path.read_text()
+            with self.subTest(path=str(path.relative_to(ROOT))):
+                self.assertEqual(bare.findall(text), [])
+                if "bin/tollgate" in text:
+                    self.assertIn('python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"', text)
+                    self.assertIn("tollgate: programma", text)
+
+    def test_finish_skill_never_pushes(self):
+        text = (ROOT / "skills" / "finish" / "SKILL.md").read_text()
+        self.assertIn("mai `git push`", text)
+        self.assertIn("gh pr create", text)
+
+    def test_finish_skill_keeps_worktree_clean(self):
+        text = (ROOT / "skills" / "finish" / "SKILL.md").read_text()
+        self.assertIn("committa", text)
+        self.assertLess(text.index("committa"), text.index("finish check"))
+        for needle in ("review prepare", "finish open-pr", "--from-findings", "agente:",
+                       "prossimo passo", "/tollgate:resolve", "/tollgate:approve finding",
+                       "/tollgate:approve rounds"):
+            self.assertIn(needle, text)
+
+    def test_final_verdict_fields_in_agent_text(self):
+        rev = (ROOT / "agents" / "final-reviewer.md").read_text()
+        for field in ("v", "sha", "code", "outcome", "findings", "severity", "confidence",
+                      "file", "line", "rule", "text"):
+            self.assertRegex(rev, rf'"{field}"', field)
+        blocks = re.findall(r"```json\n(.*?)\n```", rev, re.S)
+        self.assertEqual({json.loads(b)["outcome"] for b in blocks},
+                         {"ok", "needs_fix", "needs_you"})
+        ver = (ROOT / "agents" / "finding-verifier.md").read_text()
+        for field in ("v", "sha", "code", "results", "id", "verification", "reason"):
+            self.assertRegex(ver, rf'"{field}"', field)
+        for word in ("confirmed", "rejected", "unverified"):
+            self.assertIn(word, ver)
+        for b in re.findall(r"```json\n(.*?)\n```", ver, re.S):
+            self.assertEqual(json.loads(b)["v"], 1)
+        for b in blocks:
+            self.assertEqual(json.loads(b)["v"], 1)
+
+    def test_updated_skills_describe_closing(self):
+        approve = (ROOT / "skills" / "approve" / "SKILL.md").read_text()
+        for needle in ("finding", "rounds", "unverified-review", "rebase", "act apply",
+                       "unverified-tests", "waiver", "effect"):
+            self.assertIn(needle, approve)
+        self.assertNotIn("arriva con /tollgate:finish (P3b)", approve)
+        execute = (ROOT / "skills" / "execute" / "SKILL.md").read_text()
+        self.assertIn("digitare `/tollgate:finish`", execute)
+        self.assertNotIn("arriva con P3b", execute)
+        start = (ROOT / "skills" / "start" / "SKILL.md").read_text()
+        self.assertIn("/tollgate:adopt #N", start)
+        self.assertNotIn("arriva con P3b", start)
+        self.assertIn("/tollgate:abandon #N", start)
+        resolve = (ROOT / "skills" / "resolve" / "SKILL.md").read_text()
+        self.assertIn("concede **un** ciclo", resolve)
 
     def test_wrapper_executable(self):
         self.assertTrue(os.access(ROOT / "hooks" / "run", os.X_OK))

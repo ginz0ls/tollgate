@@ -55,4 +55,6 @@ All'avviso del hook (`warn_pct`) scrivi il checkpoint con `<programma> status --
 
 ## Fine
 
-Quando ogni task è `done`, di' all'utente di lanciare `/tollgate:finish` (arriva con P3b).
+Quando ogni task è `done`, di' all'utente di digitare `/tollgate:finish`: l'atto lo registra il hook solo quando lo digita lui, e la chiusura (controllo, revisione finale, PR) è di quella skill.
+
+Il task di correzione generato dai rilievi della revisione finale (`task start --from-findings <ciclo>`, lanciato da `/tollgate:finish`) o dal gate (`--from-gate`) è un task `fix` come gli altri: stesso ciclo di avvio, implementatore, revisione e `task done`, e alla fine di' di nuovo all'utente di digitare `/tollgate:finish`.

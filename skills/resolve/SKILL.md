@@ -15,4 +15,6 @@ L'atto è già registrato dal hook quando l'utente ha digitato il comando. Lanci
 
 Riferisci l'esito: il blocco chiuso, la **fase** a cui il lavoro torna e i task tornati `pending` (con `writer`: gli implementatori interrotti). Se rifiuta, riporta il motivo (per esempio un id che non è un blocco aperto di questo lavoro, o «sessione non riconosciuta»: in quel caso il comando va lanciato da Claude Code con tollgate acceso).
 
-Poi indica il passo successivo: con task pendenti, `/tollgate:execute`. Non aggiungere note o decisioni al posto dell'utente.
+Se il blocco era il tetto dei cicli di revisione finale («cicli di revisione esauriti»), `resolve` concede **un** ciclo in più (entro il tetto assoluto di 8); per concederne altri, o per le altre decisioni sui cicli, serve `/tollgate:approve rounds <n>` o `/tollgate:approve unverified-review`.
+
+Poi indica il passo successivo: con task pendenti, `/tollgate:execute`; con la fase `review`, `/tollgate:finish`. Non aggiungere note o decisioni al posto dell'utente.
