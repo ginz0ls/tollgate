@@ -9,7 +9,8 @@ from tollgate_core import git
 from tollgate_hooks.model import deny
 
 from ._common import (edit_lexical, edit_target, explain, governing_work, in_main_checkout, is_docs_md,
-                      is_protected_path, locked_docs, orphan_tg, scope_exempt)
+                      is_protected_path, locked_docs, orphan_next, orphan_tg,
+                      scope_exempt)
 
 CHECK = {"api": 1, "events": ["pre_edit"], "component": None, "order": 20}
 _DOCS_ONLY = ("spec_audit", "plan", "approval", "blocked", "review", "pr_open")
@@ -35,8 +36,9 @@ def decide(event, ctx):
     if work is None:
         n = orphan_tg(ctx, repo)
         if n is not None and not is_docs_md(rel):
-            return [deny(f"ramo tg/{n}-* senza lavoro nel DB: scritture negate tranne i .md "
-                         f"sotto docs/superpowers/. L'utente deve lanciare /tollgate:adopt #{n} "
+            why, command = orphan_next(ctx, repo, n)
+            return [deny(f"ramo tg/{n}-* {why}: scritture negate tranne i .md "
+                         f"sotto docs/superpowers/. L'utente deve lanciare {command} "
                          f"(12.4)", rule="adopt")]
         return []
     if not work["worktree"]:

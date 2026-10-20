@@ -59,6 +59,12 @@ def worktree_add(repo, path, *, branch: str, start_point: str | None, new_branch
         _checked(repo, "worktree", "add", *extra, str(path), branch)
 
 
+def worktree_remove(repo, path) -> None:
+    """`git worktree remove <percorso>`, mai con `--force`: un worktree con modifiche o file
+    nuovi non si toglie e git rifiuta (`GitWriteError`)."""
+    _checked(repo, "worktree", "remove", str(path))
+
+
 def rebase_in_progress(wt) -> bool:
     """Un rebase interrotto (`sync`) lascia `rebase-merge` o `rebase-apply` nella cartella git
     privata del worktree."""

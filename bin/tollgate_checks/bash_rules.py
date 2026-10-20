@@ -17,7 +17,7 @@ from tollgate_core import git
 from tollgate_hooks.model import deny
 
 from ._common import (_inside, governing_work, in_main_checkout, is_docs_md, is_protected_path,
-                      orphan_tg, output_excludes, path_forms, repo_key_of)
+                      orphan_next, orphan_tg, output_excludes, path_forms, repo_key_of)
 
 CHECK = {"api": 1, "events": ["pre_bash"], "component": None, "order": 20}
 _SUBST = "_TG_SUBST_"
@@ -250,19 +250,20 @@ def _work_rules(ctx, event, c: bash.Cmd, edir: Path, work,
 def _orphan_rule(ctx, c: bash.Cmd, repo: Path | None,
                  paths: list[tuple[str, Path]]) -> tuple[str, str] | None:
     """Ramo tg/N-* senza lavoro nel DB (12.4): scritture negate tranne i .md di docs/superpowers."""
-    hit = orphan_tg(ctx, repo) if bash.git_mutating(c) else None
+    hit, where = (orphan_tg(ctx, repo), repo) if bash.git_mutating(c) else (None, None)
     if hit is None:
         for _, p in paths:
             r = git.toplevel(p)
             n = orphan_tg(ctx, r)
             if n is not None and not is_docs_md(ctx.rel(p, r)):
-                hit = n
+                hit, where = n, r
                 break
     if hit is None:
         return None
-    return "adopt", (f"ramo tg/{hit}-* senza lavoro nel DB: comandi che scrivono negati, tranne "
-                     f"i .md sotto docs/superpowers/. L'utente deve lanciare /tollgate:adopt "
-                     f"#{hit} (12.4)")
+    why, command = orphan_next(ctx, where, hit)
+    return "adopt", (f"ramo tg/{hit}-* {why}: comandi che scrivono negati, tranne "
+                     f"i .md sotto docs/superpowers/. L'utente deve lanciare {command} "
+                     f"(12.4)")
 
 
 def _check(event, ctx, c: bash.Cmd, raw: str) -> tuple[str, str] | None:

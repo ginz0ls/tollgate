@@ -16,7 +16,7 @@ from tollgate_core import (VERSION, active, clock, config, db, git, phases, sess
                            subagents)
 from tollgate_core.paths import State, repo_key
 
-from . import gh, gitw, housekeeping, prereq, sync as flow_sync
+from . import gh, gitw, housekeeping, prereq, prstate, sync as flow_sync
 
 OK, REFUSED, NEEDS_CONFIRM, INCOMPLETE = 0, 1, 3, 4
 TRUSTED_AUTHORS = ("OWNER", "MEMBER", "COLLABORATOR")
@@ -128,6 +128,17 @@ def _resume(state, conn, main, ref, cfg, row, session, *, fetched, confirm, reop
     if not fetched:
         notes.warnings.append("senza rete: riparto dallo stato locale (git fetch origin non "
                               "è riuscito)")
+    seen = prstate.detect(state, conn, row, main, now=now, session=session)
+    if seen.error:
+        notes.warnings.append(seen.error)
+    if seen.kind == "merged":
+        return StartResult(OK, [
+            *[f"avviso: {w}" for w in notes.warnings],
+            f"lavoro #{issue} chiuso: la PR è stata unita (PR #{seen.pr.get('number')})",
+            "ramo e worktree restano: si tolgono con /tollgate:cleanup"], work=work)
+    unlink_pr = seen.kind == "closed"
+    if unlink_pr:
+        notes.confirms.append(prstate.closed_line(seen.pr))
     notes.warnings.extend(_prerequisites(state, main, ref, claude_dir, notes))
     _check_main_clean(main, notes)
     _check_default_states(state, main, ref, notes, strict=False)
@@ -158,6 +169,11 @@ def _resume(state, conn, main, ref, cfg, row, session, *, fetched, confirm, reop
             return StartResult(REFUSED, [*[f"avviso: {w}" for w in notes.warnings],
                                          f"rifiuto: {why}"])
     steps = _Steps()
+    if unlink_pr:
+        steps.run("scollegamento della PR chiusa",
+                  lambda: phases.set_pr(conn, work, None, None, now=now))
+        notes.warnings.append(f"PR #{seen.pr.get('number')} scollegata dal lavoro: "
+                              "`finish open-pr` ne aprirà una nuova")
     if str(wt) != row["worktree"]:
         steps.run("percorso del worktree",
                   lambda: phases.set_worktree(conn, work, wt, now=now))

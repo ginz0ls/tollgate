@@ -145,6 +145,31 @@ def orphan_tg(ctx, repo) -> int | None:
     return None if row else int(m.group(1))
 
 
+def closed_tg(ctx, repo) -> int | None:
+    """Ramo tg/<N>-* che è il `branch` di un lavoro `closed` del repo e di nessun lavoro attivo:
+    non serve `adopt`, i resti si tolgono con `/tollgate:cleanup` (12.4)."""
+    if repo is None:
+        return None
+    branch = git.branch(repo) or ""
+    m = _TG.match(branch)
+    key = repo_key_of(repo)
+    if not m or key is None:
+        return None
+    phases_ = [r[0] for r in ctx.db.execute(
+        "SELECT phase FROM work_items WHERE repo_key = ? AND branch = ?", (key, branch))]
+    if phases_ and all(p == "closed" for p in phases_):
+        return int(m.group(1))
+    return None
+
+
+def orphan_next(ctx, repo, n: int) -> tuple[str, str]:
+    """`(motivo, comando)` per un ramo tg/<N>-* senza lavoro attivo: `cleanup` se è il ramo di un
+    lavoro chiuso, altrimenti `adopt` (DB perso)."""
+    if closed_tg(ctx, repo) == n:
+        return "di un lavoro chiuso", "/tollgate:cleanup"
+    return "senza lavoro nel DB", f"/tollgate:adopt #{n}"
+
+
 def governing_work(ctx, path):
     """Le regole complete valgono nella sessione legata e per ogni percorso nel worktree (6.6)."""
     if ctx.bound and ctx.work is not None:

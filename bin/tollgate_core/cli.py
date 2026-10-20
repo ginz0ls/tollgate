@@ -90,6 +90,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("sync", help="rimette il ramo sul predefinito e aggiorna la PR (6.5)")
     ad = sub.add_parser("adopt", help="ricostruisce un lavoro dal ramo tg/<N>-* (12.4)")
     ad.add_argument("issue", type=_issue_number, metavar="N")
+    ab = sub.add_parser("abandon", help="chiude un lavoro senza unirlo (12.4)")
+    ab.add_argument("issue", type=_issue_number, metavar="N")
+    cl = sub.add_parser("cleanup", help="toglie rami e worktree dei lavori chiusi (12.4)")
+    cl.add_argument("--confirm", action="store_true",
+                    help="toglie davvero; senza, elenca soltanto (codice 3)")
+    cl.add_argument("--orphans", action="store_true",
+                    help="include i rami tg/<N>-* senza lavoro nel DB")
     hp = sub.add_parser("hook", help="solo per hooks/run: adattatore per Claude Code")
     hp.add_argument("event", metavar="evento")
     vp = sub.add_parser("verify", help="esegue i comandi del gate e registra le ricevute (8.1)")
@@ -229,6 +236,17 @@ def main(argv: list[str]) -> int:
                                        argv=_hook_argv(argv, args.cmd))
             print("\n".join(adopted.lines))
             return adopted.code
+        if args.cmd in ("abandon", "cleanup"):
+            from tollgate_flow import closing
+            if args.cmd == "abandon":
+                code, lines = closing.abandon(state, Path.cwd(), args.issue,
+                                              argv=_hook_argv(argv, args.cmd))
+            else:
+                code, lines = closing.cleanup(state, Path.cwd(), confirm=args.confirm,
+                                              orphans=args.orphans,
+                                              argv=_hook_argv(argv, args.cmd))
+            print("\n".join(lines))
+            return code
         if args.cmd == "task":
             from tollgate_flow import taskcmd
             try:

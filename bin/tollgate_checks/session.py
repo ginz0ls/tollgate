@@ -6,7 +6,7 @@ from pathlib import Path
 from tollgate_core import sessions, subagents
 from tollgate_hooks.model import inject, record
 
-from ._common import orphan_tg, status_lines
+from ._common import orphan_next, orphan_tg, status_lines
 
 CHECK = {"api": 1, "events": ["session_start"], "component": None, "order": 10}
 MAX_LINES, MAX_CHARS = 10, 1500
@@ -24,9 +24,10 @@ def decide(event, ctx):
     if work is None:
         n = orphan_tg(ctx, ctx.repo)
         if n is not None:
-            out.append(inject(f"tollgate: ramo tg/{n}-* senza lavoro nel DB (DB perso?). Le "
-                              f"scritture sono negate finché l'utente non lancia "
-                              f"/tollgate:adopt #{n}."))
+            why, command = orphan_next(ctx, ctx.repo, n)
+            hint = " (DB perso?)" if command.startswith("/tollgate:adopt") else ""
+            out.append(inject(f"tollgate: ramo tg/{n}-* {why}{hint}. Le scritture sono negate "
+                              f"finché l'utente non lancia {command}."))
         return out
     cp_lines = []
     if work["worktree"]:

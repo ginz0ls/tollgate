@@ -572,6 +572,58 @@ class ResumeTest(StartCase):
         self.assertIn("rifiuto: ricreazione del worktree", out(r))
         self.assertIn("il checkout principale ha modifiche non committate", out(r))
 
+    def linked(self, fl, state, **kw):
+        """Il lavoro ha la PR #1 e il finto gh la conosce nello stato `state`."""
+        phases.set_pr(fl.conn, fl.work, 1, "https://github.com/prova/flow/pull/1",
+                      now=clock.now())
+        self.gh(fl, prs=[{"number": 1, "headRefName": "tg/7-demo", "state": state,
+                          "url": "https://github.com/prova/flow/pull/1", "headRefOid": "x",
+                          "mergedAt": None, "body": "", "comments": [], **kw}])
+
+    def test_merged_pr_closes_work(self):
+        fl = self.make()
+        self.linked(fl, "MERGED", mergedAt="2026-10-19T10:00:00Z")
+        r = self.resume(fl)
+        self.assertIn("lavoro #7 chiuso: la PR è stata unita", out(r))
+        self.assertNotIn("EnterWorktree", out(r))
+        row = phases.get_work(fl.conn, fl.work)
+        self.assertEqual((row["phase"], row["closed_reason"]), ("closed", "merged"))
+        self.assertEqual(fl.events("merge_detected")[-1]["pr"], 1)
+        self.assertEqual(fl.events("phase_change")[-1]["cause"], "merged")
+        # chiuso, non si riprende più: un secondo start avvia un lavoro nuovo (o rifiuta)
+        self.assertIsNone(phases.find_active(fl.conn, row["repo_key"], 7))
+
+    def test_closed_pr_asks_and_confirm_clears_pr(self):
+        fl = self.make()
+        self.linked(fl, "CLOSED")
+        asked = self.resume(fl, code=3)
+        self.assertIn("PR #1 chiusa senza merge", out(asked))
+        self.assertIn("/tollgate:abandon", out(asked))
+        self.assertIn("--confirm", out(asked))
+        self.assertNotIn("EnterWorktree", out(asked))
+        self.assertEqual(phases.get_work(fl.conn, fl.work)["pr_number"], 1)
+        done = self.resume(fl, "--confirm")
+        row = phases.get_work(fl.conn, fl.work)
+        self.assertEqual((row["pr_number"], row["pr_url"], row["phase"]),
+                         (None, None, "execution"))
+        self.assertEqual(done.stdout.strip().splitlines()[-1],
+                         f"prossimo passo: EnterWorktree {fl.wt.resolve()}")
+
+    def test_open_pr_resumes_normally(self):
+        fl = self.make()
+        self.linked(fl, "OPEN")
+        r = self.resume(fl)
+        self.assertEqual(phases.get_work(fl.conn, fl.work)["pr_number"], 1)
+        self.assertIn("EnterWorktree", out(r))
+
+    def test_unreadable_pr_state_warns_and_resumes(self):
+        fl = self.make()
+        self.linked(fl, "MERGED")
+        self.gh(fl, prs=[], fail=["pr view"])
+        r = self.resume(fl)
+        self.assertIn("avviso: PR #1: stato non letto", out(r))
+        self.assertEqual(phases.get_work(fl.conn, fl.work)["phase"], "execution")
+
     def test_resume_runs_housekeeping(self):
         fl = self.make()
         sessions.mark_bound(fl.ts.state, "morta")
