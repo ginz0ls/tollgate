@@ -504,6 +504,26 @@ class ApproveRebaseTest(ApplyCase):
         ev = [e for e in events.export_events(fl.conn, 0) if e["type"] == "base_realigned"]
         self.assertEqual(ev[-1]["data"]["to"], expected)
 
+    def test_approve_rebase_records_rewritten_commits_as_known(self):
+        fl = self.conflict("pr_open")
+        fl.git("commit", "--allow-empty", "-qm", "riscritto a mano", repo=fl.wt)  # senza hook
+        self.assertNotIn(core_git.head(fl.wt), {e["data"]["sha"] for e in
+                                                events.export_events(fl.conn, 0)
+                                                if e["type"] == "commit"})
+        self.act("tollgate:approve", "rebase")
+        self.apply()
+        base, head = self.work()["work_base_sha"], core_git.head(fl.wt)
+        recorded = {e["data"]["sha"] for e in events.export_events(fl.conn, 0)
+                    if e["type"] == "commit"}
+        self.assertIn(head, recorded)
+        self.assertEqual(set(core_git.rev_list(fl.wt, base, head)) - recorded, set())
+        before = len(recorded)
+        out = fl.bash("git status", post=True, cwd=fl.wt)
+        self.assertEqual(out.exit, 0, out.stderr)
+        self.assertEqual(len([e for e in events.export_events(fl.conn, 0)
+                              if e["type"] == "commit"]), before)
+        self.assertEqual(self.open_reasons(), [])
+
     def test_approve_rebase_force_carries_remote_tip_as_lease(self):
         fl = self.conflict("pr_open")
         remote = core_git.head(fl.wt)

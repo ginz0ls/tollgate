@@ -52,11 +52,6 @@ def sync(state, cwd, *, now=None, argv: list[str] | None = None, environ=None) -
         conn.close()
 
 
-def _known_commits(conn, wid: int) -> set[str]:
-    return {json.loads(r[0]).get("sha") for r in conn.execute(
-        "SELECT data FROM events WHERE type = 'commit' AND work = ?", (wid,))}
-
-
 def _remote_conflict(conn, wid: int, wt: Path, branch: str, head: str,
                      issue: int) -> str | None:
     """Integra i commit remoti del ramo: avanzamento rapido, oppure nulla se sono già in HEAD o
@@ -69,21 +64,11 @@ def _remote_conflict(conn, wid: int, wt: Path, branch: str, head: str,
         if not gitw.merge_ff_only(wt, remote):
             raise gitw.GitWriteError(f"git merge --ff-only {remote[:7]} non riuscito")
         return None
-    if remote in _known_commits(conn, wid):
+    if remote in events.known_commits(conn, wid):
         return None
     return (f"sync: il ramo remoto {branch} ({remote[:7]}) e HEAD ({head[:7]}) sono divergenti: "
             "integra a mano i commit remoti e chiudi il blocco con /tollgate:resolve <id>, "
             f"oppure abbandona con /tollgate:abandon #{issue}")
-
-
-def _record_commits(conn, wid: int, wt: Path, base: str, *, now, session) -> int:
-    """Gli eventi `commit` dei commit di `base..HEAD` non ancora noti: PostToolUse Bash non li
-    tratta come nuovi."""
-    known = _known_commits(conn, wid)
-    new = [s for s in git.rev_list(wt, base, git.head(wt)) if s not in known]
-    for sha in new:
-        events.record_event(conn, "commit", {"sha": sha}, now=now, session=session, work=wid)
-    return len(new)
 
 
 def _realign(conn, state, wid: int, wt: Path, tip: str, branch: str, key: str, *, now,
@@ -97,17 +82,20 @@ def _realign(conn, state, wid: int, wt: Path, tip: str, branch: str, key: str, *
     if work["work_base_sha"] != tip:
         phases.set_base(conn, wid, tip, cause="sync", now=now, session=session)
         notes.append(f"base riallineata a {tip[:12]}")
-    new = _record_commits(conn, wid, wt, tip, now=now, session=session)
+    new = events.record_commits(conn, wid, wt, tip, now=now, session=session)
     if new:
         notes.append(f"{new} commit registrati")
     if work["phase"] == "pr_open":
         phases.set_phase(conn, state, wid, "execution", "sync", now=now, session=session)
         notes.append("fase execution")
     remote = git.resolve_ref(wt, f"origin/{branch}")
-    if (remote is not None and remote != head and not gitw.is_ancestor(wt, remote, head)
-            and not intents.force_authorized(conn, wid)):
-        intents.authorize_force(conn, wid, reason="sync", now=now, lease=remote)
-        notes.append("push forzato autorizzato")
+    if remote is not None and remote != head and not gitw.is_ancestor(wt, remote, head):
+        if not intents.force_authorized(conn, wid):
+            intents.authorize_force(conn, wid, reason="sync", now=now, lease=remote)
+            notes.append("push forzato autorizzato")
+        elif intents.force_lease(conn, wid) != remote:      # remoto avanzato e integrato (I-4)
+            intents.refresh_lease(conn, wid, remote)
+            notes.append(f"lease del push forzato rinnovato a {remote[:7]}")
     intents.complete(conn, key, outcome="riallineato", now=now)
     return notes
 
@@ -210,7 +198,7 @@ def _sync(state, conn, cwd: Path, now, argv, environ) -> SyncResult:
     try:
         divergent = _remote_conflict(conn, wid, wt, branch, head0, work["issue"])
         if git.head(wt) != head0:       # integrati con --ff-only: noti prima di ogni altro passo
-            _record_commits(conn, wid, wt, work["work_base_sha"], now=now, session=session)
+            events.record_commits(conn, wid, wt, work["work_base_sha"], now=now, session=session)
         if divergent is None and not gitw.is_ancestor(wt, tip, git.head(wt)):
             if not gitw.rebase(wt, tip):
                 gitw.rebase_abort(wt)
@@ -254,9 +242,10 @@ def _finish(state, conn, wt: Path, wid: int, tip: str, act_id: str, lines: list[
     prog = program_command(db.BIN_PATH)
     checked = finishcheck.check(state, wt, now=now, environ=environ)
     if checked.code != finishcheck.OK:
+        why = ("finish check non è verde dopo il rebase" if checked.code == finishcheck.RED
+               else "finish check ha rifiutato dopo il rebase (non ha verificato nulla)")
         return SyncResult(REFUSED, [*lines, *checked.lines,
-                                    "rifiuto: finish check non è verde dopo il rebase: correggi e "
-                                    f"rilancia {prog} finish check"])
+                                    f"rifiuto: {why}: correggi e rilancia {prog} finish check"])
     lines.append("finish check verde")
     work = phases.get_work(conn, wid)
     if work["pr_number"] is None:

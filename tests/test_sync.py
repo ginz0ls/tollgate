@@ -6,7 +6,7 @@ from unittest import mock
 from tests.flowkit import SESSION
 from tests.helpers import git as run_git
 from tests.test_openpr import BRANCH, OpenCase, head, pr, work
-from tollgate_core import (acts, clock, git as core_git, intents, phases, reviews, sessions,
+from tollgate_core import (acts, clock, events, git as core_git, intents, phases, reviews, sessions,
                            subagents)
 from tollgate_flow import gitw, prstate, sync
 
@@ -93,6 +93,24 @@ class SyncOpenWorkTest(SyncCase):
         subagents.start(fl.conn, agent_id="a-1", type_="tollgate:implementer", session=SESSION,
                         work=fl.work, task=1, base_sha=None, fingerprint=None, now=self.at)
         self.assert_refused_untouched(fl, r"implementatore")
+
+    def test_finish_check_refusal_is_not_reported_as_red(self):
+        fl = self.execution_lab()
+        fl.conn.execute("UPDATE tasks SET state = 'pending' WHERE work = ? AND number = 1",
+                        (fl.work,))
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.REFUSED, r.lines)
+        text = " ".join(r.lines)
+        self.assertIn("finish check ha rifiutato", text)
+        self.assertNotIn("non è verde", text)
+
+    def test_finish_check_red_is_reported_as_red(self):
+        fl = self.execution_lab()
+        with mock.patch.object(sync.finishcheck, "check",
+                               return_value=sync.finishcheck.CheckResult(1, ["[no] x"])):
+            r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.REFUSED, r.lines)
+        self.assertIn("finish check non è verde dopo il rebase", " ".join(r.lines))
 
     def test_readonly_subagent_does_not_refuse(self):
         fl = self.execution_lab()
@@ -351,6 +369,45 @@ class SyncRebaseTest(SyncCase):
         self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), manual)         # commit remoto intatto
         self.assertEqual(self.intent_states(fl, "force_push"), ["authorized"])
         self.assertEqual(self.calls(fl, "pr", "edit"), [])
+
+    def test_stale_lease_is_renewed_and_open_pr_pushes(self):
+        """I-4: il remoto è avanzato dopo l'autorizzazione e i suoi commit sono integrati."""
+        fl = self.pr_open_lab_twelve()
+        old_head = head(fl)
+        self.advance_main(fl, path="src/app.py", text=TWELVE_MAIN)
+        self.assertEqual(self.run_sync(fl).code, sync.REVIEW_NEEDED)
+        self.assertEqual(intents.force_lease(fl.conn, fl.work), old_head)
+        clone = fl.tmp / "clone"
+        run_git(fl.tmp, "clone", "-q", str(fl.origin), str(clone))
+        run_git(clone, "checkout", "-q", "-b", BRANCH, f"origin/{BRANCH}")
+        run_git(clone, "commit", "-q", "--allow-empty", "-m", "Update branch")
+        run_git(clone, "push", "-q", "origin", BRANCH)
+        advanced = run_git(clone, "rev-parse", "HEAD")
+        events.record_event(fl.conn, "commit", {"sha": advanced}, now=self.at, work=fl.work)
+        self.at += timedelta(minutes=30)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.REVIEW_NEEDED, r.lines)
+        self.assertEqual(intents.force_lease(fl.conn, fl.work), advanced)
+        self.assertEqual(self.intent_states(fl, "force_push"), ["authorized"])
+        phases.set_review_unverified(fl.conn, fl.work, now=fl.now)
+        r = self.go(fl, update=True, via_sync="a-99")
+        self.assertEqual(r.code, 0, r.lines)
+        self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), head(fl))
+        self.assertEqual(self.intent_states(fl, "force_push"), ["used"])
+
+    def test_failed_lease_push_points_to_sync(self):
+        fl = self.pr_open_lab_twelve()
+        self.advance_main(fl, path="src/app.py", text=TWELVE_MAIN)
+        self.assertEqual(self.run_sync(fl).code, sync.REVIEW_NEEDED)
+        clone = fl.tmp / "clone"
+        run_git(fl.tmp, "clone", "-q", str(fl.origin), str(clone))
+        run_git(clone, "checkout", "-q", "-b", BRANCH, f"origin/{BRANCH}")
+        run_git(clone, "commit", "-q", "--allow-empty", "-m", "a mano")
+        run_git(clone, "push", "-q", "origin", BRANCH)
+        phases.set_review_unverified(fl.conn, fl.work, now=fl.now)
+        r = self.go(fl, update=True, via_sync="a-99")
+        self.assertEqual(r.code, 1, r.lines)
+        self.assertIn("il ramo remoto è avanzato: /tollgate:sync", " ".join(r.lines))
 
     def pr_open_lab_twelve(self):
         return self.pr_open_lab(files={"src/app.py": TWELVE}, app=TWELVE_WORK)

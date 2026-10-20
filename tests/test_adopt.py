@@ -213,6 +213,25 @@ class AdoptPhaseTest(AdoptCase):
             fl.conn, row["id"]), sensitive=lambda p: False), {"w-7-1": "pending"})
 
 
+class AdoptIssueTest(AdoptCase):
+    def test_external_issue_author_gives_at_least_l2(self):
+        fl = self.branch_lab(L0_FILES)
+        self.gh(fl, issues={"7": {"number": 7, "title": "Aggiungi export CSV", "body": "b",
+                                  "state": "open", "labels": [], "author_association": "NONE"}})
+        r = self.adopt(fl)
+        self.assertEqual(r.returncode, 0, out(r))
+        self.assertIn("autore dell'issue esterno al repo", r.stdout)
+        (row,) = self.rows(fl)
+        self.assertEqual(row["level"], "L2")
+
+    def test_unreadable_issue_refuses(self):
+        fl = self.branch_lab(L0_FILES)
+        self.gh(fl, issues={"99": {"number": 99}})
+        r = self.adopt(fl)
+        self.assertEqual(r.returncode, 1, out(r))
+        self.assertEqual(self.rows(fl), [])
+
+
 class AdoptPrTest(AdoptCase):
     def test_open_pr_gives_pr_open_and_cap_from_block(self):
         body = prblock.render({"issue": 7, "level": "L2", "level_cap": "L1",
@@ -227,6 +246,14 @@ class AdoptPrTest(AdoptCase):
         self.assertEqual(json.loads(row["level_cap_paths"]), ["src/auth/login.py"])
         self.assertEqual(row["plan_path"], PLAN)
         self.assertEqual(len(scope.paths(fl.conn, row["id"])), 3)       # livello L1 dopo il tetto
+
+    def test_fork_pr_with_same_branch_is_not_ours(self):
+        body = prblock.render({"issue": 7, "level": "L2", "level_cap": "L0",
+                               "level_cap_reason": "di un altro"})
+        fl = self.branch_lab(L2_FILES, push=True,
+                             prs=[pr(3, "OPEN", body=body, isCrossRepository=True)])
+        row = self.adopted(fl)
+        self.assertEqual((row["pr_number"], row["level_cap"], row["level"]), (None, None, "L2"))
 
     def test_invalid_cap_in_block_is_ignored_with_warning(self):
         for name, block in {"livello": {"issue": 7, "level_cap": "L9"},

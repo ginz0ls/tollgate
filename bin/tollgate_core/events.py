@@ -6,7 +6,7 @@ import socket
 import sqlite3
 from datetime import datetime, timedelta
 
-from . import clock
+from . import clock, git
 from .db import tx
 
 ENVELOPE_VERSION = 1
@@ -39,6 +39,22 @@ def record_event(conn: sqlite3.Connection, type_: str, data: dict | None = None,
             (ENVELOPE_VERSION, clock.fmt(now), host or socket.gethostname(), session, work,
              repo_key, issue, type_, json.dumps(data or {}, ensure_ascii=False, sort_keys=True)))
         return cur.lastrowid
+
+
+def known_commits(conn: sqlite3.Connection, work: int) -> set[str]:
+    return {json.loads(r[0]).get("sha") for r in conn.execute(
+        "SELECT data FROM events WHERE type = 'commit' AND work = ?", (work,))}
+
+
+def record_commits(conn: sqlite3.Connection, work: int, wt, base: str, *, now,
+                   session: str | None = None) -> int:
+    """Gli eventi `commit` dei commit di `base..HEAD` non ancora noti (rebase, integrazioni):
+    PostToolUse Bash non li tratta come nuovi del lavoro. Dà quanti ne ha registrati."""
+    known = known_commits(conn, work)
+    new = [s for s in git.rev_list(wt, base, git.head(wt)) if s not in known]
+    for sha in new:
+        record_event(conn, "commit", {"sha": sha}, now=now, session=session, work=work)
+    return len(new)
 
 
 def _as_dict(row) -> dict:

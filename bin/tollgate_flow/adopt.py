@@ -172,7 +172,8 @@ def _safe_rel(value) -> str | None:
 
 
 def _level(state, main: Path, cfg, issue: int, base: str, sha: str, changes, warnings) -> str:
-    """Diff dalla base, profili attivi ed etichette dell'issue (come `openpr.facts`)."""
+    """Diff dalla base, profili attivi, etichette e autore dell'issue (come `openpr.facts` e
+    `start`)."""
     levels_cfg = cfg.get("levels")
     paths = [c.path for c in changes] + [c.old_path for c in changes if c.old_path]
     computed = lv.diff_level(
@@ -183,12 +184,12 @@ def _level(state, main: Path, cfg, issue: int, base: str, sha: str, changes, war
     profs = cfg.profiles
     computed = lv.max_level(computed, prof.min_level(
         prof.active_profiles(paths, profs, cfg.get("profiles.active")), profs))
-    try:
-        labels = gh.issue(state, main, issue).labels
-    except gh.GhError as e:
-        warnings.append(f"etichette dell'issue non lette ({e}): il livello viene dal solo diff")
-        return computed
-    return lv.max_level(computed, lv.labels_level(labels, levels_cfg["sensitive_labels"]))
+    iss = gh.issue(state, main, issue)      # illeggibile: GhError, adopt rifiuta come per la PR
+    computed = lv.max_level(computed, lv.labels_level(iss.labels, levels_cfg["sensitive_labels"]))
+    if iss.author_association not in flow_start.TRUSTED_AUTHORS:
+        warnings.append("autore dell'issue esterno al repo: il lavoro va in L2")
+        computed = lv.max_level(computed, "L2")
+    return computed
 
 
 def _phase(level: str, pr: dict | None, plan, spec_header, plan_header) -> str:

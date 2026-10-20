@@ -65,6 +65,15 @@ class RenderTest(unittest.TestCase):
             self.assertIn(text, body)
         self.assertEqual(prblock.parse(body), BLOCK)
 
+    def test_unverified_section_with_reason_and_neutralized(self):
+        body = render(unverified=[{"severity": "major", "file": "a.py", "line": 2, "rule": "R-1",
+                                   "text": "ping @utente", "verification_reason": "ciclo superato"}])
+        self.assertIn("## Rilievi non verificati", body)
+        self.assertIn("[major] a.py:2", body)
+        self.assertIn("non verificato: ciclo superato", body)
+        self.assertNotIn("@utente", body)
+        self.assertNotIn("Rilievi non verificati", render())
+
     def test_missing_file_or_line_in_note(self):
         body = render(notes=[{"severity": "minor", "file": None, "line": None, "rule": None,
                               "text": "t"}])

@@ -28,7 +28,7 @@ _COMMITS_STATUS = re.compile(r"^repos/[^/]+/[^/]+/commits/([^/]+)/status$")
 _ISSUE_REST = re.compile(r"^repos/[^/]+/[^/]+/issues/(\d+)$")
 _PULLS = re.compile(r"^repos/[^/]+/[^/]+/pulls(\?.*)?$")
 PR_FIELDS = frozenset({"number", "state", "url", "headRefName", "headRefOid", "mergedAt",
-                       "title", "body", "comments"})
+                       "title", "body", "comments", "isCrossRepository"})
 PULLS_FIELDS = ("number", "headRefName", "state", "url")
 DEFAULT_LIMIT = 30
 
@@ -49,6 +49,14 @@ def _fields(obj, args):
     return {k: obj[k] for k in wanted.split(",") if k in obj}
 
 
+# Campi che una PR dei dati ottiene da sola se non li dichiara: `isCrossRepository` è falso (PR
+# dal repo stesso), `headRefOid` è la punta attuale del ramo su origin (come per GitHub: segue i
+# push). Una PR da fork o con un SHA fisso li dichiara nei dati.
+_PR_DEFAULTS = {"isCrossRepository": lambda obj: False,
+                "headRefOid": lambda obj: _remote_oid(obj["headRefName"]) if obj.get("headRefName")
+                else None}
+
+
 def _pr_fields(obj, args):
     wanted = _flag(args, "--json")
     if not wanted:
@@ -57,7 +65,13 @@ def _pr_fields(obj, args):
     unknown = [n for n in names if n not in PR_FIELDS]
     if unknown:
         _fail(f"Unknown JSON field: {', '.join(unknown)}")
-    return {k: obj[k] for k in names if k in obj}
+    return {k: _pr_value(obj, k) for k in names if k in obj or k in _PR_DEFAULTS}
+
+
+def _pr_value(obj, key):
+    if key in obj:
+        return obj[key]
+    return _PR_DEFAULTS[key](obj)
 
 
 def _save(path, data):
@@ -141,8 +155,7 @@ def main(argv):
         number = max((p.get("number", 0) for p in prs), default=0) + 1
         url = f"https://github.com/prova/flow/pull/{number}"
         prs.append({"number": number, "headRefName": head, "baseRefName": base, "title": title,
-                    "state": "OPEN", "url": url, "headRefOid": _remote_oid(head),
-                    "mergedAt": None, "body": body, "comments": []})
+                    "state": "OPEN", "url": url, "mergedAt": None, "body": body, "comments": []})
         _save(path, data)
         print(url)
         return 0

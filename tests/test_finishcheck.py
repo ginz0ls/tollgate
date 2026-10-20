@@ -155,6 +155,15 @@ class GreenRedTest(FinishCheckCase):
         r = finishcheck.check(fl.ts.state, fl.main, environ=fl.env())
         self.assertEqual(r.code, finishcheck.REFUSED)
 
+    def test_git_and_os_errors_are_refusals_not_tracebacks(self):
+        fl = self.lab()
+        for exc in (core_git.GitError("git: rotto"), OSError("disco")):
+            with self.subTest(exc=type(exc).__name__):
+                with mock.patch.object(finishcheck.git, "head", side_effect=exc):
+                    r = self.check(fl)
+                self.assertEqual(r.code, finishcheck.REFUSED, r.lines)
+                self.assertIn(str(exc), " ".join(r.lines))
+
     def test_fetch_failure_warns_and_goes_on(self):
         fl = self.lab()
         with mock.patch.object(gitw, "fetch", return_value=False):

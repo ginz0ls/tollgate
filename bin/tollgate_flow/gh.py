@@ -141,13 +141,16 @@ def prs_for_branch_prefix(state, repo, prefix: str) -> list[dict]:
 
 
 def pr_for_branch(state, repo, branch: str) -> dict | None:
-    """La PR con il numero più alto per il ramo, in qualunque stato (G4). Un errore di `gh` è
-    un `GhError`, mai «nessuna PR»."""
+    """La PR con il numero più alto per il ramo, in qualunque stato (G4), escluse quelle da fork:
+    `--head` filtra per nome e non per proprietario, e il nome del ramo è prevedibile. Un errore
+    di `gh` è un `GhError`, mai «nessuna PR»."""
     data = run_json(state, repo, ["pr", "list", "--head", branch, "--state", "all", "--limit",
-                                  "100", "--json", "number,state,url,headRefOid,mergedAt"])
+                                  "100", "--json",
+                                  "number,state,url,headRefOid,mergedAt,isCrossRepository"])
     if not isinstance(data, list):
         raise GhError("pr list: risposta inattesa")
-    found = [p for p in data if isinstance(p, dict) and isinstance(p.get("number"), int)]
+    found = [p for p in data if isinstance(p, dict) and isinstance(p.get("number"), int)
+             and p.get("isCrossRepository") is not True]
     return max(found, key=lambda p: p["number"]) if found else None
 
 

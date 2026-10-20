@@ -37,12 +37,20 @@ def _note(n: dict) -> str:
     return f"[{n.get('severity') or '?'}] {where} ({n.get('rule') or 'senza regola'}): {n.get('text')}"
 
 
+def _unverified(n: dict) -> str:
+    why = n.get("verification_reason")
+    return _note(n) + (f" [non verificato: {why}]" if why else " [non verificato]")
+
+
 def render(*, issue: int, level: str, dod_lines: list[str], notes: list[dict],
-           waivers: list[str], warnings: list[str], block: dict) -> str:
+           waivers: list[str], warnings: list[str], block: dict,
+           unverified: list[dict] = ()) -> str:
     out = [f"Closes #{int(issue)}", "", f"Livello: {level}", ""]
     out += _section("Definition of Done", dod_lines)
     if notes:
         out += _section("Note della revisione (non bloccanti)", [_note(n) for n in notes])
+    if unverified:
+        out += _section("Rilievi non verificati", [_unverified(n) for n in unverified])
     if waivers:
         out += _section("Deroghe", waivers)
     if warnings:

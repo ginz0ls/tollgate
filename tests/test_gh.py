@@ -63,7 +63,13 @@ class PrReadTest(FakeGhCase):
         self.assertEqual(argv[argv.index("--state") + 1], "all")
         self.assertEqual(argv[argv.index("--limit") + 1], "100")
         self.assertEqual(argv[argv.index("--json") + 1],
-                         "number,state,url,headRefOid,mergedAt")
+                         "number,state,url,headRefOid,mergedAt,isCrossRepository")
+
+    def test_pr_for_branch_skips_fork_prs(self):
+        self.set(prs=[self.pr(5), self.pr(9, isCrossRepository=True)])
+        self.assertEqual(gh.pr_for_branch(self.state, self.tmp, "tg/7-x")["number"], 5)
+        self.set(prs=[self.pr(9, isCrossRepository=True)])
+        self.assertIsNone(gh.pr_for_branch(self.state, self.tmp, "tg/7-x"))
 
     def test_pr_for_branch_failure_is_error_not_no_pr(self):
         self.set(prs=[], fail=["pr list"])

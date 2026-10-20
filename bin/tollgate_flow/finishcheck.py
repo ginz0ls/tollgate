@@ -60,7 +60,8 @@ def check(state, cwd, *, now=None, environ=None) -> CheckResult:
         return _refuse(str(e))
     try:
         return _check(state, conn, Path(cwd), now, environ)
-    except (sqlite3.Error, phases.TransitionError, config.ConfigError) as e:
+    except (sqlite3.Error, phases.TransitionError, config.ConfigError, git.GitError,
+            OSError) as e:
         return _refuse(str(e))
     finally:
         conn.close()

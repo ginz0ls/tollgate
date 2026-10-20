@@ -78,8 +78,8 @@ def work(fl):
 
 def pr(number=1, state="OPEN", branch=BRANCH, **kw):
     d = {"number": number, "headRefName": branch, "state": state,
-         "url": f"https://github.com/prova/flow/pull/{number}", "headRefOid": "x",
-         "mergedAt": None, "body": "vecchio", "comments": []}
+         "url": f"https://github.com/prova/flow/pull/{number}", "mergedAt": None,
+         "body": "vecchio", "comments": []}
     d.update(kw)
     return d
 
@@ -545,6 +545,20 @@ class OpenOrphanFindingTest(OpenCase):
         self.assertEqual(r.code, 0, r.lines)
         self.assertEqual(len(self.prs(fl)), 1)
 
+    def test_unverified_findings_are_listed_in_the_body(self):
+        fl = self.lab(cycle=None, finish_act=False)
+        n = self.open_with_finding(fl)
+        reviews.mark_unverified(fl.conn, fl.work, n, reviews.UNVERIFIED_REVIEW_REASON, now=fl.now)
+        phases.set_review_unverified(fl.conn, fl.work, now=fl.now)
+        reviews.close_cycle(fl.conn, fl.ts.state, fl.work, n, now=fl.now)
+        self.finish_act(fl, at=fl.now + timedelta(seconds=1))
+        r = self.go(fl)
+        self.assertEqual(r.code, 0, r.lines)
+        body = self.prs(fl)[0]["body"]
+        self.assertIn("## Rilievi non verificati", body)
+        self.assertIn("manca lo zero", body)
+        self.assertIn("revisione non verificata", body)
+
     def test_unverified_review_marks_findings_without_outcome(self):
         fl = self.lab(cycle=None, finish_act=False)
         for _ in range(7):
@@ -586,6 +600,30 @@ class OpenForceTest(OpenCase):
         self.assertEqual(r.code, 0, r.lines)
         self.assertEqual(self.force_state(fl, key), "used")
         self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), head(fl))
+
+
+class OpenForkPrTest(OpenCase):
+    """I-3: una PR da fork con lo stesso nome di ramo non è la nostra."""
+
+    def test_fork_pr_with_same_branch_is_left_alone(self):
+        fl = self.lab(prs=[pr(1, isCrossRepository=True, headRefOid="f" * 40,
+                              body="corpo del fork")])
+        r = self.go(fl)
+        self.assertEqual(r.code, 0, r.lines)
+        self.assertEqual(self.calls(fl, "pr", "edit"), [])
+        by_number = {p["number"]: p for p in self.prs(fl)}
+        self.assertEqual(by_number[1]["body"], "corpo del fork")
+        self.assertIn("tollgate", by_number[2]["body"])
+        self.assertEqual(work(fl)["pr_number"], 2)
+
+    def test_pr_not_at_pushed_sha_is_not_edited(self):
+        fl = self.lab(prs=[pr(1, headRefOid="e" * 40)])
+        r = self.go(fl)
+        self.assertEqual(r.code, 1, r.lines)
+        self.assertIn("#1", " ".join(self.refusals(r)))
+        self.assertEqual(self.calls(fl, "pr", "edit"), [])
+        self.assertEqual(self.prs(fl)[0]["body"], "vecchio")
+        self.assertIsNone(work(fl)["pr_number"])
 
 
 class OpenResumeTest(OpenCase):

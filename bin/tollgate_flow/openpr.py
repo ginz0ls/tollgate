@@ -220,7 +220,8 @@ def _open(state, conn, cwd: Path, update: bool, now, argv, via_sync, environ) ->
                  cycle=review.cycle if review.required else None)
     block = prblock.build(data)
     body = prbody.render(issue=work["issue"], level=work["level"], dod_lines=dod_lines,
-                         notes=_notes(conn, wid, review), waivers=_waiver_lines(work, cfg, conn),
+                         notes=_notes(conn, wid, review),
+                         unverified=_unverified(conn, wid, review), waivers=_waiver_lines(work, cfg, conn),
                          warnings=[w.removeprefix("avviso: ") for w in warnings], block=block)
     body_file = wt / ".tollgate-run" / str(work["issue"]) / "pr-body.md"
     body_file.parent.mkdir(parents=True, exist_ok=True)
@@ -263,13 +264,27 @@ def _publish(state, conn, work, wt, main, branch, head, remote, diverged, open_p
             if not intents.force_authorized(conn, work["id"]):
                 raise gitw.GitWriteError("l'autorizzazione al push forzato non c'è più")
             lease = intents.force_lease(conn, work["id"]) or remote
-        gitw.push_sha(wt, head, branch, lease=lease)
+        try:
+            gitw.push_sha(wt, head, branch, lease=lease)
+        except gitw.GitWriteError as e:
+            if lease:
+                raise gitw.GitWriteError(f"il ramo remoto è avanzato: /tollgate:sync ({e})") from e
+            raise
         if diverged:        # si consuma solo a push riuscito: un guasto non la perde
             intents.take_force(conn, work["id"], now=now)
         if gitw.remote_sha(wt, branch) != head:
             raise gitw.GitWriteError(f"dopo il push il ramo {branch} di origin non punta a "
                                      f"{head[:7]}")
     if open_pr_ is not None:
+        current = open_pr_
+        if remote != head:      # la punta della PR si rilegge dopo il push
+            current = gh.pr_for_branch(state, main, branch)
+        if (current is None or current.get("number") != open_pr_["number"]
+                or current.get("headRefOid") != head):
+            oid = (current or {}).get("headRefOid") or "sconosciuto"
+            raise gh.GhError(f"la PR #{open_pr_['number']} ha come punta {str(oid)[:7]} e non lo "
+                             f"SHA spinto {head[:7]}: non la modifico (se GitHub è in ritardo, "
+                             "ripeti il comando)")
         gh.pr_edit(state, main, open_pr_["number"], body_file=body_file)
         return {"number": open_pr_["number"], "url": open_pr_.get("url"), "created": False}
     base = git.default_branch(main)
@@ -330,6 +345,16 @@ def _notes(conn, wid: int, review: Review) -> list[dict]:
         "SELECT * FROM findings WHERE work = ? AND cycle = ? AND verification = 'confirmed' "
         "AND (user_decision IS NULL OR user_decision <> 'dismissed') ORDER BY rowid",
         (wid, review.findings_cycle)) if r["id"] not in stopping]
+
+
+def _unverified(conn, wid: int, review: Review) -> list[dict]:
+    """I rilievi `unverified` dell'ultimo ciclo su HEAD (non provati, oltre `max_findings` o di una
+    revisione dichiarata non verificata): il blocco JSON non lo legge nessuno, il corpo sì."""
+    if review.findings_cycle == 0:
+        return []
+    return [dict(r) for r in conn.execute(
+        "SELECT * FROM findings WHERE work = ? AND cycle = ? AND verification = 'unverified' "
+        "ORDER BY rowid", (wid, review.findings_cycle))]
 
 
 def _waiver_lines(work, cfg, conn) -> list[str]:

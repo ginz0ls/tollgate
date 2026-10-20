@@ -70,6 +70,21 @@ def force_lease(conn, work: int) -> str | None:
     return json.loads(row["data"] or "{}").get("lease") if row else None
 
 
+def refresh_lease(conn, work: int, lease: str) -> bool:
+    """Porta il lease dell'autorizzazione non ancora usata alla punta remota appena letta (dopo un
+    `sync` il remoto può essere avanzato e integrato). Dà `False` se non ce n'è una."""
+    with db.tx(conn):
+        row = conn.execute("SELECT id, data FROM intents WHERE work = ? AND action = 'force_push' "
+                           "AND state = 'authorized' ORDER BY id DESC LIMIT 1", (work,)).fetchone()
+        if row is None:
+            return False
+        data = json.loads(row["data"] or "{}")
+        data["lease"] = lease
+        conn.execute("UPDATE intents SET data = ? WHERE id = ?",
+                     (json.dumps(data, ensure_ascii=False), row["id"]))
+        return True
+
+
 def take_force(conn, work: int, *, now) -> str | None:
     """Consuma la più recente autorizzazione: ogni push forzato ne usa una sola."""
     with db.tx(conn):

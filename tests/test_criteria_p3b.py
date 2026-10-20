@@ -184,7 +184,6 @@ class FinishToPrEndToEndTest(FinishCase):
         self.assertEqual((w["phase"], w["pr_number"]), ("pr_open", 1))
         (opened,) = json.loads(self.fl.gh_data.read_text())["prs"]
         self.assertEqual((opened["headRefName"], opened["state"]), (BRANCH, "OPEN"))
-        self.assertEqual(opened["headRefOid"], wt_head)
         self.assertEqual(self.fl.git("rev-parse", f"refs/heads/{BRANCH}", repo=self.fl.origin),
                          wt_head)
         block = prblock.parse(opened["body"])

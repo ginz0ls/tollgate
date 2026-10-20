@@ -11,7 +11,8 @@ import sqlite3
 from pathlib import Path
 
 from tollgate_analysis import level as lv
-from tollgate_core import (acts, clock, config, db, git, intents, phases, reviews, sessions,
+from tollgate_core import (acts, clock, config, db, events, git, intents, phases, reviews,
+                           sessions,
                            subagents, tasks)
 from tollgate_core.paths import program_command
 
@@ -187,6 +188,7 @@ def _approve_rebase(conn, state, work, act, args, now, session) -> str:
     if base is None:
         raise ActApplyError("nessuna base comune tra HEAD e il ramo predefinito di origin")
     phases.set_base(conn, work["id"], base, cause="approve_rebase", now=now, session=session)
+    events.record_commits(conn, work["id"], wt, base, now=now, session=session)
     phase = phases.close_block(conn, state, block["id"], "approve rebase", now=now,
                                session=session)
     if phase == "pr_open":
