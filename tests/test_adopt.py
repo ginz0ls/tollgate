@@ -7,6 +7,7 @@ from unittest import mock
 
 from tests.flowkit import PLAN, SESSION, plan_text
 from tests.helpers import BIN
+from tests.hookkit import DEFAULT_TOML
 from tests.test_openpr import BRANCH, SOMMA, pr
 from tests.test_start import StartCase, out
 from tollgate_analysis import prblock, waivers
@@ -44,10 +45,11 @@ PLAN_FILE = "docs/superpowers/reviews/7/plan-approval.md"
 
 
 class AdoptCase(StartCase):
-    def branch_lab(self, files, *, push=False, remote_only=False, worktree=True, prs=()):
+    def branch_lab(self, files, *, push=False, remote_only=False, worktree=True, prs=(),
+                   toml=None):
         """Repo attivo con il ramo `tg/7-demo` e nessuna riga nel DB (DB perso): i `files` sono
         un commit sul ramo. `remote_only`: il ramo esiste solo su origin (altra macchina)."""
-        fl = self.make()
+        fl = self.make(**({"toml": toml} if toml else {}))
         self.gh(fl, prs=list(prs))
         fl.git("worktree", "add", "-q", "-b", BRANCH, str(fl.wt))
         for rel, text in files.items():
@@ -143,26 +145,18 @@ class AdoptPhaseTest(AdoptCase):
         self.assertEqual(row["plan_path"], PLAN)
         self.assertEqual(len(scope.paths(fl.conn, row["id"])), 3)
 
-    def test_l2_without_plan_approval_goes_approval(self):
-        fl = self.branch_lab({**L2_DOCS, SPEC_FILE: spec_approval()})
-        row = self.adopted(fl)
-        self.assertEqual((row["level"], row["phase"]), ("L2", "approval"))
-        self.assertEqual(row["plan_path"], PLAN)
-        self.assertIsNone(row["plan_sha"])
-        self.assertEqual(scope.paths(fl.conn, row["id"]), set())
-
     def test_l2_superseded_or_mismatched_approvals_go_back(self):
         old_plan = plan_text(task2="- Create: `docs/vecchio.md`")
         cases = {
             "piano modificato dopo l'approvazione": (
                 {SPEC_FILE: spec_approval(), PLAN_FILE: plan_approval(sha=blob(old_plan))},
-                "approval"),
+                "plan"),
             "approvazione del piano con un altro path": (
                 {SPEC_FILE: spec_approval(), PLAN_FILE: plan_approval(path="docs/altro.md")},
-                "approval"),
+                "plan"),
             "spec_sha diverso dalla spec": (
                 {SPEC_FILE: spec_approval(), PLAN_FILE: plan_approval(spec_sha="0" * 40)},
-                "approval"),
+                "plan"),
             "spec modificata dopo l'approvazione": (
                 {SPEC_FILE: spec_approval(sha=blob("spec vecchia\n")), PLAN_FILE: plan_approval()},
                 "spec_audit"),
@@ -408,3 +402,45 @@ class AdoptRefusalTest(AdoptCase):
         self.assertEqual(self.rows(fl), [])
         self.assertEqual(sessions.bound_work(fl.conn, SESSION), None)
 
+
+
+class AdoptL2Test(AdoptCase):
+    """`adopt` di L2 (12.4, decisione 16): fette successive e fase `plan` o `approval`."""
+    OTHER_SPEC_FILE = "docs/superpowers/reviews/3/spec-approval.md"
+    PLAN_ADV_OFF = DEFAULT_TOML + "[components]\nplan_adversary = false\n"
+
+    def test_later_slice_with_plan_approval_goes_execution(self):
+        fl = self.branch_lab({**L2_DOCS, self.OTHER_SPEC_FILE: spec_approval(),
+                              PLAN_FILE: plan_approval(spec_sha=blob(SPEC_TEXT))})
+        row = self.adopted(fl)
+        self.assertEqual((row["level"], row["phase"]), ("L2", "execution"))
+        self.assertEqual(row["spec_path"], SPEC_DOC)
+        self.assertEqual(row["plan_path"], PLAN)
+        self.assertEqual(len(scope.paths(fl.conn, row["id"])), 3)
+
+    def test_later_slice_without_plan_approval_goes_spec_audit(self):
+        fl = self.branch_lab({**L2_DOCS, self.OTHER_SPEC_FILE: spec_approval()})
+        row = self.adopted(fl)
+        self.assertEqual((row["level"], row["phase"]), ("L2", "spec_audit"))
+        self.assertIsNone(row["plan_sha"])
+
+    def test_later_slice_with_spec_changed_after_the_first_approval_goes_spec_audit(self):
+        fl = self.branch_lab({**L2_DOCS, self.OTHER_SPEC_FILE: spec_approval(sha=blob("vecchia\n")),
+                              PLAN_FILE: plan_approval(spec_sha=blob("vecchia\n"))})
+        row = self.adopted(fl)
+        self.assertEqual((row["level"], row["phase"]), ("L2", "spec_audit"))
+
+    def test_plan_without_approval_goes_plan_with_adversary_on(self):
+        fl = self.branch_lab({**L2_DOCS, SPEC_FILE: spec_approval()})
+        row = self.adopted(fl)
+        self.assertEqual((row["level"], row["phase"]), ("L2", "plan"))
+        self.assertEqual(row["plan_path"], PLAN)
+        self.assertIsNone(row["plan_sha"])
+        self.assertEqual(scope.paths(fl.conn, row["id"]), set())
+
+    def test_plan_without_approval_goes_approval_with_adversary_off(self):
+        fl = self.branch_lab({**L2_DOCS, SPEC_FILE: spec_approval()}, toml=self.PLAN_ADV_OFF)
+        row = self.adopted(fl)
+        self.assertEqual((row["level"], row["phase"]), ("L2", "approval"))
+        self.assertEqual(row["plan_path"], PLAN)
+        self.assertIsNone(row["plan_sha"])

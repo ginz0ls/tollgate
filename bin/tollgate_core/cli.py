@@ -62,6 +62,8 @@ def build_parser() -> argparse.ArgumentParser:
     sa = sub.add_parser("start", help="avvia o riprende il lavoro su un'issue (6.1)")
     sa.add_argument("issue", type=_issue_number, metavar="N")
     sa.add_argument("--level", choices=("L1", "L2"), help="livello scelto dall'utente")
+    sa.add_argument("--spec", metavar="PERCORSO",
+                    help="fetta successiva di una spec già approvata sul ramo predefinito (5)")
     sa.add_argument("--confirm", action="store_true",
                     help="conferma gli avvisi che la prima chiamata ha elencato (codice 3)")
     sa.add_argument("--reopen-execution", action="store_true",
@@ -229,7 +231,7 @@ def main(argv: list[str]) -> int:
         if args.cmd == "start":
             from tollgate_flow import start as flow_start
             result = flow_start.start(state, Path.cwd(), args.issue, level=args.level,
-                                      confirm=args.confirm,
+                                      confirm=args.confirm, spec=args.spec,
                                       reopen_execution=args.reopen_execution,
                                       claude_dir=Path.home() / ".claude",
                                       argv=_hook_argv(argv, args.cmd))

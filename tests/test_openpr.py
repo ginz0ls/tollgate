@@ -4,8 +4,8 @@ import unittest
 from datetime import timedelta
 from unittest import mock
 
-from tests.flowkit import JUNIT_TOML, PLAN, SESSION, FlowLab, plan_text
-from tollgate_analysis import prblock, waivers
+from tests.flowkit import JUNIT_TOML, PLAN, SESSION, SPEC, FlowLab, plan_text
+from tollgate_analysis import approvals, prblock, waivers
 from tollgate_core import (VERSION, acts, clock, config, effects, events, git as core_git,
                            intents, phases, reviews)
 from tollgate_flow import finishcheck, gitw, openpr, prstate
@@ -114,6 +114,11 @@ class OpenCase(unittest.TestCase):
 
     def check(self, fl):
         return finishcheck.check(fl.ts.state, fl.wt, environ=fl.env(), now=fl.now)
+
+    def facts(self, fl, **kw):
+        cfg = config.load_config(fl.ts.state, fl.wt, work(fl)["work_base_sha"])
+        kw.setdefault("now", fl.now + timedelta(hours=1))
+        return openpr.facts(fl.conn, fl.ts.state, work(fl), cfg, fl.wt, head(fl), **kw)
 
     def ok_cycle(self, fl, findings=(), confirm=False):
         base = work(fl)["work_base_sha"]
@@ -747,11 +752,6 @@ class OpenResumeTest(OpenCase):
 
 
 class FactsTest(OpenCase):
-    def facts(self, fl, **kw):
-        cfg = config.load_config(fl.ts.state, fl.wt, work(fl)["work_base_sha"])
-        kw.setdefault("now", fl.now + timedelta(hours=1))
-        return openpr.facts(fl.conn, fl.ts.state, work(fl), cfg, fl.wt, head(fl), **kw)
-
     def test_facts_keys_match_block_fields(self):
         fl = self.lab()
         data = self.facts(fl)
@@ -776,9 +776,11 @@ class FactsTest(OpenCase):
 
     def test_counters_and_reviews_dirs(self):
         fl = self.lab()
-        header = ("---\nkind: spec-approval\npath: docs/x.md\nsha: abc\nadversarial: closed\n"
-                  "lens: suspended\n---\n")
-        fl.commit("docs/superpowers/reviews/7/spec-approval.md", header, "approvazione")
+        fl.write_spec()
+        fl.approve_spec_file()                  # il lavoro ha spec_path: le cartelle 18.1 valgono
+        fl.commit("docs/superpowers/reviews/7/spec-approval.md", approvals.render_approval(
+            {"kind": "spec-approval", "path": SPEC, "sha": core_git.blob_at(fl.wt, "HEAD", SPEC),
+             "adversarial": "closed", "lens": "suspended"}), "approvazione")
         for n in (1, 2):
             fl.conn.execute("INSERT INTO subagents (id, work, tokens) VALUES (?, ?, 100)",
                             (f"ag-{n}", fl.work))
@@ -798,6 +800,59 @@ class FactsTest(OpenCase):
         self.assertEqual(data["effects"], [{"command_hash": "k" * 8, "at": clock.fmt(fl.now)}])
         (period,) = data["off_periods"]
         self.assertIsNone(period["to"])
+
+
+class L2FactsTest(OpenCase):
+    """Le cartelle 18.1 e `spec_audit` dall'approvazione trovata (decisione 15)."""
+
+    def spec_approval(self, fl, issue, sha=None, **extra):
+        fields = {"kind": "spec-approval", "path": SPEC, "slices": 3,
+                  "sha": sha or core_git.blob_at(fl.wt, "HEAD", SPEC), **extra}
+        fl.commit(approvals.approval_paths(issue)[0], approvals.render_approval(fields),
+                  f"approvazione {issue}")
+
+    def test_without_spec_path_dirs_and_spec_audit_are_null(self):
+        fl = self.lab()
+        fl.commit("docs/superpowers/reviews/7/spec-approval.md", "---\nkind: spec-approval\n"
+                  f"path: {SPEC}\nsha: abc\nadversarial: closed\n---\n", "approvazione orfana")
+        data = self.facts(fl)
+        self.assertIsNone(data["spec_reviews_dir"])
+        self.assertEqual(data["spec_audit"], {"adversarial": None, "lens": None})
+
+    def test_dirs_and_spec_audit_from_located_approval(self):
+        fl = self.lab()
+        fl.write_spec(slices=3)
+        phases.set_spec_path(fl.conn, fl.work, SPEC, now=fl.now)
+        self.spec_approval(fl, 7, adversarial="closed", lens="suspended")
+        fl.approve_plan_file()
+        data = self.facts(fl)
+        self.assertEqual(data["spec_reviews_dir"], "docs/superpowers/reviews/7/")
+        self.assertEqual(data["plan_reviews_dir"], "docs/superpowers/reviews/7/")
+        self.assertEqual(data["spec_audit"], {"adversarial": "closed", "lens": "suspended"})
+        self.assertEqual(data["spec"], SPEC)
+
+    def test_later_slice_points_to_the_first_slice_folder(self):
+        fl = self.lab()
+        fl.write_spec(slices=3)
+        phases.set_spec_path(fl.conn, fl.work, SPEC, now=fl.now)
+        self.spec_approval(fl, 3, adversarial="closed", lens="closed")
+        data = self.facts(fl)
+        self.assertEqual(data["spec_reviews_dir"], "docs/superpowers/reviews/3/")
+        self.assertIsNone(data["plan_reviews_dir"])         # il piano non è ancora approvato
+        self.assertEqual(data["spec_audit"], {"adversarial": "closed", "lens": "closed"})
+        fl.approve_plan_file()
+        data = self.facts(fl)
+        self.assertEqual(data["plan_reviews_dir"], "docs/superpowers/reviews/7/")
+        self.assertEqual(data["spec_reviews_dir"], "docs/superpowers/reviews/3/")
+
+    def test_approval_with_other_sha_in_other_issue_is_not_the_spec_approval(self):
+        fl = self.lab()
+        fl.write_spec(slices=3)
+        phases.set_spec_path(fl.conn, fl.work, SPEC, now=fl.now)
+        self.spec_approval(fl, 3, sha="0" * 40, adversarial="closed", lens="closed")
+        data = self.facts(fl)
+        self.assertIsNone(data["spec_reviews_dir"])
+        self.assertEqual(data["spec_audit"], {"adversarial": None, "lens": None})
 
 
 class OpenReviewMatchTest(OpenCase):

@@ -230,6 +230,34 @@ class FlowLab:
         self.commit(approvals.approval_paths(work["issue"])[0],
                     approvals.render_approval(fields), "approvazione della spec")
 
+    def write_report(self, kind: str, number: int = 1, *, issue: int | None = None,
+                     counts: dict | None = None) -> None:
+        """Committa il report `<kind>-<number>.md` con intestazione valida in
+        `reviews/<issue>/` (default: il lavoro); `issue` diverso riproduce i report della
+        prima fetta, che stanno nella cartella di un'altra issue."""
+        issue = issue or phases.get_work(self.conn, self.work)["issue"]
+        fields = {"kind": kind, "number": number,
+                  "counts": {**ZERO_COUNTS, **(counts or {})}, "outcome": "empty"}
+        self.commit(f"{approvals.REVIEWS_DIR}/{issue}/{kind}-{number}.md",
+                    approvals.render_report(fields, "Nessun rilievo.\n"), f"report {kind}")
+
+    def approve_plan_file(self, adversarial: str = "closed") -> None:
+        """Il piano approvato come lo lascerebbe `approve plan`: `plan-approval.md` committato
+        con lo `sha` del piano e lo `spec_sha` della spec in HEAD. Non fa nulla se il file è già
+        così."""
+        work = phases.get_work(self.conn, self.work)
+        rel = approvals.approval_paths(work["issue"])[1]
+        fields = {"kind": "plan-approval", "path": PLAN, "sha": self._blob(PLAN),
+                  "spec_sha": self._blob(work["spec_path"] or SPEC), "adversarial": adversarial,
+                  "act_id": "act-2", "approved_at": clock.fmt(self.lab.now)}
+        target = self.wt / rel
+        current = approvals.parse_approval(target.read_text()) if target.exists() else None
+        if current and (current["sha"], current["spec_sha"]) == (fields["sha"],
+                                                                 fields["spec_sha"]):
+            return
+        text = approvals.render_approval(fields)
+        self.commit(rel, text, "approvazione del piano")
+
     def closed_round(self, kind: str, counts: dict, *, viewpoint: str | None = None,
                      sha: str | None = None) -> int:
         """Un giro chiuso, aperto e chiuso dalla libreria sul blob attuale in HEAD della spec

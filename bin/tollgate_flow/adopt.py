@@ -18,7 +18,7 @@ from tollgate_analysis import (approvals, level as lv, plan as planmod, prblock,
 from tollgate_core import (acts, active, clock, config, db, git, phases, scope, sessions)
 from tollgate_core.paths import State, repo_key
 
-from . import gh, gitw, start as flow_start
+from . import gh, gitw, l2tree, start as flow_start
 
 OK, REFUSED, INCOMPLETE = 0, 1, 4
 FAILED = object()
@@ -192,8 +192,11 @@ def _level(state, main: Path, cfg, issue: int, base: str, sha: str, changes, war
     return computed
 
 
-def _phase(level: str, pr: dict | None, plan, spec_header, plan_header) -> str:
-    """La fase dalle prove (12.4): quella che precede l'atto mancante."""
+def _phase(level: str, pr: dict | None, plan, spec_header, plan_header, plan_adversary: bool
+           ) -> str:
+    """La fase dalle prove (12.4): quella che precede l'atto mancante. In L2 con la spec approvata,
+    il piano e senza `plan-approval.md` serve `plan` se l'avversario del piano è acceso (i suoi
+    giri sono persi con il DB e `approve plan` li richiede), `approval` se è spento."""
     if pr is not None:
         return "pr_open"
     if level == "L0":
@@ -204,7 +207,40 @@ def _phase(level: str, pr: dict | None, plan, spec_header, plan_header) -> str:
         return "spec_audit"
     if not plan:
         return "plan"
-    return "execution" if plan_header else "approval"
+    if plan_header:
+        return "execution"
+    return "plan" if plan_adversary else "approval"
+
+
+def _approved_elsewhere(main: Path, sha: str, spec_sha: str) -> dict | None:
+    """Fetta successiva (decisione 16): l'approvazione di una spec, in qualunque cartella
+    `reviews/<M>/`, con `sha == spec_sha` e la spec ancora con quel blob nell'albero. Vince il
+    numero di issue più basso (la prima fetta)."""
+    for path, _ in sorted(l2tree.spec_approvals(main, sha).items(),
+                          key=lambda kv: int(kv[0].split("/")[-2])):
+        header = _approval(main, sha, path, "spec-approval")
+        if header is not None and header["sha"] == spec_sha:
+            return header
+    return None
+
+
+def _l2_proofs(main: Path, sha: str, issue: int, plan) -> tuple[dict | None, dict | None]:
+    """Le approvazioni di L2 valide nell'albero di `sha` (la punta del ramo): `(spec, piano)`.
+    Senza `spec-approval.md` proprio, un `plan-approval.md` corrente il cui `spec_sha` è lo `sha`
+    di un'approvazione trovata per una spec ancora con quel blob prova la spec approvata."""
+    spec_rel, plan_rel = approvals.approval_paths(issue)
+    spec_header = _approval(main, sha, spec_rel, "spec-approval")
+    plan_header = None
+    if plan is not None:
+        plan_header = _approval(main, sha, plan_rel, "plan-approval", doc=plan[0])
+        if spec_header is None and plan_header is not None and plan_header.get("spec_sha"):
+            spec_header = _approved_elsewhere(main, sha, plan_header["spec_sha"])
+    if spec_header is None:
+        return None, None
+    spec_sha = plan_header.get("spec_sha") if plan_header else None
+    if spec_sha is not None and spec_sha != spec_header["sha"]:
+        plan_header = None
+    return spec_header, plan_header
 
 
 def _gather(state, main: Path, cfg, issue: int, branch: str, sha: str, base: str,
@@ -216,16 +252,11 @@ def _gather(state, main: Path, cfg, issue: int, branch: str, sha: str, base: str
     changes = git.changes(main, base, head=sha, exclude=config.output_excludes(cfg))
     level = _level(state, main, cfg, issue, base, sha, changes, warnings)
     plan = find_plan(main, cfg, sha, changes, level) if level != "L0" else None
-    spec_rel, plan_rel = approvals.approval_paths(issue)
     spec_header = plan_header = None
     if level == "L2":
-        spec_header = _approval(main, sha, spec_rel, "spec-approval")
-        if plan is not None and spec_header is not None:
-            plan_header = _approval(main, sha, plan_rel, "plan-approval", doc=plan[0])
-        spec_sha = plan_header.get("spec_sha") if plan_header else None
-        if spec_sha is not None and spec_sha != spec_header["sha"]:
-            plan_header = None
-    phase = _phase(level, pr, plan, spec_header, plan_header)
+        spec_header, plan_header = _l2_proofs(main, sha, issue, plan)
+    adversary = bool(cfg.get("components").get("plan_adversary", True))
+    phase = _phase(level, pr, plan, spec_header, plan_header, adversary)
     if level == "L2" and pr is not None and cap is None and not (spec_header and plan_header):
         warnings.append("L2 con la PR aperta ma senza spec-approval.md o plan-approval.md nel "
                         "ramo: la fase viene dalla PR")

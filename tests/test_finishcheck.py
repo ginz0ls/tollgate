@@ -5,8 +5,9 @@ import unittest
 from contextlib import redirect_stderr
 from unittest import mock
 
-from tests.flowkit import JUNIT_TOML, PLAN, FlowLab, plan_text
+from tests.flowkit import JUNIT_TOML, PLAN, SPEC, FlowLab, plan_text
 from tests.helpers import git
+from tollgate_analysis import approvals
 from tollgate_core import acts, cli, dod, git as core_git, phases
 from tollgate_flow import finishcheck, gh, gitw
 
@@ -220,76 +221,6 @@ class LevelsTest(FinishCheckCase):
         report = json.loads(phases.get_work(fl.conn, fl.work)["finish_report"])
         self.assertEqual(report["items"], {"receipt": True, "guard_scope": True})
 
-    def test_l2_approvals_follow_the_files(self):
-        fl = self.lab()
-        spec = "docs/superpowers/specs/2026-10-16-somma-design.md"
-        fl.conn.execute("UPDATE work_items SET level = 'L2', spec_path = ? WHERE id = ?",
-                        (spec, fl.work))
-        fl.commit(spec, "# spec\n", "spec")
-        r = self.check(fl)
-        self.assertEqual(r.code, finishcheck.RED, r.lines)
-        self.assertFalse(self.item(r, "approvals").ok)
-        self.assertEqual(phase(fl), "execution")
-        sha_spec = git(fl.wt, "rev-parse", f"HEAD:{spec}")
-        sha_plan = git(fl.wt, "rev-parse", f"HEAD:{PLAN}")
-        header = "---\nschema_version: 1\nkind: {}\npath: {}\nsha: \"{}\"\n---\n"
-        fl.commit("docs/superpowers/reviews/7/spec-approval.md",
-                  header.format("spec-approval", spec, sha_spec), "approvazione spec")
-        fl.commit("docs/superpowers/reviews/7/plan-approval.md",
-                  header.format("plan-approval", PLAN, "0" * 40), "approvazione piano")
-        r = self.check(fl)
-        self.assertFalse(self.item(r, "approvals").ok, "sha del piano diverso dal blob")
-        fl.commit("docs/superpowers/reviews/7/plan-approval.md",
-                  header.format("plan-approval", PLAN, sha_plan), "approvazione piano")
-        r = self.check(fl)
-        self.assertEqual(r.code, finishcheck.OK, r.lines)
-        self.assertTrue(self.item(r, "approvals").ok)
-        self.assertEqual([i.key for i in r.items], list(dod.ITEMS_BY_LEVEL["L2"]))
-        self.assertEqual(self.item(r, "specialists").ok, None)
-
-    SPEC = "docs/superpowers/specs/2026-10-16-somma-design.md"
-    HEADER = "---\nschema_version: 1\nkind: {}\npath: {}\nsha: \"{}\"\n---\n"
-
-    def l2_lab(self):
-        """L2 in execution con spec e approvazioni committate e coerenti con HEAD."""
-        fl = self.lab()
-        fl.conn.execute("UPDATE work_items SET level = 'L2', spec_path = ? WHERE id = ?",
-                        (self.SPEC, fl.work))
-        fl.commit(self.SPEC, "# spec\n", "spec")
-        self.approve(fl)
-        return fl
-
-    def approve(self, fl):
-        """Riscrive i due file di approvazione con gli sha di HEAD."""
-        for kind, doc in (("spec-approval", self.SPEC), ("plan-approval", PLAN)):
-            path = f"docs/superpowers/reviews/7/{kind}.md"
-            text = self.HEADER.format(kind, doc, git(fl.wt, "rev-parse", f"HEAD:{doc}"))
-            if not (fl.wt / path).exists() or (fl.wt / path).read_text() != text:
-                fl.commit(path, text, kind)
-
-    def test_l2_approved_spec_and_reviews_files_exempt(self):
-        fl = self.l2_lab()
-        r = self.check(fl)
-        self.assertEqual(r.code, finishcheck.OK, r.lines)
-        self.assertTrue(self.item(r, "guard_scope").ok)
-
-    def test_l2_modified_plan_after_registration_is_out_of_scope(self):
-        fl = self.l2_lab()
-        fl.commit(PLAN, plan_text(tasks=1) + "\n- Create: `src/extra.py`\n", "piano ritoccato")
-        self.approve(fl)
-        r = self.check(fl)
-        self.assertEqual(r.code, finishcheck.RED, r.lines)
-        self.assertFalse(self.item(r, "guard_scope").ok)
-        self.assertIn(PLAN, " ".join(r.lines))
-
-    def test_l2_spec_changed_after_approval_is_out_of_scope(self):
-        fl = self.l2_lab()
-        fl.commit(self.SPEC, "# spec cambiata\n", "spec ritoccata")
-        r = self.check(fl)
-        self.assertEqual(r.code, finishcheck.RED, r.lines)
-        self.assertFalse(self.item(r, "guard_scope").ok)
-        self.assertIn(self.SPEC, " ".join(r.lines))
-
     def test_must_have_manual_listed_in_report(self):
         text = plan_text(tasks=1).replace("M2. Zero — test: tests.test_app::test_zero",
                                           "M2. Colore — test: manuale")
@@ -299,6 +230,157 @@ class LevelsTest(FinishCheckCase):
         report = json.loads(phases.get_work(fl.conn, fl.work)["finish_report"])
         self.assertEqual(report["manual"], ["M2"])
         self.assertIn("M2", " ".join(r.lines))
+
+
+class L2ApprovalsTest(FinishCheckCase):
+    """La voce `approvals` della DoD in L2 (8.7): `approvals.check_l2` sui file di HEAD."""
+
+    def l2_lab(self, *, reports=True, plan_approval=True, **kw):
+        """L2 in execution: spec e piano committati, `spec-approval.md` e `plan-approval.md`
+        coerenti con HEAD e, con `reports`, i report dell'avversario della spec e del piano."""
+        fl = self.lab(**kw)
+        fl.conn.execute("UPDATE work_items SET level = 'L2' WHERE id = ?", (fl.work,))
+        fl.write_spec()
+        fl.approve_spec_file()
+        if plan_approval:
+            fl.approve_plan_file()
+        if reports:
+            fl.write_report("spec-adversarial")
+            fl.write_report("plan-adversarial")
+        return fl
+
+    def approvals_detail(self, r):
+        return next(x for x in item_lines(r) if "approvat" in x.lower())
+
+    def test_missing_approvals_is_red_and_stays_in_execution(self):
+        fl = self.l2_lab(plan_approval=False, reports=False)
+        fl.git("rm", "-q", "docs/superpowers/reviews/7/spec-approval.md", repo=fl.wt)
+        fl.git("commit", "-qm", "senza approvazione", repo=fl.wt)
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.RED, r.lines)
+        self.assertFalse(self.item(r, "approvals").ok)
+        self.assertIn("spec-approval.md", self.approvals_detail(r))
+        self.assertIn("plan-approval.md", self.approvals_detail(r))
+        self.assertEqual(phase(fl), "execution")
+
+    def test_plan_sha_different_from_blob_is_false(self):
+        fl = self.l2_lab()
+        header = {"kind": "plan-approval", "path": PLAN, "sha": "0" * 40,
+                  "spec_sha": core_git.blob_at(fl.wt, "HEAD", SPEC), "adversarial": "closed"}
+        fl.commit("docs/superpowers/reviews/7/plan-approval.md",
+                  approvals.render_approval(header), "approvazione del piano superata")
+        r = self.check(fl)
+        self.assertFalse(self.item(r, "approvals").ok)
+        self.assertIn("rifai approve plan", self.approvals_detail(r))
+
+    def test_reports_required(self):
+        fl = self.l2_lab(reports=False)
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.RED, r.lines)
+        self.assertFalse(self.item(r, "approvals").ok)
+        detail = self.approvals_detail(r)
+        self.assertIn("spec-adversarial", detail)
+        self.assertIn("plan-adversarial", detail)
+        fl.write_report("spec-adversarial")
+        r = self.check(fl)
+        detail = self.approvals_detail(r)
+        self.assertNotIn("spec-adversarial", detail)
+        self.assertIn("plan-adversarial", detail)
+        fl.write_report("plan-adversarial")
+        self.assertEqual(self.check(fl).code, finishcheck.OK)
+
+    def test_report_with_invalid_header_does_not_count(self):
+        fl = self.l2_lab(reports=False)
+        fl.write_report("plan-adversarial")
+        fl.commit("docs/superpowers/reviews/7/spec-adversarial-1.md", "senza intestazione\n",
+                  "report rotto")
+        r = self.check(fl)
+        self.assertFalse(self.item(r, "approvals").ok)
+        self.assertIn("spec-adversarial", self.approvals_detail(r))
+
+    def test_complete_l2_is_green(self):
+        fl = self.l2_lab()
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.OK, r.lines)
+        self.assertTrue(self.item(r, "approvals").ok)
+        self.assertEqual([i.key for i in r.items], list(dod.ITEMS_BY_LEVEL["L2"]))
+        self.assertEqual(self.item(r, "specialists").ok, None)
+        self.assertEqual(phase(fl), "review")
+
+    def test_kind_mismatch_is_false(self):
+        fl = self.l2_lab()
+        header = {"kind": "spec-approval", "path": PLAN, "sha": core_git.blob_at(
+            fl.wt, "HEAD", PLAN)}
+        fl.commit("docs/superpowers/reviews/7/plan-approval.md",
+                  approvals.render_approval(header), "approvazione del tipo sbagliato")
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.RED, r.lines)
+        self.assertFalse(self.item(r, "approvals").ok)
+        self.assertIn("plan-approval.md", self.approvals_detail(r))
+
+    def test_must_have_tests_off(self):
+        """Triage 31: con `must_have_tests = false` la voce `must_have` non blocca, e `approvals`
+        resta valutata come sempre."""
+        off = TOML + "[components]\nmust_have_tests = false\n"
+        fl = self.l2_lab(toml=off, ids="tests.test_app::test_somma ok\n")   # manca il test M2
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.OK, r.lines)
+        self.assertTrue(self.item(r, "must_have").ok)
+        self.assertTrue(self.item(r, "approvals").ok)
+        fl.git("rm", "-q", "docs/superpowers/reviews/7/spec-adversarial-1.md", repo=fl.wt)
+        fl.git("commit", "-qm", "senza report", repo=fl.wt)
+        r = self.check(fl)
+        self.assertTrue(self.item(r, "must_have").ok)
+        self.assertFalse(self.item(r, "approvals").ok)
+
+    def test_later_slice_reports_live_in_the_first_slice_folder(self):
+        """Fetta successiva: l'approvazione e i report della spec sono di un'altra issue (18.1)."""
+        fl = self.lab()
+        fl.conn.execute("UPDATE work_items SET level = 'L2' WHERE id = ?", (fl.work,))
+        fl.write_spec(slices=3)
+        phases.set_spec_path(fl.conn, fl.work, SPEC, now=fl.lab.now)
+        fields = {"kind": "spec-approval", "path": SPEC, "sha": core_git.blob_at(
+            fl.wt, "HEAD", SPEC), "slices": 3, "adversarial": "closed", "lens": "closed"}
+        fl.commit(approvals.approval_paths(3)[0], approvals.render_approval(fields),
+                  "approvazione della prima fetta")
+        fl.approve_plan_file()
+        fl.write_report("plan-adversarial")
+        detail = self.approvals_detail(self.check(fl))
+        self.assertIn("docs/superpowers/reviews/3/", detail)        # i report mancano là
+        self.assertNotIn("docs/superpowers/reviews/7/spec", detail)
+        fl.write_report("spec-adversarial", issue=3)
+        fl.write_report("spec-lens", issue=3)
+        # i file della prima fetta stanno già sul predefinito: sono nella base del lavoro
+        fl.conn.execute("UPDATE work_items SET work_base_sha = ? WHERE id = ?",
+                        (head(fl), fl.work))
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.OK, r.lines)
+        self.assertTrue(self.item(r, "approvals").ok)
+        self.assertTrue(self.item(r, "guard_scope").ok)
+
+    def test_approved_spec_and_reviews_files_exempt(self):
+        fl = self.l2_lab()
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.OK, r.lines)
+        self.assertTrue(self.item(r, "guard_scope").ok)
+
+    def test_modified_plan_after_registration_is_out_of_scope(self):
+        fl = self.l2_lab()
+        fl.commit(PLAN, plan_text(tasks=1) + "\n- Create: `src/extra.py`\n", "piano ritoccato")
+        fl.approve_plan_file()
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.RED, r.lines)
+        self.assertFalse(self.item(r, "guard_scope").ok)
+        self.assertIn(PLAN, " ".join(r.lines))
+
+    def test_spec_changed_after_approval_is_out_of_scope(self):
+        fl = self.l2_lab()
+        fl.commit(SPEC, "# spec cambiata\n", "spec ritoccata")
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.RED, r.lines)
+        self.assertFalse(self.item(r, "guard_scope").ok)
+        self.assertFalse(self.item(r, "approvals").ok)
+        self.assertIn(SPEC, " ".join(r.lines))
 
 
 class ProfileDodTest(FinishCheckCase):

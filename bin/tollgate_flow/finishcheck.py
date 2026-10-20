@@ -16,7 +16,7 @@ from tollgate_core import (acts, clock, config, db, dod, events, git, phases, re
                            sessions, verify, violations)
 from tollgate_core.paths import program_command
 
-from . import gitw, prstate, taskcmd
+from . import gitw, l2tree, prstate, taskcmd
 
 OK, RED, REFUSED = 0, 1, 2
 SKIP = ("findings", "specialists")      # si valutano dopo la revisione (decisione 15)
@@ -120,10 +120,12 @@ def _check(state, conn, cwd: Path, now, environ) -> CheckResult:
     comps = cfg.get("components")
     details: dict[str, str] = {}
 
+    approved_spec = _approved_spec_blob(wt, work) if level == "L2" else None
+    spec_blob = git.blob_at(wt, "HEAD", work["spec_path"]) if approved_spec else None
     found = [v for v in violations.diff_violations(cfg, conn, work, wt, base, sha,
                                                    git.changes(wt, base, head=sha),
                                                    components=comps)
-             if not _own_document(wt, work, v)]
+             if not _own_document(work, v, approved_spec, spec_blob)]
     external = {"guard_scope": not found}
     if found:
         shown = [f"{v.kind} {v.path}" for v in found[:MAX_LISTED]]
@@ -180,21 +182,23 @@ def profile_receipts(conn, wid: int, sha: str, extra, allow_no_tests: bool,
     return items, details
 
 
-def _own_document(wt: Path, work, v) -> bool:
+def _approved_spec_blob(wt: Path, work) -> str | None:
+    """Lo `sha` dell'approvazione della spec trovata in HEAD (anche di un'altra issue, per una
+    fetta successiva), oppure `None`. Una sola lettura dell'albero per `finish check`."""
+    spec_path = work["spec_path"]
+    if not spec_path:
+        return None
+    blob = git.blob_at(wt, "HEAD", spec_path)
+    found = l2tree.locate(wt, "HEAD", issue=work["issue"], spec_path=spec_path, spec_blob=blob)
+    return found[1]["sha"] if found is not None else None
+
+
+def _own_document(work, v, approved_spec: str | None, spec_blob: str | None) -> bool:
     """Esente dallo scope in un lavoro L2: la spec approvata, cioè con il blob in HEAD uguale allo
-    `sha` di `spec-approval.md`. I file di `reviews/<N>/` sono esenti in `scope_exempt`; il piano
-    lo è solo se è il blob registrato (`is_registered_plan`, dentro `diff_violations`)."""
-    if v.kind != "out_of_scope":
-        return False
-    if not work["spec_path"] or v.path != work["spec_path"]:
-        return False
-    header = approvals_mod.parse_approval(
-        git.text_at(wt, "HEAD", approvals_mod.approval_paths(work["issue"])[0]) or "")
-    try:
-        blob = git.run(wt, "rev-parse", f"HEAD:{v.path}").strip()
-    except git.GitError:
-        return False
-    return header is not None and header["kind"] == "spec-approval" and header["sha"] == blob
+    `sha` dell'approvazione trovata. Il piano lo è solo se è il blob registrato
+    (`is_registered_plan`, dentro `diff_violations`)."""
+    return (v.kind == "out_of_scope" and bool(work["spec_path"]) and v.path == work["spec_path"]
+            and approved_spec is not None and approved_spec == spec_blob)
 
 
 def _saved(work, sha: str) -> CheckResult:
@@ -238,24 +242,14 @@ def _must_have(wt: Path, work, cfg, comps, run) -> tuple[bool, list[str], str]:
 
 
 def _approvals(wt: Path, work) -> tuple[bool, str]:
-    """Spec e piano approvati: i due file esistono in HEAD con `sha` uguale al blob del
-    documento in HEAD. I report avversariali sono di P3c."""
-    spec_approval, plan_approval = approvals_mod.approval_paths(work["issue"])
-    problems = []
-    for kind, doc, path in (("spec-approval", work["spec_path"], spec_approval),
-                            ("plan-approval", work["plan_path"], plan_approval)):
-        if not doc:
-            problems.append(f"{kind}: il lavoro non ha {'la spec' if kind[0] == 's' else 'il piano'}")
-            continue
-        header = approvals_mod.parse_approval(git.text_at(wt, "HEAD", path) or "")
-        if header is None or header["kind"] != kind:
-            problems.append(f"{path} mancante o non valido in HEAD")
-            continue
-        try:
-            blob = git.run(wt, "rev-parse", f"HEAD:{doc}").strip()
-        except git.GitError:
-            problems.append(f"{doc} assente in HEAD")
-            continue
-        if not approvals_mod.is_current(header, blob):
-            problems.append(f"{path}: sha diverso da {doc} in HEAD (approvazione superata)")
+    """Spec e piano approvati, report avversariali presenti (8.7): `approvals.check_l2` sui file
+    di `docs/superpowers/reviews/` in HEAD (decisione 15)."""
+    spec_path, plan_path = work["spec_path"], work["plan_path"]
+    spec_blob = git.blob_at(wt, "HEAD", spec_path) if spec_path else None
+    plan_blob = git.blob_at(wt, "HEAD", plan_path) if plan_path else None
+    files, _ = l2tree.collect(wt, "HEAD", issue=work["issue"], spec_path=spec_path,
+                              spec_blob=spec_blob)
+    problems = approvals_mod.check_l2(files, issue=work["issue"], spec_path=spec_path,
+                                      spec_blob=spec_blob, plan_path=plan_path,
+                                      plan_blob=plan_blob)
     return not problems, "; ".join(problems)

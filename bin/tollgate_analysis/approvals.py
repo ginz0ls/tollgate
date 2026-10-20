@@ -136,6 +136,14 @@ def approval_listing(paths) -> list[str]:
     return [p for p in paths if _APPROVAL_PATH.match(p)]
 
 
+def report_listing(paths, folders) -> list[str]:
+    """I percorsi di report di giro (nome `<tipo>-<n>.md`) direttamente dentro una delle
+    `folders`, senza barra finale, nell'ordine dato."""
+    wanted = set(folders)
+    return [p for p in paths if p.rpartition("/")[0] in wanted
+            and _REPORT_NAME.match(p.rpartition("/")[2])]
+
+
 def locate_spec_approval(files: Mapping[str, str], *, issue: int, spec_path: str,
                          spec_blob: str | None) -> tuple[str, dict] | None:
     """L'approvazione della spec `spec_path`, come (percorso, intestazione), oppure `None`.

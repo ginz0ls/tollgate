@@ -17,7 +17,7 @@ from tollgate_core import (VERSION, acts, clock, config, db, dod, events, git, i
                            receipts, reviews, sessions, stats, verify, violations)
 from tollgate_core.paths import program_command
 
-from . import finishcheck, gh, gitw, prstate
+from . import finishcheck, gh, gitw, l2tree, prstate
 
 OK, REFUSED = 0, 1
 REVIEWER = "tollgate:final-reviewer"
@@ -376,6 +376,24 @@ def _labels(state, main, work) -> tuple[tuple[str, ...] | None, str | None]:
                       "calcolato dal solo diff")
 
 
+def _l2_dirs(wt: Path, head: str, work) -> tuple[str | None, dict, str | None]:
+    """Cartelle 18.1 e intestazione dell'approvazione della spec, dall'albero di `head` (lo SHA
+    spinto, decisione 15). La spec si approva solo in L2 ma conta `spec_path`: senza, nessuna
+    cartella. L'approvazione trovata può essere di un'altra issue (fetta successiva); la
+    cartella del piano è quella del lavoro se `plan-approval.md` esiste."""
+    issue = work["issue"]
+    plan_file = approvals_mod.approval_paths(issue)[1]
+    plan_dir = plan_file.rpartition("/")[0] + "/" if git.exists_at(wt, head, plan_file) else None
+    spec_path = work["spec_path"]
+    if not spec_path:
+        return None, {}, plan_dir
+    found = l2tree.locate(wt, head, issue=issue, spec_path=spec_path,
+                          spec_blob=git.blob_at(wt, head, spec_path))
+    if found is None:
+        return None, {}, plan_dir
+    return found[0].rpartition("/")[0] + "/", found[1], plan_dir
+
+
 def facts(conn, state, work, cfg, wt: Path, head: str, *, now, dod=None, labels=None,
           cycle=_AUTO) -> dict:
     """I campi del blocco 18.1 (decisione 11). `dod` sono le voci ricalcolate da `open-pr`,
@@ -400,9 +418,7 @@ def facts(conn, state, work, cfg, wt: Path, head: str, *, now, dod=None, labels=
                                 profs),
         lv.labels_level(labels or (), levels_cfg["sensitive_labels"]))
 
-    spec_path, plan_path = approvals_mod.approval_paths(issue)
-    reviews_dir = f"{approvals_mod.REVIEWS_DIR}/{issue}/"
-    spec_header = approvals_mod.parse_approval(git.text_at(wt, head, spec_path) or "") or {}
+    spec_dir, spec_header, plan_dir = _l2_dirs(wt, head, work)
     if cycle is _AUTO:
         latest = reviews.latest(conn, wid)
         cycle = latest if latest is not None and latest["sha"] == head else None
@@ -426,8 +442,8 @@ def facts(conn, state, work, cfg, wt: Path, head: str, *, now, dod=None, labels=
         "plan": work["plan_path"],
         "plan_sha": work["plan_sha"],
         "spec": work["spec_path"],
-        "spec_reviews_dir": reviews_dir if git.exists_at(wt, head, spec_path) else None,
-        "plan_reviews_dir": reviews_dir if git.exists_at(wt, head, plan_path) else None,
+        "spec_reviews_dir": spec_dir,
+        "plan_reviews_dir": plan_dir,
         "spec_audit": {"adversarial": spec_header.get("adversarial"),
                        "lens": spec_header.get("lens")},
         "head_sha": head,

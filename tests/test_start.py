@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import re
@@ -7,15 +8,18 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import timedelta
 from pathlib import Path
+from unittest import mock
 
-from tests.flowkit import ORIGIN_URL, SESSION, FlowLab
+from tests.flowkit import ORIGIN_URL, SESSION, SPEC, FlowLab, spec_text
 from tests.helpers import BIN
 from tests.hookkit import DEFAULT_TOML
-from tollgate_core import (VERSION, clock, effects, events, intents, phases, sessions, subagents,
+from tollgate_analysis import approvals
+from tollgate_core import (VERSION, cli, clock, effects, events, intents, phases, sessions, subagents,
                            tasks)
-from tollgate_flow import gitw, housekeeping
+from tollgate_flow import gitw, housekeeping, start as flow_start
 
 SENTINEL_TITLE = "tollgate: merge non verificato"
 
@@ -25,6 +29,12 @@ def issue(n=7, title="Aggiungi export CSV", **kw):
             "labels": [], "author_association": "OWNER"}
     data.update(kw)
     return data
+
+
+def blob(text):
+    """Lo sha git del contenuto, come lo calcola `git hash-object`."""
+    return subprocess.run(["git", "hash-object", "--stdin"], input=text, capture_output=True,
+                          text=True, check=True).stdout.strip()
 
 
 def out(r):
@@ -492,6 +502,132 @@ class StartNewTest(StartCase):
         self.assertIn("registrazione incompleta: info/exclude", r.stdout)
         (row,) = self.rows(fl)
         self.assertTrue((Path(row["worktree"]) / ".tollgate-run" / "7" / "issue.md").is_file())
+
+
+class StartSpecTest(StartCase):
+    """`start #M --spec <percorso>` (5, 6.1, decisione 14, criterio 24): fetta successiva di una
+    spec già approvata sul ramo predefinito dall'issue 3."""
+    SPEC_PATH = SPEC
+    APPROVAL = approvals.approval_paths(3)[0]
+
+    def spec_lab(self, *, approval="current", slices=3, **kw):
+        """Repo il cui predefinito ha la spec e, secondo `approval`, la sua approvazione con lo
+        `sha` attuale (`current`), con uno `sha` vecchio (`stale`) o nessuna (`none`)."""
+        text = spec_text(slices)
+        files = {self.SPEC_PATH: text}
+        if approval != "none":
+            sha = blob(text) if approval == "current" else "0" * 40
+            files[self.APPROVAL] = approvals.render_approval(
+                {"kind": "spec-approval", "path": self.SPEC_PATH, "sha": sha, "slices": slices,
+                 "adversarial": "closed", "lens": "closed"})
+        return self.make(files=files, **kw)
+
+    def start(self, fl, *extra, issue="9", spec=None):
+        return fl.cli("start", issue, "--spec", spec or self.SPEC_PATH, *extra)
+
+    def test_approved_spec_starts_in_plan(self):
+        fl = self.spec_lab()
+        r = self.start(fl)
+        self.assertEqual(r.returncode, 0, out(r))
+        (row,) = self.rows(fl)
+        self.assertEqual((row["issue"], row["level"], row["phase"], row["spec_path"]),
+                         (9, "L2", "plan", self.SPEC_PATH))
+        self.assertIn(f"spec approvata: {self.SPEC_PATH} (approvazione in "
+                      "docs/superpowers/reviews/3/)", r.stdout)
+        self.assertEqual(fl.events("phase_change")[-1], {"from": None, "to": "plan",
+                                                         "cause": "start"})
+        self.assertEqual(fl.git("status", "--porcelain", repo=Path(row["worktree"])), "")
+        self.assertTrue((Path(row["worktree"]) / self.SPEC_PATH).is_file())
+
+    def test_spec_forces_l2_even_for_a_trusted_plain_issue(self):
+        fl = self.spec_lab()
+        r = self.start(fl, "--level", "L1")
+        self.assertEqual(r.returncode, 0, out(r))
+        self.assertEqual(self.rows(fl)[0]["level"], "L2")
+
+    def test_without_approval_refused(self):
+        fl = self.spec_lab(approval="none")
+        r = self.start(fl)
+        self.assertEqual(r.returncode, 1, out(r))
+        self.assertIn("approvazione", out(r))
+        self.assertIn(self.SPEC_PATH, out(r))
+        self.assertEqual(self.rows(fl), [])
+        self.assertEqual(fl.git("branch", "--list", "tg/9-*"), "")
+
+    def test_approval_only_on_the_local_disk_is_not_enough(self):
+        """Conta il ramo predefinito (la punta di origin), non il disco del checkout."""
+        fl = self.spec_lab(approval="none")
+        target = fl.main / self.APPROVAL
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(approvals.render_approval(
+            {"kind": "spec-approval", "path": self.SPEC_PATH, "sha": blob(spec_text(3))}))
+        r = self.start(fl)
+        self.assertEqual(r.returncode, 1, out(r))
+        self.assertEqual(self.rows(fl), [])
+
+    def test_changed_spec_needs_confirm_then_spec_audit(self):
+        fl = self.spec_lab(approval="stale")
+        r = self.start(fl)
+        self.assertEqual(r.returncode, 3, out(r))
+        self.assertIn("la spec è cambiata dopo l'approvazione", out(r))
+        self.assertIn("con --confirm il lavoro parte da spec_audit", out(r))
+        self.assertEqual(self.rows(fl), [])
+        r = self.start(fl, "--confirm")
+        self.assertEqual(r.returncode, 0, out(r))
+        (row,) = self.rows(fl)
+        self.assertEqual((row["level"], row["phase"], row["spec_path"]),
+                         ("L2", "spec_audit", self.SPEC_PATH))
+        self.assertIn("spec_audit", r.stdout)
+        self.assertNotIn("spec approvata:", r.stdout)
+
+    def test_bad_path_refused(self):
+        fl = self.spec_lab()
+        for name, path in {
+                "assoluto": "/etc/passwd",
+                "assoluto sotto specs": "/" + self.SPEC_PATH,
+                "con ..": "docs/superpowers/specs/../specs/" + self.SPEC_PATH.rpartition("/")[2],
+                "risale": "../" + self.SPEC_PATH,
+                "fuori da specs": "docs/superpowers/plans/x.md",
+                "radice": "README.md",
+                "con a capo": self.SPEC_PATH + "\nrm -rf /",
+                "con ./": "docs/superpowers/./specs/" + self.SPEC_PATH.rpartition("/")[2],
+                "assente sul predefinito": "docs/superpowers/specs/non-esiste.md"}.items():
+            with self.subTest(name):
+                r = self.start(fl, spec=path)
+                self.assertEqual(r.returncode, 1, out(r))
+                self.assertTrue(out(r).startswith("rifiuto:"), out(r))
+                self.assertEqual(self.rows(fl), [])
+        self.assertEqual(fl.git("branch", "--list", "tg/9-*"), "")
+
+    def test_spec_ignored_on_resume_with_warning(self):
+        fl = self.spec_lab()
+        self.assertEqual(fl.cli("start", "9").returncode, 0)
+        before = self.rows(fl)[0]
+        self.assertEqual((before["level"], before["phase"], before["spec_path"]),
+                         ("L0", "execution", None))
+        r = self.start(fl)
+        self.assertEqual(r.returncode, 0, out(r))
+        self.assertIn("avviso: --spec ignorato", r.stdout)
+        after = self.rows(fl)
+        self.assertEqual(len(after), 1)
+        self.assertEqual((after[0]["level"], after[0]["phase"], after[0]["spec_path"]),
+                         ("L0", "execution", None))
+
+    def test_cli_passes_spec(self):
+        fl = self.spec_lab()
+        seen = {}
+
+        def fake(state, cwd, issue, **kw):
+            seen.update(issue=issue, **kw)
+            return flow_start.StartResult(0, ["fatto"])
+
+        with mock.patch.dict(os.environ, fl.ts.env()), \
+                mock.patch.object(flow_start, "start", side_effect=fake), \
+                redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(["start", "9", "--spec", self.SPEC_PATH]), 0)
+            self.assertEqual(seen["spec"], self.SPEC_PATH)
+            self.assertEqual(cli.main(["start", "9"]), 0)
+            self.assertIsNone(seen["spec"])
 
 
 class ResumeTest(StartCase):

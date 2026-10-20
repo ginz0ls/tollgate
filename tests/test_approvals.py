@@ -131,6 +131,18 @@ class HeaderTest(unittest.TestCase):
         self.assertEqual(approvals.approval_listing(paths),
                          [f"{REV}/3/spec-approval.md", f"{REV}/5/spec-approval.md"])
 
+    def test_report_listing(self):
+        paths = [f"{REV}/3/spec-adversarial-1.md", f"{REV}/3/spec-lens-2.md",
+                 f"{REV}/3/spec-approval.md", f"{REV}/5/plan-adversarial-1.md",
+                 f"{REV}/3/sub/spec-lens-1.md", f"{REV}/3/spec-lens-stato.md",
+                 f"{REV}/3/note-1.md", f"{REV}/30/spec-lens-1.md"]
+        self.assertEqual(approvals.report_listing(paths, [f"{REV}/3"]),
+                         [f"{REV}/3/spec-adversarial-1.md", f"{REV}/3/spec-lens-2.md"])
+        self.assertEqual(approvals.report_listing(paths, [f"{REV}/3", f"{REV}/5"]),
+                         [f"{REV}/3/spec-adversarial-1.md", f"{REV}/3/spec-lens-2.md",
+                          f"{REV}/5/plan-adversarial-1.md"])
+        self.assertEqual(approvals.report_listing(paths, []), [])
+
 
 class LocateTest(unittest.TestCase):
     def test_locate_own_then_other_issue(self):
