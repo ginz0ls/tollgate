@@ -261,6 +261,16 @@ class VerifierTest(Base):
         self.assertEqual(self.open_blocks(), [])
 
 
+class ComponentOffTest(Base):
+    toml = DEFAULT_TOML + "[components]\nfinal_review = false\n"
+
+    def test_final_review_component_off_ignores_verdict(self):      # criterio 18
+        self.assertEqual(self.stop(text=self.verdict()).exit, 0)
+        self.assertEqual(self.findings(), [])
+        self.assertEqual((self.cycle()["stage"], self.cycle()["reported"]), ("review", "{}"))
+        self.assertEqual(self.open_blocks(), [])
+
+
 class SpecialistTest(Base):
     toml = SEC_TOML
     level = "L2"
