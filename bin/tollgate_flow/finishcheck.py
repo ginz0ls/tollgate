@@ -181,14 +181,11 @@ def profile_receipts(conn, wid: int, sha: str, extra, allow_no_tests: bool,
 
 
 def _own_document(wt: Path, work, v) -> bool:
-    """Esenti dallo scope in un lavoro L2: i file di `reviews/<N>/` (approvazioni e report,
-    scritti da CLI e hook) e la spec approvata, cioè con il blob in HEAD uguale allo `sha` di
-    `spec-approval.md`. Il piano non è mai esente qui: lo è solo se è il blob registrato
-    (`is_registered_plan`, dentro `diff_violations`)."""
+    """Esente dallo scope in un lavoro L2: la spec approvata, cioè con il blob in HEAD uguale allo
+    `sha` di `spec-approval.md`. I file di `reviews/<N>/` sono esenti in `scope_exempt`; il piano
+    lo è solo se è il blob registrato (`is_registered_plan`, dentro `diff_violations`)."""
     if v.kind != "out_of_scope":
         return False
-    if v.path.startswith(f"{approvals_mod.REVIEWS_DIR}/{work['issue']}/"):
-        return True
     if not work["spec_path"] or v.path != work["spec_path"]:
         return False
     header = approvals_mod.parse_approval(

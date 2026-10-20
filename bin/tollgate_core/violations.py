@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from tollgate_analysis import globs, profiles as prof, testguard, waivers
+from tollgate_analysis.approvals import REVIEWS_DIR
 from tollgate_analysis.testguard import DEFAULT_TEST_GLOBS, GuardConfig, Violation
 
 from . import git, scope as scope_mod
@@ -51,8 +52,7 @@ def locked_docs(work) -> set[str]:
     if work["plan_sha"] and work["plan_path"] and _rank(phase) > _rank("plan"):
         out.add(work["plan_path"])
     if work["spec_path"] and work["worktree"] and _rank(phase) > _rank("spec_audit"):
-        approval = Path(work["worktree"]) / f"docs/superpowers/reviews/{work['issue']}" \
-                                           "/spec-approval.md"
+        approval = Path(work["worktree"]) / f"{REVIEWS_DIR}/{work['issue']}/spec-approval.md"
         if approval.exists():
             out.add(work["spec_path"])
     return out
@@ -68,11 +68,11 @@ def scope_exempt(cfg: Config, work, rel: str, scope: set[str], *,
         return True
     # I report e le approvazioni del lavoro li scrivono solo la CLI e gli hook e il
     # coordinatore li committa con spec e piano (decisione 26).
-    if rel.startswith(f"docs/superpowers/reviews/{work['issue']}/"):
+    if rel.startswith(f"{REVIEWS_DIR}/{work['issue']}/"):
         return True
     if git.excluded(rel, output_excludes(cfg)):
         return True
-    if is_docs_md(rel) and not rel.startswith("docs/superpowers/reviews/") \
+    if is_docs_md(rel) and not rel.startswith(f"{REVIEWS_DIR}/") \
             and rel not in (locked_docs(work) if locked is None else locked):
         return True
     if globs.match_any(cfg.get("scope.always"), rel):

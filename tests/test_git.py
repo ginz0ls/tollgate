@@ -270,6 +270,14 @@ class BlobAtTest(unittest.TestCase):
         self.assertIsNone(git.blob_at(self.repo, "HEAD", "manca.md"))
         self.assertIsNone(git.blob_at(self.repo, "origin/main", "a.md"))
 
+    def test_blob_at_directory_is_none(self):
+        (self.repo / "d").mkdir()
+        (self.repo / "d" / "f.md").write_text("x\n")
+        g(self.repo, "add", "-A")
+        g(self.repo, "commit", "-qm", "dir")
+        self.assertIsNone(git.blob_at(self.repo, "HEAD", "d"))
+        self.assertIsNotNone(git.blob_at(self.repo, "HEAD", "d/f.md"))
+
 
 class FingerprintTest(unittest.TestCase):
     def setUp(self):

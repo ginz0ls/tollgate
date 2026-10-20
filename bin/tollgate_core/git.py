@@ -307,9 +307,17 @@ def ls_files_at(repo, ref: str, prefix: str) -> list[str]:
 
 
 def blob_at(repo, ref: str, path: str) -> str | None:
-    """SHA del blob di `path` nell'albero di `ref`; `None` se manca (o manca il riferimento)."""
-    r = _proc(repo, ["rev-parse", "--verify", "-q", f"{ref}:{path}"])
-    return r.stdout.decode().strip() or None if r.returncode == 0 else None
+    """SHA del blob di `path` nell'albero di `ref`; `None` se manca, se è una cartella o se manca
+    il riferimento."""
+    r = _proc(repo, ["ls-tree", "-z", ref, "--", path])
+    if r.returncode != 0:
+        return None
+    for entry in r.stdout.decode("utf-8", "surrogateescape").split("\0"):
+        meta, _, name = entry.partition("\t")
+        parts = meta.split()
+        if name == path and len(parts) == 3 and parts[1] == "blob":
+            return parts[2]
+    return None
 
 
 def exists_at(repo, ref: str, path: str) -> bool:
