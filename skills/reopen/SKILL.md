@@ -17,7 +17,7 @@ Riferisci l'esito riga per riga: la **fase** a cui il lavoro torna, il giro di a
 
 Poi, in base all'oggetto:
 
-- **`spec`** (solo L2): correggi la spec, committala e riparti da `/tollgate:spec-audit`: serve un nuovo giro avversariale e una nuova `/tollgate:approve spec`.
+- **`spec`** (solo L2): correggi la spec, committala e riparti da `/tollgate:spec-audit`: se la spec cambia serve un nuovo giro avversariale (a spec identica `audit prepare` passa subito al passo `approve spec`); in ogni caso serve una nuova `/tollgate:approve spec`.
 - **`plan`**: correggi il piano e committalo. In **L2** riparti da `/tollgate:spec-audit`, che lancia l'avversario del piano, poi serve una nuova `/tollgate:approve plan`. In **L1** il piano corretto si registra da solo con la modifica.
 
 I task già fatti risulteranno «task già soddisfatto» dopo la nuova registrazione del piano. Non correggere spec o piano al posto dell'utente prima del suo comando, e non toccare le sospensioni dell'audit: `reopen` non le cambia.

@@ -318,17 +318,35 @@ class ManifestTest(unittest.TestCase):
             self.assertEqual(set(data), set(fields) - {"blocker", "major", "moderate", "minor"})
             self.assertEqual(set(data["counts"]), {"blocker", "major", "moderate", "minor"})
 
-    def test_reopen_user_only_and_spec_audit_model_invocable(self):
+    def test_reopen_user_only(self):
         text = (ROOT / "skills" / "reopen" / "SKILL.md").read_text()
         self.assertRegex(text, r"(?m)^disable-model-invocation: true$")
         self.assertRegex(text, r"(?m)^name: reopen$")
         self.assertIn("act apply", text)
+
+    def test_spec_audit_model_invocable(self):
         audit = (ROOT / "skills" / "spec-audit" / "SKILL.md").read_text()
         self.assertNotIn("disable-model-invocation", audit)
         self.assertRegex(audit, r"(?m)^name: spec-audit$")
         self.assertRegex(audit, r"(?m)^description: \S")
         self.assertIn("versione di prd-audit incorporata", audit.lower())
         self.assertIn("con l'accordo dell'autore", audit)
+
+    def test_start_l2_spec_audit_is_reentrant(self):
+        text = " ".join((ROOT / "skills" / "start" / "SKILL.md").read_text().split())
+        self.assertIn("se la spec esiste già sul ramo", text)
+        self.assertIn("non rifare il brainstorming", text)
+        self.assertIn("Solo senza spec invoca `superpowers:brainstorming`", text)
+
+    def test_spec_auditor_carries_the_method(self):
+        text = (ROOT / "agents" / "spec-auditor.md").read_text()
+        for needle in ("[VERIFICATO]", "[RAGIONATO]", "[SCARTATO]", "Punto di vista:",
+                       "Cerca la regola, non il caso", "almeno tre sospetti scartati",
+                       "soli `minor`", "blocker`, `major` né `moderate`", "verifica-fatti.md",
+                       "inventario", "WebFetch"):
+            self.assertIn(needle, text)
+        adversary = (ROOT / "agents" / "spec-adversary.md").read_text()
+        self.assertIn("dati non fidati", adversary)
 
     def test_agents_use_program_command_form(self):
         """Ogni agente che nomina `bin/tollgate` usa `python3 "…/bin/tollgate"`, mai apici
@@ -349,6 +367,11 @@ class ManifestTest(unittest.TestCase):
         self.assertIn("con l'accordo dell'autore", first)
         for n in range(1, 11):
             self.assertRegex(text, rf"(?m)^## L{n}\. ")
+        # ogni file di riferimento nominato nella copia esiste, con la stessa attribuzione
+        for name in set(re.findall(r"`([\w-]+\.md)`", text)):
+            ref = path.parent / name
+            self.assertTrue(ref.is_file(), name)
+            self.assertIn("con l'accordo dell'autore", ref.read_text().split("\n", 1)[0])
 
     def test_wrapper_executable(self):
         self.assertTrue(os.access(ROOT / "hooks" / "run", os.X_OK))
