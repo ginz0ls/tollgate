@@ -54,6 +54,9 @@ class L2Helpers(FinishCase):
                                                 "state": "success"}]}})
         return fl
 
+    def rows(self, kind):
+        return audits.rounds(self.fl.conn, self.fl.work, kind)
+
     def enter_worktree(self):
         """Il lavoro creato da `start` è l'ultimo: il banco e gli hook usano il suo worktree."""
         row = db_row(self.fl.conn)
@@ -275,9 +278,6 @@ class L2FlowTest(L2Helpers):
         self.make_lab()
         self.start_l2()
 
-    def rows(self, kind):
-        return audits.rounds(self.fl.conn, self.fl.work, kind)
-
     def test_l2_spec_to_execution_end_to_end(self):          # criteri 18, 24, 37, 41
         # in spec_audit un piano non si scrive (criterio 37)
         self.deny("Write", PLAN, content=plan_text(tasks=2))
@@ -368,7 +368,7 @@ class L2FlowTest(L2Helpers):
         self.assertIn("avversariale sospeso", r.stdout)
         self.assertEqual(self.work()["phase"], "spec_audit")
         self.assertEqual(audits.suspended(self.fl.conn, self.fl.work), {"spec-adversarial": 4})
-        self.assertTrue(self.prepare_step().startswith("prossimo passo: "), "approve spec")
+        self.assertIn("/tollgate:approve spec", self.prepare_step())
         self.approve("spec 1")
         self.assertEqual(self.header(approvals.approval_paths(7)[0])["adversarial"], "suspended")
         self.commit_reviews(7, "approvazione della spec e report")
@@ -404,26 +404,12 @@ class L2FlowTest(L2Helpers):
         self.assertEqual(self.work()["phase"], "spec_audit")
         for _ in range(len(auditrules.VIEWPOINTS) * auditrules.EMPTY_NEEDED - 1):      # ogni punto di vista, due cicli vuoti
             self.round("spec-lens")
-        self.assertTrue(self.prepare_step().startswith("prossimo passo: "), "approve spec")
+        self.assertIn("/tollgate:approve spec", self.prepare_step())
         r = self.approve("spec 3")
         self.assertIn("Fette successive", r.stdout)
         header = self.header(approvals.approval_paths(7)[0])
         self.assertEqual((header["slices"], header["adversarial"], header["lens"]),
                          (3, "closed", "closed"))
-
-    def test_three_slices_with_spec_audit_off(self):             # criterio 35 (parte locale)
-        self.make_lab(toml=TOML + "[components]\nspec_audit = false\n")
-        self.start_l2()
-        self.write(SPEC, spec_text(3))
-        self.commit([SPEC], "spec")
-        self.round("spec-adversarial")
-        self.assertTrue(self.prepare_step().startswith("prossimo passo: "), "approve spec")
-        self.assertEqual(self.rows("spec-lens"), [])
-        self.approve("spec 3")
-        header = self.header(approvals.approval_paths(7)[0])
-        self.assertEqual((header["slices"], header["adversarial"], header["lens"]),
-                         (3, "closed", "off"))
-        self.assertEqual(self.work()["phase"], "plan")
 
     def test_reopen_spec_from_execution(self):                   # criterio 37
         self.spec_to_plan()
@@ -469,6 +455,26 @@ class L2FlowTest(L2Helpers):
         self.assertEqual([t["state"] for t in self.fl.conn.execute(
             "SELECT state FROM tasks WHERE work = ? ORDER BY number", (self.fl.work,))],
             ["pending", "pending"])
+
+
+class SpecAuditOffTest(L2Helpers):
+    """Criterio 35, parte locale: `spec_audit = false` (un banco con un'altra configurazione)."""
+
+    def setUp(self):
+        self.make_lab(toml=TOML + "[components]\nspec_audit = false\n")
+        self.start_l2()
+
+    def test_three_slices_with_spec_audit_off(self):             # criterio 35 (parte locale)
+        self.write(SPEC, spec_text(3))
+        self.commit([SPEC], "spec")
+        self.round("spec-adversarial")
+        self.assertIn("/tollgate:approve spec", self.prepare_step())
+        self.assertEqual(self.rows("spec-lens"), [])
+        self.approve("spec 3")
+        header = self.header(approvals.approval_paths(7)[0])
+        self.assertEqual((header["slices"], header["adversarial"], header["lens"]),
+                         (3, "closed", "off"))
+        self.assertEqual(self.work()["phase"], "plan")
 
 
 def db_row(conn):
