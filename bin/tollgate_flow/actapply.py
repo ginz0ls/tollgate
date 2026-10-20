@@ -155,7 +155,12 @@ def _approve_unverified_review(conn, state, work, act, args, now, session) -> st
     if done < reviews.MAX_CYCLES:
         raise ActApplyError(f"approve unverified-review vale solo dopo {reviews.MAX_CYCLES} "
                             f"cicli di revisione: ne risultano {done}")
-    phases.set_review_unverified(conn, work["id"], now=now)
+    last = reviews.latest(conn, work["id"])
+    with db.tx(conn):
+        phases.set_review_unverified(conn, work["id"], now=now)
+        if last is not None:        # nessun rilievo resta senza esito (spec 8.6)
+            reviews.mark_unverified(conn, work["id"], last["number"],
+                                    reviews.UNVERIFIED_REVIEW_REASON, now=now)
     msg = "revisione finale dichiarata non verificata"
     block = _cycles_block(conn, work["id"])
     if block is not None:

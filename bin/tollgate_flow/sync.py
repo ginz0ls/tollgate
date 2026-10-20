@@ -16,7 +16,8 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
-from tollgate_core import (acts, clock, config, db, events, git, intents, phases, sessions)
+from tollgate_core import (acts, clock, config, db, events, git, intents, phases, sessions,
+                           subagents)
 from tollgate_core.paths import program_command
 
 from . import finishcheck, gh, gitw, openpr, prstate
@@ -139,6 +140,26 @@ def _conflict_reason(wt: Path, ref: str, tip: str, issue: int) -> str:
             f"/tollgate:approve rebase, oppure abbandona con /tollgate:abandon #{issue}")
 
 
+def _in_use(conn, state, work, environ) -> str | None:
+    """Il motivo per cui i commit non si possono riscrivere ora: un task in corso (o non `done`
+    con commit, i cui commit `_range` ritroverebbe vecchi dopo il rebase) o un implementatore che
+    scrive nel worktree (I-2)."""
+    for t in conn.execute("SELECT number FROM tasks WHERE work = ? AND (state IN ('running', "
+                          "'review') OR (state != 'done' AND commits != '[]')) ORDER BY number",
+                          (work["id"],)):
+        return (f"il task {t['number']} è in corso o ha commit non chiusi: chiudi o riporta in "
+                f"attesa il task {t['number']}, poi /tollgate:sync")
+    running = subagents.running(conn, work=work["id"])
+    if running:
+        base = work["work_base_sha"] or git.default_ref(git.main_worktree(Path(work["worktree"])))
+        cfg = config.load_config(state, Path(work["worktree"]), base, env=environ)
+        for sub in running:
+            if not config.is_readonly(cfg, sub["type"]):
+                return (f"l'implementatore {sub['id']} sta scrivendo nel worktree: attendi che "
+                        "finisca (o interrompilo con /tollgate:resolve writer), poi /tollgate:sync")
+    return None
+
+
 def _sync(state, conn, cwd: Path, now, argv, environ) -> SyncResult:
     work = sessions.work_for_path(conn, cwd)
     if work is None:
@@ -166,6 +187,9 @@ def _sync(state, conn, cwd: Path, now, argv, environ) -> SyncResult:
                                                       and work["pr_number"] is not None):
         return _refuse(f"la fase è {phase}: `sync` si usa in execution o pr_open",
                        warnings=warnings)
+    busy = _in_use(conn, state, work, environ)
+    if busy:
+        return _refuse(busy, warnings=warnings)
     if gitw.rebase_in_progress(wt):
         return _refuse("c'è un rebase in corso nel worktree: finiscilo o annullalo "
                        f"(`git -C {shlex.quote(str(wt))} rebase --abort`) e rilancia",

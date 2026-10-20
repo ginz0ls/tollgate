@@ -6,7 +6,8 @@ from unittest import mock
 from tests.flowkit import SESSION
 from tests.helpers import git as run_git
 from tests.test_openpr import BRANCH, OpenCase, head, pr, work
-from tollgate_core import acts, clock, git as core_git, intents, phases, reviews, sessions
+from tollgate_core import (acts, clock, git as core_git, intents, phases, reviews, sessions,
+                           subagents)
 from tollgate_flow import gitw, prstate, sync
 
 TWELVE = "".join(f"x{i} = {i}\n" for i in range(1, 13))
@@ -51,6 +52,54 @@ class SyncCase(OpenCase):
         return [r[0] for r in fl.conn.execute(
             "SELECT state FROM intents WHERE work = ? AND action = ? ORDER BY id",
             (fl.work, action))]
+
+
+class SyncOpenWorkTest(SyncCase):
+    """I-2: `sync` non riscrive i commit mentre un task o un implementatore li sta usando."""
+
+    def execution_lab(self):
+        fl = self.lab()
+        fl.git("config", "user.name", "t")
+        fl.git("config", "user.email", "t@example.com")
+        phases.set_phase(fl.conn, fl.ts.state, fl.work, "execution", "needs_fix", now=fl.now)
+        self.at = fl.now + timedelta(hours=2)
+        self.advance_main(fl)
+        return fl
+
+    def assert_refused_untouched(self, fl, pattern):
+        before = head(fl)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.REFUSED, r.lines)
+        self.assertRegex(" ".join(r.lines), pattern)
+        self.assertEqual(head(fl), before)
+        self.assertEqual(self.intent_states(fl, "sync"), [])
+        self.assertEqual(work(fl)["phase"], "execution")
+
+    def test_task_in_review_with_commits_refuses(self):
+        fl = self.execution_lab()
+        fl.conn.execute("UPDATE tasks SET state = 'review', commits = ? WHERE work = ? "
+                        "AND number = 1", (json.dumps([head(fl)]), fl.work))
+        self.assert_refused_untouched(fl, r"chiudi o riporta in attesa il task 1, poi "
+                                          r"/tollgate:sync")
+
+    def test_running_task_refuses(self):
+        fl = self.execution_lab()
+        fl.conn.execute("UPDATE tasks SET state = 'running' WHERE work = ? AND number = 1",
+                        (fl.work,))
+        self.assert_refused_untouched(fl, r"task 1")
+
+    def test_writer_subagent_running_refuses(self):
+        fl = self.execution_lab()
+        subagents.start(fl.conn, agent_id="a-1", type_="tollgate:implementer", session=SESSION,
+                        work=fl.work, task=1, base_sha=None, fingerprint=None, now=self.at)
+        self.assert_refused_untouched(fl, r"implementatore")
+
+    def test_readonly_subagent_does_not_refuse(self):
+        fl = self.execution_lab()
+        subagents.start(fl.conn, agent_id="a-2", type_="tollgate:final-reviewer", session=SESSION,
+                        work=fl.work, task=None, base_sha=None, fingerprint=None, now=self.at)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.OK, r.lines)
 
 
 class SyncRefusalTest(SyncCase):

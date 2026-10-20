@@ -509,6 +509,59 @@ class OpenUnverifiedTest(OpenCase):
         self.assertIsNone(prblock.parse(self.prs(fl)[0]["body"])["verdict"]["outcome"])
 
 
+class OpenOrphanFindingTest(OpenCase):
+    """I-1: un rilievo senza esito di un ciclo superato, o di una revisione dichiarata non
+    verificata, non blocca `open-pr` per sempre."""
+    FINDING = {"severity": "major", "confidence": 0.9, "file": "src/app.py", "line": 2,
+               "rule": "R-1", "text": "manca lo zero"}
+
+    def open_with_finding(self, fl):
+        base = work(fl)["work_base_sha"]
+        n = reviews.open_cycle(fl.conn, fl.work, sha=head(fl),
+                               patch_id=core_git.patch_id(fl.wt, base, head(fl)), code="c1",
+                               reviewers=[REVIEWER], now=fl.now)
+        stage = reviews.add_report(fl.conn, fl.work, n, source=REVIEWER, outcome="needs_fix",
+                                   findings=[self.FINDING], rejected=[], blocking_rules=set(),
+                                   known_rules=set(), now=fl.now)
+        self.assertEqual(stage, "verify")
+        return n
+
+    def verification(self, fl, fid):
+        r = fl.conn.execute("SELECT verification, verification_reason FROM findings "
+                            "WHERE work = ? AND id = ?", (fl.work, fid)).fetchone()
+        return r[0], r[1]
+
+    def test_finding_of_superseded_cycle_does_not_block(self):
+        fl = self.lab(cycle=None, finish_act=False)
+        n = self.open_with_finding(fl)
+        fl.commit("src/app.py", SOMMA + "\n\n# dopo\n", "dopo")
+        reviews.supersede(fl.conn, fl.work, n, now=fl.now)
+        self.assertEqual(self.verification(fl, "f-1-1"), ("unverified", "ciclo superato"))
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.OK, r.lines)
+        self.ok_cycle(fl)
+        self.finish_act(fl, at=fl.now + timedelta(seconds=1))
+        r = self.go(fl)
+        self.assertEqual(r.code, 0, r.lines)
+        self.assertEqual(len(self.prs(fl)), 1)
+
+    def test_unverified_review_marks_findings_without_outcome(self):
+        fl = self.lab(cycle=None, finish_act=False)
+        for _ in range(7):
+            k = reviews.open_cycle(fl.conn, fl.work, sha="vecchio", patch_id=None, code="c",
+                                   reviewers=[REVIEWER], now=fl.now)
+            reviews.supersede(fl.conn, fl.work, k, now=fl.now)
+        n = self.open_with_finding(fl)
+        self.assertEqual(n, 8)
+        self.assertIsNone(self.verification(fl, "f-8-1")[0])
+        reviews.mark_unverified(fl.conn, fl.work, n, reviews.UNVERIFIED_REVIEW_REASON,
+                                now=fl.now)
+        phases.set_review_unverified(fl.conn, fl.work, now=fl.now)
+        self.finish_act(fl, at=fl.now + timedelta(seconds=1))
+        r = self.go(fl)
+        self.assertEqual(r.code, 0, r.lines)
+
+
 class OpenForceTest(OpenCase):
     def diverged_lab(self):
         fl = self.lab()

@@ -459,6 +459,24 @@ class ApproveUnverifiedReviewTest(ReviewApplyCase):
         self.assertEqual((w["review_unverified"], w["phase"]), (1, "review"))
         self.assertEqual(self.open_reasons(), [])
 
+    def test_findings_without_outcome_become_unverified(self):
+        fl = self.make(phase="review")
+        self.eight_cycles(7)
+        n = reviews.open_cycle(fl.conn, fl.work, sha="s8", patch_id=None, code="c",
+                               reviewers=[REVIEWER], now=fl.now)
+        reviews.add_report(fl.conn, fl.work, n, source=REVIEWER, outcome="needs_fix",
+                           findings=[{"severity": "major", "confidence": 0.9, "file": "a",
+                                      "line": 1, "rule": "R-1", "text": "t"}],
+                           rejected=[], blocking_rules=set(), known_rules=set(), now=fl.now)
+        self.assertEqual(n, 8)
+        self.open_block(reviews.CAP_REASON)
+        self.act("tollgate:approve", "unverified-review")
+        self.apply()
+        row = fl.conn.execute("SELECT verification, verification_reason FROM findings "
+                              "WHERE work = ? AND id = 'f-8-1'", (fl.work,)).fetchone()
+        self.assertEqual(tuple(row), ("unverified", "revisione non verificata"))
+        self.assertEqual(reviews.unjudged_ids(fl.conn, fl.work, 8), [])
+
 
 class ApproveRebaseTest(ApplyCase):
     def conflict(self, phase):

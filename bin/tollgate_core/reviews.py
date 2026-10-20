@@ -28,6 +28,8 @@ VERIFICATIONS = ("confirmed", "rejected", "unverified")
 MAX_TEXT = 2000
 NO_PROOF = "senza prova (8.6)"
 BEYOND_MAX = "oltre max_findings"
+SUPERSEDED_REASON = "ciclo superato"
+UNVERIFIED_REVIEW_REASON = "revisione non verificata"
 
 
 def latest(conn, work: int) -> sqlite3.Row | None:
@@ -82,13 +84,26 @@ def open_cycle(conn, work: int, *, sha: str, patch_id: str | None, code: str,
         return number
 
 
+def mark_unverified(conn, work: int, cycle: int, reason: str, *, now) -> int:
+    """Porta a `unverified` i rilievi del ciclo ancora senza esito (nessun rilievo registrato
+    resta con `verification` nullo una volta chiuso o superato il ciclo). Dà quanti sono."""
+    with db.tx(conn):
+        ids = unjudged_ids(conn, work, cycle)
+        for fid in ids:
+            conn.execute("UPDATE findings SET verification = 'unverified', "
+                         "verification_reason = ? WHERE work = ? AND id = ?", (reason, work, fid))
+            _log_finding(conn, _finding(conn, work, fid), now=now)
+        return len(ids)
+
+
 def supersede(conn, work: int, cycle: int, *, now) -> None:
     """Chiude un ciclo ancora aperto perché il lavoro è andato avanti (P3b, Task 7): non pesa
-    sul tetto."""
+    sul tetto. I suoi rilievi senza esito diventano `unverified`."""
     with db.tx(conn):
         row = _cycle(conn, work, cycle)
         if row["stage"] == "closed":
             raise ValueError(f"ciclo {cycle} già chiuso")
+        mark_unverified(conn, work, cycle, SUPERSEDED_REASON, now=now)
         conn.execute("UPDATE review_cycles SET outcome = 'superseded', stage = 'closed', "
                      "counted = 0 WHERE work = ? AND number = ?", (work, cycle))
         record_event(conn, "review_cycle", {"number": cycle, "outcome": "superseded",
