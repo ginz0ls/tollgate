@@ -41,8 +41,8 @@ def _plan(ctx, work, wt: Path, rel: str):
                        f"execution. Prossimo passo: /tollgate:execute.")]
     else:
         out += [record("plan_path", work=work["id"], plan_path=rel),
-                inject("tollgate: piano valido. Prossimi passi in L2: plan-adversary, poi "
-                       "/tollgate:approve plan.")]
+                inject("tollgate: piano valido. Prossimo passo in L2: /tollgate:spec-audit "
+                       "(lancia l'avversario del piano), poi /tollgate:approve plan.")]
     return out
 
 

@@ -171,6 +171,9 @@ class PlanCheckHookTest(unittest.TestCase):
             self.assertEqual((w["phase"], w["plan_path"], w["plan_sha"]),
                              ("plan", "docs/superpowers/plans/p.md", None))
             self.assertEqual(scope.paths(lab.conn, lab.work), set())
+            self.assertIn("/tollgate:spec-audit", r.stdout)
+            self.assertIn("/tollgate:approve plan", r.stdout)
+            self.assertNotIn("plan-adversary", r.stdout)
         finally:
             lab.close()
 

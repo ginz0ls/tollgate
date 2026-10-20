@@ -9,15 +9,20 @@ import sqlite3
 from pathlib import Path
 
 from tollgate_analysis import profiles as prof
-from tollgate_core import clock, db, reviews, sessions
+from tollgate_core import audits, clock, db, reviews, sessions
 from tollgate_core.paths import program_command
 from tollgate_core.tasks import STATES
 
-from . import gitw
+from . import audit, gitw
 
-# Prefisso del motivo del blocco -> nome del tetto.
+# Prefisso del motivo del blocco -> nome del tetto. I tetti dell'audit (decisione 20) non sono
+# in `CAP_PREFIXES`: il loro passo è `resolve`, non `approve rounds`.
 CAPS = {"budget superato": "budget del task", "giri di correzione esauriti": "giri di correzione",
-        reviews.CAP_REASON: "cicli di revisione"}
+        reviews.CAP_REASON: "cicli di revisione",
+        audits.CAP_REASONS["spec-adversarial"]: "giri avversariali della spec",
+        audits.CAP_REASONS["plan-adversarial"]: "giri avversariali del piano",
+        audits.CAP_REASONS["spec-lens"]: "audit a lenti",
+        audits.DECLINE_REASON: "audit a lenti"}
 CAP_PREFIXES = ("giri di correzione esauriti sul task", reviews.CAP_REASON)
 MAX_NOTES = 5
 EXCLUDE = "docs/superpowers/reviews/*/checkpoint.md"
@@ -45,9 +50,11 @@ ROUNDS_ASK = ("serve una decisione dell'utente: /tollgate:approve rounds <n>, "
 
 
 def _cap_step(conn, work: int, issue: int) -> str | None:
-    """Tetto dei giri di correzione sul task o dei cicli di revisione (m12, decisione 13)."""
+    """Tetto dei giri di correzione, dei cicli di revisione (m12, decisione 13) o dell'audit."""
     for b in conn.execute("SELECT id, reason FROM blocks WHERE work = ? AND closed IS NULL "
                           "ORDER BY id", (work,)):
+        if audits.cap_kind(b["reason"]) is not None:
+            return audit.STEPS["resolve"].replace("<id>", str(b["id"]))
         if b["reason"].startswith(CAP_PREFIXES):
             return f"{b['reason']}: " + ROUNDS_ASK.format(block=b["id"], issue=issue)
     return None
@@ -110,11 +117,11 @@ def next_step(conn, work: int) -> str:
     prog = program_command(db.BIN_PATH)
     if row is None:
         phase = item["phase"]
+        if item["level"] == "L2" and phase in ("spec_audit", "plan", "approval"):
+            return audit.peek(conn, item)
         if phase == "plan":
             return ("scrivi il piano con superpowers:writing-plans (intestazioni di 7.5), "
                     "committalo, poi /tollgate:execute")
-        if phase in ("spec_audit", "approval"):
-            return f"fase {phase}: percorso L2, arriva con P3c"
         return _closing_step(conn, item, prog)
     k, state = row["number"], row["state"]
     if state == "pending":

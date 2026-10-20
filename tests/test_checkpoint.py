@@ -4,9 +4,9 @@ import unittest
 from tests.flowkit import FlowLab
 from tests.hookkit import T0
 from tests.test_check_session import context_of, start_payload
-from tollgate_core import db, phases, reviews, tasks
+from tollgate_core import audits, db, phases, reviews, tasks
 from tollgate_core.paths import program_command
-from tollgate_flow import checkpoint
+from tollgate_flow import audit, checkpoint
 
 
 class CheckpointCase(unittest.TestCase):
@@ -95,8 +95,6 @@ class CheckpointCase(unittest.TestCase):
         got = step("plan")
         for needle in ("superpowers:writing-plans", "7.5", "committalo", "/tollgate:execute"):
             self.assertIn(needle, got)
-        for phase in ("spec_audit", "approval"):
-            self.assertIn("P3c", step(phase))
         self.assertIn("/tollgate:finish", step("execution"))
 
     def test_notes_kept_last_five(self):
@@ -277,3 +275,81 @@ class CheckpointCase(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CheckpointL2Case(unittest.TestCase):
+    """Fasi del percorso L2 (decisione 20): il passo è quello di `audit prepare`, senza giri."""
+
+    def setUp(self):
+        self.fl = FlowLab(issue=7, level="L2", phase="spec_audit")
+        self.addCleanup(self.fl.close)
+        self.conn, self.work = self.fl.conn, self.fl.work
+        self.prog = program_command(db.BIN_PATH)
+
+    def set_phase(self, phase):
+        self.conn.execute("UPDATE work_items SET phase = ? WHERE id = ?", (phase, self.work))
+        self.conn.commit()
+
+    def step(self):
+        return checkpoint.next_step(self.conn, self.work)
+
+    def block(self, reason):
+        return phases.open_block(self.conn, self.fl.ts.state, self.work, "needs_you", reason,
+                                 now=T0)
+
+    def test_l2_phases_point_to_audit_prepare(self):
+        got = self.step()
+        self.assertNotIn("P3c", got)
+        self.assertEqual(got, audit.STEPS["write_spec"].replace("<programma>", self.prog))
+        self.fl.write_spec()
+        self.assertIn(f"{self.prog} audit prepare", self.step())
+        self.assertNotIn("P3c", self.step())
+        self.fl.approve_spec_file()
+        self.set_phase("plan")
+        got = self.step()
+        self.assertEqual(got, audit.STEPS["write_plan"].replace("<programma>", self.prog))
+        self.assertNotIn("/tollgate:execute", got)
+        self.fl.write_l2_plan()
+        got = self.step()
+        self.assertIn(f"{self.prog} audit prepare", got)
+        self.assertNotIn("/tollgate:execute", got)
+
+    def test_approval_points_to_approve_plan(self):
+        self.set_phase("approval")
+        self.assertEqual(self.step(), audit.STEPS["approve_plan"])
+        self.assertIn("/tollgate:approve plan", self.step())
+
+    def test_audit_caps_in_stopped_by(self):
+        b1 = self.block(audits.cap_reason("spec-adversarial", 3))
+        b2 = self.block(audits.cap_reason("plan-adversarial", 2))
+        b3 = self.block(audits.cap_reason("spec-lens", 0))
+        b4 = self.block(audits.DECLINE_REASON)
+        self.assertEqual(checkpoint.stopped_by(self.conn, self.work), [
+            f"tetto: giri avversariali della spec (blocco {b1})",
+            f"tetto: giri avversariali del piano (blocco {b2})",
+            f"tetto: audit a lenti (blocco {b3})",
+            f"tetto: audit a lenti (blocco {b4})"])
+
+    def test_audit_cap_step_is_resolve_not_rounds(self):
+        for reason in (audits.cap_reason("spec-adversarial", 3), audits.DECLINE_REASON,
+                       audits.cap_reason("spec-lens", 0)):
+            b = self.block(reason)
+            got = self.step()
+            self.assertEqual(got, audit.STEPS["resolve"].replace("<id>", str(b)), reason)
+            self.assertNotIn("approve rounds", got)
+            phases.close_block(self.conn, self.fl.ts.state, b, "chiuso a mano", now=T0)
+
+    def test_steps_use_program_command(self):
+        subcommand = "audit prepare"
+        steps = [self.step()]
+        self.fl.write_spec()
+        steps.append(self.step())
+        self.fl.approve_spec_file()
+        self.set_phase("plan")
+        steps.append(self.step())
+        self.fl.write_l2_plan()
+        steps.append(self.step())
+        for st in steps:
+            self.assertEqual(st.count(f"{self.prog} {subcommand}"), st.count(subcommand), st)
+            self.assertTrue(st.count(subcommand), st)
+            self.assertNotIn(str(db.BIN_PATH), st.replace(self.prog, ""))
