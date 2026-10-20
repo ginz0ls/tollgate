@@ -79,10 +79,9 @@ def _review(conn, work, cfg, wt, base, head, comps) -> _Review:
     if last is not None:
         patch = git.patch_id(wt, base, head)
         same = last["sha"] == head or (patch is not None and last["patch_id"] == patch)
-    ok = bool(work["review_unverified"]) or (
-        same and last["stage"] == "closed" and last["outcome"] == "ok")
-    # con la revisione non verificata il lavoro va avanti com'è: i rilievi dei cicli non contano
-    on_head = same and last["stage"] == "closed" and not work["review_unverified"]
+    on_head = same and last["stage"] == "closed"
+    ok = bool(work["review_unverified"]) or (on_head and last["outcome"] == "ok")
+    # anche con la revisione non verificata la DoD guarda l'ultimo ciclo chiuso su HEAD (8.7)
     specialists = ([r for r in json.loads(last["reviewers"]) if r != REVIEWER]
                    if on_head else [])
     return _Review(True, ok, last if same else None, last["number"] if on_head else 0, specialists)
@@ -261,10 +260,12 @@ def _publish(state, conn, work, wt, main, branch, head, remote, diverged, open_p
     if remote != head:
         lease = None
         if diverged:
-            if intents.take_force(conn, work["id"], now=now) is None:
+            if not intents.force_authorized(conn, work["id"]):
                 raise gitw.GitWriteError("l'autorizzazione al push forzato non c'è più")
             lease = remote
         gitw.push_sha(wt, head, branch, lease=lease)
+        if diverged:        # si consuma solo a push riuscito: un guasto non la perde
+            intents.take_force(conn, work["id"], now=now)
         if gitw.remote_sha(wt, branch) != head:
             raise gitw.GitWriteError(f"dopo il push il ramo {branch} di origin non punta a "
                                      f"{head[:7]}")

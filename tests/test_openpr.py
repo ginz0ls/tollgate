@@ -456,6 +456,77 @@ class OpenRefusalTest(OpenCase):
         self.assertIsNone(gitw.remote_sha(fl.wt, BRANCH))
 
 
+class OpenUnverifiedTest(OpenCase):
+    def test_unverified_review_still_stops_on_confirmed_blocker(self):
+        fl = self.lab(cycle=None)
+        base = work(fl)["work_base_sha"]
+        for _ in range(7):
+            n = reviews.open_cycle(fl.conn, fl.work, sha="vecchio", patch_id=None, code="c",
+                                   reviewers=[REVIEWER], now=fl.now)
+            reviews.supersede(fl.conn, fl.work, n, now=fl.now)
+        n = reviews.open_cycle(fl.conn, fl.work, sha=head(fl),
+                               patch_id=core_git.patch_id(fl.wt, base, head(fl)), code="c8",
+                               reviewers=[REVIEWER], now=fl.now)
+        self.assertEqual(n, 8)
+        reviews.add_report(fl.conn, fl.work, n, source=REVIEWER, outcome="needs_fix",
+                           findings=[{"severity": "major", "confidence": 0.9, "file": "src/app.py",
+                                      "line": 2, "rule": "R-1", "text": "manca lo zero"}],
+                           rejected=[], blocking_rules=set(), known_rules=set(), now=fl.now)
+        rows = reviews.to_verify(fl.conn, fl.work, n, max_findings=15, now=fl.now)
+        reviews.apply_verification(fl.conn, fl.work, n, [
+            {"id": r["id"], "verification": "confirmed", "reason": "ok"} for r in rows],
+            now=fl.now)
+        reviews.close_cycle(fl.conn, fl.ts.state, fl.work, n, now=fl.now)
+        self.assertEqual(self.check(fl).code, finishcheck.OK)       # di nuovo in review
+        phases.set_review_unverified(fl.conn, fl.work, now=fl.now)
+        self.finish_act(fl, at=fl.now + timedelta(seconds=1))
+        r = self.go(fl)
+        self.assertEqual(r.code, 1, r.lines)
+        self.assertIn("Nessun rilievo", " ".join(self.refusals(r)))
+        self.assertEqual(self.prs(fl), [])
+        reviews.set_decision(fl.conn, fl.work, "f-8-1", "dismissed", now=fl.now)
+        r = self.go(fl)
+        self.assertEqual(r.code, 0, r.lines)
+        body = self.prs(fl)[0]["body"]
+        self.assertIn("non verificata", body)
+        block = prblock.parse(body)
+        self.assertTrue(block["verdict"]["unverified"])
+        self.assertTrue(block["dod"]["items"]["findings"])
+
+    def test_unverified_without_closed_cycle_passes_with_null_outcome(self):
+        fl = self.lab(cycle=None)
+        phases.set_review_unverified(fl.conn, fl.work, now=fl.now)
+        r = self.go(fl)
+        self.assertEqual(r.code, 0, r.lines)
+        self.assertIsNone(prblock.parse(self.prs(fl)[0]["body"])["verdict"]["outcome"])
+
+
+class OpenForceTest(OpenCase):
+    def diverged_lab(self):
+        fl = self.lab()
+        fl.git("commit", "--allow-empty", "-qm", "altrove")
+        fl.git("push", "-q", "origin", f"HEAD:refs/heads/{BRANCH}")
+        fl.git("reset", "-q", "--hard", "HEAD~1")
+        key = intents.authorize_force(fl.conn, fl.work, reason="rebase", now=fl.now)
+        return fl, key
+
+    def force_state(self, fl, key):
+        return fl.conn.execute("SELECT state FROM intents WHERE idempotency_key = ?",
+                               (key,)).fetchone()[0]
+
+    def test_failed_push_keeps_force_authorization(self):
+        fl, key = self.diverged_lab()
+        with mock.patch.object(gitw, "push_sha", side_effect=gitw.GitWriteError("rete assente")):
+            r = self.go(fl)
+        self.assertEqual(r.code, 1, r.lines)
+        self.assertEqual(self.force_state(fl, key), "authorized")
+        self.assertEqual(self.prs(fl), [])
+        r = self.go(fl)
+        self.assertEqual(r.code, 0, r.lines)
+        self.assertEqual(self.force_state(fl, key), "used")
+        self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), head(fl))
+
+
 class OpenResumeTest(OpenCase):
     def test_interrupted_after_push_no_duplicate_pr(self):
         fl = self.lab(fail=["pr create"])

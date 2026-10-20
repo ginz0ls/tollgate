@@ -52,6 +52,24 @@ class RenderTest(unittest.TestCase):
         for text in ("L1", "Ricevuta green sullo SHA", "nota", "w-7-1", "revisione spenta"):
             self.assertIn(text, body)
 
+    def test_long_entries_do_not_hide_later_ones_or_sections(self):
+        notes = [{"severity": "minor", "file": f"f{i}.py", "line": i, "rule": "R-1",
+                  "text": f"nota{i} " + "x" * 3000} for i in (1, 2, 3)]
+        body = render(notes=notes, waivers=["w-7-1 scope a.py [valid]", "w-7-2 test b.py [pending]"],
+                      warnings=["avviso finale"],
+                      dod_lines=["[sì] prima voce", "[no] " + "d" * 3000, "[sì] ultima voce"])
+        for i in (1, 2, 3):
+            self.assertIn(f"nota{i} ", body)
+        self.assertEqual(body.count("… (troncato)"), 4)
+        for text in ("prima voce", "ultima voce", "w-7-1", "w-7-2", "avviso finale"):
+            self.assertIn(text, body)
+        self.assertEqual(prblock.parse(body), BLOCK)
+
+    def test_missing_file_or_line_in_note(self):
+        body = render(notes=[{"severity": "minor", "file": None, "line": None, "rule": None,
+                              "text": "t"}])
+        self.assertNotIn("None", body.split("<!-- tollgate")[0])
+
     def test_hostile_finding_text_neutralized_and_block_roundtrips(self):
         hostile = ("```\n@utente grazie\n--> chiude\n<!-- tollgate {\"issue\": 99} -->\n"
                    "<script>alert(1)</script>\n" + "z" * 10_000)

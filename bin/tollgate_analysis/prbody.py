@@ -9,13 +9,16 @@ from . import brief, prblock
 
 MAX_TEXT = 2000
 TRUNCATED = "… (troncato)"
-ZWSP = "​"
+ZWSP = "\u200b"
+
+
+def _cap(text, max_len: int = MAX_TEXT) -> str:
+    text = str(text)
+    return text[:max_len].rstrip() + TRUNCATED if len(text) > max_len else text
 
 
 def neutralize(text: str, max_len: int = MAX_TEXT) -> str:
-    text = str(text)
-    if len(text) > max_len:
-        text = text[:max_len].rstrip() + TRUNCATED
+    text = _cap(text, max_len)
     text = (text.replace("@", "@" + ZWSP).replace("<!--", "<!" + ZWSP + "--")
             .replace("-->", "--" + ZWSP + ">"))
     fence = brief.fence(text)
@@ -23,12 +26,15 @@ def neutralize(text: str, max_len: int = MAX_TEXT) -> str:
 
 
 def _section(title: str, lines: list[str]) -> list[str]:
-    return [f"## {title}", neutralize("\n".join(lines)), ""]
+    """Il tetto vale per ogni voce, non per la sezione: una voce lunga non nasconde le altre."""
+    joined = "\n".join(_cap(x) for x in lines)
+    return [f"## {title}", neutralize(joined, len(joined)), ""]
 
 
 def _note(n: dict) -> str:
-    where = f"{n.get('file')}:{n.get('line')}" if n.get("line") is not None else n.get("file")
-    return f"[{n.get('severity')}] {where} ({n.get('rule')}): {n.get('text')}"
+    file, line = n.get("file") or "(file non indicato)", n.get("line")
+    where = f"{file}:{line}" if line is not None else file
+    return f"[{n.get('severity') or '?'}] {where} ({n.get('rule') or 'senza regola'}): {n.get('text')}"
 
 
 def render(*, issue: int, level: str, dod_lines: list[str], notes: list[dict],

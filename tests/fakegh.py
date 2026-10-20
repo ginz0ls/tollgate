@@ -162,7 +162,11 @@ def main(argv):
         if _flag(argv, "--jq") is None or "prs" not in data:
             _fail("api --paginate pulls vuole --jq e prs nei dati")
         for p in data["prs"]:
-            print(json.dumps({k: p.get(k) for k in PULLS_FIELDS}, separators=(",", ":")))
+            out = {k: p.get(k) for k in PULLS_FIELDS}
+            if p.get("mergedAt"):       # il jq normalizza: unita = MERGED, il resto maiuscolo
+                out["state"] = "MERGED"
+            out["state"] = (out["state"] or "").upper()
+            print(json.dumps(out, separators=(",", ":")))
         return 0
     if argv[:1] == ["api"] and len(argv) > 1:
         m = _COMMITS_STATUS.match(argv[1])

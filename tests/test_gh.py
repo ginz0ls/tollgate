@@ -99,7 +99,8 @@ class PrReadTest(FakeGhCase):
         self.assertEqual(argv[:2], ["api", "--paginate"])
         self.assertEqual(argv[2], "repos/{owner}/{repo}/pulls?state=all&per_page=100")
         self.assertEqual(argv[3], "--jq")
-        self.assertEqual(argv[4], ".[] | {number, headRefName: .head.ref, state, url: .html_url}")
+        self.assertEqual(argv[4], ".[] | {number, headRefName: .head.ref, state: (if .merged_at "
+                         'then "MERGED" else (.state | ascii_upcase) end), url: .html_url}')
         self.assertEqual(len(gh.prs_for_branch_prefix(self.state, self.tmp, "tg/")), 251)
 
 

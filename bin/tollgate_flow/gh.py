@@ -125,7 +125,10 @@ def issue(state, repo, n: int) -> Issue:
                  author_association=text("author_association").upper())
 
 
-PR_JQ = ".[] | {number, headRefName: .head.ref, state, url: .html_url}"
+# L'API REST dà `state` in minuscolo e il merge solo in `merged_at`: si porta alla forma di
+# `gh pr list` (OPEN, CLOSED, MERGED), che si aspettano `start` e i task successivi.
+PR_JQ = (".[] | {number, headRefName: .head.ref, state: (if .merged_at then \"MERGED\" else "
+         "(.state | ascii_upcase) end), url: .html_url}")
 
 
 def prs_for_branch_prefix(state, repo, prefix: str) -> list[dict]:
