@@ -8,7 +8,7 @@ from pathlib import Path
 
 from tollgate_analysis import level as lv, profiles as prof
 from tollgate_analysis.protected import is_protected
-from tollgate_core import config, git, reviews, subagents, violations
+from tollgate_core import audits, config, git, reviews, subagents, violations
 from tollgate_core.paths import program_command, repo_key
 from tollgate_hooks.adapter import edit_path
 from tollgate_hooks.model import inject, record
@@ -123,6 +123,27 @@ def awaiting_final(ctx, row):
     if cycle["stage"] == "verify" and row["type"] == reviews.VERIFIER:
         return work, cycle, "verifier"
     return None
+
+
+def awaiting_audit(ctx, row):
+    """Il giro di audit aperto del lavoro del subagente, se è l'agente di quel giro: tipo
+    giusto (`audits.AGENTS`), riga `running` o `interrupted` e `started` non nullo e non
+    precedente a `opened` (decisione 4: l'agente di un giro superato non appartiene al nuovo).
+    Altrimenti None."""
+    if row["state"] not in ("running", "interrupted") or row["started"] is None:
+        return None
+    if row["work"] is not None:
+        work = ctx.db.execute("SELECT * FROM work_items WHERE id = ?", (row["work"],)).fetchone()
+    else:
+        work = governing_work(ctx, ctx.event.cwd)
+    if work is None:
+        return None
+    rnd = ctx.db.execute("SELECT * FROM spec_audit WHERE work = ? AND stage = 'open' "
+                         "ORDER BY id LIMIT 1", (work["id"],)).fetchone()
+    if rnd is None or rnd["opened"] is None or row["type"] != audits.AGENTS[rnd["kind"]] \
+            or row["started"] < rnd["opened"]:
+        return None
+    return rnd
 
 
 def repo_key_of(repo) -> str | None:

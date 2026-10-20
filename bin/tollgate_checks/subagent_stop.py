@@ -1,6 +1,6 @@
 """SubagentStop (spec 7.2, 8.1, 6.3, 7.3): implementatori e sola lettura. Il revisore del task in
-attesa è di `task_verdict`, i revisori finali e il verificatore in attesa di `final_review`;
-gli avversari sono di P3b."""
+attesa è di `task_verdict`, i revisori finali e il verificatore in attesa di `final_review`,
+gli agenti di un giro di audit aperto (avversari e auditor di spec e piano) di `audit_round`."""
 from __future__ import annotations
 
 import json
@@ -64,8 +64,9 @@ def decide(event, ctx):
     work = ctx.db.execute("SELECT * FROM work_items WHERE id = ?",
                           (row["work"],)).fetchone() if row["work"] is not None else None
     if ctx.readonly(event.agent_type):
-        if _common.awaiting_review(ctx, row) or _common.awaiting_final(ctx, row):
-            return []      # lo chiude task_verdict (decisione 11) o final_review
+        if _common.awaiting_review(ctx, row) or _common.awaiting_final(ctx, row) \
+                or _common.awaiting_audit(ctx, row):
+            return []      # lo chiude task_verdict (decisione 11), final_review o audit_round
         return _readonly(ctx, row, work)
     msg = event.raw.get("last_assistant_message")
     # Il report resta nel DB anche in modalità manuale: `review-prepare` ne legge i dubbi.

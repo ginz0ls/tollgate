@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import getpass
+import os
 
 from pathlib import Path
 
-from tollgate_analysis import profiles as prof
-from tollgate_core import (acts, effects, events, git, phases, reviews, scope, sessions,
+from tollgate_analysis import approvals, auditrules, brief, profiles as prof
+from tollgate_core import (acts, audits, effects, events, git, phases, reviews, scope, sessions,
                            subagents, tasks)
+
+REPORT_MAX_CHARS = 60000
 
 
 def _actor() -> str | None:
@@ -117,6 +120,105 @@ def _finding_verify(conn, state, ctx, d):
         reviews.verifier_incomplete(conn, state, wid, n, now=ctx.now, session=ctx.event.session)
 
 
+def _write_atomic(path: Path, text: str) -> None:
+    """Scrive `path` con un file temporaneo accanto e `os.replace`; `OSError` se non riesce."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def _report_body(title: str, msg: str, extra: list[str]) -> str:
+    """Corpo del report: i rilievi meccanici e il messaggio dell'agente (testo non fidato, in
+    un recinto, troncato a `REPORT_MAX_CHARS`)."""
+    cut = len(msg) - REPORT_MAX_CHARS
+    if cut > 0:
+        msg = msg[:REPORT_MAX_CHARS]
+    out = [f"# {title}", ""]
+    out += [f"rilievo meccanico: {line}" for line in extra]
+    out += ["", brief.DATA_NOTE, "", brief.fence(msg), msg, brief.fence(msg)]
+    if cut > 0:
+        out += ["", f"(messaggio troncato: {cut} caratteri omessi)"]
+    return "\n".join(out) + "\n"
+
+
+def _audit_veto(conn, ctx, wid, reason: str) -> None:
+    events.record_event(conn, "veto", {"event": "subagent_stop", "rule": "audit_round",
+                                       "reason": reason}, now=ctx.now,
+                        session=ctx.event.session or None, work=wid)
+
+
+def _cap_block(conn, state, ctx, wid, kind: str, number: int, counts: dict) -> None:
+    """Blocchi dei tetti (decisione 7), contando i giri chiusi non `superseded` del tipo. Il
+    tetto dei cicli a lenti si confronta per uguaglianza: i cicli di conferma oltre il tetto
+    non lo riaprono."""
+    done = len(audits.rounds(conn, wid, kind))
+    if kind == "spec-adversarial":
+        hit = done >= ctx.cfg("spec_audit.spec_rounds") and not auditrules.is_clean(counts)
+    elif kind == auditrules.PLAN_KIND:
+        hit = done >= ctx.cfg("spec_audit.plan_rounds") and not auditrules.is_clean(counts)
+    else:
+        rows = audits.rounds(conn, wid, kind)
+        closed = auditrules.lens_state([(r["viewpoint"], r["outcome"]) for r in rows]).closed
+        hit = done == ctx.cfg("spec_audit.spec_audit_cycles") and not closed
+    if hit:
+        phases.open_block(conn, state, wid, "needs_you", audits.cap_reason(kind, number),
+                          now=ctx.now, session=ctx.event.session)
+
+
+def _audit_report(conn, state, ctx, d):
+    """Report valido di un giro (decisione 5): scrive il file, chiude il giro, rigenera lo stato
+    delle lenti, apre i blocchi dei tetti. Un giro non più aperto con quel numero (superato o
+    chiuso: una corsa) si ignora; una scrittura che fallisce lascia il giro aperto. In entrambi i
+    casi un evento `veto`, mai un'eccezione."""
+    wid, kind, number = d["work"], d["kind"], d["number"]
+    rnd = conn.execute("SELECT * FROM spec_audit WHERE work = ? AND kind = ? AND number = ? "
+                       "AND stage = 'open'", (wid, kind, number)).fetchone()
+    if rnd is None:
+        _audit_veto(conn, ctx, wid, "giro non più aperto")
+        return
+    work = phases.get_work(conn, wid)
+    counts = d["counts"]
+    outcome = auditrules.outcome(counts)
+    rel = f"{approvals.REVIEWS_DIR}/{work['issue']}/{kind}-{number}.md"
+    fields = {"schema_version": 1, "kind": kind, "number": number, "viewpoint": rnd["viewpoint"],
+              "spec_sha": rnd["spec_sha"]}
+    if kind == auditrules.PLAN_KIND:
+        fields["plan_sha"] = rnd["sha"]
+    fields.update(counts=counts, outcome=outcome)
+    title = f"Report {kind} {number}, lavoro #{work['issue']}"
+    wt = Path(work["worktree"]) if work["worktree"] else None
+    try:
+        if wt is None or not wt.is_dir():
+            raise FileNotFoundError("worktree assente")
+        _write_atomic(wt / rel, approvals.render_report(
+            fields, _report_body(title, d["body"], d.get("extra") or [])))
+    except OSError as e:
+        _audit_veto(conn, ctx, wid, f"report non scritto: {e}")
+        return
+    audits.close_round(conn, wid, kind=kind, number=number, counts=counts, outcome=outcome,
+                       report_path=rel, now=ctx.now)
+    if kind == auditrules.LENS_KIND:
+        lens = auditrules.lens_state([(r["viewpoint"], r["outcome"])
+                                      for r in audits.rounds(conn, wid, kind)])
+        text = auditrules.render_lens_status(
+            lens, issue=work["issue"], cap=ctx.cfg("spec_audit.spec_audit_cycles"),
+            suspended=kind in audits.suspended(conn, wid))
+        try:
+            _write_atomic(wt / approvals.REVIEWS_DIR / str(work["issue"]) / "spec-lens-stato.md",
+                          text)
+        except OSError as e:
+            _audit_veto(conn, ctx, wid, f"stato delle lenti non scritto: {e}")
+    _cap_block(conn, state, ctx, wid, kind, number, counts)
+
+
 _OPS = {
     "event": lambda c, s, x, d: events.record_event(c, d["type"], d.get("data"), now=x.now,
                                                     session=x.event.session, work=d.get("work")),
@@ -163,6 +265,7 @@ _OPS = {
     "effect_execute": _effect_execute,
     "review_report": _review_report,
     "finding_verify": _finding_verify,
+    "audit_report": _audit_report,
 }
 OPS = frozenset(_OPS)
 

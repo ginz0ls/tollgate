@@ -10,11 +10,11 @@ from datetime import timedelta
 from pathlib import Path
 
 from tests.helpers import BIN, ROOT, git
-from tests.hookkit import DEFAULT_FILES, DEFAULT_TOML, Lab
+from tests.hookkit import DEFAULT_FILES, DEFAULT_TOML, Lab, sample
 from tests.test_check_post_edit import SECTIONS
 from tollgate_analysis import approvals, auditrules
 from tollgate_core import (VERSION, audits, clock, events, git as core_git, phases, sessions,
-                           tasks as task_store)
+                           subagents, tasks as task_store)
 
 SESSION = "sess-flow"
 ORIGIN_URL = "https://github.com/prova/flow.git"
@@ -87,6 +87,19 @@ def spec_text(slices: int = 1, pitch: bool = True, note: str = "") -> str:
     if note:
         out += ["", note]
     return "\n".join(out) + "\n"
+
+
+def round_message(row, counts: dict | None = None, *, kind: str | None = None) -> str:
+    """Il messaggio finale di un agente di giro: un po' di prosa e la riga JSON della decisione 5
+    con `code` e SHA della riga `spec_audit` `row`. `kind` sostituisce il tipo dichiarato."""
+    kind = kind or row["kind"]
+    data = {"v": 1, "kind": kind, "number": row["number"],
+            "viewpoint": row["viewpoint"] if kind == auditrules.LENS_KIND else None,
+            "spec_sha": row["spec_sha"]}
+    if kind == auditrules.PLAN_KIND:
+        data["plan_sha"] = row["sha"]
+    data.update(code=row["code"], counts={**ZERO_COUNTS, **(counts or {})})
+    return "Riepilogo dei rilievi.\n" + json.dumps(data)
 
 
 class FlowLab:
@@ -234,6 +247,39 @@ class FlowLab:
                            report_path=f"docs/superpowers/reviews/7/{kind}-{number}.md",
                            now=self.lab.now)
         return number
+
+    def report_round(self, kind: str | None = None, counts: dict | None = None, *,
+                     bad_json: bool = False, cut: bool = False) -> subprocess.CompletedProcess:
+        """L'agente del giro aperto riporta: `SubagentStart` (solo se non è già partito: una
+        seconda chiamata è un altro `SubagentStop` della stessa riga, quindi un altro veto) e
+        `SubagentStop` con la riga JSON giusta, attraverso `hookkit.Lab.hook`. `kind` cambia il
+        tipo dell'agente e dichiarato (default: quello del giro), `counts` completa i conteggi a
+        zero, `bad_json` manda solo prosa, `cut` tronca il messaggio a metà della riga JSON.
+        **Orologio:** `audit prepare` dalla CLI usa l'ora reale, gli hook del banco quella di
+        `hookkit`: alla partenza `self.lab.now` diventa `opened` del giro più un secondo (può
+        tornare indietro rispetto a prima, se il banco era già avanti), così `started >= opened`.
+        Restituisce l'esito dello `SubagentStop` come `CompletedProcess` (`returncode` = uscita
+        dell'hook)."""
+        row = audits.open_round_row(self.conn, self.work)
+        if row is None:
+            raise AssertionError("nessun giro aperto")
+        kind = kind or row["kind"]
+        agent_id, agent_type = f"a-{kind}-{row['number']}", audits.AGENTS[kind]
+        sub = subagents.get(self.conn, agent_id)
+        if sub is None or sub["started"] is None:
+            self.lab.now = clock.parse(row["opened"]) + timedelta(seconds=1)
+            self.lab.hook(sample("SubagentStart-none", session_id=SESSION, cwd=str(self.wt),
+                                 agent_id=agent_id, agent_type=agent_type))
+        msg = round_message(row, counts, kind=kind)
+        if bad_json:
+            msg = "Ho letto il documento: niente di grave, ecco la prosa senza la riga JSON."
+        elif cut:
+            msg = msg[:-25]
+        payload = sample("SubagentStop-manual-normal", session_id=SESSION, cwd=str(self.wt),
+                         agent_id=agent_id, agent_type=agent_type, last_assistant_message=msg,
+                         agent_transcript_path="/non/esiste.jsonl")
+        r = self.lab.hook(payload)
+        return subprocess.CompletedProcess(["SubagentStop"], r.exit, r.stdout, r.stderr)
 
     def close_tasks(self) -> None:
         """Ogni task del lavoro `done` con verdetto `approved`, passando per le transizioni."""
