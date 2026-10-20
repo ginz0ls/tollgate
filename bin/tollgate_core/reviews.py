@@ -263,6 +263,33 @@ def set_decision(conn, work: int, finding_id: str, decision: str, *, now, sessio
         _log_finding(conn, _finding(conn, work, finding_id), now=now, session=session)
 
 
+def recompute_outcome(conn, work: int, cycle: int, *, now) -> str:
+    """Ricalcola l'esito di un ciclo già chiuso dopo `approve finding` (Task 10, M2): `ok` se non
+    resta un rilievo bloccante aperto, altrimenti `needs_fix`; aggiorna `outcome` e
+    `findings_confirmed`. Non cambia fase né blocchi (a quelli pensa `actapply`) e non
+    richiama `close_cycle`. Un ciclo `needs_you`, `superseded` o ancora aperto non si
+    ricalcola: `needs_you` resta com'è, gli altri sono `ValueError`."""
+    with db.tx(conn):
+        row = _cycle(conn, work, cycle)
+        if row["stage"] != "closed":
+            raise ValueError(f"ciclo {cycle} non ancora chiuso")
+        if row["outcome"] == "needs_you":
+            return "needs_you"
+        if row["outcome"] not in ("ok", "needs_fix"):
+            raise ValueError(f"ciclo {cycle}: esito {row['outcome']} non ricalcolabile")
+        outcome = "needs_fix" if blocking_open(conn, work, cycle) else "ok"
+        confirmed = conn.execute("SELECT count(*) FROM findings WHERE work = ? AND cycle = ? "
+                                 "AND verification = 'confirmed' AND (user_decision IS NULL "
+                                 "OR user_decision <> 'dismissed')", (work, cycle)).fetchone()[0]
+        if (outcome, confirmed) != (row["outcome"], row["findings_confirmed"]):
+            conn.execute("UPDATE review_cycles SET outcome = ?, findings_confirmed = ? "
+                         "WHERE work = ? AND number = ?", (outcome, confirmed, work, cycle))
+            record_event(conn, "review_cycle", {"number": cycle, "outcome": outcome,
+                                                "findings_confirmed": confirmed},
+                         now=now, work=work)
+        return outcome
+
+
 def _has_open_block(conn, work: int, reason: str) -> bool:
     return conn.execute("SELECT 1 FROM blocks WHERE work = ? AND closed IS NULL AND reason = ?",
                         (work, reason)).fetchone() is not None

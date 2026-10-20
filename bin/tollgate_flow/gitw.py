@@ -154,6 +154,13 @@ def is_ancestor(repo, a: str, b: str) -> bool:
     return _run(repo, "merge-base", "--is-ancestor", a, b).returncode == 0
 
 
+def merge_base(repo, a: str, b: str) -> str | None:
+    """Il miglior antenato comune di `a` e `b`; `None` se non c'è o se un riferimento manca."""
+    r = _run(repo, "merge-base", a, b)
+    out = r.stdout.strip()
+    return out if r.returncode == 0 and out else None
+
+
 def worktree_dir(main: Path, branch: str) -> Path:
     """`<checkout principale>/.claude/worktrees/tg-<N>-<slug>` (decisione 4)."""
     return main / ".claude" / "worktrees" / branch.replace("/", "-")

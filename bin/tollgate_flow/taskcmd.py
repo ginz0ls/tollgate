@@ -16,7 +16,7 @@ from tollgate_core.paths import program_command
 
 from . import prereq
 
-MAX_FIX_ROUNDS = 5
+MAX_FIX_ROUNDS = tasks.BASE_FIX_ROUNDS
 MODEL_HINT = "inherit"
 
 
@@ -101,7 +101,7 @@ def _task_start(state, conn, cwd: Path, number: int, *, fix: bool, claude_dir: P
     except ValueError as e:
         raise TaskError(f"task {number} inesistente nel lavoro #{work['issue']}") from e
     _check_state(row, number, fix)
-    if fix and row["fix_rounds"] >= MAX_FIX_ROUNDS:
+    if fix and row["fix_rounds"] >= MAX_FIX_ROUNDS + row["extra_fix_rounds"]:
         reason = f"giri di correzione esauriti sul task {number}"
         phases.open_block(conn, state, work["id"], "needs_you", reason, now=now)
         raise TaskError(f"{reason}: serve una decisione dell'utente (aperto un blocco needs_you)")

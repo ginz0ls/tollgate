@@ -281,6 +281,45 @@ class CloseTest(ReviewsCase):
                                  (self.w,)).fetchall()
 
 
+class RecomputeOutcomeTest(ReviewsCase):
+    def setup_cycle(self, n_findings=1):
+        c = self.open()
+        self.report(c, [finding() for _ in range(n_findings)], outcome="needs_fix")
+        self.confirm_all(c)
+        reviews.close_cycle(self.conn, self.t.state, self.w, c, now=T0)
+        return c
+
+    def row(self, c):
+        return self.conn.execute("SELECT * FROM review_cycles WHERE work = ? AND number = ?",
+                                 (self.w, c)).fetchone()
+
+    def test_dismissal_turns_needs_fix_into_ok_without_touching_phase(self):
+        c = self.setup_cycle()
+        self.assertEqual(self.phase(), "execution")
+        reviews.set_decision(self.conn, self.w, "f-1-1", "dismissed", now=T0)
+        self.assertEqual(reviews.recompute_outcome(self.conn, self.w, c, now=T0), "ok")
+        self.assertEqual((self.row(c)["outcome"], self.row(c)["stage"]), ("ok", "closed"))
+        self.assertEqual(self.row(c)["findings_confirmed"], 0)      # l'archiviato non conta
+        self.assertEqual(self.row(c)["counted"], 1)                 # il ciclo pesa ancora
+        self.assertEqual(self.phase(), "execution")
+        self.assertEqual(self.conn.execute("SELECT count(*) FROM blocks").fetchone()[0], 0)
+        ev = [e for e in events.export_events(self.conn, 0) if e["type"] == "review_cycle"]
+        self.assertEqual(ev[-1]["data"], {"number": 1, "outcome": "ok", "findings_confirmed": 0})
+
+    def test_still_blocking_stays_needs_fix(self):
+        c = self.setup_cycle(2)
+        reviews.set_decision(self.conn, self.w, "f-1-1", "dismissed", now=T0)
+        self.assertEqual(reviews.recompute_outcome(self.conn, self.w, c, now=T0), "needs_fix")
+
+    def test_needs_you_and_open_cycles_are_not_recomputed(self):
+        c = self.open()
+        with self.assertRaises(ValueError):
+            reviews.recompute_outcome(self.conn, self.w, c, now=T0)
+        self.report(c, [], outcome="needs_you")
+        reviews.close_cycle(self.conn, self.t.state, self.w, c, now=T0)
+        self.assertEqual(reviews.recompute_outcome(self.conn, self.w, c, now=T0), "needs_you")
+
+
 class DecisionTest(ReviewsCase):
     def confirmed(self, severity="major"):
         c = self.open()

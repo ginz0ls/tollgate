@@ -22,6 +22,8 @@ _TRANSITIONS = {
 }
 TASK_EVENTS = tuple(sorted({e for _, e in _TRANSITIONS}))
 _VERDICT = {"fix": "changes", "approved": "approved"}
+BASE_FIX_ROUNDS = 5       # giri di correzione senza deroghe (P3a)
+MAX_FIX_ROUNDS = 8        # tetto in tutto, con `approve rounds` (decisione 13)
 VERDICTS = ("approved", "changes")
 
 
@@ -80,6 +82,23 @@ def task_event(conn, work: int, number: int, event: str, *, now, session=None) -
                      "WHERE work = ? AND number = ?", (new, fix_rounds, verdict, work, number))
         _log(conn, get_task(conn, work, number), now=now, session=session)
     return new
+
+
+def add_extra_rounds(conn, work: int, number: int, n: int) -> int:
+    """Giri di correzione concessi oltre i cinque (`approve rounds`, decisione 13). Dà il nuovo
+    totale dei giri extra; `ValueError` se `n` non è positivo o i giri in tutto superano 8."""
+    if n < 1:
+        raise ValueError("i giri da aggiungere devono essere almeno uno")
+    with db.tx(conn):
+        row = get_task(conn, work, number)
+        extra = row["extra_fix_rounds"] + n
+        if BASE_FIX_ROUNDS + extra > MAX_FIX_ROUNDS:
+            raise ValueError(f"task {number}: al massimo {MAX_FIX_ROUNDS} giri di correzione in "
+                             f"tutto ({BASE_FIX_ROUNDS} più {MAX_FIX_ROUNDS - BASE_FIX_ROUNDS} "
+                             "concessi)")
+        conn.execute("UPDATE tasks SET extra_fix_rounds = ? WHERE work = ? AND number = ?",
+                     (extra, work, number))
+        return extra
 
 
 def unblock_all(conn, work: int, *, now, session=None) -> list[int]:

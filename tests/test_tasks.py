@@ -240,3 +240,34 @@ class UnblockAllTest(unittest.TestCase):
                 tasks.unblock_all(self.conn, self.w, now=T0)
         self.assertEqual(self.states(), ["blocked", "pending", "blocked"])
         self.assertFalse(self.conn.in_transaction)
+
+
+class ExtraRoundsTest(unittest.TestCase):
+    def setUp(self):
+        self.t = TempState()
+        self.conn = db.open_db(self.t.state)
+        self.w = phases.create_work(self.conn, repo_key="github.com/o/r", issue=1, level="L1",
+                                    now=T0)
+        tasks.add_task(self.conn, self.w, 1, source="plan:1", now=T0)
+
+    def tearDown(self):
+        self.conn.close()
+        self.t.cleanup()
+
+    def test_adds_up_to_eight_rounds_in_all(self):
+        self.assertEqual(tasks.add_extra_rounds(self.conn, self.w, 1, 2), 2)
+        self.assertEqual(tasks.add_extra_rounds(self.conn, self.w, 1, 1), 3)
+        self.assertEqual(tasks.get_task(self.conn, self.w, 1)["extra_fix_rounds"], 3)
+
+    def test_over_eight_refused_and_nothing_written(self):
+        tasks.add_extra_rounds(self.conn, self.w, 1, 2)
+        with self.assertRaisesRegex(ValueError, "8"):
+            tasks.add_extra_rounds(self.conn, self.w, 1, 2)
+        self.assertEqual(tasks.get_task(self.conn, self.w, 1)["extra_fix_rounds"], 2)
+
+    def test_bad_n_or_task_refused(self):
+        for n in (0, -1):
+            with self.assertRaises(ValueError):
+                tasks.add_extra_rounds(self.conn, self.w, 1, n)
+        with self.assertRaises(ValueError):
+            tasks.add_extra_rounds(self.conn, self.w, 9, 1)

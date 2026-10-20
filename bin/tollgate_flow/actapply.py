@@ -11,7 +11,14 @@ import sqlite3
 from pathlib import Path
 
 from tollgate_analysis import level as lv
-from tollgate_core import acts, clock, config, db, git, phases, sessions, subagents, tasks
+from tollgate_core import (acts, clock, config, db, git, intents, phases, reviews, sessions,
+                           subagents, tasks)
+from tollgate_core.paths import program_command
+
+from . import gitw
+
+
+FIX_CAP = re.compile(r"giri di correzione esauriti sul task ([0-9]+)")     # motivo di taskcmd
 
 
 class ActApplyError(Exception):
@@ -43,11 +50,13 @@ def _resolve(conn, state, work, act, args, now, session) -> str:
             else "nessun implementatore in corso da interrompere"
     block = None
     if re.fullmatch(r"[0-9]+", act["target"]):
-        block = conn.execute("SELECT id FROM blocks WHERE id = ? AND work = ? "
+        block = conn.execute("SELECT id, reason FROM blocks WHERE id = ? AND work = ? "
                              "AND closed IS NULL", (int(act["target"]), work["id"])).fetchone()
     if block is None:
         raise ActApplyError(f"blocco {act['target']}: non è un blocco aperto di questo lavoro")
     note = " ".join(args[1:]).strip() or "risolto dall'utente"
+    if block["reason"] == reviews.CAP_REASON:
+        _grant_cycles(conn, work, 1, now)       # decisione 13: `resolve` concede un ciclo
     phase = phases.close_block(conn, state, block["id"], note, now=now, session=session)
     unblocked = tasks.unblock_all(conn, work["id"], now=now, session=session) \
         if phase != "blocked" else []
@@ -55,6 +64,132 @@ def _resolve(conn, state, work, act, args, now, session) -> str:
     if unblocked:
         msg += "; task di nuovo pending: " + ", ".join(str(n) for n in unblocked)
     return msg
+
+
+def _grant_cycles(conn, work, n: int, now) -> int:
+    """`n` cicli di revisione oltre i quattro; i cicli fatti più `n` non superano 8."""
+    done = reviews.count(conn, work["id"])
+    if done + n > reviews.MAX_CYCLES:
+        raise ActApplyError(
+            f"cicli di revisione: {done} fatti, {n} in più superano il tetto di "
+            f"{reviews.MAX_CYCLES}; oltre serve /tollgate:approve unverified-review")
+    return phases.add_extra_cycles(conn, work["id"], n, now=now)
+
+
+def _open_blocks(conn, work_id: int) -> list:
+    return conn.execute("SELECT id, reason FROM blocks WHERE work = ? AND closed IS NULL "
+                        "ORDER BY id", (work_id,)).fetchall()
+
+
+def _cycles_block(conn, work_id: int):
+    return next((b for b in _open_blocks(conn, work_id) if b["reason"] == reviews.CAP_REASON),
+                None)
+
+
+def _approve_rounds(conn, state, work, act, args, now, session) -> str:
+    if not re.fullmatch(r"[0-9]+", act["target"]) or int(act["target"]) < 1:
+        raise ActApplyError("approve rounds vuole un numero intero positivo: "
+                            "/tollgate:approve rounds <n>")
+    n = int(act["target"])
+    caps = []
+    for b in _open_blocks(conn, work["id"]):
+        fix = FIX_CAP.fullmatch(b["reason"])
+        if fix or b["reason"] == reviews.CAP_REASON:
+            caps.append((b, fix))
+    if not caps:
+        raise ActApplyError("nessun tetto raggiunto: serve un blocco «cicli di revisione "
+                            "esauriti» o «giri di correzione esauriti sul task k»")
+    if len(caps) > 1:
+        raise ActApplyError("più tetti raggiunti insieme: risolvine uno alla volta con "
+                            "/tollgate:resolve <id del blocco>")
+    block, fix_block = caps[0]
+    if fix_block is None:
+        total = _grant_cycles(conn, work, n, now)
+        msg = f"cicli di revisione concessi: {total} oltre i quattro; blocco {block['id']} chiuso"
+    else:
+        number = int(fix_block.group(1))
+        try:
+            total = tasks.add_extra_rounds(conn, work["id"], number, n)
+        except ValueError as e:
+            raise ActApplyError(str(e)) from e
+        msg = (f"task {number}: {total} giri di correzione oltre i {tasks.BASE_FIX_ROUNDS}; "
+               f"blocco {block['id']} chiuso; riprendi con "
+               f"{program_command(db.BIN_PATH)} task start {number} --fix")
+    phase = phases.close_block(conn, state, block["id"], f"approve rounds {n}", now=now,
+                               session=session)
+    return f"{msg}; fase {phase}"
+
+
+def _approve_finding(conn, state, work, act, args, now, session) -> str:
+    fid, choice, reason = act["target"], (args[2] if len(args) > 2 else ""), \
+        " ".join(args[3:]).strip()
+    if choice != "dismiss" and choice not in reviews.SEVERITY_ORDER:
+        raise ActApplyError("approve finding vuole <id> <gravità: blocker|major|moderate|minor, "
+                            "oppure dismiss> <motivo>")
+    if not reason:
+        raise ActApplyError("approve finding vuole un motivo: /tollgate:approve finding "
+                            "<id> <gravità|dismiss> <motivo>")
+    decision = "dismissed" if choice == "dismiss" else f"downgraded:{choice}"
+    try:
+        reviews.set_decision(conn, work["id"], fid, decision, now=now, session=session)
+    except ValueError as e:
+        raise ActApplyError(str(e)) from e
+    cycle = conn.execute("SELECT cycle FROM findings WHERE work = ? AND id = ?",
+                         (work["id"], fid)).fetchone()[0]
+    msg = f"rilievo {fid}: {decision} ({reason})"
+    latest = reviews.latest(conn, work["id"])
+    if latest is None or latest["number"] != cycle or latest["stage"] != "closed":
+        return msg
+    outcome = reviews.recompute_outcome(conn, work["id"], cycle, now=now)
+    msg += f"; esito del ciclo {cycle}: {outcome}"
+    block = _cycles_block(conn, work["id"])
+    if outcome == "ok" and block is not None:
+        phase = phases.close_block(conn, state, block["id"], f"approve finding {fid}", now=now,
+                                   session=session)
+        msg += f"; blocco {block['id']} chiuso, fase {phase}"
+    return msg
+
+
+def _approve_unverified_review(conn, state, work, act, args, now, session) -> str:
+    done = reviews.count(conn, work["id"])
+    if done < reviews.MAX_CYCLES:
+        raise ActApplyError(f"approve unverified-review vale solo dopo {reviews.MAX_CYCLES} "
+                            f"cicli di revisione: ne risultano {done}")
+    phases.set_review_unverified(conn, work["id"], now=now)
+    msg = "revisione finale dichiarata non verificata"
+    block = _cycles_block(conn, work["id"])
+    if block is not None:
+        phase = phases.close_block(conn, state, block["id"], "approve unverified-review",
+                                   now=now, session=session)
+        msg += f"; blocco {block['id']} chiuso, fase {phase}"
+    return msg
+
+
+def _approve_rebase(conn, state, work, act, args, now, session) -> str:
+    block = next((b for b in _open_blocks(conn, work["id"])
+                  if b["reason"].startswith(intents.SYNC_CONFLICT_REASON)), None)
+    if block is None:
+        raise ActApplyError("approve rebase vale solo con un blocco aperto per il conflitto "
+                            "di `sync` (non c'è)")
+    wt = Path(work["worktree"])
+    if not wt.is_dir():
+        raise ActApplyError("worktree del lavoro assente: il rebase non è verificabile")
+    if gitw.rebase_in_progress(wt):
+        raise ActApplyError("il rebase è ancora in corso nel worktree: finiscilo (o "
+                            "`git rebase --abort`) e ridai /tollgate:approve rebase")
+    ref = git.default_ref(git.main_worktree(wt))
+    base = gitw.merge_base(wt, "HEAD", ref) if ref else None
+    if base is None:
+        raise ActApplyError("nessuna base comune tra HEAD e il ramo predefinito di origin")
+    phases.set_base(conn, work["id"], base, cause="approve_rebase", now=now, session=session)
+    phase = phases.close_block(conn, state, block["id"], "approve rebase", now=now,
+                               session=session)
+    if phase == "pr_open":
+        phases.set_phase(conn, state, work["id"], "execution", "sync", now=now, session=session)
+        phase = "execution"
+    intents.authorize_force(conn, work["id"], reason="approve rebase", now=now)
+    return (f"base riallineata a {base[:12]}; blocco {block['id']} chiuso; fase {phase}; "
+            "push forzato autorizzato per il prossimo open-pr")
 
 
 def _approve_level(conn, state, work, act, args, now, session) -> str:
@@ -83,6 +218,10 @@ def _approve_level(conn, state, work, act, args, now, session) -> str:
 APPLIERS = {
     ("resolve", None): _resolve,
     ("approve", "level"): _approve_level,
+    ("approve", "finding"): _approve_finding,
+    ("approve", "rounds"): _approve_rounds,
+    ("approve", "unverified-review"): _approve_unverified_review,
+    ("approve", "rebase"): _approve_rebase,
 }
 
 
@@ -102,7 +241,8 @@ def _pick(conn, work, act_id, session, now):
         "ORDER BY n DESC LIMIT 1", [session, work["id"], clock.fmt(now), *keys]).fetchone()
     if row is None:
         raise ActApplyError("nessun atto da applicare per questa sessione: dai prima "
-                            "/tollgate:resolve o /tollgate:approve level")
+                            "/tollgate:resolve o un /tollgate:approve (level, finding, rounds, "
+                            "unverified-review, rebase)")
     return row
 
 
@@ -132,7 +272,7 @@ def apply_act(state, cwd, act_id: str | None, *, now=None,
         try:
             msg = applier(conn, state, work, act, json.loads(act["args"]), now, session)
         except (sqlite3.Error, phases.TransitionError, tasks.TaskTransitionError,
-                git.GitError) as e:
+                git.GitError, gitw.GitWriteError) as e:
             raise ActApplyError(str(e)) from e
         return f"atto {act['act_id']} applicato ({_label(act)}): {msg}"
     finally:

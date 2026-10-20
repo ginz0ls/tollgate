@@ -52,6 +52,13 @@ class GitwPushTest(unittest.TestCase):
         gitw.push_sha(self.fl.wt, self.head, BRANCH, lease=remote)
         self.assertEqual(gitw.remote_sha(self.fl.wt, BRANCH), self.head)
 
+    def test_merge_base(self):
+        base = self.fl.lab.base
+        self.assertEqual(gitw.merge_base(self.fl.wt, "HEAD", base), base)
+        self.assertEqual(gitw.merge_base(self.fl.wt, base, "HEAD"), base)
+        self.assertIsNone(gitw.merge_base(self.fl.wt, "HEAD", "0" * 40))
+        self.assertIsNone(gitw.merge_base(self.fl.wt, "HEAD", "nonesiste"))
+
     def test_is_ancestor(self):
         base = self.fl.lab.base
         self.assertTrue(gitw.is_ancestor(self.fl.wt, base, self.head))
