@@ -3,7 +3,7 @@ import unittest
 from tests.flowkit import FlowLab
 from tests.hookkit import T0
 from tests.test_check_session import context_of, start_payload
-from tollgate_core import db, phases, tasks
+from tollgate_core import db, phases, reviews, tasks
 from tollgate_core.paths import program_command
 from tollgate_flow import checkpoint
 
@@ -122,6 +122,14 @@ class CheckpointCase(unittest.TestCase):
         got = checkpoint.stopped_by(self.conn, self.work)
         self.assertEqual(got, [f"tetto: budget del task (blocco {b1})",
                                f"tetto: giri di correzione (blocco {b2})"])
+        self.assertIn(got[0], self.write().read_text(encoding="utf-8"))
+
+    def test_stopped_by_review_cycles(self):
+        self.add(1)
+        b = phases.open_block(self.conn, self.fl.ts.state, self.work, "needs_you",
+                              reviews.CAP_REASON, now=T0)
+        got = checkpoint.stopped_by(self.conn, self.work)
+        self.assertEqual(got, [f"tetto: cicli di revisione (blocco {b})"])
         self.assertIn(got[0], self.write().read_text(encoding="utf-8"))
 
     def test_session_start_injects_checkpoint(self):

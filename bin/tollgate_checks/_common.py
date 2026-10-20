@@ -8,7 +8,7 @@ from pathlib import Path
 
 from tollgate_analysis import level as lv, profiles as prof
 from tollgate_analysis.protected import is_protected
-from tollgate_core import config, git, subagents, violations
+from tollgate_core import config, git, reviews, subagents, violations
 from tollgate_core.paths import program_command, repo_key
 from tollgate_hooks.adapter import edit_path
 from tollgate_hooks.model import inject, record
@@ -98,6 +98,31 @@ def awaiting_review(ctx, row):
         "AND (? IS NULL OR number = ?) ORDER BY number LIMIT 1",
         (work["id"], row["type"], row["task"], row["task"])).fetchone()
     return None if task is None else (work, task)
+
+
+def awaiting_final(ctx, row):
+    """`(lavoro, ciclo, ruolo)` se il subagente è un revisore finale che deve ancora riportare
+    nell'ultimo ciclo in stadio `review` (`reviewer`), o il verificatore di un ciclo in stadio
+    `verify` (`verifier`); altrimenti None. Accetta righe `running` e `interrupted`: un revisore
+    fermo per sola lettura può essere segnato interrotto prima di riportare (decisione 7)."""
+    if row["state"] not in ("running", "interrupted"):
+        return None
+    if row["work"] is not None:
+        work = ctx.db.execute("SELECT * FROM work_items WHERE id = ?", (row["work"],)).fetchone()
+    else:
+        work = governing_work(ctx, ctx.event.cwd)
+    if work is None:
+        return None
+    cycle = ctx.db.execute("SELECT * FROM review_cycles WHERE work = ? ORDER BY number DESC "
+                           "LIMIT 1", (work["id"],)).fetchone()
+    if cycle is None:
+        return None
+    if cycle["stage"] == "review" and row["type"] in json.loads(cycle["reviewers"]) \
+            and row["type"] not in json.loads(cycle["reported"]):
+        return work, cycle, "reviewer"
+    if cycle["stage"] == "verify" and row["type"] == reviews.VERIFIER:
+        return work, cycle, "verifier"
+    return None
 
 
 def repo_key_of(repo) -> str | None:

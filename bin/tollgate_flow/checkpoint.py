@@ -8,14 +8,15 @@ import os
 import sqlite3
 from pathlib import Path
 
-from tollgate_core import clock, db, sessions
+from tollgate_core import clock, db, reviews, sessions
 from tollgate_core.paths import program_command
 from tollgate_core.tasks import STATES
 
 from . import gitw
 
-# Prefisso del motivo del blocco -> nome del tetto. P3b aggiunge i cicli di revisione.
-CAPS = {"budget superato": "budget del task", "giri di correzione esauriti": "giri di correzione"}
+# Prefisso del motivo del blocco -> nome del tetto.
+CAPS = {"budget superato": "budget del task", "giri di correzione esauriti": "giri di correzione",
+        reviews.CAP_REASON: "cicli di revisione"}
 MAX_NOTES = 5
 EXCLUDE = "docs/superpowers/reviews/*/checkpoint.md"
 NOTES_HEADER = "## Note"

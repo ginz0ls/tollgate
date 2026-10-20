@@ -22,6 +22,7 @@ BLOCKING_SEVERITIES = SEVERITY_ORDER[:2]
 CAP_COUNTED = 4          # cicli contati prima del tetto (+ extra_review_cycles)
 MAX_CYCLES = 8           # oltre serve `approve unverified-review`
 CAP_REASON = "cicli di revisione esauriti"
+VERIFIER = "tollgate:finding-verifier"      # il suo contatore di riporti sta in `reported`
 REPORT_OUTCOMES = ("ok", "needs_fix", "needs_you")
 VERIFICATIONS = ("confirmed", "rejected", "unverified")
 MAX_TEXT = 2000
@@ -197,6 +198,35 @@ def apply_verification(conn, work: int, cycle: int, results: list[dict], *, now)
             _log_finding(conn, _finding(conn, work, row["id"]), now=now)
         return conn.execute("SELECT count(*) FROM findings WHERE work = ? AND cycle = ? "
                             "AND verification IS NULL", (work, cycle)).fetchone()[0]
+
+
+def unjudged_ids(conn, work: int, cycle: int) -> list[str]:
+    """Gli id dei rilievi del ciclo ancora senza esito, in ordine di arrivo."""
+    return [r[0] for r in conn.execute(
+        "SELECT id FROM findings WHERE work = ? AND cycle = ? AND verification IS NULL "
+        "ORDER BY rowid", (work, cycle))]
+
+
+def verifier_incomplete(conn, state: State, work: int, cycle: int, *, now,
+                        session=None) -> int:
+    """Conta un riporto del verificatore che lascia rilievi senza esito (mai `unverified`
+    automatico); dal secondo apre `needs_you`. Va chiamata fuori da una transazione. Dà il
+    numero di riporti incompleti del ciclo."""
+    if conn.in_transaction:
+        raise RuntimeError("verifier_incomplete va chiamato fuori da una transazione")
+    with db.tx(conn):
+        row = _cycle(conn, work, cycle)
+        reported = json.loads(row["reported"])
+        n = reported.get(VERIFIER, 0)
+        n = (n if isinstance(n, int) else 0) + 1
+        reported[VERIFIER] = n
+        conn.execute("UPDATE review_cycles SET reported = ? WHERE work = ? AND number = ?",
+                     (json.dumps(reported), work, cycle))
+        ids = unjudged_ids(conn, work, cycle)
+    reason = f"verificatore senza esito su: {', '.join(ids)}"[:500]
+    if n >= 2 and ids and not _has_open_block(conn, work, reason):
+        open_block(conn, state, work, "needs_you", reason, now=now, session=session)
+    return n
 
 
 def effective_severity(row) -> str | None:

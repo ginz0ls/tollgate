@@ -19,7 +19,7 @@ from tollgate_core.paths import program_command
 from . import taskcmd
 
 REVIEWER = "tollgate:final-reviewer"
-VERIFIER = "tollgate:finding-verifier"
+VERIFIER = reviews.VERIFIER
 
 
 class ReviewError(Exception):

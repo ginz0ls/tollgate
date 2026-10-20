@@ -3,7 +3,11 @@ from __future__ import annotations
 
 import getpass
 
-from tollgate_core import (acts, effects, events, phases, scope, sessions, subagents, tasks)
+from pathlib import Path
+
+from tollgate_analysis import profiles as prof
+from tollgate_core import (acts, effects, events, git, phases, reviews, scope, sessions,
+                           subagents, tasks)
 
 
 def _actor() -> str | None:
@@ -62,6 +66,57 @@ def _effect_execute(conn, state, ctx, d):
                           session=ctx.event.session)
 
 
+def _final_rules(ctx, work, sha: str) -> tuple[set[str], set[str]]:
+    """Regole `[blocca]` e note dei profili attivi sul diff del ciclo (decisione 8). Se il diff
+    non si legge, nessun profilo è attivo: ogni `R-…` blocca (fail-closed)."""
+    wt = Path(work["worktree"]) if work["worktree"] else None
+    base = work["work_base_sha"]
+    files: list[str] = []
+    if wt is not None and wt.is_dir() and base:
+        try:
+            files = [c.path for c in git.changes(wt, base, head=sha) if c.status != "D"]
+        except git.GitError:
+            files = []
+    profs = ctx.config.profiles
+    names = prof.active_profiles(files, profs, ctx.cfg("profiles.active"))
+    return prof.blocking_rules(names, profs), prof.known_rules(names, profs)
+
+
+def _review_report(conn, state, ctx, d):
+    """Riporto di un revisore finale. Un riporto non più accettabile (ciclo non in stadio
+    review, fonte non attesa o già riportata: una corsa) è ignorato, mai un'eccezione."""
+    wid, n = d["work"], d["cycle"]
+    work = phases.get_work(conn, wid)
+    cycle = conn.execute("SELECT sha FROM review_cycles WHERE work = ? AND number = ?",
+                         (wid, n)).fetchone()
+    if cycle is None:
+        return
+    blocking, known = _final_rules(ctx, work, cycle["sha"])
+    try:
+        stage = reviews.add_report(conn, wid, n, source=d["source"], outcome=d["outcome"],
+                                   findings=d["findings"], rejected=d["rejected"],
+                                   blocking_rules=blocking, known_rules=known, now=ctx.now)
+    except ValueError:
+        return
+    if stage == "verify" and not reviews.unjudged_ids(conn, wid, n):
+        reviews.close_cycle(conn, state, wid, n, now=ctx.now, session=ctx.event.session)
+
+
+def _finding_verify(conn, state, ctx, d):
+    """Esiti del verificatore. A zero rilievi senza esito chiude il ciclo; altrimenti conta il
+    riporto incompleto (dal secondo, `needs_you`)."""
+    wid, n = d["work"], d["cycle"]
+    cycle = conn.execute("SELECT stage FROM review_cycles WHERE work = ? AND number = ?",
+                         (wid, n)).fetchone()
+    if cycle is None or cycle["stage"] != "verify":
+        return
+    left = reviews.apply_verification(conn, wid, n, d["results"], now=ctx.now)
+    if left == 0:
+        reviews.close_cycle(conn, state, wid, n, now=ctx.now, session=ctx.event.session)
+    else:
+        reviews.verifier_incomplete(conn, state, wid, n, now=ctx.now, session=ctx.event.session)
+
+
 _OPS = {
     "event": lambda c, s, x, d: events.record_event(c, d["type"], d.get("data"), now=x.now,
                                                     session=x.event.session, work=d.get("work")),
@@ -106,6 +161,8 @@ _OPS = {
         c, key=d["key"], command=d["command"], work=d.get("work"), sha=d.get("sha"), now=x.now,
         session=x.event.session),
     "effect_execute": _effect_execute,
+    "review_report": _review_report,
+    "finding_verify": _finding_verify,
 }
 OPS = frozenset(_OPS)
 
