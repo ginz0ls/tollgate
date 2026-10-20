@@ -141,18 +141,18 @@ def _counts(row) -> dict | None:
     return json.loads(row["counts"]) if row["counts"] else None
 
 
-def _clean(row) -> bool:
+def clean(row) -> bool:
     counts = _counts(row)
     return counts is not None and auditrules.is_clean(counts)
 
 
-def _passed(conn, work: int, row, kind: str) -> bool:
+def passed(conn, work: int, row, kind: str) -> bool:
     """Un giro è «passato» se è pulito o è quello sospeso con `resolve` (decisione 7)."""
-    return row is not None and (_clean(row) or audits.suspended(conn, work).get(kind) ==
+    return row is not None and (clean(row) or audits.suspended(conn, work).get(kind) ==
                                 row["number"])
 
 
-def _last(conn, work: int, kind: str):
+def last_round(conn, work: int, kind: str):
     rows = audits.rounds(conn, work, kind)
     return rows[-1] if rows else None
 
@@ -163,9 +163,9 @@ def adversarial_ok(conn, work: sqlite3.Row, cfg, spec_blob: str | None) -> bool:
     o sospeso."""
     if not _on(cfg, ADV_KIND):
         return True
-    last = _last(conn, work["id"], ADV_KIND)
+    last = last_round(conn, work["id"], ADV_KIND)
     return (last is not None and spec_blob is not None and last["sha"] == spec_blob
-            and _passed(conn, work["id"], last, ADV_KIND))
+            and passed(conn, work["id"], last, ADV_KIND))
 
 
 def _check_path(path: str) -> None:
@@ -219,7 +219,7 @@ def _spec_round(kind: str, spec: tuple, viewpoint: str | None = None) -> _Round:
 def _adv_or_fix(ctx: _Ctx, last, spec: tuple, slices: int, supersede, register) -> _Act:
     """Avversariale da fare: se l'ultimo giro ha rilievi bloccanti sulla spec attuale (e non è
     sospeso) si corregge prima, altrimenti nuovo giro (o giro di conferma)."""
-    if last is not None and last["sha"] == spec[1] and not _passed(ctx.conn, ctx.work["id"],
+    if last is not None and last["sha"] == spec[1] and not passed(ctx.conn, ctx.work["id"],
                                                                    last, ADV_KIND):
         raise _Refuse(f"l'ultimo giro avversariale ({last['number']}) ha blocker o major sulla "
                       "spec attuale", "fix_spec")
@@ -248,9 +248,9 @@ def _decide_spec(ctx: _Ctx) -> _Act:
 def _spec_branches(ctx: _Ctx, spec: tuple, slices: int, stale, register) -> _Act:
     conn, wid, cfg, blob = ctx.conn, ctx.work["id"], ctx.cfg, spec[1]
     adv_on, lens_on = _on(cfg, ADV_KIND), _on(cfg, LENS_KIND)
-    last_adv = _last(conn, wid, ADV_KIND)
+    last_adv = last_round(conn, wid, ADV_KIND)
     # 2. avversariale non passato (qualunque SHA)
-    if adv_on and not _passed(conn, wid, last_adv, ADV_KIND):
+    if adv_on and not passed(conn, wid, last_adv, ADV_KIND):
         return _adv_or_fix(ctx, last_adv, spec, slices, stale, register)
     lens_rows = audits.rounds(conn, wid, LENS_KIND)
     state = auditrules.lens_state([(r["viewpoint"], r["outcome"]) for r in lens_rows])
@@ -340,9 +340,9 @@ def _decide_plan(ctx: _Ctx) -> _Act:
     if row is not None and row["kind"] == PLAN_KIND and row["sha"] == plan_blob \
             and row["spec_sha"] == spec_blob:
         return _Act("reprint", rnd, row=row, register_plan=register)
-    last = _last(conn, wid, PLAN_KIND)
+    last = last_round(conn, wid, PLAN_KIND)
     same = last is not None and last["sha"] == plan_blob and last["spec_sha"] == spec_blob
-    if same and _passed(conn, wid, last, PLAN_KIND):
+    if same and passed(conn, wid, last, PLAN_KIND):
         return _Act("advance", supersede=row, register_plan=register)
     if same:
         refusal = _Refuse(f"l'ultimo giro del piano ({last['number']}) ha blocker o major sul "

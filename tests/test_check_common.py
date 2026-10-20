@@ -1,10 +1,14 @@
 import unittest
 from types import SimpleNamespace
 
+from tests.flowkit import SESSION, SPEC as FLOW_SPEC, FlowLab
 from tests.helpers import git
 from tests.hookkit import T0, Lab
+from tests.test_check_acts import expand
+from tollgate_analysis import approvals
 from tollgate_checks._common import locked_docs, orphan_tg
-from tollgate_core import phases
+from tollgate_core import phases, sessions
+from tollgate_flow import actapply
 from tollgate_hooks.context import ReadDb
 
 SPEC = "docs/superpowers/specs/x.md"
@@ -19,7 +23,8 @@ class LockedDocsTest(unittest.TestCase):
                               (SPEC, self.lab.work))
         p = self.lab.wt / APPROVAL
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text("approvata\n")
+        p.write_text(approvals.render_approval({"kind": "spec-approval", "path": SPEC,
+                                                "sha": "abc", "slices": 1}))
 
     def tearDown(self):
         self.lab.close()
@@ -65,6 +70,43 @@ class LockedDocsTest(unittest.TestCase):
             self.assertNotIn(PLAN, locked_docs(phases.get_work(lab.conn, lab.work)))
         finally:
             lab.close()
+
+    def test_spec_locked_by_approval_of_another_issue(self):
+        (self.lab.wt / APPROVAL).unlink()
+        other = self.lab.wt / "docs/superpowers/reviews/3/spec-approval.md"
+        other.parent.mkdir(parents=True)
+        other.write_text(approvals.render_approval({"kind": "spec-approval", "path": SPEC,
+                                                    "sha": "abc"}))
+        self.lab.goto("plan")
+        self.assertIn(SPEC, locked_docs(self.row()))
+
+    def test_spec_not_locked_by_invalid_or_foreign_approval(self):
+        (self.lab.wt / APPROVAL).write_text("approvata\n")
+        other = self.lab.wt / "docs/superpowers/reviews/3/spec-approval.md"
+        other.parent.mkdir(parents=True)
+        other.write_text(approvals.render_approval({"kind": "spec-approval",
+                                                    "path": "docs/superpowers/specs/y.md",
+                                                    "sha": "abc"}))
+        self.lab.goto("plan")
+        self.assertNotIn(SPEC, locked_docs(self.row()))
+
+    def test_spec_locked_by_real_approve_spec(self):
+        fl = FlowLab(issue=7, level="L2", phase="spec_audit")
+        self.addCleanup(fl.close)
+        fl.write_spec()
+        phases.set_spec_path(fl.conn, fl.work, FLOW_SPEC, now=fl.now)
+        fl.closed_round("spec-adversarial", {})
+        self.assertEqual(fl.pre_edit(fl.wt / FLOW_SPEC).exit, 0)        # ancora in spec_audit
+        self.assertEqual(expand(fl.lab, "tollgate:approve", "spec 1", session=SESSION).exit, 0)
+        now = fl.now
+        sessions.note_cli_call(fl.ts.state, SESSION, str(fl.wt), ["act"], now=now)
+        actapply.apply_act(fl.ts.state, fl.wt, None, now=now)
+        self.assertEqual(phases.get_work(fl.conn, fl.work)["phase"], "plan")
+        r = fl.pre_edit(fl.wt / FLOW_SPEC)
+        self.assertEqual(r.exit, 2)
+        self.assertIn("bloccato", r.stderr)
+        r = fl.pre_edit(fl.wt / approvals.approval_paths(7)[0])
+        self.assertEqual(r.exit, 2)
 
 
 class OrphanTgTest(unittest.TestCase):

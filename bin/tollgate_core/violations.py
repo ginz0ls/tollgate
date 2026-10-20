@@ -6,7 +6,7 @@ import posixpath
 from collections.abc import Mapping
 from pathlib import Path
 
-from tollgate_analysis import globs, profiles as prof, testguard, waivers
+from tollgate_analysis import approvals, globs, profiles as prof, testguard, waivers
 from tollgate_analysis.approvals import REVIEWS_DIR
 from tollgate_analysis.testguard import DEFAULT_TEST_GLOBS, GuardConfig, Violation
 
@@ -42,6 +42,25 @@ def is_docs_md(rel: str | None) -> bool:
     return bool(rel) and rel.startswith("docs/superpowers/") and rel.endswith(".md")
 
 
+def _approval_files(wt: Path) -> dict[str, str]:
+    """`{percorso relativo: testo}` dei `spec-approval.md` presenti sul disco del worktree, anche
+    di altre issue (fette successive, decisione 19). Illeggibili e collegamenti simbolici no."""
+    out: dict[str, str] = {}
+    folder = wt / REVIEWS_DIR
+    try:
+        found = sorted(folder.glob("*/spec-approval.md"))
+    except OSError:
+        return out
+    for p in found:
+        try:
+            if p.is_symlink() or not p.is_file():
+                continue
+            out[p.relative_to(wt).as_posix()] = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+    return out
+
+
 def locked_docs(work) -> set[str]:
     """Spec bloccata dopo approve spec, piano bloccato dopo la registrazione dello scope (6.2).
     Un lavoro in blocco vale la fase precedente al blocco. Un ritorno con reopen riporta la
@@ -51,10 +70,11 @@ def locked_docs(work) -> set[str]:
     out = set()
     if work["plan_sha"] and work["plan_path"] and _rank(phase) > _rank("plan"):
         out.add(work["plan_path"])
-    if work["spec_path"] and work["worktree"] and _rank(phase) > _rank("spec_audit"):
-        approval = Path(work["worktree"]) / f"{REVIEWS_DIR}/{work['issue']}/spec-approval.md"
-        if approval.exists():
-            out.add(work["spec_path"])
+    if work["spec_path"] and work["worktree"] and _rank(phase) > _rank("spec_audit") \
+            and approvals.locate_spec_approval(
+                _approval_files(Path(work["worktree"])), issue=work["issue"],
+                spec_path=work["spec_path"], spec_blob=None) is not None:
+        out.add(work["spec_path"])
     return out
 
 

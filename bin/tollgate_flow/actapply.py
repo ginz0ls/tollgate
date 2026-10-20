@@ -11,12 +11,11 @@ import sqlite3
 from pathlib import Path
 
 from tollgate_analysis import level as lv
-from tollgate_core import (acts, clock, config, db, events, git, intents, phases, reviews,
-                           sessions,
-                           subagents, tasks)
+from tollgate_core import (acts, audits, clock, config, db, events, git, intents, phases,
+                           reviews, sessions, subagents, tasks)
 from tollgate_core.paths import program_command
 
-from . import gitw
+from . import gitw, l2acts
 
 
 FIX_CAP = re.compile(r"giri di correzione esauriti sul task ([0-9]+)")     # motivo di taskcmd
@@ -58,10 +57,16 @@ def _resolve(conn, state, work, act, args, now, session) -> str:
     note = " ".join(args[1:]).strip() or "risolto dall'utente"
     if block["reason"] == reviews.CAP_REASON:
         _grant_cycles(conn, work, 1, now)       # decisione 13: `resolve` concede un ciclo
+    suspended = None
+    if audits.cap_kind(block["reason"]) is not None:    # tetti dell'audit (decisione 7)
+        suspended = l2acts.suspend_on_resolve(conn, work["id"], block["reason"], now=now,
+                                              cfg=_config(state, work))
     phase = phases.close_block(conn, state, block["id"], note, now=now, session=session)
     unblocked = tasks.unblock_all(conn, work["id"], now=now, session=session) \
         if phase != "blocked" else []
     msg = f"blocco {block['id']} chiuso; fase {phase}"
+    if suspended:
+        msg += f"; {suspended}"
     if unblocked:
         msg += "; task di nuovo pending: " + ", ".join(str(n) for n in unblocked)
     return msg
@@ -233,6 +238,8 @@ APPLIERS = {
     ("approve", "rounds"): _approve_rounds,
     ("approve", "unverified-review"): _approve_unverified_review,
     ("approve", "rebase"): _approve_rebase,
+    ("approve", "spec"): l2acts.approve_spec,
+    ("approve", "plan"): l2acts.approve_plan,
 }
 
 
@@ -252,8 +259,8 @@ def _pick(conn, work, act_id, session, now):
         "ORDER BY n DESC LIMIT 1", [session, work["id"], clock.fmt(now), *keys]).fetchone()
     if row is None:
         raise ActApplyError("nessun atto da applicare per questa sessione: dai prima "
-                            "/tollgate:resolve o un /tollgate:approve (level, finding, rounds, "
-                            "unverified-review, rebase)")
+                            "/tollgate:resolve, un /tollgate:approve (level, finding, rounds, "
+                            "unverified-review, rebase, spec, plan) o /tollgate:reopen")
     return row
 
 
@@ -283,7 +290,7 @@ def apply_act(state, cwd, act_id: str | None, *, now=None,
         try:
             msg = applier(conn, state, work, act, json.loads(act["args"]), now, session)
         except (sqlite3.Error, phases.TransitionError, tasks.TaskTransitionError,
-                git.GitError, gitw.GitWriteError) as e:
+                git.GitError, gitw.GitWriteError, l2acts.Refused) as e:
             raise ActApplyError(str(e)) from e
         return f"atto {act['act_id']} applicato ({_label(act)}): {msg}"
     finally:

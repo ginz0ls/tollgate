@@ -15,6 +15,7 @@ from tests.test_check_post_edit import SECTIONS
 from tollgate_analysis import approvals, auditrules
 from tollgate_core import (VERSION, audits, clock, events, git as core_git, phases, sessions,
                            subagents, tasks as task_store)
+from tollgate_flow import gitw, start as flow_start
 
 SESSION = "sess-flow"
 ORIGIN_URL = "https://github.com/prova/flow.git"
@@ -118,6 +119,7 @@ class FlowLab:
         self.ts, self.tmp, self.main, self.origin = (self.lab.ts, self.lab.tmp, self.lab.main,
                                                      self.lab.origin)
         self.conn, self.work, self.wt = self.lab.conn, self.lab.work, self.lab.wt
+        gitw.add_excludes(self.main, flow_start.EXCLUDES)     # come `start` in produzione
         self.home = self.tmp / "home dir"
         plugins = self.home / ".claude" / "plugins"
         plugins.mkdir(parents=True)

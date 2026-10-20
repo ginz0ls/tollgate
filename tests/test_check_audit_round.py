@@ -7,7 +7,7 @@ import tests.test_audit_prepare as tap
 from tests.flowkit import SESSION, SPEC, round_message
 from tests.hookkit import DEFAULT_TOML, sample
 from tollgate_analysis import approvals, auditrules
-from tollgate_core import audits, clock, git as core_git, subagents
+from tollgate_core import audits, clock, subagents
 from tollgate_flow import audit
 from tollgate_hooks import apply
 
@@ -18,16 +18,6 @@ REPORT = f"docs/superpowers/reviews/7/{ADV}-1.md"
 
 
 class RoundCase(tap.AuditCase):
-    def lab(self, *args, **kw):
-        """Come `start`, il banco esclude `.tollgate-run/` con `info/exclude`: senza, il brief di
-        un giro scritto da `audit prepare` cambierebbe l'impronta di un agente già partito."""
-        fl = super().lab(*args, **kw)
-        exclude = core_git.common_dir(fl.main) / "info" / "exclude"
-        exclude.parent.mkdir(exist_ok=True)
-        with exclude.open("a") as f:
-            f.write(".tollgate-run/\n")
-        return fl
-
     def open_adv(self, **spec):
         """Una spec committata e il giro avversariale 1 aperto da `audit prepare`."""
         fl = self.lab(toml=spec.pop("toml", DEFAULT_TOML))
