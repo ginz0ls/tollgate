@@ -4,6 +4,7 @@ import unittest
 from unittest import mock
 
 from tests.flowkit import PLAN
+from tests.hookkit import DEFAULT_TOML
 from tests.test_taskcmd import TaskCase
 from tollgate_analysis import brief
 from tollgate_core import git as core_git, phases, reviews, tasks
@@ -17,13 +18,21 @@ OUTSIDE = {"severity": "major", "file": "lib/altro.py", "line": 9, "rule": "pian
 MINOR = {"severity": "minor", "file": "src/app.py", "line": 1, "rule": "R-9", "text": "nota"}
 
 
+SRC_TOML = DEFAULT_TOML + """
+[profiles.src]
+paths = ["src/**"]
+agent = "probe:implementer-src"
+reviewer = "probe:reviewer-src"
+"""
+
+
 class FixTaskCase(TaskCase):
     def setUp(self):
         super().setUp()
         self.fl = None
 
-    def lab(self, outcome="needs_fix", findings=(BLOCKER, OUTSIDE, MINOR)):
-        fl = self.make()
+    def lab(self, outcome="needs_fix", findings=(BLOCKER, OUTSIDE, MINOR), **kw):
+        fl = self.make(**kw)
         fl.close_tasks()
         c = reviews.open_cycle(fl.conn, fl.work, sha="s1", patch_id="p1", code="c0de",
                                reviewers=[REVIEWER], now=fl.now)
@@ -92,6 +101,56 @@ class FromFindingsTest(FixTaskCase):
         with self.assertRaisesRegex(taskcmd.TaskError, "execution"):
             self.findings()
 
+    def test_routing_stable_after_dismiss(self):
+        """Decisione 25: l'instradamento resta quello dei rilievi usati per creare il task, anche
+        se l'utente li archivia dopo (rileggerli dal vivo darebbe l'agente di default)."""
+        fl, c = self.lab(toml=SRC_TOML)
+        self.findings(c)
+        self.assertEqual(self.row(3)["agent_type"], "probe:implementer-src")
+        for r in reviews.blocking_open(fl.conn, fl.work, c):
+            reviews.set_decision(fl.conn, fl.work, r["id"], "dismissed", now=fl.now)
+        self.assertEqual(reviews.blocking_open(fl.conn, fl.work, c), [])
+        tasks.task_event(fl.conn, fl.work, 3, "report_done", now=fl.now)
+        tasks.set_review_prep(fl.conn, fl.work, 3, sha="abc", code="K1")
+        tasks.set_verdict(fl.conn, fl.work, 3, outcome="changes", findings=[BLOCKER],
+                          now=fl.now)
+        _, summary = self.start(3, fix=True)
+        self.assertIn("probe:implementer-src", summary)
+        self.assertIn("revisore: probe:reviewer-src", summary)
+        self.assertEqual(self.row(3)["agent_type"], "probe:implementer-src")
+
+    def test_brief_shows_effective_severity(self):
+        fl, c = self.lab()
+        major = reviews.blocking_open(fl.conn, fl.work, c)[0]
+        self.assertEqual(major["severity"], "blocker")
+        reviews.set_decision(fl.conn, fl.work, major["id"], "downgraded:major", now=fl.now)
+        path, _ = self.findings(c)
+        text = path.read_text()
+        self.assertIn("- [major (originale blocker)] src/app.py:2 (piano:task 1)", text)
+        self.assertIn("- [major] lib/altro.py:9", text)        # invariata: nessun «originale»
+        self.assertNotIn("[blocker]", text)
+
+    def test_from_findings_rollback_on_error(self):
+        fl, c = self.lab()
+        with mock.patch.object(tasks, "assign", side_effect=tasks.TaskTransitionError("no")):
+            with self.assertRaisesRegex(taskcmd.TaskError, "no"):
+                self.findings(c)
+        self.assertEqual(fl.conn.execute("SELECT count(*) FROM tasks").fetchone()[0], 2)
+        self.assertFalse(fl.conn.in_transaction)
+        path, _ = self.findings(c)          # nessun «esiste già»: il task non era rimasto
+        self.assertEqual(path.name, "task-3.md")
+        self.assertEqual(self.row(3)["source"], "cycle:1")
+
+    def test_l0_refused(self):
+        fl, c = self.lab()
+        fl.conn.execute("UPDATE work_items SET level = 'L0' WHERE id = ?", (fl.work,))
+        fl.conn.commit()
+        with self.assertRaisesRegex(taskcmd.TaskError, "L0"):
+            self.findings(c)
+        with self.assertRaisesRegex(taskcmd.TaskError, "L0"):
+            fixtask.from_gate(fl.ts.state, fl.wt, claude_dir=fl.home / ".claude")
+        self.assertEqual(fl.conn.execute("SELECT count(*) FROM tasks").fetchone()[0], 2)
+
     def test_fix_task_review_and_done(self):
         fl, c = self.lab()
         self.findings(c)
@@ -157,6 +216,26 @@ class FromGateTest(FixTaskCase):
         # nessun testo del commento in un argomento di gh
         for call in fl.gh_calls():
             self.assertNotIn("rm -rf", " ".join(call["argv"]))
+
+    def test_cli_from_gate(self):
+        fl = self.gate([f"{fixtask.GATE_MARKER} v1 -->\nlint rosso"])
+        r = fl.cli("task", "start", "--from-gate", cwd=fl.wt)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("task-3.md", r.stdout)
+        self.assertIn("name=tg-7-t3", r.stdout)
+        self.assertEqual(self.row(3)["source"], f"gate:{core_git.head(fl.wt)}")
+        self.assertIn("lint rosso", (fl.wt / ".tollgate-run" / "7" / "task-3.md").read_text())
+
+    def test_gate_fence_longer_than_any_backtick_run(self):
+        comment = f"{fixtask.GATE_MARKER} v1 -->\nrosso ``` e ````` dentro\n```sh\nls\n```"
+        fl = self.gate([comment])
+        path, _ = fixtask.from_gate(fl.ts.state, fl.wt, claude_dir=fl.home / ".claude")
+        fence = "`" * 6                  # la sequenza più lunga del commento ha 5 backtick
+        block = f"\n{fence}\n{comment}\n{fence}"
+        task_text = self.row(3)["task_text"]
+        self.assertTrue(task_text.endswith(block), task_text)
+        self.assertNotIn("`" * 7, task_text)
+        self.assertIn(block + "\n", path.read_text())     # il brief lo ricopia in un recinto di 7
 
     def test_from_gate_without_pr_refused(self):
         fl = self.make()

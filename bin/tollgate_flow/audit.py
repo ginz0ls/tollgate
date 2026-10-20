@@ -52,7 +52,7 @@ STEPS = {
 CONFIRM_STEP = ("chiedi all'utente se procedere: con il sì rilancia <programma> audit prepare "
                 "--confirm, con il no lancia <programma> audit decline")
 ERRORS = (sqlite3.Error, git.GitError, config.ConfigError, phases.TransitionError, OSError,
-          db.DbError)
+          db.DbError, UnicodeDecodeError)
 
 
 class AuditError(Exception):

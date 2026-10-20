@@ -247,6 +247,28 @@ class FixRoundsTest(TaskCase):
         self.assertEqual(phases.get_work(fl.conn, fl.work)["phase"], "blocked")
         self.assertEqual(self.row()["fix_rounds"], 5)
 
+    def test_sixth_round_name_launch_inherit(self):
+        """Dopo `approve rounds 1` il sesto giro ha nome -r6, si lancia e usa model: inherit."""
+        fl = self.make()
+        self.start()
+        for _ in range(5):
+            self.to_changes()
+            self.start(fix=True)
+        self.to_changes()
+        with self.assertRaisesRegex(taskcmd.TaskError, "giri di correzione esauriti"):
+            self.start(fix=True)
+        block = fl.conn.execute("SELECT id FROM blocks WHERE closed IS NULL").fetchone()
+        self.assertEqual(tasks.add_extra_rounds(fl.conn, fl.work, 1, 1), 1)      # approve rounds 1
+        phases.close_block(fl.conn, fl.ts.state, block["id"], "approve rounds 1", now=fl.now)
+        path, summary = self.start(fix=True)
+        row = self.row()
+        self.assertEqual((row["fix_rounds"], row["implementer"], row["pending"]),
+                         (6, "tg-7-t1-r6", "launch"))
+        self.assertIn("model: inherit", summary)
+        self.assertIn("tg-7-t1-r6", summary)
+        self.assertIn("model: inherit", path.read_text())
+        self.assertIn("`tg-7-t1-r6`", path.read_text())
+
     def test_fix_needs_changes_verdict_and_a_fresh_one_each_round(self):
         self.make()
         self.start()

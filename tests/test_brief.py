@@ -67,6 +67,18 @@ class ImplementerBriefTest(unittest.TestCase):
         self.assertNotIn("giro di correzione", brief.implementer_brief(impl()))
 
 
+class FindingSeverityTest(unittest.TestCase):
+    def test_effective_severity_with_original_in_parentheses_only_if_different(self):
+        f = {"severity": "blocker", "file": "a.py", "line": 3, "rule": "R-1", "text": "t"}
+        self.assertEqual(brief._finding(f), "- [blocker] a.py:3 (R-1): t")
+        self.assertEqual(brief._finding({**f, "user_decision": "downgraded:major"}),
+                         "- [major (originale blocker)] a.py:3 (R-1): t")
+        self.assertEqual(brief._finding({**f, "user_decision": "downgraded:blocker"}),
+                         "- [blocker] a.py:3 (R-1): t")
+        self.assertEqual(brief._finding({**f, "user_decision": "dismissed"}),
+                         "- [blocker] a.py:3 (R-1): t")
+
+
 class ReviewBriefTest(unittest.TestCase):
     def test_review_brief_has_sha_code_and_size_warning(self):
         out = brief.review_brief(review(lines=250))
@@ -113,6 +125,21 @@ class FinalBriefTest(unittest.TestCase):
                                              checklists=["usa ``` qui"]))
         self.assertIn("probe:final-security", out)
         self.assertIn("````\n- usa ``` qui\n````", out)
+
+
+    def test_rebase_note_when_sha_differs_from_head(self):
+        out = brief.final_review_brief(final(sha="a" * 40, head="d" * 40))
+        self.assertIn("Il ciclo è stato aperto su `" + "a" * 40 + "`; HEAD è `" + "d" * 40 + "` "
+                      "dopo un rebase senza modifiche di contenuto: rivedi il diff di HEAD.", out)
+
+    def test_no_rebase_note_when_sha_is_head(self):
+        self.assertNotIn("dopo un rebase", brief.final_review_brief(final()))
+
+    def test_issue_file_named_only_when_present(self):
+        self.assertIn("Issue: `.tollgate-run/7/issue.md`", brief.final_review_brief(final()))
+        out = brief.final_review_brief(final(issue_file=None))
+        self.assertNotIn("Issue:", out)
+        self.assertNotIn("issue.md", out)
 
 
 class VerifierBriefTest(unittest.TestCase):

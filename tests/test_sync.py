@@ -1,6 +1,7 @@
 import json
 import unittest
 from datetime import timedelta
+from pathlib import Path
 from unittest import mock
 
 from tests.flowkit import SESSION
@@ -37,6 +38,15 @@ class SyncCase(OpenCase):
         fl.git("commit", "-qm", msg)
         fl.git("push", "-q", "origin", "main")
         return fl.git("rev-parse", "HEAD")
+
+    def update_branch_remote(self, fl):
+        """«Update branch» su origin/<ramo>: il predefinito (avanzato prima) unito con un merge."""
+        clone = fl.tmp / "clone"
+        run_git(fl.tmp, "clone", "-q", str(fl.origin), str(clone))
+        run_git(clone, "checkout", "-q", "-b", BRANCH, f"origin/{BRANCH}")
+        run_git(clone, "merge", "-q", "--no-ff", "-m", "Update branch", "origin/main")
+        run_git(clone, "push", "-q", "origin", BRANCH)
+        return clone, run_git(clone, "rev-parse", "HEAD")
 
     def sync_act(self, fl, *, session=SESSION):
         return acts.record_act(fl.conn, type_="sync", typed_text="/tollgate:sync",
@@ -241,15 +251,6 @@ class SyncRebaseTest(SyncCase):
         self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), head(fl))
         self.assertEqual(self.intent_states(fl, "force_push"), ["used"])
 
-    def update_branch_remote(self, fl):
-        """«Update branch» su origin/<ramo>: il predefinito (avanzato prima) unito con un merge."""
-        clone = fl.tmp / "clone"
-        run_git(fl.tmp, "clone", "-q", str(fl.origin), str(clone))
-        run_git(clone, "checkout", "-q", "-b", BRANCH, f"origin/{BRANCH}")
-        run_git(clone, "merge", "-q", "--no-ff", "-m", "Update branch", "origin/main")
-        run_git(clone, "push", "-q", "origin", BRANCH)
-        return clone, run_git(clone, "rev-parse", "HEAD")
-
     def test_integrated_commits_recorded_when_rebase_conflicts(self):
         """Review Focus 4: dopo l'integrazione --ff-only HEAD sta sulla punta remota; con il
         conflitto nel rebase quei commit sono comunque noti, e PostToolUse Bash non apre nulla."""
@@ -442,6 +443,90 @@ class SyncRebaseTest(SyncCase):
         fl.git("commit", "-q", "--allow-empty", "-m", "nuovo", repo=fl.wt)
         fl.bash("git commit --allow-empty -m nuovo", post=True, cwd=fl.wt)
         self.assertEqual(len(fl.events("commit")), commits + 1)
+
+
+class SyncEdgeTest(SyncCase):
+    """Riga 55 di P3b: l'ordine dell'intento, il rebase già in corso, `--ff-only` che fallisce e
+    `finish check` rosso dopo il rebase."""
+
+    def test_intent_recorded_before_rebase(self):
+        fl = self.pr_open_lab()
+        old_head = head(fl)
+        tip = self.advance_main(fl)
+        seen = []
+        real = gitw.rebase
+
+        def spy(wt, onto):
+            seen.append([(r["state"], json.loads(r["data"])) for r in
+                         intents.pending(fl.conn, fl.work, "sync")])
+            return real(wt, onto)
+
+        with mock.patch.object(gitw, "rebase", side_effect=spy):
+            r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.OK, r.lines)
+        self.assertEqual(len(seen), 1)
+        (state, data), = seen[0]            # al momento del rebase l'intento è già richiesto
+        self.assertEqual(state, "requested")
+        self.assertEqual((data["from"], data["to"], data["branch"]), (old_head, tip, BRANCH))
+        self.assertEqual(self.intent_states(fl, "sync"), ["executed"])
+
+    def test_rebase_in_progress_at_start_refused(self):
+        fl = self.pr_open_lab()
+        before = head(fl)
+        self.advance_main(fl)
+        gitdir = fl.git("rev-parse", "--absolute-git-dir", repo=fl.wt)
+        (Path(gitdir) / "rebase-merge").mkdir()        # un rebase lasciato a metà
+        with mock.patch.object(gitw, "fetch") as fetch, mock.patch.object(gitw, "rebase") as rb:
+            r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.REFUSED, r.lines)
+        self.assertIn("rebase in corso", " ".join(r.lines))
+        self.assertIn("rebase --abort", " ".join(r.lines))
+        fetch.assert_not_called()
+        rb.assert_not_called()
+        self.assertEqual(head(fl), before)
+        self.assertEqual(self.intent_states(fl, "sync"), [])
+        self.assertEqual(fl.conn.execute("SELECT state FROM acts WHERE type = 'sync'")
+                         .fetchone()[0], "pending")
+
+    def test_ff_only_failure_blocks(self):
+        """`merge --ff-only` dei commit remoti che fallisce ferma `sync`: HEAD intatto, intento
+        chiuso con l'errore, atto non consumato, nessun rebase né push forzato."""
+        fl = self.pr_open_lab()
+        self.advance_main(fl, msg="primo")
+        self.update_branch_remote(fl)
+        before = head(fl)
+        with mock.patch.object(gitw, "merge_ff_only", return_value=False), \
+                mock.patch.object(gitw, "rebase") as rb:
+            r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.REFUSED, r.lines)
+        self.assertRegex(" ".join(r.lines), r"merge --ff-only [0-9a-f]{7} non riuscito")
+        rb.assert_not_called()
+        self.assertEqual(head(fl), before)
+        self.assertEqual(self.intent_states(fl, "sync"), ["executed"])
+        outcome = fl.conn.execute("SELECT outcome FROM intents WHERE action = 'sync'").fetchone()[0]
+        self.assertIn("non riuscito", outcome)
+        self.assertEqual(self.intent_states(fl, "force_push"), [])
+        self.assertEqual(fl.conn.execute("SELECT state FROM acts WHERE type = 'sync'")
+                         .fetchone()[0], "pending")
+        self.assertEqual(work(fl)["phase"], "pr_open")
+
+    def test_finish_check_red_after_rebase(self):
+        """Dopo un rebase riuscito, un `finish check` rosso dà il messaggio del rosso (m4), non
+        quello del rifiuto; il rebase resta fatto e la PR non si aggiorna."""
+        fl = self.pr_open_lab()
+        tip = self.advance_main(fl)
+        with mock.patch.object(sync.finishcheck, "check",
+                               return_value=sync.finishcheck.CheckResult(1, ["[no] x"])):
+            r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.REFUSED, r.lines)
+        text = " ".join(r.lines)
+        self.assertIn("finish check non è verde dopo il rebase", text)
+        self.assertNotIn("ha rifiutato", text)
+        self.assertIn("[no] x", text)
+        self.assertEqual(work(fl)["work_base_sha"], tip)         # il rebase è stato fatto
+        self.assertEqual(work(fl)["phase"], "execution")
+        self.assertEqual(self.intent_states(fl, "sync"), ["executed"])
+        self.assertEqual(self.calls(fl, "pr", "edit"), [])
 
 
 class SyncCliTest(SyncCase):

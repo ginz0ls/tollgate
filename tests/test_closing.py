@@ -1,8 +1,9 @@
+import shutil
 from pathlib import Path
 
 from tests.flowkit import SESSION
 from tests.test_start import StartCase, out
-from tollgate_core import acts, clock, git as core_git, phases
+from tollgate_core import acts, clock, effects, git as core_git, phases
 from tollgate_flow import gitw
 
 BRANCH = "tg/7-demo"
@@ -112,6 +113,35 @@ class CleanupTest(ClosingCase):
         # un atto consumato non basta a un secondo giro
         self.assertEqual(fl.cli("cleanup", "--confirm").returncode, 1)
 
+    def test_cleanup_from_inside_worktree(self):
+        """Da dentro il worktree del ramo chiuso né il worktree né il ramo si toccano."""
+        fl = self.lab(closed="merged")
+        self.act(fl, "cleanup")
+        r = fl.cli("cleanup", "--confirm", cwd=fl.wt)
+        self.assertEqual(r.returncode, 0, out(r))
+        self.assertIn("sei dentro il worktree", out(r))
+        self.assertIn("niente da ripulire", out(r))
+        self.assertTrue(fl.wt.is_dir())
+        self.assertIn(BRANCH, self.branches(fl))
+        self.assertEqual(self.act_state(fl, "cleanup"), "pending")
+
+    def test_cleanup_with_missing_worktree_dir(self):
+        """La cartella è sparita ma git la ricorda: si toglie il ramo, senza errori."""
+        fl = self.lab(closed="merged")
+        sha = fl.git("rev-parse", BRANCH)
+        shutil.rmtree(fl.wt)
+        self.act(fl, "cleanup")
+        listing = fl.cli("cleanup")
+        self.assertEqual(listing.returncode, 3, out(listing))
+        self.assertIn(f"ramo {BRANCH}", out(listing))
+        self.assertNotIn("worktree " + str(fl.wt), out(listing))
+        r = fl.cli("cleanup", "--confirm")
+        self.assertEqual(r.returncode, 0, out(r))
+        self.assertNotIn(BRANCH, self.branches(fl))
+        self.assertIn(f"ramo {BRANCH} tolto (puntava a {sha}", out(r))
+        self.assertNotIn("Traceback", out(r))
+        self.assertEqual(self.act_state(fl, "cleanup"), "consumed")
+
     def test_cleanup_keeps_active_work(self):
         fl = self.lab()
         self.act(fl, "cleanup")
@@ -201,3 +231,33 @@ class ClosedBranchHintTest(ClosingCase):
         denied = fl.pre_edit(fl.wt / "src/app.py")
         self.assertEqual(denied.exit, 2)
         self.assertIn("/tollgate:adopt #7", denied.stderr)
+
+
+class StartConfirmTest(ClosingCase):
+    def test_start_confirm_closed_pr_with_other_confirmations(self):
+        """PR chiusa e intento pendente chiedono conferma insieme; con --confirm la PR si
+        scollega e le conferme restano scritte come «confermato»."""
+        fl = self.lab()
+        phases.set_pr(fl.conn, fl.work, 1, "https://github.com/prova/flow/pull/1",
+                      now=clock.now())
+        self.gh(fl, prs=[{"number": 1, "headRefName": BRANCH, "state": "CLOSED",
+                          "url": "https://github.com/prova/flow/pull/1", "headRefOid": "x",
+                          "mergedAt": None, "body": "", "comments": []}])
+        effects.request(fl.conn, key=effects.effect_key("gh issue comment 7", fl.work, None),
+                        command="gh issue comment 7", work=fl.work, sha=None, now=clock.now())
+        asked = fl.cli("start", "7")
+        self.assertEqual(asked.returncode, 3, out(asked))
+        confirms = [l for l in out(asked).splitlines() if l.startswith("conferma:")]
+        self.assertEqual(len(confirms), 2, out(asked))
+        self.assertTrue(any("PR #1 chiusa senza merge" in l for l in confirms))
+        self.assertTrue(any("intento e-" in l for l in confirms))
+        self.assertEqual(phases.get_work(fl.conn, fl.work)["pr_number"], 1)
+        done = fl.cli("start", "7", "--confirm")
+        self.assertEqual(done.returncode, 0, out(done))
+        row = phases.get_work(fl.conn, fl.work)
+        self.assertEqual((row["pr_number"], row["pr_url"]), (None, None))
+        self.assertIn("confermato: PR #1 chiusa senza merge", out(done))
+        self.assertIn("confermato: intento e-", out(done))
+        self.assertEqual(fl.conn.execute("SELECT state FROM intents").fetchone()[0], "requested")
+        self.assertEqual(done.stdout.strip().splitlines()[-1],
+                         f"prossimo passo: EnterWorktree {fl.wt.resolve()}")

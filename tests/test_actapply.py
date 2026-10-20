@@ -407,6 +407,36 @@ class ApproveFindingTest(ReviewApplyCase):
         self.assertEqual(reviews.latest(fl.conn, fl.work)["outcome"], "needs_fix")
         self.assertEqual(self.work()["phase"], "execution")       # com'era prima del blocco
 
+    def test_old_cycle_finding_closes_cycles_block(self):
+        """Decisione 25: un rilievo di un ciclo non ultimo scioglie comunque il blocco dei cicli."""
+        fl = self.make(phase="review")
+        self.cap_reached()
+        self.assertEqual(reviews.latest(fl.conn, fl.work)["number"], 4)
+        self.act("tollgate:approve", "finding f-1-1 dismiss falso positivo del primo ciclo")
+        out = self.apply()
+        self.assertEqual(self.decision("f-1-1"), "dismissed")
+        self.assertEqual(self.open_reasons(), [])
+        self.assertEqual(self.work()["phase"], "execution")
+        self.assertIn("esito del ciclo 1: ok", out)
+        self.assertIn("chiuso", out)
+        self.assertEqual(self.cycle_row(1)["outcome"], "ok")
+        self.assertEqual(self.cycle_row(4)["outcome"], "needs_fix")     # l'ultimo non si tocca
+
+    def test_superseded_last_cycle_is_a_refusal(self):
+        """`recompute_outcome` su un ciclo superseded è un rifiuto, a decisione già scritta."""
+        fl = self.make(phase="review")
+        n = self.cycle(close=False)         # stadio verify, un rilievo confermato
+        reviews.supersede(fl.conn, fl.work, n, now=fl.now)
+        self.act("tollgate:approve", f"finding f-{n}-1 dismiss non più valido")
+        with self.assertRaisesRegex(actapply.ActApplyError, "non ricalcolabile.*superseded"):
+            self.apply()
+        self.assertEqual(self.decision(f"f-{n}-1"), "dismissed")
+        self.assertEqual(self.cycle_row(n)["outcome"], "superseded")
+
+    def cycle_row(self, n):
+        return self.fl.conn.execute("SELECT * FROM review_cycles WHERE work = ? AND number = ?",
+                                    (self.fl.work, n)).fetchone()
+
     def test_approve_finding_needs_reason_and_confirmed(self):
         fl = self.make(phase="review")
         self.cycle()

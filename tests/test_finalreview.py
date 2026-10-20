@@ -143,6 +143,38 @@ class PrepareNewCycleTest(FinalCase):
             self.prepare()
 
 
+class PrepareBriefTest(FinalCase):
+    def test_issue_file_named_only_if_start_wrote_it(self):
+        self.lab()
+        self.assertFalse((self.run_dir() / "issue.md").exists())     # il banco non lo scrive
+        self.prepare()
+        self.assertNotIn("issue.md", (self.run_dir() / "final-1.md").read_text())
+        (self.run_dir() / "issue.md").write_text("testo dell'issue\n")
+        self.prepare()                  # riprende il ciclo e riscrive il brief
+        self.assertIn("Issue: `" + str(self.run_dir() / "issue.md") + "`",
+                      (self.run_dir() / "final-1.md").read_text())
+
+    def test_rebase_explained_in_brief(self):
+        fl = self.lab()
+        self.prepare()
+        old = self.cycle()["sha"]
+        git(fl.main, "checkout", "-q", "-b", "avanti", fl.base)
+        (fl.main / "altro.txt").write_text("x\n")
+        git(fl.main, "add", "altro.txt")
+        git(fl.main, "commit", "-q", "-m", "avanti")
+        new_base = git(fl.main, "rev-parse", "HEAD")
+        git(fl.wt, "rebase", "-q", "--onto", new_base, fl.base)
+        new_head = core_git.head(fl.wt)
+        phases.set_base(fl.conn, fl.work, new_base, cause="rebase", now=fl.now)
+        phases.set_finish(fl.conn, fl.work, new_head, {"items": {}, "manual": []}, now=fl.now)
+        r = self.prepare()
+        self.assertEqual(self.cycle()["number"], 1)             # stesso ciclo, stesso patch-id
+        self.assertEqual(len(r.launches), 1)
+        self.assertIn(f"Il ciclo è stato aperto su `{old}`; HEAD è `{new_head}` dopo un rebase "
+                      "senza modifiche di contenuto: rivedi il diff di HEAD.",
+                      (self.run_dir() / "final-1.md").read_text())
+
+
 class PrepareResumeTest(FinalCase):
     def test_resume_open_cycle_keeps_code(self):
         self.lab(toml=SEC_TOML, level="L2")

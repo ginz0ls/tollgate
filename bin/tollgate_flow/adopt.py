@@ -328,6 +328,9 @@ def _adopt(state, conn, main: Path, ref: str, cfg, key: str, issue: int, session
         return _refuse(f"nessuna base comune tra {branch} e {ref}")
 
     warnings = list(cfg.warnings)
+    remote_tip = git.resolve_ref(main, f"refs/remotes/origin/{branch}") if local else None
+    if remote_tip is not None and remote_tip != sha:
+        warnings.append(f"ramo locale e remoto diversi: uso la punta locale {sha[:12]}")
     found_ev = _gather(state, main, cfg, issue, branch, sha, base, warnings)
     if isinstance(found_ev, AdoptResult):
         return found_ev
@@ -347,11 +350,14 @@ def _adopt(state, conn, main: Path, ref: str, cfg, key: str, issue: int, session
     except (phases.WorkExists, sqlite3.Error, db.DbError) as e:
         return _refuse(f"{e} (ramo {branch} e worktree {wt} restano: adottali di nuovo con "
                        "/tollgate:adopt dopo aver risolto)", warnings=warnings)
+    unconsumed = None
     try:
         acts.consume(conn, act["act_id"], type_="adopt", target=str(issue), work=None,
                      session=session, now=now)
     except acts.ActError as e:
         warnings.append(str(e))
+    except sqlite3.Error as e:      # il lavoro esiste già: non è un rifiuto, come per `start`
+        unconsumed = f"lavoro creato, atto non consumato: {e}"
 
     failed: list[str] = []
 
@@ -383,13 +389,14 @@ def _adopt(state, conn, main: Path, ref: str, cfg, key: str, issue: int, session
 
     row = phases.get_work(conn, work)
     out = [*[f"avviso: {w}" for w in warnings],
+           *([f"avviso: {unconsumed}"] if unconsumed else []),
            *[f"avviso: registrazione incompleta: {x}" for x in failed],
            f"lavoro #{issue} adottato: livello {row['level']}, fase {row['phase']}, ramo {branch}",
            *lines,
            "gli intenti e i cicli di revisione non si ricostruiscono; i task del piano risultano "
            "pending e si rivedono una volta",
            f"prossimo passo: EnterWorktree {wt}"]
-    return AdoptResult(INCOMPLETE if failed else OK, out, wt, work)
+    return AdoptResult(INCOMPLETE if failed or unconsumed else OK, out, wt, work)
 
 
 def _apply_cap(conn, main: Path, cfg, work: int, wt: Path, base: str, ev: _Evidence, now,

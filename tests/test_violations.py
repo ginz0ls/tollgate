@@ -1,4 +1,7 @@
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
 from tests.helpers import ROOT, git
 from tests.hookkit import DEFAULT_FILES, DEFAULT_TOML, Lab
@@ -29,6 +32,41 @@ class ReviewsExemptTest(unittest.TestCase):
                                              changes, components={})
             self.assertEqual([v.path for v in got],
                              ["docs/superpowers/reviews/8/plan-approval.md"])
+        finally:
+            lab.close()
+
+
+class ActiveProfileNamesTest(unittest.TestCase):
+    TOML = DEFAULT_TOML + """
+[profiles.web]
+paths = ["web/**"]
+"""
+
+    def test_no_commit_gives_no_profiles_and_never_reads_the_working_tree(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "senza commit"
+            repo.mkdir()
+            git(repo, "init", "-q")
+            (repo / "web").mkdir()
+            (repo / "web" / "page.tsx").write_text("x\n")        # non tracciato: non conta
+            cfg = load_config_text(self.TOML)
+            work = {"work_base_sha": "0" * 40}
+            self.assertIsNone(core_git.head(repo))
+            with mock.patch.object(core_git, "changes") as changes:
+                self.assertEqual(violations.active_profile_names(cfg, repo, work), [])
+                self.assertEqual(violations.active_profile_names(cfg, repo, work, head=None), [])
+            changes.assert_not_called()
+
+    def test_with_head_profiles_come_from_the_diff(self):
+        lab = Lab(toml=self.TOML)
+        try:
+            (lab.wt / "web").mkdir()
+            (lab.wt / "web" / "page.tsx").write_text("x\n")
+            git(lab.wt, "add", "-A")
+            git(lab.wt, "commit", "-qm", "web")
+            cfg = load_config_text(self.TOML)
+            work = phases.get_work(lab.conn, lab.work)
+            self.assertEqual(violations.active_profile_names(cfg, lab.wt, work), ["web"])
         finally:
             lab.close()
 

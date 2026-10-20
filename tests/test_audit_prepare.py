@@ -619,6 +619,51 @@ class PeekTest(AuditCase):
         self.assertIn("audit prepare", audit.peek(fl.conn, self.work()))
 
 
+class NonUtf8Test(AuditCase):
+    """Spec e piano non UTF-8 committati: `peek` non solleva mai (decisione 20) e `prepare` dà un
+    rifiuto (`AuditError`), mai un traceback."""
+
+    def commit_bytes(self, fl, path, data: bytes):
+        target = fl.wt / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        fl.git("add", "--", path, repo=fl.wt)
+        fl.git("commit", "-qm", "non utf-8", repo=fl.wt)
+
+    def test_committed_non_utf8_spec_never_raises(self):
+        fl = self.lab()
+        self.commit_bytes(fl, SPEC, "# Spec\n\ncaffè «niente»\n".encode("latin-1"))
+        self.assertIn("audit prepare", audit.peek(fl.conn, self.work()))
+        try:
+            r = self.prepare()
+        except audit.AuditError:
+            pass                                    # un rifiuto va bene, un traceback no
+        else:
+            self.assertIn(r.code, (audit.OK, audit.REFUSED))
+
+    def test_committed_non_utf8_plan_never_raises(self):
+        fl = self.plan_lab()
+        self.commit_bytes(fl, PLAN, plan_text().encode("utf-8") + "\ncaffè\n".encode("latin-1"))
+        self.assertIn("audit prepare", audit.peek(fl.conn, self.work()))
+        try:
+            r = self.prepare()
+        except audit.AuditError:
+            pass
+        else:
+            self.assertIn(r.code, (audit.OK, audit.REFUSED))
+
+    def test_undecodable_read_is_fallback_for_peek_and_refusal_for_prepare(self):
+        fl = self.lab()
+        fl.write_spec()
+        boom = UnicodeDecodeError("utf-8", b"\xe8", 0, 1, "invalid continuation byte")
+        with mock.patch.object(core_git, "text_at", side_effect=boom):
+            self.assertIn("audit prepare", audit.peek(fl.conn, self.work()))
+            with self.assertRaisesRegex(audit.AuditError, "utf-8"):
+                self.prepare()
+        self.assertEqual(self.rows(), [])
+        self.assertIsNone(self.work()["spec_path"])
+
+
 class AdversarialOkTest(AuditCase):
     def cfg(self):
         from tollgate_core import config

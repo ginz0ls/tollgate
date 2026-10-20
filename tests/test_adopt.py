@@ -1,5 +1,6 @@
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -205,6 +206,50 @@ class AdoptPhaseTest(AdoptCase):
         parsed = waivers.parse((Path(row["worktree"]) / waivers.path_for(7)).read_text())
         self.assertEqual(waivers.status(parsed, approved_ids=acts.approved_waivers(
             fl.conn, row["id"]), sensitive=lambda p: False), {"w-7-1": "pending"})
+
+
+class AdoptEdgeTest(AdoptCase):
+    def adopt_in_process(self, fl):
+        self.act(fl)
+        sessions.note_cli_call(fl.ts.state, SESSION, str(fl.main), ["adopt", "7"],
+                               now=clock.now())
+        with mock.patch.dict(os.environ, fl.env()):
+            return adopt.adopt(fl.ts.state, fl.main, 7, argv=["adopt", "7"])
+
+    def test_local_and_remote_tips_differ_warns_and_uses_local(self):
+        fl = self.branch_lab(L0_FILES, push=True)
+        pushed = fl.git("rev-parse", "HEAD", repo=fl.wt)
+        (fl.wt / "src" / "extra.py").write_text("y = 2\n")
+        fl.git("add", "-A", repo=fl.wt)
+        fl.git("commit", "-qm", "solo locale", repo=fl.wt)
+        local = fl.git("rev-parse", "HEAD", repo=fl.wt)
+        self.assertNotEqual(local, pushed)
+        r = self.adopt_in_process(fl)
+        text = "\n".join(r.lines)
+        self.assertEqual(r.code, adopt.OK, text)
+        self.assertIn(f"avviso: ramo locale e remoto diversi: uso la punta locale {local[:12]}",
+                      text)
+        self.assertEqual(fl.git("rev-parse", "HEAD", repo=fl.wt), local)
+
+    def test_same_tips_no_warning(self):
+        fl = self.branch_lab(L0_FILES, push=True)
+        r = self.adopt_in_process(fl)
+        self.assertEqual(r.code, adopt.OK, "\n".join(r.lines))
+        self.assertNotIn("ramo locale e remoto diversi", "\n".join(r.lines))
+
+    def test_consume_sqlite_error_after_create_work_is_incomplete(self):
+        fl = self.branch_lab(L0_FILES)
+        with mock.patch.object(acts, "consume", side_effect=sqlite3.OperationalError("disco pieno")):
+            r = self.adopt_in_process(fl)
+        text = "\n".join(r.lines)
+        self.assertEqual(r.code, adopt.INCOMPLETE, text)
+        self.assertIn("avviso: lavoro creato, atto non consumato: disco pieno", text)
+        self.assertNotIn("rifiuto:", text)
+        (row,) = self.rows(fl)          # il lavoro esiste e il resto della registrazione è fatto
+        self.assertEqual((row["issue"], row["phase"]), (7, "execution"))
+        self.assertEqual(r.work, row["id"])
+        self.assertTrue((fl.ts.dir / "bound" / SESSION).is_file())
+        self.assertEqual(self.act_state(fl), "pending")
 
 
 class AdoptIssueTest(AdoptCase):

@@ -142,10 +142,14 @@ def _approve_finding(conn, state, work, act, args, now, session) -> str:
     cycle = conn.execute("SELECT cycle FROM findings WHERE work = ? AND id = ?",
                          (work["id"], fid)).fetchone()[0]
     msg = f"rilievo {fid}: {decision} ({reason})"
-    latest = reviews.latest(conn, work["id"])
-    if latest is None or latest["number"] != cycle or latest["stage"] != "closed":
+    row = conn.execute("SELECT stage FROM review_cycles WHERE work = ? AND number = ?",
+                       (work["id"], cycle)).fetchone()
+    if row is None or row["stage"] != "closed":
         return msg
-    outcome = reviews.recompute_outcome(conn, work["id"], cycle, now=now)
+    try:
+        outcome = reviews.recompute_outcome(conn, work["id"], cycle, now=now)
+    except ValueError as e:         # ciclo superseded: la decisione è già scritta (decisione 25)
+        raise ActApplyError(f"{msg}; esito del ciclo {cycle} non ricalcolabile: {e}") from e
     msg += f"; esito del ciclo {cycle}: {outcome}"
     block = _cycles_block(conn, work["id"])
     if block is not None:       # spec 10: il blocco si scioglie anche con approve finding

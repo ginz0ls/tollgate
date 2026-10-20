@@ -194,15 +194,26 @@ class FinishToPrEndToEndTest(FinishCase):
 
 
 class NeedsFixTest(FinishCase):
-    def test_needs_fix_then_from_findings_consumes_cycle(self):  # criteri 26 e 37
+    def prepare_needs_fix_cycle(self):
+        """Dal lavoro in `execution` al ciclo 1 chiuso `needs_fix` con un rilievo maggiore
+        confermato (fase di nuovo `execution`). Dà il numero del ciclo."""
         self.finish_check()
         n = self.review([MAJOR])
         c = self.cycle(n)
         self.assertEqual((c["stage"], c["outcome"], c["counted"]), ("closed", "needs_fix", 1))
         self.assertEqual(self.work()["phase"], "execution")
+        return n
+
+    def test_needs_fix_then_from_findings_consumes_cycle(self):  # criteri 26 e 37
+        n = self.prepare_needs_fix_cycle()
         self.assertEqual(reviews.counted(self.fl.conn, self.fl.work), 1)
-        r = self.prepare_refused_open_pr()
-        self.assertNotEqual(r.returncode, 0)
+        self.slash("finish")
+        r = self.cli("finish", "open-pr")                        # criterio 26: rifiuto, non errore
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        lines = (r.stdout + r.stderr).splitlines()
+        self.assertTrue(lines[0].startswith("rifiuto: la fase è execution"), lines)
+        self.assertTrue(all(l.startswith("rifiuto:") for l in lines), lines)
+        self.assertIn("Nessun rilievo blocker o major confermato", r.stdout + r.stderr)
         self.assertEqual(self.work()["phase"], "execution")
 
         r = self.cli("task", "start", "--from-findings", str(n))
@@ -217,10 +228,29 @@ class NeedsFixTest(FinishCase):
         self.assertEqual(reviews.counted(self.fl.conn, self.fl.work), 1)
         self.assertEqual(reviews.count(self.fl.conn, self.fl.work), 1)
 
-    def prepare_refused_open_pr(self):
-        """Con il ciclo `needs_fix` aperto-pr rifiuta e la fase resta `execution`."""
-        self.slash("finish")
-        return self.cli("finish", "open-pr")
+    def test_second_finish_is_new_cycle(self):                   # criteri 26 e 28, dal programma
+        n = self.prepare_needs_fix_cycle()
+        r = self.cli("task", "start", "--from-findings", str(n))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        old_head = self.fl.git("rev-parse", "HEAD", repo=self.wt)
+        self.fl.commit("src/app.py", SOMMA + "# corretto il caso zero\n", "correzione")
+        self.fl.close_tasks()                                    # il task di correzione è chiuso
+        self.slash("finish")                                     # il secondo `finish`
+        r = self.cli("finish", "check")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.work()["phase"], "review")
+        self.assertNotEqual(self.work()["finish_sha"], old_head)
+
+        self.review([MINOR, NO_RULE], outcome="ok")              # ciclo 2: nuovo, non il 1
+        c = self.cycle()
+        self.assertEqual((c["number"], c["stage"], c["outcome"]), (2, "closed", "ok"))
+        self.assertEqual(self.cycle(1)["outcome"], "needs_fix")
+        self.assertEqual(reviews.count(self.fl.conn, self.fl.work), 2)
+        self.open_pr()                                           # open-pr dà 0
+        w = self.work()
+        self.assertEqual((w["phase"], w["pr_number"]), ("pr_open", 1))
+        (opened,) = json.loads(self.fl.gh_data.read_text())["prs"]
+        self.assertEqual(prblock.parse(opened["body"])["verdict"]["outcome"], "ok")
 
 
 class SyncTest(FinishCase):

@@ -82,12 +82,14 @@ def active_profile_names(cfg: Config, wt: Path, work, *, head: str | None = None
     """I profili attivi sul diff del lavoro (dalla base del lavoro, o da `default_ref` se manca,
     fino a `head` o alla punta del worktree), senza i file cancellati. Sta qui perché la usano
     sia `review prepare` sia l'applicazione dei riporti degli hook. Senza base né
-    `default_ref`: nessun profilo. Un diff illeggibile solleva `git.GitError`."""
+    `default_ref`, o senza nessun commit (`head` nullo): nessun profilo, perché `changes` senza
+    `head` includerebbe working tree e file non tracciati. Un diff illeggibile solleva
+    `git.GitError`."""
     base = work["work_base_sha"] or git.default_ref(wt)
-    if base is None:
+    tip = head or git.head(wt)
+    if base is None or tip is None:
         return []
-    files = [c.path for c in git.changes(wt, base, head=head or git.head(wt))
-             if c.status != "D"]
+    files = [c.path for c in git.changes(wt, base, head=tip) if c.status != "D"]
     return prof.active_profiles(files, cfg.profiles, cfg.get("profiles.active"))
 
 

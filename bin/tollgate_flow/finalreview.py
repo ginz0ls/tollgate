@@ -196,6 +196,12 @@ def _must_haves(wt, work, cfg) -> list:
         active_always=cfg.get("profiles.active")).must_haves
 
 
+def _issue_file(run_dir: Path) -> str | None:
+    """`issue.md` solo se `start` lo ha scritto (alla ripresa l'issue può non essere leggibile)."""
+    path = run_dir / "issue.md"
+    return str(path) if path.is_file() else None
+
+
 def _final_brief(conn, work, cfg, cycle, wt, base, head, diff, run_dir, agent, names,
                  must_haves):
     if agent == REVIEWER:
@@ -208,4 +214,4 @@ def _final_brief(conn, work, cfg, cycle, wt, base, head, diff, run_dir, agent, n
         base=base, head=head, diff_path=str(diff), plan_path=work["plan_path"] or "",
         plan_sha=work["plan_sha"] or "", must_haves=must_haves,
         scope=sorted(scope.paths(conn, work["id"])), checklists=checklists,
-        severity=cfg.get("severity"), issue_file=str(run_dir / "issue.md"), role=agent)
+        severity=cfg.get("severity"), issue_file=_issue_file(run_dir), role=agent)

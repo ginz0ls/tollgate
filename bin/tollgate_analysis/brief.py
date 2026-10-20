@@ -46,9 +46,20 @@ class ImplBrief:
     fix_round: int = 0
 
 
+def _effective_severity(f: dict):
+    """La gravità dopo `approve finding` (`downgraded:<g>`), se la riga la ha; altrimenti quella
+    dichiarata. Stessa regola di `reviews.effective_severity`: questo strato non importa il core."""
+    decision = f.get("user_decision")
+    if isinstance(decision, str) and decision.startswith("downgraded:"):
+        return decision.split(":", 1)[1]
+    return f.get("severity")
+
+
 def _finding(f: dict) -> str:
     where = f"{f.get('file')}:{f.get('line')}" if f.get("line") is not None else str(f.get("file"))
-    return f"- [{f.get('severity')}] {where} ({f.get('rule')}): {f.get('text')}"
+    effective, declared = _effective_severity(f), f.get("severity")
+    severity = effective if effective == declared else f"{effective} (originale {declared})"
+    return f"- [{severity}] {where} ({f.get('rule')}): {f.get('text')}"
 
 
 def findings_task_text(cycle: int, findings: list[dict], scope: list[str]) -> str:
@@ -180,7 +191,7 @@ class FinalBrief:
     scope: list[str]
     checklists: list[str]
     severity: dict
-    issue_file: str
+    issue_file: str | None
     role: str
 
 
@@ -200,9 +211,14 @@ FINAL_STANDARD = [
 def final_review_brief(b: FinalBrief) -> str:
     out = [f"# Revisione finale del lavoro #{b.issue}, ciclo {b.cycle}", "",
            f"Sei `{b.role}`. Intervallo revisionato: `{b.base}..{b.head}`. Diff: `{b.diff_path}`.",
-           f"Piano: `{b.plan_path}` (blob `{b.plan_sha}`). Issue: `{b.issue_file}`.",
+           f"Piano: `{b.plan_path}` (blob `{b.plan_sha}`)."
+           + (f" Issue: `{b.issue_file}`." if b.issue_file else ""),
            "Sei in sola lettura: non modificare nessun file e non eseguire test che scrivono "
-           "file (rapporti, copertura, cache).", DATA_NOTE, "", *FINAL_STANDARD,
+           "file (rapporti, copertura, cache).", DATA_NOTE]
+    if b.sha != b.head:
+        out.append(f"Il ciclo è stato aperto su `{b.sha}`; HEAD è `{b.head}` dopo un rebase "
+                   "senza modifiche di contenuto: rivedi il diff di HEAD.")
+    out += ["", *FINAL_STANDARD,
            "", "## Must-have",
            _bullets([f"{m.id}. {m.text} — test: {', '.join(m.tests) or 'nessuno'}"
                      for m in b.must_haves]), "", "## Scope", _bullets(b.scope)]

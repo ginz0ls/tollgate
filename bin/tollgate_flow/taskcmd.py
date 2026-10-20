@@ -65,12 +65,16 @@ def _check_state(row, number: int, fix: bool) -> None:
 
 def _fix_files(conn, work, row) -> list[str]:
     """File dei rilievi di un task di correzione `cycle:<n>` (per l'instradamento); quelli di un
-    task `gate:<sha>` non si conoscono."""
+    task `gate:<sha>` non si conoscono. Sono i rilievi confermati e bloccanti del ciclo usati per
+    creare il task, qualunque sia la decisione successiva dell'utente (`approve finding`):
+    l'instradamento resta quello dell'origine (decisione 25)."""
     kind, _, ref = (row["source"] or "").partition(":")
     if kind != "cycle" or not ref.isdigit():
         return []
-    return list(dict.fromkeys(r["file"] for r in reviews.blocking_open(conn, work["id"], int(ref))
-                              if r["file"]))
+    rows = conn.execute("SELECT file FROM findings WHERE work = ? AND cycle = ? "
+                        "AND verification = 'confirmed' AND blocking = 1 ORDER BY rowid",
+                        (work["id"], int(ref))).fetchall()
+    return list(dict.fromkeys(r["file"] for r in rows if r["file"]))
 
 
 def _related_tests(task, must_haves: list[planmod.MustHave]) -> list[str]:
