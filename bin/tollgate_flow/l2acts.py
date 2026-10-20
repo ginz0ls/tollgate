@@ -274,8 +274,7 @@ def reopen(conn, state, work, act, args, now, session) -> str:
         phases.check_transition(work["level"], work["phase"], target, cause)
     except phases.TransitionError as e:
         raise Refused(f"reopen {what} non vale in {work['level']}: {e}") from e
-    cfg = _cfg(state, work)
-    busy = subagents.in_use(conn, work["id"], lambda: cfg)
+    busy = subagents.in_use(conn, work["id"], lambda: _cfg(state, work))   # config solo se serve
     if busy is not None and busy.kind == "task":
         raise Refused(f"il task {busy.ident} è in corso o ha commit non chiusi: chiudi o "
                       f"riporta in attesa il task {busy.ident}, poi /tollgate:reopen {what}")
@@ -293,10 +292,15 @@ def reopen(conn, state, work, act, args, now, session) -> str:
         parts.append(f"giro {open_row['kind']} {open_row['number']} superato")
     if removed:
         parts.append(f"registrazione del piano tolta (task {', '.join(map(str, removed))})")
-    fix = "correggi la spec" if what == "spec" else "correggi il piano"
-    tail = "" if what == "spec" else " (in L1 il piano corretto si registra da solo)"
+    if what == "plan" and work["level"] == "L1":
+        nxt = "correggi il piano: si registra da solo con la prossima modifica (post_edit)"
+    elif what == "plan":
+        nxt = (f"correggi il piano, committalo e riparti da {_program()} audit prepare "
+               "per l'avversario del piano")
+    else:
+        nxt = f"correggi la spec, committala e riparti da {_program()} audit prepare"
     return (", ".join(parts) + f". I file di approvazione restano come storico e non valgono "
-            f"più: {fix}, poi {_program()} audit prepare{tail}.")
+            f"più: {nxt}.")
 
 
 # --- sospensioni dei tetti, da `resolve` ---------------------------------------------------

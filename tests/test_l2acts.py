@@ -496,6 +496,8 @@ class ReopenTest(L2Case):
         self.assertIn(SPEC, self.locked())
         msg = self.reopen("spec", "manca un caso")
         self.assertIn("spec_audit", msg)
+        self.assertIn("audit prepare", msg)
+        self.assertNotIn("si registra da solo", msg)
         self.assertEqual((self.phase(), self.causes()[-1]), ("spec_audit", "reopen_spec"))
         self.assertNotIn(SPEC, self.locked())
         self.assertEqual(fl.pre_edit(fl.wt / SPEC).exit, 0)
@@ -519,6 +521,32 @@ class ReopenTest(L2Case):
         last = fl.conn.execute("SELECT outcome FROM spec_audit WHERE work = ? AND kind = ? "
                                "ORDER BY id DESC", (fl.work, PLAN_ADV)).fetchone()
         self.assertEqual(last["outcome"], "superseded")
+
+    def test_reopen_keeps_audit_suspensions(self):
+        fl = self.to_execution()
+        audits.suspend(fl.conn, fl.work, ADV, 4, now=fl.lab.now)
+        audits.suspend(fl.conn, fl.work, LENS, 0, now=fl.lab.now)
+        before = audits.suspended(fl.conn, fl.work)
+        self.reopen("plan")
+        self.assertEqual(audits.suspended(fl.conn, fl.work), before)
+        fl.conn.execute("UPDATE work_items SET phase = 'approval' WHERE id = ?", (fl.work,))
+        self.reopen("spec")
+        self.assertEqual(audits.suspended(fl.conn, fl.work), before)
+        self.assertEqual(before, {ADV: 4, LENS: 0})
+
+    def test_reopen_loads_config_only_for_a_running_subagent(self):
+        fl = self.to_execution()
+        bad = mock.patch.object(l2acts.audit, "work_config",
+                                side_effect=config.ConfigError("rotta"))
+        with bad:
+            self.reopen("plan")                          # nessun subagente: la config non serve
+        self.assertEqual(self.phase(), "plan")
+        fl.conn.execute("UPDATE work_items SET phase = 'approval' WHERE id = ?", (fl.work,))
+        subagents.start(fl.conn, agent_id="a-w", type_="tollgate:implementer", session=SESSION,
+                        work=fl.work, task=None, base_sha=None, fingerprint=None, now=fl.lab.now)
+        with bad:
+            self.assertIn("configurazione non valida", self.refused_reopen("spec"))
+        self.assertEqual(self.phase(), "approval")
 
     def test_reopen_needs_reason(self):
         self.to_approval()
@@ -574,7 +602,9 @@ class ReopenTest(L2Case):
         fl.register_plan(tasks=1)
         first = self.work()["plan_sha"]
         self.assertTrue(scope.paths(fl.conn, fl.work))
-        self.reopen("plan", "serve una pagina")
+        msg = self.reopen("plan", "serve una pagina")
+        self.assertIn("si registra da solo", msg)
+        self.assertNotIn("audit prepare", msg)
         work = self.work()
         self.assertEqual((work["phase"], work["plan_sha"], work["plan_path"]),
                          ("plan", None, PLAN))
@@ -632,7 +662,10 @@ class ReopenTest(L2Case):
         fl = self.to_execution()
         first = self.work()["plan_sha"]
         self.assertEqual(scope.paths(fl.conn, fl.work), {"src/app.py", "tests/test_app.py"})
-        self.reopen("plan", "serve la pagina")
+        msg = self.reopen("plan", "serve la pagina")
+        self.assertIn("audit prepare", msg)
+        self.assertIn("avversario del piano", msg)
+        self.assertNotIn("si registra da solo", msg)
         self.assertEqual((self.phase(), self.work()["plan_sha"]), ("plan", None))
         self.assertEqual(scope.paths(fl.conn, fl.work), set())
         self.assertEqual(fl.pre_edit(fl.wt / PLAN).exit, 0)
