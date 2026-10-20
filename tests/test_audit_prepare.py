@@ -630,27 +630,23 @@ class NonUtf8Test(AuditCase):
         fl.git("add", "--", path, repo=fl.wt)
         fl.git("commit", "-qm", "non utf-8", repo=fl.wt)
 
-    def test_committed_non_utf8_spec_never_raises(self):
+    def test_committed_non_utf8_spec_is_read_with_latin1_fallback(self):
         fl = self.lab()
         self.commit_bytes(fl, SPEC, "# Spec\n\ncaffè «niente»\n".encode("latin-1"))
         self.assertIn("audit prepare", audit.peek(fl.conn, self.work()))
-        try:
-            r = self.prepare()
-        except audit.AuditError:
-            pass                                    # un rifiuto va bene, un traceback no
-        else:
-            self.assertIn(r.code, (audit.OK, audit.REFUSED))
+        r = self.prepare()
+        self.assertEqual(r.code, audit.OK, self.text(r))
+        self.assertEqual([x.agent_type for x in r.launches], [ADV])
+        self.assertEqual(self.work()["spec_path"], SPEC)
 
-    def test_committed_non_utf8_plan_never_raises(self):
+    def test_committed_non_utf8_plan_is_a_refusal(self):
         fl = self.plan_lab()
         self.commit_bytes(fl, PLAN, plan_text().encode("utf-8") + "\ncaffè\n".encode("latin-1"))
         self.assertIn("audit prepare", audit.peek(fl.conn, self.work()))
-        try:
-            r = self.prepare()
-        except audit.AuditError:
-            pass
-        else:
-            self.assertIn(r.code, (audit.OK, audit.REFUSED))
+        r = self.prepare()
+        self.assertEqual(r.code, audit.REFUSED, self.text(r))
+        self.assertIn("rifiuto: nessun piano valido nel ramo", self.text(r))
+        self.assertEqual(r.launches, [])
 
     def test_undecodable_read_is_fallback_for_peek_and_refusal_for_prepare(self):
         fl = self.lab()

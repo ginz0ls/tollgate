@@ -119,6 +119,23 @@ class FromFindingsTest(FixTaskCase):
         self.assertIn("revisore: probe:reviewer-src", summary)
         self.assertEqual(self.row(3)["agent_type"], "probe:implementer-src")
 
+    def test_routing_files_only_declared_blocker_or_major(self):
+        """Riga 71: entrano i rilievi di gravità dichiarata blocker o major, anche se declassati
+        dopo; un moderate con regola di piano (blocking = 1) non entra."""
+        moderate = {"severity": "moderate", "file": "lib/nota.py", "line": 3,
+                    "rule": "piano:task 1", "text": "nota di stile"}
+        fl, c = self.lab(findings=(BLOCKER, OUTSIDE, moderate))
+        flagged = fl.conn.execute("SELECT blocking FROM findings WHERE file = 'lib/nota.py'"
+                                  ).fetchone()[0]
+        self.assertEqual(flagged, 1)           # il flag da solo non basta
+        self.findings(c)
+        major = next(r for r in reviews.blocking_open(fl.conn, fl.work, c)
+                     if r["file"] == "lib/altro.py")
+        reviews.set_decision(fl.conn, fl.work, major["id"], "downgraded:minor", now=fl.now)
+        work = phases.get_work(fl.conn, fl.work)
+        self.assertEqual(taskcmd._fix_files(fl.conn, work, self.row(3)),
+                         ["src/app.py", "lib/altro.py"])
+
     def test_brief_shows_effective_severity(self):
         fl, c = self.lab()
         major = reviews.blocking_open(fl.conn, fl.work, c)[0]

@@ -488,9 +488,10 @@ class SyncEdgeTest(SyncCase):
         self.assertEqual(fl.conn.execute("SELECT state FROM acts WHERE type = 'sync'")
                          .fetchone()[0], "pending")
 
-    def test_ff_only_failure_blocks(self):
-        """`merge --ff-only` dei commit remoti che fallisce ferma `sync`: HEAD intatto, intento
-        chiuso con l'errore, atto non consumato, nessun rebase né push forzato."""
+    def test_ff_only_failure_refuses(self):
+        """`merge --ff-only` dei commit remoti che fallisce è un rifiuto (spec 6.5), non un
+        blocco: HEAD intatto, intento chiuso con l'errore, atto non consumato, nessun rebase né
+        push forzato, nessun blocco aperto."""
         fl = self.pr_open_lab()
         self.advance_main(fl, msg="primo")
         self.update_branch_remote(fl)
@@ -509,6 +510,8 @@ class SyncEdgeTest(SyncCase):
         self.assertEqual(fl.conn.execute("SELECT state FROM acts WHERE type = 'sync'")
                          .fetchone()[0], "pending")
         self.assertEqual(work(fl)["phase"], "pr_open")
+        self.assertEqual(fl.conn.execute("SELECT count(*) FROM blocks WHERE closed IS NULL")
+                         .fetchone()[0], 0)
 
     def test_finish_check_red_after_rebase(self):
         """Dopo un rebase riuscito, un `finish check` rosso dà il messaggio del rosso (m4), non
