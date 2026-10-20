@@ -193,5 +193,24 @@ class TaskTextTest(unittest.TestCase):
             self.assertNotIn(spurious, r.scope)
 
 
+class FenceIndentTest(unittest.TestCase):
+    def _plan(self, indent):
+        return ("## Must-have\nM1. Uno — test: a::b\n\n### Task 1: Primo\n\n"
+                "- Create: `a.py`\n" + indent + "````\n### Task 9: nel recinto?\n"
+                "- Create: `z.py`\n\n### Task 2: Secondo\n\n- Modify: `b.py`\n")
+
+    def test_fence_with_four_spaces_does_not_open(self):
+        text = self._plan("    ")
+        r = check(text)
+        self.assertEqual([t.number for t in r.tasks], [1, 9, 2])
+        self.assertIn("z.py", r.scope)
+        inside = self._plan("   ")
+        self.assertEqual([t.number for t in check(inside).tasks], [1])
+
+    def test_task_text_same_rule(self):
+        self.assertIsNotNone(plan.task_text(self._plan("    "), 9))
+        self.assertIsNone(plan.task_text(self._plan("   "), 9))
+
+
 if __name__ == "__main__":
     unittest.main()
