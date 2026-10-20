@@ -14,7 +14,7 @@ L'atto è già registrato dal hook quando l'utente ha digitato il comando. Lanci
 
 Il comando fa `fetch`, integra i commit remoti del ramo, fa il rebase sul predefinito di `origin`, rilancia `finish check` e, se il contenuto non è cambiato, aggiorna la PR. Riferisci l'esito riga per riga, senza riassumere. Il codice d'uscita dice cosa fare:
 
-- **0**: riallineato (le righe dicono cosa è stato fatto; se la PR non è ancora aperta, indica `/tollgate:finish`).
+- **0, riallineato**: le righe dicono cosa è stato fatto; se la PR non è ancora aperta, indica `/tollgate:finish`.
 - **1, rifiuto**: riporta le righe `rifiuto:` così come sono. Se dicono che un task è in corso («chiudi o riporta in attesa il task k, poi /tollgate:sync») o che un implementatore sta scrivendo, il rebase non è partito: chiudi il task (o riportalo in attesa) oppure aspetta l'implementatore, poi l'utente rilancia `/tollgate:sync`. Se dicono che il rebase è stato fatto, un nuovo `/tollgate:sync` completa il riallineamento senza ripeterlo.
 - **2, blocco `needs_you`** (base e fase restano): leggi la riga `needs_you:` e distingui i due casi, mostrando all'utente le strade che la riga stessa indica. Non risolvere nulla al posto suo.
   - **«sync: conflitto nel rebase …»**: il rebase è annullato. Strade: (a) risolvere fuori da tollgate (rebase a mano nel worktree, finito), poi `/tollgate:approve rebase`, che riallinea la base e autorizza il push forzato del prossimo `finish open-pr`; oppure (b) `/tollgate:abandon #N`.

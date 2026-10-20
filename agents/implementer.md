@@ -47,7 +47,7 @@ Fermarsi e dire «questo è troppo difficile per me» è sempre accettabile. Lav
 
 Come: chiudi con BLOCKED o NEEDS_CONTEXT, descrivendo dove sei bloccato, cosa hai provato e che aiuto serve.
 
-**Test e specifica in conflitto.** Se un test esistente contraddice la specifica del task, non adattare il test per farlo passare: apri un blocco con `<programma> block open test_spec_conflict --reason "<cosa si contraddice, con file e riga>"` e chiudi con BLOCKED. `<programma>` è la forma esatta che il brief e il messaggio di avvio indicano per il comando di verifica (`python3 '<percorso>/bin/tollgate'`): `tollgate` nudo non è nel PATH.
+**Test e specifica in conflitto.** Se un test esistente contraddice la specifica del task, non adattare il test per farlo passare: apri un blocco con `<programma> block open test_spec_conflict --reason "<cosa si contraddice, con file e riga>"` e chiudi con BLOCKED. `<programma>` è la forma esatta che il brief e il messaggio di avvio indicano per il comando di verifica (`python3 "<percorso>/bin/tollgate"`): `tollgate` nudo non è nel PATH.
 
 ## Autorevisione prima del report
 

@@ -24,9 +24,9 @@ Il controllo rifiuta un albero con modifiche non committate. Come primo passo co
 
 Lancia `<programma> finish check`: esegue il gate e le verifiche dei profili e stampa la Definition of Done voce per voce.
 
-- **Uscita 1, rosso**: mostra all'utente tutte le voci `[no]` con il loro dettaglio e fermati. Le voci `[dopo la revisione]` non sono errori. Non correggere da solo: indica la riga «prossimo passo», che dice di correggere e rilanciare.
-- **Uscita 2, rifiuto** (nessun lavoro attivo, fase sbagliata, PR già unita o chiusa senza merge): riporta le righe `rifiuto:` e fermati. Per una PR chiusa senza merge le due strade sono nel messaggio.
-- **Uscita 0, verde**: la fase è `review`. Leggi la riga «prossimo passo»: in L0 è `finish open-pr` (vai al passo 3); in L1 e L2 è `review prepare` (passo 2).
+- **1, rosso**: mostra all'utente tutte le voci `[no]` con il loro dettaglio e fermati. Le voci `[dopo la revisione]` non sono errori. Non correggere da solo: indica la riga «prossimo passo», che dice di correggere e rilanciare. In L2 la voce `approvals` `[no]` (spec e piano approvati, report dell'audit presenti) dice quale file di approvazione o quale report manca o non è più quello attuale: se la spec o il piano sono cambiati dopo l'approvazione, la via è `/tollgate:reopen spec` o `/tollgate:reopen plan` e un nuovo audit; un file di approvazione o un report non committato si committa con `git add` e `git commit`.
+- **2, rifiuto** (nessun lavoro attivo, fase sbagliata, PR già unita o chiusa senza merge): riporta le righe `rifiuto:` e fermati. Per una PR chiusa senza merge le due strade sono nel messaggio.
+- **0, verde**: la fase è `review`. Leggi la riga «prossimo passo»: in L0 è `finish open-pr` (vai al passo 3); in L1 e L2 è `review prepare` (passo 2).
 
 ## 2. Revisione finale (L1 e L2)
 

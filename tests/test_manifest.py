@@ -88,7 +88,7 @@ class ManifestTest(unittest.TestCase):
             self.assertIn(ATTRIBUTION, path.read_text())
 
     def test_user_only_skills(self):
-        for name in ("approve", "resolve", "setup", "off", "on"):
+        for name in ("approve", "resolve", "setup", "off", "on", "reopen"):
             text = (ROOT / "skills" / name / "SKILL.md").read_text()
             self.assertRegex(text, r"(?m)^disable-model-invocation: true$", name)
             self.assertRegex(text, rf"(?m)^name: {name}$")
@@ -99,7 +99,8 @@ class ManifestTest(unittest.TestCase):
             self.assertRegex(text, r"(?m)^description: \S")
 
     def test_skills_use_quoted_program(self):
-        for name in ("start", "execute", "status", "approve", "resolve", "setup"):
+        for name in ("start", "execute", "status", "approve", "resolve", "setup", "spec-audit",
+                     "reopen"):
             text = (ROOT / "skills" / name / "SKILL.md").read_text()
             self.assertIn('python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"', text, name)
             self.assertNotIn('"<programma>"', text, name)
@@ -122,7 +123,7 @@ class ManifestTest(unittest.TestCase):
         for needle in ("--confirm", "EnterWorktree", "cd <percorso> && claude",
                        "status --checkpoint", "writing-plans", "brainstorming"):
             self.assertIn(needle, text)
-        self.assertRegex(text, r"(?m)^argument-hint: \"#N \[L1\|L2\]\"$")
+        self.assertRegex(text, r"(?m)^argument-hint: \"#N \[L1\|L2\] \[--spec <percorso>\]\"$")
 
     def test_setup_skill_does_not_write_settings(self):
         text = (ROOT / "skills" / "setup" / "SKILL.md").read_text()
@@ -283,6 +284,71 @@ class ManifestTest(unittest.TestCase):
         self.assertIn("/tollgate:abandon #N", start)
         resolve = (ROOT / "skills" / "resolve" / "SKILL.md").read_text()
         self.assertIn("concede **un** ciclo", resolve)
+
+    AUDIT_AGENTS = {"spec-adversary": (["Read", "Grep", "Glob", "WebFetch"], "inherit"),
+                    "spec-auditor": (["Read", "Grep", "Glob", "WebFetch"], "sonnet"),
+                    "plan-adversary": (["Read", "Grep", "Glob"], "inherit")}
+    AUDIT_ATTRIBUTION = "Metodo derivato da prd-audit (sAInapse), con l'accordo dell'autore"
+
+    def test_audit_agents_frontmatter(self):
+        for name, (tools, model) in self.AUDIT_AGENTS.items():
+            path = ROOT / "agents" / f"{name}.md"
+            fm = frontmatter(path)
+            self.assertEqual(fm["name"], name)
+            self.assertEqual(fm["model"], model, name)
+            self.assertEqual([t.strip() for t in fm["tools"].split(",")], tools, name)
+            self.assertTrue(fm["description"])
+            for banned in ("Edit", "Write", "Bash"):
+                self.assertNotIn(banned, tools)
+        self.assertIn(self.AUDIT_ATTRIBUTION,
+                      (ROOT / "agents" / "spec-auditor.md").read_text())
+
+    def test_audit_json_fields_in_agent_text(self):
+        common = ("v", "kind", "number", "viewpoint", "spec_sha", "code", "counts", "blocker",
+                  "major", "moderate", "minor")
+        for name in self.AUDIT_AGENTS:
+            text = (ROOT / "agents" / f"{name}.md").read_text()
+            fields = common + (("plan_sha",) if name == "plan-adversary" else ())
+            for field in fields:
+                self.assertRegex(text, rf'"{field}"', f"{name}: {field}")
+            blocks = re.findall(r"```json\n(.*?)\n```", text, re.S)
+            self.assertEqual(len(blocks), 1, name)
+            data = json.loads(blocks[0])
+            self.assertEqual(data["v"], 1)
+            self.assertEqual(set(data), set(fields) - {"blocker", "major", "moderate", "minor"})
+            self.assertEqual(set(data["counts"]), {"blocker", "major", "moderate", "minor"})
+
+    def test_reopen_user_only_and_spec_audit_model_invocable(self):
+        text = (ROOT / "skills" / "reopen" / "SKILL.md").read_text()
+        self.assertRegex(text, r"(?m)^disable-model-invocation: true$")
+        self.assertRegex(text, r"(?m)^name: reopen$")
+        self.assertIn("act apply", text)
+        audit = (ROOT / "skills" / "spec-audit" / "SKILL.md").read_text()
+        self.assertNotIn("disable-model-invocation", audit)
+        self.assertRegex(audit, r"(?m)^name: spec-audit$")
+        self.assertRegex(audit, r"(?m)^description: \S")
+        self.assertIn("versione di prd-audit incorporata", audit.lower())
+        self.assertIn("con l'accordo dell'autore", audit)
+
+    def test_agents_use_program_command_form(self):
+        """Ogni agente che nomina `bin/tollgate` usa `python3 "…/bin/tollgate"`, mai apici
+        singoli (riga 79 del triage di P3b)."""
+        bare = re.compile(r"""(?<!python3 ")(?<!python3 "…/)(?<!python3 "<percorso>/)"""
+                          r"""(?<!python3 "\$\{CLAUDE_PLUGIN_ROOT\}/)bin/tollgate(?![\w])""")
+        for path in sorted((ROOT / "agents").glob("*.md")):
+            text = path.read_text()
+            with self.subTest(path=path.name):
+                self.assertNotIn("python3 '", text)
+                self.assertEqual(bare.findall(text), [])
+
+    def test_dimensioni_copied_with_attribution(self):
+        path = ROOT / "skills" / "spec-audit" / "references" / "dimensioni.md"
+        text = path.read_text()
+        first = text.split("\n", 1)[0]
+        self.assertIn("prd-audit", first)
+        self.assertIn("con l'accordo dell'autore", first)
+        for n in range(1, 11):
+            self.assertRegex(text, rf"(?m)^## L{n}\. ")
 
     def test_wrapper_executable(self):
         self.assertTrue(os.access(ROOT / "hooks" / "run", os.X_OK))
