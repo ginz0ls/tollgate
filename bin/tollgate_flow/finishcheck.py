@@ -184,7 +184,8 @@ def profile_receipts(conn, wid: int, sha: str, extra, allow_no_tests: bool,
 
 def _approved_spec_blob(wt: Path, work) -> str | None:
     """Lo `sha` dell'approvazione della spec trovata in HEAD (anche di un'altra issue, per una
-    fetta successiva), oppure `None`. Una sola lettura dell'albero per `finish check`."""
+    fetta successiva), oppure `None`. Legge solo le approvazioni delle spec (non i report); `_approvals` rilegge
+    l'albero per `check_l2`, che serve anche i report."""
     spec_path = work["spec_path"]
     if not spec_path:
         return None

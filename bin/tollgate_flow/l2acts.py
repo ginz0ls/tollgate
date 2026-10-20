@@ -16,7 +16,7 @@ from tollgate_analysis import (approvals, auditrules, brief as briefs, profiles 
 from tollgate_core import audits, clock, config, db, git, phases, scope, subagents
 from tollgate_core.paths import program_command
 
-from . import audit
+from . import audit, l2tree
 
 ADV_KIND, LENS_KIND, PLAN_KIND = audit.ADV_KIND, audit.LENS_KIND, audit.PLAN_KIND
 SPEC_KINDS = audit.SPEC_KINDS
@@ -184,8 +184,7 @@ def approve_spec(conn, state, work, act, args, now, session) -> str:
 
 def _spec_approved(wt: Path, work, spec_blob: str) -> None:
     """D3: l'approvazione della spec si cerca nei file in HEAD, con lo `sha` attuale."""
-    listing = git.ls_files_at(wt, "HEAD", approvals.REVIEWS_DIR + "/")
-    files = {p: git.text_at(wt, "HEAD", p) or "" for p in approvals.approval_listing(listing)}
+    files = l2tree.spec_approvals(wt, "HEAD")
     where = {"issue": work["issue"], "spec_path": work["spec_path"]}
     found = approvals.locate_spec_approval(files, spec_blob=spec_blob, **where)
     if found is None and approvals.locate_spec_approval(files, spec_blob=None, **where):

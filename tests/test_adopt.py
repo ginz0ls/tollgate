@@ -403,7 +403,6 @@ class AdoptRefusalTest(AdoptCase):
         self.assertEqual(sessions.bound_work(fl.conn, SESSION), None)
 
 
-
 class AdoptL2Test(AdoptCase):
     """`adopt` di L2 (12.4, decisione 16): fette successive e fase `plan` o `approval`."""
     OTHER_SPEC_FILE = "docs/superpowers/reviews/3/spec-approval.md"

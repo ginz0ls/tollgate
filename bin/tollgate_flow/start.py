@@ -2,8 +2,9 @@
 
 Codici: 0 fatto, 1 rifiuto, 3 serve conferma (decisione 6), 4 lavoro creato ma registrazione
 incompleta (la riga esiste: la ripresa la completa). Con `--spec` un lavoro nuovo è la fetta
-successiva di una spec già approvata sul ramo predefinito (5, decisione 14). Il testo dell'issue non entra mai
-in un comando né negli argomenti di git: finisce solo in `.tollgate-run/<N>/issue.md`."""
+successiva di una spec già approvata sul ramo predefinito (5, decisione 14). Il testo dell'issue
+non entra mai in un comando né negli argomenti di git: finisce solo in
+`.tollgate-run/<N>/issue.md`."""
 from __future__ import annotations
 
 import json

@@ -23,7 +23,7 @@ from tollgate_analysis import (approvals, auditrules, brief as briefs, plan as p
 from tollgate_core import audits, clock, config, db, git, phases, scope, sessions
 from tollgate_core.paths import program_command
 
-from . import adopt, finalreview
+from . import adopt, finalreview, l2tree
 
 OK, REFUSED, NEEDS_CONFIRM = 0, 1, 3
 SPECS_DIR = "docs/superpowers/specs/"
@@ -324,8 +324,7 @@ def _spec_branches(ctx: _Ctx, spec: tuple, slices: int, stale, register) -> _Act
 
 def _spec_approval_current(ctx: _Ctx, spec_path: str, spec_blob: str) -> None:
     """D3: l'approvazione della spec si legge a HEAD e deve essere sullo `sha` attuale."""
-    listing = git.ls_files_at(ctx.wt, "HEAD", approvals.REVIEWS_DIR + "/")
-    files = {p: git.text_at(ctx.wt, "HEAD", p) or "" for p in approvals.approval_listing(listing)}
+    files = l2tree.spec_approvals(ctx.wt, "HEAD")
     issue = ctx.work["issue"]
     found = approvals.locate_spec_approval(files, issue=issue, spec_path=spec_path, spec_blob=None)
     if found is None:
