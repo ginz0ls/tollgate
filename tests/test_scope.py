@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime, timezone
 
 from tests.helpers import TempState
-from tollgate_core import db, phases, scope, tasks
+from tollgate_core import db, events, phases, scope, tasks
 
 T0 = datetime(2026, 10, 9, 10, 0, tzinfo=timezone.utc)
 
@@ -43,6 +43,47 @@ class ScopeTest(unittest.TestCase):
         scope.set_plan_path(self.conn, self.w, "p.md", now=T0)
         scope.set_plan_path(self.conn, self.w, "altro.md", now=T0)
         self.assertEqual(phases.get_work(self.conn, self.w)["plan_path"], "p.md")
+
+
+class ResetPlanTest(unittest.TestCase):
+    def setUp(self):
+        self.ts = TempState()
+        self.conn = db.open_db(self.ts.state)
+        self.w = phases.create_work(self.conn, repo_key="r", issue=7, level="L2", now=T0)
+
+    def tearDown(self):
+        self.conn.close()
+        self.ts.cleanup()
+
+    def register(self, sha, paths=("a",), n=2):
+        scope.register_plan(self.conn, self.ts.state, self.w, plan_path="p.md", plan_sha=sha,
+                            scope_paths=list(paths), plan_tasks=[(i, []) for i in range(1, n + 1)],
+                            advance=False, now=T0)
+
+    def test_reset_then_register_again(self):
+        self.register("s1", ("a", "b"))
+        self.conn.execute("INSERT INTO scope (work, path, origin, registered_at) "
+                          "VALUES (?, 'extra', 'waiver', 'x')", (self.w,))
+        self.conn.execute("INSERT INTO subagents (id, type, work, task, state, report) "
+                          "VALUES ('ag1', 'impl', ?, 1, 'done', 'vecchio')", (self.w,))
+        self.assertEqual(scope.reset_plan(self.conn, self.w, now=T0), [1, 2])
+        row = phases.get_work(self.conn, self.w)
+        self.assertEqual((row["plan_sha"], row["plan_path"]), (None, "p.md"))
+        self.assertEqual(scope.paths(self.conn, self.w), {"extra"})
+        self.assertEqual(self.conn.execute("SELECT count(*) FROM tasks").fetchone()[0], 0)
+        ev = [e for e in events.export_events(self.conn, 0) if e["type"] == "plan_reset"]
+        self.assertEqual([e["data"] for e in ev], [{"plan_sha": "s1", "tasks": [1, 2]}])
+        # la riga storica del subagente non si aggancia ai task rinumerati del piano nuovo
+        self.assertIsNone(self.conn.execute("SELECT task FROM subagents").fetchone()[0])
+        self.register("s2", ("c",), n=3)
+        self.assertEqual(scope.paths(self.conn, self.w), {"extra", "c"})
+        self.assertEqual(self.conn.execute("SELECT count(*) FROM tasks").fetchone()[0], 3)
+        self.assertEqual(phases.get_work(self.conn, self.w)["plan_sha"], "s2")
+
+    def test_reset_without_plan_is_noop_without_event(self):
+        self.assertEqual(scope.reset_plan(self.conn, self.w, now=T0), [])
+        self.assertEqual(self.conn.execute(
+            "SELECT count(*) FROM events WHERE type='plan_reset'").fetchone()[0], 0)
 
 
 if __name__ == "__main__":

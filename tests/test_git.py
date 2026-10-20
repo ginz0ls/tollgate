@@ -224,6 +224,53 @@ class GitTest(unittest.TestCase):
         self.assertFalse(sentinel.exists())
 
 
+class LsFilesAtTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="tollgate ls "))
+        self.repo = make_repo(self.tmp / "repo con spazi")
+        for rel in ("docs/superpowers/reviews/7/spec-approval.md",
+                    "docs/superpowers/reviews/8/a b.md", "docs/altro.md", "src/x.py"):
+            (self.repo / rel).parent.mkdir(parents=True, exist_ok=True)
+            (self.repo / rel).write_text(f"{rel}\n")
+        g(self.repo, "add", "-A")
+        g(self.repo, "commit", "-qm", "base")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_lists_files_under_prefix_recursively(self):
+        self.assertEqual(
+            git.ls_files_at(self.repo, "HEAD", "docs/superpowers/reviews/"),
+            ["docs/superpowers/reviews/7/spec-approval.md", "docs/superpowers/reviews/8/a b.md"])
+
+    def test_missing_ref_or_prefix_is_empty(self):
+        self.assertEqual(git.ls_files_at(self.repo, "origin/main", "docs/"), [])
+        self.assertEqual(git.ls_files_at(self.repo, "HEAD", "nessuna/"), [])
+
+    def test_non_ascii_name_is_not_quoted(self):
+        (self.repo / "docs" / "è.md").write_text("x\n")
+        g(self.repo, "add", "-A")
+        g(self.repo, "commit", "-qm", "accento")
+        self.assertIn("docs/è.md", git.ls_files_at(self.repo, "HEAD", "docs/"))
+
+
+class BlobAtTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="tollgate blob "))
+        self.repo = make_repo(self.tmp / "repo")
+        (self.repo / "a.md").write_text("uno\n")
+        g(self.repo, "add", "-A")
+        g(self.repo, "commit", "-qm", "base")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_blob_at_matches_hash_object_and_none_when_absent(self):
+        self.assertEqual(git.blob_at(self.repo, "HEAD", "a.md"), git.blob_sha(self.repo, "a.md"))
+        self.assertIsNone(git.blob_at(self.repo, "HEAD", "manca.md"))
+        self.assertIsNone(git.blob_at(self.repo, "origin/main", "a.md"))
+
+
 class FingerprintTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="tollgate fp "))

@@ -153,8 +153,20 @@ SCHEMA_V4 = [
     "ALTER TABLE tasks ADD COLUMN task_text TEXT",
 ]
 
+# Migrazione 5 (piano P3c, decisione 1): giri di audit con codice, documenti esaminati e stato
+# (le righe esistenti sono giri chiusi), sospensioni dei tetti.
+SCHEMA_V5 = [
+    "ALTER TABLE spec_audit ADD COLUMN code TEXT",
+    "ALTER TABLE spec_audit ADD COLUMN sha TEXT",
+    "ALTER TABLE spec_audit ADD COLUMN spec_sha TEXT",
+    "ALTER TABLE spec_audit ADD COLUMN stage TEXT NOT NULL DEFAULT 'closed' "
+    "CHECK (stage IN ('open','closed'))",
+    "ALTER TABLE spec_audit ADD COLUMN opened TEXT",
+    "ALTER TABLE work_items ADD COLUMN audit_suspended TEXT NOT NULL DEFAULT '{}'",
+]
+
 MIGRATIONS: list[tuple[int, list[str]]] = [(1, SCHEMA_V1), (2, SCHEMA_V2), (3, SCHEMA_V3),
-                                           (4, SCHEMA_V4)]
+                                           (4, SCHEMA_V4), (5, SCHEMA_V5)]
 
 
 def latest_version() -> int:

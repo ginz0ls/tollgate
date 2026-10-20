@@ -12,6 +12,27 @@ from tollgate_hooks.context import Ctx, ReadDb
 SCOPE = ("src/app.py", "tests/test_app.py")
 
 
+class ReviewsExemptTest(unittest.TestCase):
+    def test_own_reviews_dir_exempt_other_issue_not(self):
+        lab = Lab()
+        try:
+            with_scope(lab, SCOPE)
+            cfg = load_config_text(DEFAULT_TOML)
+            for rel in ("docs/superpowers/reviews/7/plan-approval.md",
+                        "docs/superpowers/reviews/8/plan-approval.md"):
+                (lab.wt / rel).parent.mkdir(parents=True, exist_ok=True)
+                (lab.wt / rel).write_text("x\n")
+            work = phases.get_work(lab.conn, lab.work)
+            self.assertEqual(work["issue"], 7)
+            changes = core_git.changes(lab.wt, lab.base)
+            got = violations.diff_violations(cfg, lab.conn, work, lab.wt, lab.base, None,
+                                             changes, components={})
+            self.assertEqual([v.path for v in got],
+                             ["docs/superpowers/reviews/8/plan-approval.md"])
+        finally:
+            lab.close()
+
+
 class DiffViolationsTest(unittest.TestCase):
     def setUp(self):
         self.lab = Lab()

@@ -297,6 +297,21 @@ def worktree_text(repo, path: str) -> str | None:
         return None
 
 
+def ls_files_at(repo, ref: str, prefix: str) -> list[str]:
+    """I file sotto `prefix` nell'albero di `ref`, ricorsivi; `[]` se il riferimento non c'è.
+    Divide su NUL: i nomi non vengono citati né spezzati da spazi o accenti."""
+    r = _proc(repo, ["ls-tree", "-r", "-z", "--name-only", ref, "--", prefix])
+    if r.returncode != 0:
+        return []
+    return [p for p in r.stdout.decode("utf-8", "surrogateescape").split("\0") if p]
+
+
+def blob_at(repo, ref: str, path: str) -> str | None:
+    """SHA del blob di `path` nell'albero di `ref`; `None` se manca (o manca il riferimento)."""
+    r = _proc(repo, ["rev-parse", "--verify", "-q", f"{ref}:{path}"])
+    return r.stdout.decode().strip() or None if r.returncode == 0 else None
+
+
 def exists_at(repo, ref: str, path: str) -> bool:
     return ok(repo, "cat-file", "-e", f"{ref}:{path}")
 

@@ -195,8 +195,8 @@ class MigrationV4Test(unittest.TestCase):
     def tearDown(self):
         self.ts.cleanup()
 
-    def test_latest_version_is_4(self):
-        self.assertEqual(db.latest_version(), 4)
+    def test_latest_version_is_5(self):
+        self.assertEqual(db.latest_version(), 5)
 
     def test_from_v3_adds_columns_keeps_rows_and_backup(self):
         saved = db.MIGRATIONS[:]
@@ -216,7 +216,8 @@ class MigrationV4Test(unittest.TestCase):
         conn = db.open_db(self.ts.state)
         try:
             self.assertEqual(conn.execute(
-                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "4")
+                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0],
+                str(db.latest_version()))
 
             def cols(table):
                 return {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
@@ -245,6 +246,47 @@ class MigrationV4Test(unittest.TestCase):
     def test_fresh_db_makes_no_copy(self):
         db.open_db(self.ts.state).close()
         self.assertEqual(list(self.ts.state.backup_dir.glob("*migrazione-4*")), [])
+
+
+class MigrationV5Test(unittest.TestCase):
+    def setUp(self):
+        self.ts = TempState()
+
+    def tearDown(self):
+        self.ts.cleanup()
+
+    def test_from_v4_adds_columns_keeps_rows_and_backup(self):
+        saved = db.MIGRATIONS[:]
+        try:
+            db.MIGRATIONS[:] = saved[:4]
+            conn = db.open_db(self.ts.state)
+            insert_work(conn)
+            conn.execute("INSERT INTO spec_audit (work, kind, number, viewpoint, counts, outcome, "
+                         "report_path) VALUES (1, 'spec-lens', 1, 'executor', '{}', 'empty', 'r.md')")
+            conn.close()
+        finally:
+            db.MIGRATIONS[:] = saved
+        conn = db.open_db(self.ts.state)
+        try:
+            self.assertEqual(conn.execute(
+                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "5")
+
+            def cols(table):
+                return {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+            self.assertTrue({"code", "sha", "spec_sha", "stage", "opened"} <= cols("spec_audit"))
+            self.assertIn("audit_suspended", cols("work_items"))
+            w = conn.execute("SELECT * FROM work_items").fetchone()
+            self.assertEqual((w["issue"], w["audit_suspended"]), (1, "{}"))
+            a = conn.execute("SELECT * FROM spec_audit").fetchone()
+            self.assertEqual((a["kind"], a["outcome"], a["report_path"], a["stage"], a["code"],
+                              a["opened"]), ("spec-lens", "empty", "r.md", "closed", None, None))
+        finally:
+            conn.close()
+        self.assertTrue(list(self.ts.state.backup_dir.glob("tollgate-*-migrazione-5.db")))
+
+    def test_fresh_db_makes_no_copy(self):
+        db.open_db(self.ts.state).close()
+        self.assertEqual(list(self.ts.state.backup_dir.glob("*migrazione-5*")), [])
 
 
 _FROZEN = datetime(2026, 10, 9, 12, 0, 0, 123456, tzinfo=timezone.utc)

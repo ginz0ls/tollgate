@@ -58,16 +58,22 @@ def locked_docs(work) -> set[str]:
     return out
 
 
-def scope_exempt(cfg: Config, work, rel: str, scope: set[str]) -> bool:
+def scope_exempt(cfg: Config, work, rel: str, scope: set[str], *,
+                 locked: set[str] | None = None) -> bool:
     """Esenzioni dallo scope (7.4). I percorsi di `scope` sono nomi letterali (possono
     contenere `[ ]`): si confrontano per uguaglianza, mai come pattern. Solo `[scope] always`
-    è fatto di pattern."""
+    è fatto di pattern. `locked` sono i documenti bloccati (`locked_docs`): chi esamina molti
+    file lo calcola una volta sola e lo passa."""
     if rel.startswith(".superpowers/") or rel == f".tollgate/waivers/{work['issue']}.toml":
+        return True
+    # I report e le approvazioni del lavoro li scrivono solo la CLI e gli hook e il
+    # coordinatore li committa con spec e piano (decisione 26).
+    if rel.startswith(f"docs/superpowers/reviews/{work['issue']}/"):
         return True
     if git.excluded(rel, output_excludes(cfg)):
         return True
     if is_docs_md(rel) and not rel.startswith("docs/superpowers/reviews/") \
-            and rel not in locked_docs(work):
+            and rel not in (locked_docs(work) if locked is None else locked):
         return True
     if globs.match_any(cfg.get("scope.always"), rel):
         return True
@@ -122,8 +128,9 @@ def diff_violations(cfg: Config, conn, work, wt: Path, base_ref: str, head_ref: 
         out += testguard.check(tg, guard_config(cfg, [c.path for c in changes])).violations
     if components.get("scope_check", True) and work["level"] != "L0" and work["plan_sha"]:
         scope = scope_mod.paths(conn, work["id"])
+        locked = locked_docs(work)
         for c in changes:
-            if c.path not in scope and not scope_exempt(cfg, work, c.path, scope) \
+            if c.path not in scope and not scope_exempt(cfg, work, c.path, scope, locked=locked) \
                     and not is_registered_plan(work, wt, c.path, head_ref):
                 out.append(Violation("out_of_scope", c.path, "file fuori dallo scope del piano",
                                      "scope"))

@@ -9,7 +9,7 @@ from tollgate_core.phases import TransitionError
 T0 = clock.parse("2026-10-08T10:00:00.000000Z")
 OPEN_PHASES = ["spec_audit", "plan", "approval", "execution", "review", "pr_open"]
 CAUSES = ["advance", "finish_check_green", "needs_fix", "start", "sync", "reopen_spec",
-          "reopen_plan", "l0_grew", "merged"]
+          "reopen_plan", "l0_grew", "merged", "approve_spec", "audit_clean", "approve_plan"]
 BACK = {("review", "execution", "needs_fix"), ("review", "execution", "start"),
         ("pr_open", "execution", "start"), ("pr_open", "execution", "sync")}
 EXPECTED = {
@@ -17,8 +17,8 @@ EXPECTED = {
            ("execution", "plan", "l0_grew")} | BACK,
     "L1": {("plan", "execution", "advance"), ("execution", "review", "finish_check_green"),
            ("review", "pr_open", "advance"), ("execution", "plan", "reopen_plan")} | BACK,
-    "L2": {("spec_audit", "plan", "advance"), ("plan", "approval", "advance"),
-           ("approval", "execution", "advance"), ("execution", "review", "finish_check_green"),
+    "L2": {("spec_audit", "plan", "approve_spec"), ("plan", "approval", "audit_clean"),
+           ("approval", "execution", "approve_plan"), ("execution", "review", "finish_check_green"),
            ("review", "pr_open", "advance"),
            ("plan", "spec_audit", "reopen_spec"), ("approval", "spec_audit", "reopen_spec"),
            ("execution", "spec_audit", "reopen_spec"),
@@ -40,6 +40,11 @@ class CheckTransitionTest(unittest.TestCase):
                     pass
             with self.subTest(level=level):
                 self.assertEqual(allowed, expected)
+
+    def test_l2_forward_needs_its_cause(self):
+        for frm, to in (("spec_audit", "plan"), ("plan", "approval"), ("approval", "execution")):
+            with self.assertRaises(TransitionError):
+                phases.check_transition("L2", frm, to, "advance")
 
     def test_closed(self):
         for frm in OPEN_PHASES + ["blocked"]:
@@ -324,7 +329,21 @@ class CreateWorkPhaseTest(WorkCase):
 
     def test_phase_and_approved_spec_are_exclusive(self):
         with self.assertRaises(ValueError):
-            self.new("L2", phase="plan", from_approved_spec=True)
+            self.new("L2", phase="plan", from_approved_spec=True, spec_path="s.md")
+
+    def test_from_approved_spec_requires_spec_path(self):
+        with self.assertRaisesRegex(ValueError, "from_approved_spec richiede spec_path"):
+            self.new("L2", from_approved_spec=True)
+        self.assertEqual(self.conn.execute("SELECT count(*) FROM work_items").fetchone()[0], 0)
+        w = self.new("L2", from_approved_spec=True, spec_path="docs/superpowers/specs/s.md")
+        self.assertEqual(phases.get_work(self.conn, w)["phase"], "plan")
+
+    def test_set_spec_path_only_once(self):
+        w = self.new("L2")
+        phases.set_spec_path(self.conn, w, "docs/superpowers/specs/a.md", now=T0)
+        phases.set_spec_path(self.conn, w, "docs/superpowers/specs/b.md", now=T0)
+        self.assertEqual(phases.get_work(self.conn, w)["spec_path"],
+                         "docs/superpowers/specs/a.md")
 
     def test_refused_phase_creates_nothing(self):
         with self.assertRaises(ValueError):

@@ -18,7 +18,14 @@ INITIAL = {"L0": "execution", "L1": "plan", "L2": "spec_audit"}
 LEVELS = ("L0", "L1", "L2")
 BLOCK_TYPES = ("needs_you", "test_spec_conflict", "dependency", "permission", "transient")
 CLOSE_CAUSES = frozenset({"merged", "closed_unmerged", "abandoned"})
-_FORWARD_CONDITION = {("execution", "review"): "finish_check_green"}
+# Il passaggio in avanti di L2 ha una causa propria: la fase non avanza senza l'atto o il giro
+# pulito che la giustifica (decisione 11).
+_FORWARD_CONDITION = {
+    ("execution", "review"): "finish_check_green",
+    ("spec_audit", "plan"): "approve_spec",
+    ("plan", "approval"): "audit_clean",
+    ("approval", "execution"): "approve_plan",
+}
 _BACK = {
     ("review", "execution"): {"needs_fix", "start"},
     ("pr_open", "execution"): {"start", "sync"},
@@ -86,6 +93,8 @@ def create_work(conn, *, repo_key: str, issue: int, level: str, now, session=Non
     stare nella sequenza del livello e non essere `closed`; esclude `from_approved_spec`."""
     if level not in LEVELS:
         raise ValueError(f"livello sconosciuto: {level}")
+    if from_approved_spec and phase is None and not spec_path:
+        raise ValueError("from_approved_spec richiede spec_path")
     if phase is not None:
         if from_approved_spec:
             raise ValueError("phase e from_approved_spec si escludono")
@@ -128,6 +137,14 @@ def set_worktree(conn, work: int, path, *, now) -> None:
         get_work(conn, work)
         conn.execute("UPDATE work_items SET worktree = ?, updated = ? WHERE id = ?",
                      (str(path), clock.fmt(now), work))
+
+
+def set_spec_path(conn, work: int, path: str, *, now) -> None:
+    """Registra la spec del lavoro, una volta sola: una già registrata non si cambia."""
+    with db.tx(conn):
+        get_work(conn, work)
+        conn.execute("UPDATE work_items SET spec_path = ?, updated = ? "
+                     "WHERE id = ? AND spec_path IS NULL", (path, clock.fmt(now), work))
 
 
 def set_base(conn, work: int, sha: str, *, cause: str, now, session=None) -> None:
