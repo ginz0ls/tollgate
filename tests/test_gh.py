@@ -79,6 +79,12 @@ class PrReadTest(FakeGhCase):
         with self.assertRaises(gh.GhError):
             gh.pr_view(self.state, self.tmp, 6)
 
+    def test_pr_body(self):
+        self.set(prs=[self.pr(5, body="corpo\n<!-- tollgate {} -->")])
+        self.assertEqual(gh.pr_body(self.state, self.tmp, 5), "corpo\n<!-- tollgate {} -->")
+        with self.assertRaises(gh.GhError):
+            gh.pr_body(self.state, self.tmp, 6)
+
     def test_unknown_json_field_is_rejected_by_fake(self):
         self.set(prs=[])
         for args in (["pr", "list", "--json", "number,nonEsiste"],

@@ -171,6 +171,15 @@ def pr_edit(state, repo, number: int, *, body_file) -> None:
     _run_checked(state, repo, ["pr", "edit", str(int(number)), "--body-file", str(body_file)])
 
 
+def pr_body(state, repo, number: int) -> str:
+    """Il corpo della PR (dato non fidato: `adopt` ne legge solo il blocco JSON)."""
+    data = run_json(state, repo, ["pr", "view", str(int(number)), "--json", "body"])
+    body = data.get("body") if isinstance(data, dict) else None
+    if not isinstance(body, str):
+        raise GhError(f"pr view {number}: risposta inattesa")
+    return body
+
+
 def pr_comments(state, repo, number: int) -> list[dict]:
     data = run_json(state, repo, ["pr", "view", str(int(number)), "--json", "comments"])
     comments = data.get("comments") if isinstance(data, dict) else None
