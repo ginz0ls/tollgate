@@ -15,7 +15,7 @@ from tollgate_core import (acts, audits, clock, config, db, events, git, intents
                            reviews, sessions, subagents, tasks)
 from tollgate_core.paths import program_command
 
-from . import gitw, l2acts
+from . import audit, gitw, l2acts
 
 
 FIX_CAP = re.compile(r"giri di correzione esauriti sul task ([0-9]+)")     # motivo di taskcmd
@@ -30,11 +30,8 @@ def _label(row) -> str:
 
 
 def _config(state, work) -> config.Config:
-    wt = Path(work["worktree"])
-    main = git.main_worktree(wt)
-    base = work["work_base_sha"] or git.default_ref(main)
     try:
-        return config.load_config(state, main, base)
+        return audit.work_config(state, work)
     except config.ConfigError as e:
         raise ActApplyError(f"configurazione non valida: {e}") from e
 
@@ -59,8 +56,10 @@ def _resolve(conn, state, work, act, args, now, session) -> str:
         _grant_cycles(conn, work, 1, now)       # decisione 13: `resolve` concede un ciclo
     suspended = None
     if audits.cap_kind(block["reason"]) is not None:    # tetti dell'audit (decisione 7)
+        # senza worktree la config non si legge: valgono i tetti predefiniti
+        cfg = _config(state, work) if work["worktree"] else None
         suspended = l2acts.suspend_on_resolve(conn, work["id"], block["reason"], now=now,
-                                              cfg=_config(state, work))
+                                              cfg=cfg)
     phase = phases.close_block(conn, state, block["id"], note, now=now, session=session)
     unblocked = tasks.unblock_all(conn, work["id"], now=now, session=session) \
         if phase != "blocked" else []

@@ -10,8 +10,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from tollgate_analysis import (approvals, auditrules, brief as briefs, plan as planmod,
-                               profiles as prof, specdoc)
+from tollgate_analysis import (approvals, auditrules, brief as briefs, profiles as prof,
+                               specdoc)
 from tollgate_core import audits, clock, config, db, git, phases, scope
 from tollgate_core.paths import program_command
 
@@ -30,17 +30,10 @@ def _program() -> str:
 
 
 def _cfg(state, work) -> config.Config:
-    wt = Path(work["worktree"])
-    main = git.main_worktree(wt)
-    base = work["work_base_sha"] or git.default_ref(main)
     try:
-        return config.load_config(state, main, base)
+        return audit.work_config(state, work)
     except config.ConfigError as e:
         raise Refused(f"configurazione non valida: {e}") from e
-
-
-def _on(cfg, kind: str) -> bool:
-    return bool(cfg.get("components").get(audits.COMPONENTS[kind], True))
 
 
 def _check_ready(conn, work, phase: str, what: str) -> Path:
@@ -69,17 +62,12 @@ def _no_open_round(conn, work) -> None:
 
 def _committed(wt: Path, path: str, what: str) -> tuple[str, str]:
     """`(blob a HEAD, testo a HEAD)` di `path`, solo se il file del worktree è identico."""
-    blob = git.blob_at(wt, "HEAD", path)
-    if blob is None:
-        if (wt / path).exists():
-            raise Refused(f"committa {path} prima di approvare")
-        raise Refused(f"{what} {path} non è nel ramo")
     try:
-        same = git.blob_sha(wt, path) == blob
-    except git.GitError:
-        same = False
-    if not same:
-        raise Refused(f"committa {path} prima di approvare")
+        blob = audit.committed_blob(wt, path)
+    except audit.Uncommitted as e:
+        if e.missing:
+            raise Refused(f"{what} {path} non è nel ramo") from e
+        raise Refused(f"committa {path} prima di approvare") from e
     return blob, git.text_at(wt, "HEAD", path) or ""
 
 
@@ -111,7 +99,7 @@ def _target_slices(act) -> int | None:
 
 def _adversarial_check(conn, work, cfg, blob: str) -> str:
     """Il valore di `adversarial` del file, oppure il rifiuto che dice cosa manca."""
-    if not _on(cfg, ADV_KIND):
+    if not audit.on(cfg, ADV_KIND):
         return "off"
     last = audit.last_round(conn, work["id"], ADV_KIND)
     if last is None:
@@ -130,7 +118,7 @@ def _lens_check(conn, work, cfg, slices: int) -> str | None:
     """Il valore di `lens`: `None` con una fetta sola, `off`, `closed` o `suspended`."""
     if slices <= 1:
         return None
-    if not _on(cfg, LENS_KIND):
+    if not audit.on(cfg, LENS_KIND):
         return "off"
     rows = audits.rounds(conn, work["id"], LENS_KIND)
     state = auditrules.lens_state([(r["viewpoint"], r["outcome"]) for r in rows])
@@ -196,8 +184,10 @@ def _spec_approved(wt: Path, work, spec_blob: str) -> None:
     """D3: l'approvazione della spec si cerca nei file in HEAD, con lo `sha` attuale."""
     listing = git.ls_files_at(wt, "HEAD", approvals.REVIEWS_DIR + "/")
     files = {p: git.text_at(wt, "HEAD", p) or "" for p in approvals.approval_listing(listing)}
-    found = approvals.locate_spec_approval(files, issue=work["issue"],
-                                           spec_path=work["spec_path"], spec_blob=None)
+    where = {"issue": work["issue"], "spec_path": work["spec_path"]}
+    found = approvals.locate_spec_approval(files, spec_blob=spec_blob, **where)
+    if found is None and approvals.locate_spec_approval(files, spec_blob=None, **where):
+        raise Refused("spec cambiata dopo approve spec: /tollgate:reopen spec")
     if found is None:
         own = approvals.approval_paths(work["issue"])[0]
         if (wt / own).exists():
@@ -208,7 +198,7 @@ def _spec_approved(wt: Path, work, spec_blob: str) -> None:
 
 
 def _plan_adversarial(conn, work, cfg, plan_blob: str, spec_blob: str) -> str:
-    if not _on(cfg, PLAN_KIND):
+    if not audit.on(cfg, PLAN_KIND):
         return "off"
     last = audit.last_round(conn, work["id"], PLAN_KIND)
     if last is None:
@@ -237,11 +227,7 @@ def approve_plan(conn, state, work, act, args, now, session) -> str:
     if spec_blob is None:
         raise Refused(f"la spec {spec_path} non è nel ramo: /tollgate:reopen spec")
     _spec_approved(wt, work, spec_blob)
-    check = planmod.check_plan(
-        plan_text, required_sections=cfg.get("plan.required_sections"),
-        max_scope_files=cfg.get("plan.max_scope_files"),
-        must_have_tests=bool(cfg.get("components").get("must_have_tests", True)), level="L2",
-        profiles=cfg.profiles, active_always=cfg.get("profiles.active"))
+    check = audit.plan_check(cfg, plan_text)
     if not check.ok:
         raise Refused("il piano non passa plan-check:\n- " + "\n- ".join(check.problems))
     adversarial = _plan_adversarial(conn, work, cfg, plan_blob, spec_blob)

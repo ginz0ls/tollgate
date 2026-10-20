@@ -2,7 +2,7 @@ import unittest
 from unittest import mock
 
 import tests.test_audit_prepare as tap
-from tests.flowkit import PLAN, SPEC, FlowLab, spec_text
+from tests.flowkit import PLAN, SESSION, SPEC, FlowLab, spec_text
 from tests.test_actapply import ApplyCase
 from tollgate_analysis import approvals, brief as briefs
 from tollgate_core import audits, config, phases, scope
@@ -137,8 +137,8 @@ class ApproveSpecTest(L2Case):
         fl = self.lab()
         fl.write_spec(slices=3)
         self.spec_round()
-        self.assertIn("3", self.refused("spec 1"))
-        self.assertIn("3", self.refused("spec 2"))
+        self.assertIn("la spec prevede 3 fette: /tollgate:approve spec 3", self.refused("spec 1"))
+        self.assertIn("la spec prevede 3 fette: /tollgate:approve spec 3", self.refused("spec 2"))
         self.assertEqual(self.phase(), "spec_audit")
 
     def test_three_slices_refused_until_lens_closed_or_suspended(self):
@@ -304,6 +304,24 @@ class ApproveSpecTest(L2Case):
         self.assertEqual(lines[i + 3], fence)
         self.assertEqual(fl.gh_calls(), [])
 
+    def test_blocked_refused_pointing_to_resolve(self):
+        fl = self.lab()
+        fl.write_spec()
+        self.spec_round()
+        block = phases.open_block(fl.conn, fl.ts.state, fl.work, "needs_you", "serve una scelta",
+                                  now=fl.lab.now)
+        msg = self.refused("spec 1")
+        self.assertIn(f"/tollgate:resolve {block}", msg)
+        self.assertFalse((fl.wt / SPEC_APPROVAL).exists())
+
+    def test_uncommitted_spec_refused(self):
+        fl = self.lab()
+        fl.write_spec()
+        self.spec_round()
+        (fl.wt / SPEC).write_text(spec_text(1, note="non committata"))
+        self.assertIn(f"committa {SPEC}", self.refused("spec 1"))
+        self.assertEqual(self.phase(), "spec_audit")
+
     def test_wrong_phase_refused(self):
         self.lab("plan").write_spec()
         self.assertIn("spec_audit", self.refused("spec 1"))
@@ -381,6 +399,28 @@ class ApprovePlanTest(L2Case):
         self.assertEqual(self.header(PLAN_APPROVAL)["adversarial"], "off")
         self.assertEqual(self.phase(), "execution")
 
+    def test_blocked_refused_pointing_to_resolve(self):
+        fl = self.to_approval()
+        block = phases.open_block(fl.conn, fl.ts.state, fl.work, "needs_you", "serve una scelta",
+                                  now=fl.lab.now)
+        self.assertIn(f"/tollgate:resolve {block}", self.refused("plan"))
+        self.assertIsNone(self.work()["plan_sha"])
+
+    def test_later_slice_approval_with_current_sha_wins_over_stale_lower_issue(self):
+        fl = self.lab("plan")
+        blob = fl.write_spec()
+        phases.set_spec_path(fl.conn, fl.work, SPEC, now=fl.lab.now)
+        for issue, sha in ((3, "0" * 40), (5, blob)):
+            fields = {"kind": "spec-approval", "path": SPEC, "sha": sha, "slices": 3}
+            fl.commit(approvals.approval_paths(issue)[0], approvals.render_approval(fields),
+                      f"approvazione {issue}")
+        fl.write_l2_plan()
+        fl.closed_round(PLAN_ADV, CLEAN)
+        phases.set_phase(fl.conn, fl.ts.state, fl.work, "approval", "audit_clean",
+                         now=fl.lab.now)
+        self.approve("plan")
+        self.assertEqual(self.phase(), "execution")
+
     def test_dirty_plan_round_refused(self):
         fl = self.to_approval()
         fl.closed_round(PLAN_ADV, MAJOR)
@@ -440,6 +480,19 @@ class SuspendOnResolveTest(L2Case):
             self.assertNotIn("sospeso", msg)
             self.assertEqual(audits.suspended(fl.conn, fl.work), {})
             self.assertEqual(self.phase(), "spec_audit")
+
+    def test_resolve_without_worktree_falls_back_to_default_caps(self):
+        fl = self.lab()
+        fl.write_spec()
+        for _ in range(4):
+            fl.closed_round(ADV, MAJOR)
+        block = phases.open_block(fl.conn, fl.ts.state, fl.work, "needs_you",
+                                  audits.cap_reason(ADV, 4), now=fl.lab.now)
+        fl.conn.execute("UPDATE work_items SET worktree = NULL WHERE id = ?", (fl.work,))
+        act = {"target": str(block)}
+        msg = actapply._resolve(fl.conn, fl.ts.state, self.work(), act, [str(block), "ok"],
+                                fl.now, SESSION)
+        self.assertIn("avversariale sospeso", msg)
 
     def test_below_the_cap_not_suspended(self):
         fl = self.lab()

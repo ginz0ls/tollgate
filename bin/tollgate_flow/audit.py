@@ -129,12 +129,30 @@ class _Act:
     slices: int = 1
 
 
-def _comp(cfg, name: str) -> bool:
+def comp(cfg, name: str) -> bool:
     return bool(cfg.get("components").get(name, True))
 
 
-def _on(cfg, kind: str) -> bool:
-    return _comp(cfg, audits.COMPONENTS[kind])
+def on(cfg, kind: str) -> bool:
+    """Il componente che governa il tipo di giro è acceso."""
+    return comp(cfg, audits.COMPONENTS[kind])
+
+
+def work_base(work, wt: Path) -> str | None:
+    """La base del lavoro: `work_base_sha` o la punta del ramo predefinito di origin."""
+    return work["work_base_sha"] or git.default_ref(git.main_worktree(wt))
+
+
+def work_config(state, work) -> config.Config:
+    """La configurazione del lavoro, letta dalla base (spec 3.2): l'unico punto che la carica per
+    `audit`, `approve spec|plan` e `resolve`. `ConfigError` se manca il worktree o la base."""
+    if not work["worktree"]:
+        raise config.ConfigError("il lavoro non ha un worktree")
+    wt = Path(work["worktree"])
+    base = work_base(work, wt)
+    if not base:
+        raise config.ConfigError("manca la base del lavoro: nessun ramo predefinito su origin")
+    return config.load_config(state, git.main_worktree(wt), base)
 
 
 def _counts(row) -> dict | None:
@@ -161,7 +179,7 @@ def adversarial_ok(conn, work: sqlite3.Row, cfg, spec_blob: str | None) -> bool:
     """La condizione avversariale di `approve spec` e dei rami di `prepare` (decisione 3):
     componente spento, oppure l'ultimo giro avversariale chiuso sta sul blob attuale ed è pulito
     o sospeso."""
-    if not _on(cfg, ADV_KIND):
+    if not on(cfg, ADV_KIND):
         return True
     last = last_round(conn, work["id"], ADV_KIND)
     return (last is not None and spec_blob is not None and last["sha"] == spec_blob
@@ -176,20 +194,46 @@ def _check_path(path: str) -> None:
                       "caratteri di controllo: rinomina il file")
 
 
-def _committed(ctx: _Ctx, path: str, what: str, step: str) -> str:
-    """Il blob di `path` a HEAD, solo se il file del worktree è identico."""
-    blob = git.blob_at(ctx.wt, "HEAD", path)
+class Uncommitted(Exception):
+    """Il documento non è in HEAD tale e quale: `missing` se non c'è nemmeno sul disco."""
+
+    def __init__(self, path: str, missing: bool):
+        super().__init__(path)
+        self.path, self.missing = path, missing
+
+
+def committed_blob(wt: Path, path: str) -> str:
+    """Il blob di `path` a HEAD, solo se il file del worktree è identico; altrimenti
+    `Uncommitted`. Chi chiama sceglie il messaggio."""
+    blob = git.blob_at(wt, "HEAD", path)
     if blob is None:
-        if (ctx.wt / path).exists():
-            raise _Refuse(f"committa {path} prima del giro")
-        raise _Refuse(f"{what} {path} non è nel ramo", step)
+        raise Uncommitted(path, missing=not (wt / path).exists())
     try:
-        same = git.blob_sha(ctx.wt, path) == blob
+        same = git.blob_sha(wt, path) == blob
     except git.GitError:
         same = False
     if not same:
-        raise _Refuse(f"committa {path} prima del giro")
+        raise Uncommitted(path, missing=False)
     return blob
+
+
+def _committed(ctx: _Ctx, path: str, what: str, step: str) -> str:
+    try:
+        return committed_blob(ctx.wt, path)
+    except Uncommitted as e:
+        if e.missing:
+            raise _Refuse(f"{what} {path} non è nel ramo", step) from e
+        raise _Refuse(f"committa {path} prima del giro") from e
+
+
+def plan_check(cfg, text: str) -> planmod.PlanCheck:
+    """Il plan-check di L2 con le soglie della config: lo stesso per `audit prepare` e per
+    `approve plan`."""
+    return planmod.check_plan(
+        text, required_sections=cfg.get("plan.required_sections"),
+        max_scope_files=cfg.get("plan.max_scope_files"),
+        must_have_tests=comp(cfg, "must_have_tests"), level="L2", profiles=cfg.profiles,
+        active_always=cfg.get("profiles.active"))
 
 
 def _new_file(ctx: _Ctx, prefix: str) -> list[str]:
@@ -233,7 +277,7 @@ def _decide_spec(ctx: _Ctx) -> _Act:
     spec = (path, blob, text, register)
     slices = specdoc.slices(text)
     row = audits.open_round_row(conn, wid)
-    if row is not None and row["kind"] in SPEC_KINDS and _on(cfg, row["kind"]) \
+    if row is not None and row["kind"] in SPEC_KINDS and on(cfg, row["kind"]) \
             and row["sha"] == blob:
         return _Act("reprint", _spec_round(row["kind"], spec, row["viewpoint"]),
                     row=row, register_spec=register, slices=slices)
@@ -247,7 +291,7 @@ def _decide_spec(ctx: _Ctx) -> _Act:
 
 def _spec_branches(ctx: _Ctx, spec: tuple, slices: int, stale, register) -> _Act:
     conn, wid, cfg, blob = ctx.conn, ctx.work["id"], ctx.cfg, spec[1]
-    adv_on, lens_on = _on(cfg, ADV_KIND), _on(cfg, LENS_KIND)
+    adv_on, lens_on = on(cfg, ADV_KIND), on(cfg, LENS_KIND)
     last_adv = last_round(conn, wid, ADV_KIND)
     # 2. avversariale non passato (qualunque SHA)
     if adv_on and not passed(conn, wid, last_adv, ADV_KIND):
@@ -323,17 +367,12 @@ def _decide_plan(ctx: _Ctx) -> _Act:
         plan_path = register = found[0]
     _check_path(plan_path)
     plan_blob = _committed(ctx, plan_path, "il piano", "write_plan")
-    check = planmod.check_plan(
-        git.text_at(ctx.wt, "HEAD", plan_path) or "",
-        required_sections=cfg.get("plan.required_sections"),
-        max_scope_files=cfg.get("plan.max_scope_files"),
-        must_have_tests=_comp(cfg, "must_have_tests"), level="L2", profiles=cfg.profiles,
-        active_always=cfg.get("profiles.active"))
+    check = plan_check(cfg, git.text_at(ctx.wt, "HEAD", plan_path) or "")
     if not check.ok:
         raise _Refuse("il piano non passa plan-check:\n- " + "\n- ".join(check.problems),
                       "write_plan")
     row = audits.open_round_row(conn, wid)
-    if not _on(cfg, PLAN_KIND):
+    if not on(cfg, PLAN_KIND):
         return _Act("advance", supersede=row, register_plan=register)
     rnd = _Round(PLAN_KIND, plan_path, plan_blob, spec_path, spec_blob,
                  tasks=_task_rows(ctx, check))
@@ -368,14 +407,13 @@ def _context(state, conn, cwd: Path, confirm: bool) -> _Ctx:
     if work["phase"] not in ("spec_audit", "plan", "approval"):
         raise _Refuse(f"audit prepare vale in spec_audit, plan e approval (fase {work['phase']})")
     wt = Path(work["worktree"])
-    main = git.main_worktree(wt)
-    base = work["work_base_sha"] or git.default_ref(main)
+    base = work_base(work, wt)
     if not base:
         raise AuditError("manca la base del lavoro: nessun ramo predefinito su origin")
     head = git.head(wt)
     if head is None:
         raise AuditError("il worktree non ha commit")
-    return _Ctx(conn, wt, work, config.load_config(state, main, base), head, base, confirm)
+    return _Ctx(conn, wt, work, work_config(state, work), head, base, confirm)
 
 
 def _decide(ctx: _Ctx) -> _Act:
@@ -490,7 +528,7 @@ def decline(state, cwd, *, now=None) -> tuple[int, list[str]]:
         wid = ctx.work["id"]
         if ctx.work["phase"] != "spec_audit":
             raise _Refuse(f"audit decline vale in spec_audit (fase {ctx.work['phase']})")
-        if not _on(ctx.cfg, LENS_KIND):
+        if not on(ctx.cfg, LENS_KIND):
             raise _Refuse("l'audit a lenti è spento: non c'è nulla da rifiutare")
         if specdoc.slices(_spec_doc(ctx)[2]) <= 1:
             raise _Refuse("la spec ha una sola fetta: l'audit a lenti non si applica")
