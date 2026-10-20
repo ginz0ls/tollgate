@@ -285,6 +285,8 @@ def _round_example(b: AuditBrief) -> str:
 
 
 def _task_line(t: dict) -> str:
+    """Una riga della tabella dei task: il titolo viene dal piano (testo non fidato), quindi la
+    tabella va sempre in un recinto."""
     notes = []
     if t.get("split_candidate"):
         notes.append("candidato a essere diviso (agenti diversi o troppe skill)")
@@ -328,7 +330,7 @@ def audit_brief(b: AuditBrief) -> str:
                 "sbagliati, must-have senza test, ordine dei task, scope che non copre la spec.",
                 "Per ogni task sono dati i file e l'instradamento; un task marcato «candidato a "
                 "essere diviso» o con troppi file va valutato:"]
-        out += [_task_line(t) for t in b.tasks] or ["- (nessun task)"]
+        out.append(_block("\n".join(_task_line(t) for t in b.tasks) or "- (nessun task)"))
     out += ["", "## Rilievi",
             "Per ogni rilievo scrivi la sezione del documento, la gravità e perché, con una "
             "prova (la riga o il passo). Senza prova non vale.",

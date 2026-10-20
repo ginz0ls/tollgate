@@ -83,6 +83,7 @@ class _Refuse(Exception):
     def __init__(self, message: str, step: str | None = None, **subs):
         super().__init__(message)
         self.message, self.step, self.subs = message, step, subs
+        self.supersede = None       # giro aperto su un altro SHA da chiudere anche rifiutando
 
     def lines(self) -> list[str]:
         out = [f"rifiuto: {self.message}"]
@@ -237,6 +238,15 @@ def _decide_spec(ctx: _Ctx) -> _Act:
         return _Act("reprint", _spec_round(row["kind"], spec, row["viewpoint"]),
                     row=row, register_spec=register, slices=slices)
     stale = row         # giro aperto su un altro SHA, di un tipo spento o di un altro documento
+    try:
+        return _spec_branches(ctx, spec, slices, stale, register)
+    except _Refuse as r:
+        r.supersede = stale         # decisione 3: si chiude anche quando poi si rifiuta
+        raise
+
+
+def _spec_branches(ctx: _Ctx, spec: tuple, slices: int, stale, register) -> _Act:
+    conn, wid, cfg, blob = ctx.conn, ctx.work["id"], ctx.cfg, spec[1]
     adv_on, lens_on = _on(cfg, ADV_KIND), _on(cfg, LENS_KIND)
     last_adv = _last(conn, wid, ADV_KIND)
     # 2. avversariale non passato (qualunque SHA)
@@ -322,9 +332,9 @@ def _decide_plan(ctx: _Ctx) -> _Act:
     if not check.ok:
         raise _Refuse("il piano non passa plan-check:\n- " + "\n- ".join(check.problems),
                       "write_plan")
-    if not _on(cfg, PLAN_KIND):
-        return _Act("advance", register_plan=register)
     row = audits.open_round_row(conn, wid)
+    if not _on(cfg, PLAN_KIND):
+        return _Act("advance", supersede=row, register_plan=register)
     rnd = _Round(PLAN_KIND, plan_path, plan_blob, spec_path, spec_blob,
                  tasks=_task_rows(ctx, check))
     if row is not None and row["kind"] == PLAN_KIND and row["sha"] == plan_blob \
@@ -335,8 +345,10 @@ def _decide_plan(ctx: _Ctx) -> _Act:
     if same and _passed(conn, wid, last, PLAN_KIND):
         return _Act("advance", supersede=row, register_plan=register)
     if same:
-        raise _Refuse(f"l'ultimo giro del piano ({last['number']}) ha blocker o major sul piano "
-                      "attuale", "fix_plan")
+        refusal = _Refuse(f"l'ultimo giro del piano ({last['number']}) ha blocker o major sul "
+                          "piano attuale", "fix_plan")
+        refusal.supersede = row
+        raise refusal
     return _Act("open", rnd, supersede=row, register_plan=register)
 
 
@@ -418,9 +430,12 @@ def _execute(state, ctx: _Ctx, act: _Act, now) -> PrepareResult:
     if act.kind == "open":
         rnd = act.round
         code = secrets.token_hex(4)
-        number = audits.open_round(conn, wid, kind=rnd.kind, sha=rnd.doc_blob,
-                                   spec_sha=rnd.spec_blob, viewpoint=rnd.viewpoint, code=code,
-                                   now=now)
+        try:
+            number = audits.open_round(conn, wid, kind=rnd.kind, sha=rnd.doc_blob,
+                                       spec_sha=rnd.spec_blob, viewpoint=rnd.viewpoint,
+                                       code=code, now=now)
+        except ValueError as e:
+            raise AuditError(str(e)) from e
         return _launch(ctx, rnd, number, code, again=False)
     if act.kind == "confirm":
         cap = ctx.cfg.get("spec_audit.spec_audit_cycles")
@@ -448,6 +463,12 @@ def prepare(state, cwd, *, confirm: bool, now=None) -> PrepareResult:
         ctx = _context(state, conn, Path(cwd), confirm)
         return _execute(state, ctx, _decide(ctx), now)
     except _Refuse as r:
+        if r.supersede is not None:
+            try:
+                audits.supersede(conn, ctx.work["id"], (r.supersede["kind"],
+                                                        r.supersede["number"]), now=now)
+            except sqlite3.Error as e:
+                raise AuditError(str(e)) from e
         return PrepareResult(REFUSED, r.lines())
     except ERRORS as e:
         raise AuditError(str(e)) from e

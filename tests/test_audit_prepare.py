@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 from tests.flowkit import PLAN, SPEC, ZERO_COUNTS, FlowLab, plan_text
 from tests.hookkit import DEFAULT_TOML
@@ -126,6 +127,25 @@ class SpecRoundsTest(AuditCase):
         self.assertEqual(r.code, audit.REFUSED)
         self.assertTrue(r.lines[-1].startswith("prossimo passo: " + fixed("fix_spec")))
         self.assertEqual(len(self.rows()), 1)
+
+    def test_fix_spec_refusal_supersedes_open_round_on_other_sha(self):
+        fl = self.lab()
+        fl.write_spec()
+        fl.closed_round("spec-adversarial", MAJOR)
+        audits.open_round(fl.conn, fl.work, kind="spec-lens", sha="0" * 40,
+                          spec_sha="0" * 40, viewpoint="executor", code="aaaa0000",
+                          now=fl.lab.now)
+        r = self.prepare()
+        self.assertEqual(r.code, audit.REFUSED)
+        self.assertIn(fixed("fix_spec"), r.lines[-1])
+        self.assertIsNone(audits.open_round_row(fl.conn, fl.work))
+        self.assertEqual(self.rows("spec-lens")[0]["outcome"], "superseded")
+
+    def test_open_round_value_error_is_an_audit_error(self):
+        self.lab().write_spec()
+        with mock.patch.object(audit.audits, "open_round", side_effect=ValueError("già aperto")):
+            with self.assertRaisesRegex(audit.AuditError, "già aperto"):
+                self.prepare()
 
     def test_dirty_round_other_sha_opens_new_round(self):
         fl = self.lab()
@@ -493,6 +513,27 @@ class PlanRoundsTest(AuditCase):
         self.assertEqual((r.code, r.launches), (audit.OK, []))
         self.assertEqual(self.work()["phase"], "approval")
         self.assertEqual(self.rows(), [])
+
+    def test_plan_adversary_off_supersedes_open_plan_round(self):
+        fl = self.plan_lab(toml=self.off("plan_adversary"))
+        fl.write_l2_plan()
+        audits.open_round(fl.conn, fl.work, kind="plan-adversarial", sha=fl._blob(PLAN),
+                          spec_sha=fl._blob(SPEC), viewpoint=None, code="aaaa0000",
+                          now=fl.lab.now)
+        self.assertEqual(self.prepare().code, audit.OK)
+        self.assertEqual(self.work()["phase"], "approval")
+        self.assertIsNone(audits.open_round_row(fl.conn, fl.work))
+        self.assertEqual(self.rows()[0]["outcome"], "superseded")
+
+    def test_fix_plan_refusal_supersedes_stale_open_round(self):
+        fl = self.plan_lab()
+        fl.write_l2_plan()
+        fl.closed_round("plan-adversarial", MAJOR)
+        audits.open_round(fl.conn, fl.work, kind="plan-adversarial", sha="0" * 40,
+                          spec_sha=fl._blob(SPEC), viewpoint=None, code="aaaa0000",
+                          now=fl.lab.now)
+        self.assertEqual(self.prepare().code, audit.REFUSED)
+        self.assertIsNone(audits.open_round_row(fl.conn, fl.work))
 
     def test_approval_phase_prints_approve_plan(self):
         fl = self.plan_lab()
