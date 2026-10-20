@@ -21,8 +21,10 @@ REPO="$FLOW/repo"          # checkout principale (cwd del solo passo 1)
 BARE="$FLOW/origin.git"    # repo nudo locale, dietro l'URL finto
 STATE="$FLOW/state"
 LOGS="$FLOW/logs"
-SPEC_SRC="$FLOW/spec-L2.md"
-PLAN_SRC="$FLOW/piano-L2.md"
+INPUT="$FLOW/input"       # i soli file di prova leggibili dal modello (--add-dir)
+SHIM="$FLOW/shim"         # cartella in testa al PATH dei claude -p: contiene il finto gh
+SPEC_SRC="$INPUT/spec-L2.md"
+PLAN_SRC="$INPUT/piano-L2.md"
 GH_DATA="$FLOW/fakegh-data.json"
 ORIGIN_URL=https://github.com/prova/flow.git
 MODEL=sonnet
@@ -37,7 +39,11 @@ TG=(python3 "$PLUGIN/bin/tollgate")
 prepara() {
   case "$FLOW" in /tmp/tollgate-p3c/flow) ;; *) echo "percorso inatteso: $FLOW" >&2; return 1 ;; esac
   rm -rf "$FLOW"
-  mkdir -p "$LOGS" "$STATE" || return 1
+  mkdir -p "$LOGS" "$STATE" "$INPUT" "$SHIM" || return 1
+  # un `gh issue create` o `gh pr create` del modello non deve mai raggiungere GitHub: nel PATH
+  # dei claude -p il primo `gh` e' questo shim, che esegue tests/fakegh.py (dati e log del banco)
+  printf '#!/bin/sh\nexec python3 "%s" "$@"\n' "$PLUGIN_REAL/tests/fakegh.py" > "$SHIM/gh" || return 1
+  chmod +x "$SHIM/gh" || return 1
   [ "$PLUGIN" = "$PLUGIN_REAL" ] || ln -s "$PLUGIN_REAL" "$PLUGIN" || return 1
   : > "$STATE/.tollgate-test"
   git init -q --bare -b main "$BARE" || return 1
@@ -236,6 +242,14 @@ PY
 }
 
 # decisione 23: nessun push in rete. Ferma lo script se il push di origin non va al repo nudo locale.
+verifica_gh() { # il `gh` che vedra' il modello deve essere lo shim, non il gh vero
+  local found; found="$(PATH="$SHIM:$PATH" command -v gh 2>/dev/null)"
+  if [ "$found" != "$SHIM/gh" ]; then
+    echo "STOP: command -v gh = '$found', atteso '$SHIM/gh'" >&2
+    return 1
+  fi
+}
+
 verifica_push() {
   local url
   url="$(git -C "$REPO" remote get-url --push origin 2>/dev/null)"
@@ -247,7 +261,7 @@ verifica_push() {
 
 worktree_lavoro() { # worktree del ramo tg/1-* del lavoro, sempre sotto $FLOW
   local wt
-  wt="$(git -C "$REPO" worktree list --porcelain | awk '/^worktree /{p=$2} /^branch refs\/heads\/tg\/1-/{print p}' | head -1)"
+  wt="$(git -C "$REPO" worktree list --porcelain | awk '/^worktree /{p=substr($0,10)} /^branch refs\/heads\/tg\/1-/{print p}' | head -1)"
   case "$wt" in "$FLOW"/*) echo "$wt" ;; *) echo "worktree del lavoro non trovato: '$wt'" >&2; return 1 ;; esac
 }
 
@@ -256,17 +270,28 @@ worktree_lavoro() { # worktree del ramo tg/1-* del lavoro, sempre sotto $FLOW
 claude_step() {
   local id="$1" prompt="$2" dir="$REPO"
   verifica_push || return 1
+  verifica_gh || return 1
   if [ "$id" != passo1 ]; then
     dir="$(worktree_lavoro)" || return 1
     case "$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null)" in tg/1-*) ;; *)
       echo "STOP: $dir non e' sul ramo tg/1-*" >&2; return 1 ;; esac
     case "$dir" in "$FLOW"/*) ;; *) echo "STOP: $dir fuori da $FLOW" >&2; return 1 ;; esac
   fi
-  ( cd "$dir" && timeout 1800 claude -p --add-dir "$FLOW" --plugin-dir "$PLUGIN" --model "$MODEL" \
+  ( cd "$dir" && PATH="$SHIM:$PATH" timeout 1800 claude -p --add-dir "$INPUT" --plugin-dir "$PLUGIN" --model "$MODEL" \
       --permission-mode acceptEdits --allowedTools "$TOOLS" --output-format stream-json --verbose \
       --include-hook-events "$prompt" < /dev/null ) > "$LOGS/$id.jsonl" 2> "$LOGS/$id.err"
   local rc=$?
   echo "$id: uscita $rc (cwd $dir)" | tee -a "$LOGS/exit-codes.txt"
+  # il modello non deve aver cambiato il push di origin durante il passo
+  verifica_push || return 1
+  return "$rc"
+}
+
+# esegue il passo, registra comunque i log, esce con l'esito del passo
+passo() { # id, prompt
+  claude_step "$1" "$2"; local rc=$?
+  registra
+  return "$rc"
 }
 
 registra() { # copia i log degli hook, gli eventi del DB, i report e le sessioni dei passi
@@ -307,7 +332,7 @@ spec_nel_ramo() { # 0 se nel worktree c'e' gia' qualcosa sotto docs/superpowers/
 }
 
 passo1() {
-  claude_step passo1 "/tollgate:start #1 L2"; registra
+  passo passo1 "/tollgate:start #1 L2" || return 1
   # In L2 senza --spec la skill start manda il modello al brainstorming e lui scrive e committa una
   # spec sua (provato in due esecuzioni su due: vedi il rapporto). Non e' un errore: il passo 2
   # usa quella spec al posto di $SPEC_SRC. Si ferma solo se le spec sono piu' di una (il «primo file
@@ -323,21 +348,20 @@ passo2() {
   local wt f; wt="$(worktree_lavoro)" || return 1
   if spec_nel_ramo; then
     f="$(ls "$wt/docs/superpowers/specs")"
-    claude_step passo2 "La spec è già scritta e committata in docs/superpowers/specs/$f: segui /tollgate:spec-audit finché audit prepare non chiede /tollgate:approve spec 1."
+    passo passo2 "La spec è già scritta e committata in docs/superpowers/specs/$f: segui /tollgate:spec-audit finché audit prepare non chiede /tollgate:approve spec 1."
   else
-    claude_step passo2 "La spec è in $SPEC_SRC: copiala in docs/superpowers/specs/2026-10-20-prova.md senza cambiarla, committala, poi segui /tollgate:spec-audit finché audit prepare non chiede /tollgate:approve spec 1."
+    passo passo2 "La spec è in $SPEC_SRC: copiala in docs/superpowers/specs/2026-10-20-prova.md senza cambiarla, committala, poi segui /tollgate:spec-audit finché audit prepare non chiede /tollgate:approve spec 1."
   fi
-  registra
 }
-passo3() { claude_step passo3 "/tollgate:approve spec 1"; registra; }
-passo4() { claude_step passo4 "Il piano è in $PLAN_SRC: scrivilo con lo strumento Write in docs/superpowers/plans/2026-10-20-prova.md (così passa da plan-check), committalo, poi segui /tollgate:spec-audit per l'avversario del piano finché non chiede /tollgate:approve plan."; registra; }
-passo5() { claude_step passo5 "/tollgate:approve plan"; registra; }
-passo6() { claude_step passo6 "/tollgate:execute"; registra; }
+passo3() { passo passo3 "/tollgate:approve spec 1"; }
+passo4() { passo passo4 "Il piano è in $PLAN_SRC: scrivilo con lo strumento Write in docs/superpowers/plans/2026-10-20-prova.md (così passa da plan-check), committalo, poi segui /tollgate:spec-audit per l'avversario del piano finché non chiede /tollgate:approve plan."; }
+passo5() { passo passo5 "/tollgate:approve plan"; }
+passo6() { passo passo6 "/tollgate:execute"; }
 # libero "<prompt>": un prompt dal worktree, per esempio /tollgate:resolve <id> <nota> a un tetto
 libero() {
   [ -n "${1:-}" ] || { echo "uso: $0 libero \"<prompt>\"" >&2; return 2; }
   local n=1; while [ -e "$LOGS/libero-$n.jsonl" ]; do n=$((n + 1)); done
-  claude_step "libero-$n" "$1"; registra
+  passo "libero-$n" "$1"
 }
 
 case "${1:-tutto}" in

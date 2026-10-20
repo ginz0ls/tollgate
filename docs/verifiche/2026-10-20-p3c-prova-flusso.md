@@ -2,9 +2,9 @@
 
 Versioni: Claude Code 2.1.304, tollgate 0.1.0 (`tollgate_core.VERSION`), modello `sonnet` per le sessioni e per gli agenti. Data: 20 ottobre 2026.
 
-Piano: Task 14 di P3c. Script: `spikes/run-p3c-flow.sh` (`prepara`, `passo1`..`passo6`, `libero "<prompt>"`, `registra`, `tutto`). Uscite grezze in `/tmp/tollgate-p3c/flow/logs` (fuori dal repo): `passo*.jsonl`, `events.jsonl`, `stats.json`, `status.txt`, `sessioni.txt`, `reviews-1/` (copia dei report), `fakegh.log`, `fakegh-data-finale.json`, `origin-refs.txt`, `hooks.log` (copia di `hook-errors.log`, vuoto), `git-log-worktree.txt`. I log del primo tentativo del passo 1 sono in `/tmp/tollgate-p3c-keep/tentativo1-logs`.
+Piano: Task 14 di P3c. Script: `spikes/run-p3c-flow.sh` (`prepara`, `passo1`..`passo6`, `libero "<prompt>"`, `registra`, `tutto`). Uscite grezze in `/tmp/tollgate-p3c/prova-1/flow/logs (copia conservata; `/tmp/tollgate-p3c/flow` è stato rigenerato dopo la prova)` (fuori dal repo): `passo*.jsonl`, `events.jsonl`, `stats.json`, `status.txt`, `sessioni.txt`, `reviews-1/` (copia dei report), `fakegh.log`, `fakegh-data-finale.json`, `origin-refs.txt`, `hooks.log` (copia di `hook-errors.log`, vuoto), `git-log-worktree.txt`. I log del primo tentativo del passo 1 sono in `/tmp/tollgate-p3c-keep/tentativo1-logs`.
 
-**Esito: riuscito** per il percorso completo, **composito** per il passo 1 (due tentativi, vedi D1) e con una variante del passo 2 rispetto al brief (spec scritta dal modello, non quella di prova).
+**Esito: riuscito** per il percorso completo, **composito** per il passo 1 (due tentativi, vedi D1) e con una variante del passo 2 rispetto al brief (spec scritta dal modello, non quella di prova). Il passo 1 è girato con una versione dello script precedente a quella committata (D5).
 
 ## Impianto
 
@@ -31,14 +31,14 @@ Sessioni nuove e distinte, tutte legate (gli eventi del DB portano il `session` 
 
 | Passo | Prompt | Esito | Evidenza |
 |---|---|---|---|
-| 1 | `/tollgate:start #1 L2` (checkout) | riuscito al secondo tentativo (D1) | `start 1 --level L2`, `EnterWorktree`, `superpowers:brainstorming`, spec scritta con Write e committata dal modello (`9e3f5a8`), fase `spec_audit` |
+| 1 | `/tollgate:start #1 L2` (checkout) | riuscito (giudizio) al secondo tentativo, con lo script in forma precedente (D1, D5) | `start 1 --level L2`, `EnterWorktree`, `superpowers:brainstorming`, spec scritta con Write e committata dal modello (`9e3f5a8`), fase `spec_audit` |
 | 2 | spec già scritta: segui `/tollgate:spec-audit` | riuscito | giro 1 `tollgate:spec-adversary` con `findings` (0 blocker, 0 major, 1 moderate, 2 minor), spec corretta e committata (`62676b0`); giro 2 `empty` (`52d8ddc`); `audit prepare` chiede `/tollgate:approve spec 1` |
 | 3 | `/tollgate:approve spec 1` | riuscito | `act apply`, `spec-approval.md` con `sha` = blob della spec a HEAD (`a4816f6b…`), `slices: 1`, `adversarial: closed`, fase `plan` |
-| 4 | piano con Write in `docs/superpowers/plans/2026-10-20-prova.md`, poi `/tollgate:spec-audit` | riuscito | piano scritto dal modello e committato (`486c3ab`), `spec-approval.md` committato (`audit prepare` rifiutava finché non lo era); giro 1 `tollgate:plan-adversary` con un `minor` (import e comando di verifica nel Task 1), piano corretto (`4aca8f5`); giro 2 `empty`; fase `approval` (`audit_clean`) |
+| 4 | piano con Write in `docs/superpowers/plans/2026-10-20-prova.md`, poi `/tollgate:spec-audit` | riuscito | il modello ha letto `piano-L2.md` e lo ha scritto con Write byte per byte, committato in `486c3ab` (blob `6ad777ba…`), `spec-approval.md` committato (`audit prepare` rifiutava finché non lo era); giro 1 `tollgate:plan-adversary` con un `minor` (import e comando di verifica nel Task 1), il modello ha corretto il piano (`4aca8f5`, blob `f7340037…`, quello approvato); giro 2 `empty`; fase `approval` (`audit_clean`) |
 | 5 | `/tollgate:approve plan` | riuscito | `plan-approval.md` con `sha` = `plan_sha` = `f7340037…` (blob del piano approvato, quello corretto) e `spec_sha` = `a4816f6b…`; scope di 2 file e 1 task; fase `execution` |
 | 6 | `/tollgate:execute` | riuscito | `plan-approval.md` committato, `task start 1`, implementatore (`DONE`), ricevuta `verify` green con 2 test, revisore `approved`, `task done 1`; `status`: `task: 1 done` |
 
-La spec e il piano di prova (`spec-L2.md`, `piano-L2.md`) non sono stati usati: vedi D1. Il passo 4 ha usato il piano di prova solo come indicazione: il piano a HEAD è quello scritto dal modello (con le correzioni del giro 1).
+Il piano di prova `piano-L2.md` è stato usato: copiato dal modello senza modifiche nel primo commit del piano e poi corretto dal giro 1 dell'avversario (un `minor`); il piano approvato è quindi il piano di prova più quella correzione. La spec di prova `spec-L2.md` non è stata usata: vedi D1.
 
 Esiti attesi dal brief, verificati sui dati finali: giro `spec-adversarial` chiuso con report in `reviews/1/` (`spec-adversarial-1.md`, `-2.md`, con la riga JSON `v: 1` letta dal hook); `spec-approval.md` con lo `sha` della spec; fase `plan`; due giri `plan-adversarial` (`plan-adversarial-1.md`, `-2.md`); `approval` poi `execution` con `plan_sha` = blob del piano approvato; `plan-approval.md` con `spec_sha`; task 1 `done`.
 
@@ -54,13 +54,24 @@ Eventi chiave del DB: `phase_change` start->spec_audit, `commit`, `subagent_star
 - **O1.** Il passo 3 e il passo 5 non committano i file di approvazione (la riga dell'atto lo propone all'utente). Il passo 4 e il passo 6 li hanno committati su richiesta del rifiuto di `audit prepare` e del worktree sporco di `execute`: il meccanismo regge, ma dipende dal modello. Nessun difetto di codice.
 - **O2.** Il giro 1 dell'avversario della spec ha trovato rilievi `moderate`/`minor` sul testo del modello e il coordinatore li ha corretti (skill `spec-audit`, punto 3); l'avversario del piano ha trovato un solo `minor`. I giri hanno chiuso `empty` al secondo, come atteso con una spec e un piano piccoli.
 - **O3.** Frontmatter degli agenti nuovi (`spec-adversary`, `plan-adversary`) letto da Claude Code (tipi risolti e registrati in `subagents.type`), lanciati in primo piano da righe `agente:` di `audit prepare`, brief letto dal percorso, riga JSON dei giri riconosciuta (`code`, `spec_sha`, `plan_sha`). I rischi che i test non vedevano (frontmatter, righe di lancio, riga JSON, atti in sessione legata) sono tutti chiusi in questa prova.
+- **D5, versione dello script del passo 1.** Il passo 1 (entrambe le esecuzioni) è girato con la forma precedente dello script, in cui `passo1` si fermava se trovava una spec: `exit-codes.txt` chiude il passo con «rifare il passo 1». Il passo 1 è stato accettato per giudizio, dopo aver cambiato lo script. Il ramo committato del controllo del passo 1 (una sola spec ammessa, nota «ha scritto la spec del modello») e `tutto` end to end non sono stati eseguiti nella prova di riferimento; il solo ramo nuovo girato è quello `spec_nel_ramo` del passo 2.
 - Nessun difetto di P3c emerso: nessuna correzione al codice, nessun passo ripetuto per un difetto.
 
 ## Ciò che resta non esercitato
 
 - L'audit a lenti (`tollgate:spec-auditor`, conferma di costo `--confirm`/`audit decline`), `/tollgate:reopen spec|plan`, `start --spec` (fette successive), i tetti dei giri (`/tollgate:resolve`), le più fette e la proposta di issue per le fette successive (la spec ha una sola fetta).
-- Il ramo «nessuna spec» del passo 2 (copia di `spec-L2.md`) e il piano di prova `piano-L2.md` (verificato da `check_plan` ma non usato).
+- Il ramo «nessuna spec» del passo 2 (copia di `spec-L2.md`) (`spec-L2.md`, verificata da `pitch_problems` ma non usata).
 - `/tollgate:finish` e la PR in L2, il verificatore dei rilievi, la revisione finale.
 - L'uso interattivo (compreso `/clear` e la ripresa dal checkpoint): tutta la prova è `claude -p`, un passo per sessione.
 - Il `gh` vero: solo il finto.
 - Un'unica esecuzione dei passi 2-6: il comportamento del modello varia da una esecuzione all'altra.
+
+## Correzioni dopo la prova
+
+Rilievi della revisione, corretti solo nello script e in questo rapporto; **la prova di riferimento non è stata rifatta** e le correzioni dello script non sono state esercitate da una prova pianificata di `claude -p`. Verifiche senza modello: `bash -n`, `prepara` (che rigenera `/tmp/tollgate-p3c/flow`; la prova di riferimento è conservata in `/tmp/tollgate-p3c/prova-1/flow`, con `logs/`, `repo/`, `state/`, `origin.git/`), controllo di `verifica_gh` e di `verifica_push`, esecuzione dello shim `gh auth status`.
+
+- `gh`: `prepara` crea `$FLOW/shim/gh`, che esegue `tests/fakegh.py`; ogni `claude -p` parte con `PATH="$FLOW/shim:$PATH"` e prima di ogni passo `verifica_gh` controlla che `command -v gh` sia lo shim. Prima di questa correzione il `gh` vero era raggiungibile dal modello (non usato nella prova: nessun `gh`, `curl` o `git push` nei `tool_use` dei passi).
+- Esito dei passi: `claude_step` restituisce l'uscita di `claude` (o il fallimento dei controlli), il passo registra comunque i log e propaga l'esito, quindi `tutto` si ferma al primo passo fallito. Prima l'uscita di `registra` lo sostituiva.
+- `--add-dir` ristretto a `$FLOW/input` (solo `spec-L2.md` e `piano-L2.md`), non più `$FLOW` con `state/`, `origin.git/` e `logs/`.
+- `worktree_lavoro` legge il percorso intero (anche con spazi). `verifica_push` gira anche dopo ogni passo, oltre che prima.
+- **Esecuzione accidentale.** Durante la verifica ho lanciato per errore `tutto` invece del solo controllo; il `claude -p` è partito (stesse cautele: solo in `/tmp/tollgate-p3c/flow`, shim, `--plugin-dir`, `--model sonnet`, nessun push, nessuna rete) e ha eseguito i passi 1-3 e parte del 4, poi l'ho fermato per PID. Non fa parte della prova: è un'esecuzione non pianificata, contraria all'indicazione di non lanciare `claude -p` in questo giro, con i log in `/tmp/tollgate-p3c/prova-accidentale/logs`. Di fatto ha girato con la nuova forma dello script (passo 1 con la nota «ha scritto la spec del modello (1 file)», shim `gh`, `--add-dir` su `input/`): il modello ha di nuovo scritto una propria spec al passo 1, il passo 2 l'ha usata, il passo 3 ha approvato la spec e il passo 4 ha letto e copiato il piano; nessuna chiamata `gh` oltre alle 4 della CLI. Non la uso come evidenza del rapporto.
