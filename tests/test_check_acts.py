@@ -97,6 +97,13 @@ class ActsTest(unittest.TestCase):
         expand(self.lab, "tollgate:approve", "pr", session="altra", cwd=self.lab.main)
         self.assertEqual(self.acts(), [])
 
+    def test_unbound_finish_refusal_says_how_to_recover(self):
+        r = expand(self.lab, "tollgate:finish", "", session="altra", cwd=self.lab.main)
+        text = json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("vale solo in una sessione legata a un lavoro", text)
+        self.assertIn("/tollgate:start #<N>", text)
+        self.assertIn("worktree del lavoro", text)
+
     def test_quoted_args_stay_whole(self):
         expand(self.lab, "tollgate:approve", 'finding f-1 minor "motivo con spazi"')
         a = self.acts()[0]

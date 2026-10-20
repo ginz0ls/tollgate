@@ -9,6 +9,7 @@ Sei il coordinatore della chiusura: lanci i comandi, lanci i revisori, leggi i v
 Lancia i comandi dal **worktree del lavoro**.
 
 L'atto `finish` lo registra il hook solo quando l'utente ha digitato `/tollgate:finish`. Se questa skill parte da un'altra strada e un comando rifiuta per mancanza dell'atto, di' all'utente di digitare `/tollgate:finish` e fermati.
+Se il hook ha risposto «atto non registrato … vale solo in una sessione legata a un lavoro», la sessione non è legata (per esempio aperta dalla radice del checkout): di' all'utente di riprendere il lavoro con `/tollgate:start #<N>` (lega questa sessione) oppure di aprire Claude Code nel worktree del lavoro, poi di digitare di nuovo `/tollgate:finish`, e fermati. Ridigitarlo nella stessa sessione non cambia nulla.
 
 **Regola ferma:** mai `git push` né `gh pr create` da Bash: la PR la apre soltanto `finish open-pr`, che spinge lo SHA giusto e la descrive dal DB.
 

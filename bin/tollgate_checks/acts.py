@@ -45,7 +45,10 @@ def _act(event, ctx, type_):
     obj = target = None
     if type_ == "finish":
         if work is None or not head:
-            return _refuse("/tollgate:finish vale solo in una sessione legata a un lavoro")
+            return _refuse("/tollgate:finish vale solo in una sessione legata a un lavoro: "
+                           "riprendi il lavoro con /tollgate:start #<N> (lega questa sessione) "
+                           "oppure apri Claude Code nel worktree del lavoro, poi digita di "
+                           "nuovo /tollgate:finish")
     elif type_ == "approve":
         if not args or args[0] not in acts.APPROVE_OBJECTS:
             return _refuse(f"oggetto di approve sconosciuto: {args[0] if args else '(vuoto)'}")

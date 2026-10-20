@@ -7,7 +7,7 @@
 # di ogni passo lo script controlla che `git remote get-url --push origin` sia quel repo nudo.
 #
 # Uso: [PLUGIN_REAL_PATH=1] bash spikes/run-p3b-flow.sh \
-#        [prepara|passo1|passo2|passo3|passo4|passo5|passo6|tutto]
+#        [prepara|passo1|passo2|passo3|passo4|passo4-radice|passo5|passo6|tutto]
 # (predefinito: tutto). passo5 si puo' ripetere (nuovo atto /tollgate:finish).
 set -uo pipefail
 
@@ -235,6 +235,7 @@ claude_step() { # id, prompt
   local cont=() dir="$REPO"
   case "$id" in
     passo1) ;;
+    passo4-radice) cont=(--continue) ;;   # riproduce il tentativo a: radice del checkout
     passo4|passo5*) dir="$(worktree_lavoro)" || return 1 ;;
     *) cont=(--continue) ;;
   esac
@@ -260,6 +261,8 @@ passo2() { claude_step passo2 "Nel worktree del lavoro, se non c'è ancora un pi
 passo3() { claude_step passo3 "/tollgate:execute"; registra; }
 passo4() { claude_step passo4 "/tollgate:finish"; registra; }
 # ripetibile: il prompt e' il parametro (predefinito: nuovo atto /tollgate:finish)
+# tentativo a della prova (cwd = radice, --continue): l'atto viene rifiutato. Non fa parte di `tutto`.
+passo4_radice() { claude_step passo4-radice "/tollgate:finish"; registra; }
 passo5() { claude_step "passo5-${2:-1}" "${1:-/tollgate:finish}"; registra; }
 passo6() { ( cd "$REPO" && "${TG[@]}" status; "${TG[@]}" events; "${TG[@]}" stats ) > "$LOGS/passo6.txt" 2>&1; registra; }
 
@@ -269,6 +272,7 @@ case "${1:-tutto}" in
   passo2) passo2 ;;
   passo3) passo3 ;;
   passo4) passo4 ;;
+  passo4-radice) passo4_radice ;;
   passo5) passo5 "${2:-}" "${3:-1}" ;;
   passo6) passo6 ;;
   tutto) prepara && passo1 && passo2 && passo3 && passo4 && passo6 ;;
