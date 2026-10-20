@@ -8,6 +8,7 @@ import os
 import sqlite3
 from pathlib import Path
 
+from tollgate_analysis import profiles as prof
 from tollgate_core import clock, db, reviews, sessions
 from tollgate_core.paths import program_command
 from tollgate_core.tasks import STATES
@@ -17,6 +18,7 @@ from . import gitw
 # Prefisso del motivo del blocco -> nome del tetto.
 CAPS = {"budget superato": "budget del task", "giri di correzione esauriti": "giri di correzione",
         reviews.CAP_REASON: "cicli di revisione"}
+CAP_PREFIXES = ("giri di correzione esauriti sul task", reviews.CAP_REASON)
 MAX_NOTES = 5
 EXCLUDE = "docs/superpowers/reviews/*/checkpoint.md"
 NOTES_HEADER = "## Note"
@@ -38,19 +40,83 @@ def stopped_by(conn, work: int) -> list[str]:
     return out
 
 
+ROUNDS_ASK = ("serve una decisione dell'utente: /tollgate:approve rounds <n>, "
+              "/tollgate:resolve {block} o /tollgate:abandon #{issue}")
+
+
+def _cap_step(conn, work: int, issue: int) -> str | None:
+    """Tetto dei giri di correzione sul task o dei cicli di revisione (m12, decisione 13)."""
+    for b in conn.execute("SELECT id, reason FROM blocks WHERE work = ? AND closed IS NULL "
+                          "ORDER BY id", (work,)):
+        if b["reason"].startswith(CAP_PREFIXES):
+            return f"{b['reason']}: " + ROUNDS_ASK.format(block=b["id"], issue=issue)
+    return None
+
+
+def _review_brief(worktree: str, issue: int) -> str | None:
+    """L'ultimo brief del revisore di task scritto da `review-prepare` (`review-<k>.md`)."""
+    run_dir = Path(worktree) / ".tollgate-run" / str(issue)
+    if not run_dir.is_dir():
+        return None
+    found = [(int(p.stem.split("-")[1]), p) for p in run_dir.glob("review-*.md")
+             if p.stem.split("-")[1].isdigit()]
+    return str(max(found)[1]) if found else None
+
+
+def _closing_step(conn, item, prog: str) -> str:
+    """Prossimo passo a task tutti `done`, secondo fase e ultimo ciclo di revisione."""
+    phase, issue, wid = item["phase"], item["issue"], item["id"]
+    if phase == "pr_open":
+        if not item["pr_number"]:
+            return (f"PR chiusa senza merge: /tollgate:start #{issue} --reopen-execution, poi "
+                    f"/tollgate:finish per aprirne una nuova (oppure /tollgate:abandon #{issue})")
+        return (f"PR #{item['pr_number']} aperta: attendi il gate; per correggere "
+                f"/tollgate:start #{issue} --reopen-execution; se il predefinito è avanzato "
+                "/tollgate:sync")
+    if phase not in ("execution", "review"):
+        return "/tollgate:finish"
+    cycle = reviews.latest(conn, wid)
+    if cycle is not None and cycle["outcome"] == "needs_fix":
+        n = cycle["number"]
+        if not conn.execute("SELECT 1 FROM tasks WHERE work = ? AND source = ?",
+                            (wid, f"cycle:{n}")).fetchone() and reviews.blocking_open(conn, wid, n):
+            return f"{prog} task start --from-findings {n}"
+    if phase == "execution":
+        return "/tollgate:finish"
+    if item["level"] == "L0":
+        return f"{prog} finish open-pr"
+    if cycle is None or cycle["outcome"] == "superseded":
+        return f"revisione finale da preparare: {prog} review prepare"
+    n = cycle["number"]
+    if cycle["stage"] == "review":
+        return f"ciclo {n} in stadio review: {prog} review prepare (elenca i revisori da lanciare)"
+    if cycle["stage"] == "verify":
+        return (f"ciclo {n} in stadio verify: {prog} review prepare (prepara il brief del "
+                "verificatore da lanciare)")
+    if cycle["outcome"] == "ok":
+        return f"{prog} finish open-pr"
+    if cycle["outcome"] == "needs_you":
+        return "serve una decisione dell'utente (blocco needs_you): /tollgate:resolve"
+    return "/tollgate:finish"
+
+
 def next_step(conn, work: int) -> str:
+    item = conn.execute("SELECT * FROM work_items WHERE id = ?", (work,)).fetchone()
+    capped = _cap_step(conn, work, item["issue"])
+    if capped:
+        return capped
     row = conn.execute("SELECT * FROM tasks WHERE work = ? AND state <> 'done' "
                        "ORDER BY number LIMIT 1", (work,)).fetchone()
+    prog = program_command(db.BIN_PATH)
     if row is None:
-        phase = conn.execute("SELECT phase FROM work_items WHERE id = ?", (work,)).fetchone()[0]
+        phase = item["phase"]
         if phase == "plan":
             return ("scrivi il piano con superpowers:writing-plans (intestazioni di 7.5), "
                     "committalo, poi /tollgate:execute")
         if phase in ("spec_audit", "approval"):
             return f"fase {phase}: percorso L2, arriva con P3c"
-        return "/tollgate:finish"
+        return _closing_step(conn, item, prog)
     k, state = row["number"], row["state"]
-    prog = program_command(db.BIN_PATH)
     if state == "pending":
         return f"task {k} pending: {prog} task start {k}"
     if state == "running":
@@ -62,6 +128,13 @@ def next_step(conn, work: int) -> str:
         return f"task {k} in review, approvato: {prog} task done {k}"
     if row["verdict"] == "changes" and row["review_sha"] is not None:
         return f"task {k} in review, da correggere: {prog} task start {k} --fix"
+    if (row["verdict"] is None and row["review_sha"] is not None
+            and row["review_code"] is not None):
+        brief = _review_brief(item["worktree"], item["issue"])
+        if brief is not None:
+            who = row["reviewer_type"] or prof.DEFAULT_REVIEWER
+            return (f"task {k} in review, revisione preparata: lancia il revisore {who} "
+                    f'con il brief "{brief}"')
     return f"task {k} in review: {prog} task review-prepare {k}"
 
 
