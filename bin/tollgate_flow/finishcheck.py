@@ -16,7 +16,7 @@ from tollgate_core import (acts, clock, config, db, dod, events, git, phases, re
                            sessions, verify, violations)
 from tollgate_core.paths import program_command
 
-from . import gitw, taskcmd
+from . import gitw, prstate, taskcmd
 
 OK, RED, REFUSED = 0, 1, 2
 SKIP = ("findings", "specialists")      # si valutano dopo la revisione (decisione 15)
@@ -71,17 +71,25 @@ def _check(state, conn, cwd: Path, now, environ) -> CheckResult:
     if work is None:
         return _refuse("nessun lavoro attivo per questa cartella: lancia il comando dal "
                        "worktree del lavoro")
+    wt = Path(work["worktree"])
+    seen = prstate.detect(state, conn, work, git.main_worktree(wt), now=now)
+    if seen.kind == "merged":
+        return _refuse(f"la PR #{seen.pr.get('number')} è stata unita: il lavoro è chiuso")
+    if seen.kind == "closed":
+        return _refuse(prstate.closed_line(seen.pr))
     if work["phase"] not in ("execution", "review"):
         return _refuse(f"la fase è {work['phase']}: `finish check` si usa in execution (o in "
                        "review, per ripeterlo)")
-    wt = Path(work["worktree"])
     sha = git.head(wt)
     if sha is None:
         return _refuse("nessun commit da verificare")
     if work["phase"] == "review" and work["finish_sha"] == sha and work["finish_report"]:
-        return _saved(work, sha)
+        saved = _saved(work, sha)
+        if seen.error:
+            saved.lines.insert(0, f"avviso: {seen.error}")
+        return saved
 
-    lines: list[str] = []
+    lines: list[str] = [f"avviso: {seen.error}"] if seen.error else []
     if not gitw.fetch(wt):
         lines.append("avviso: git fetch origin non riuscito (senza rete?): si prosegue con i "
                      "riferimenti locali")
@@ -130,16 +138,9 @@ def _check(state, conn, cwd: Path, now, environ) -> CheckResult:
 
     allow_unverified = acts.has_approval(conn, wid, "unverified-tests")
     allow_no_tests = cfg.get("project.allow_no_tests")
-    profile_items: dict[str, bool] = {}
-    for spec in extra:
-        rows = [r for r in receipts.latest(conn, wid, sha) if r["command"] == spec.name]
-        profile_items[spec.name], why = dod.receipt_verdict(
-            rows, sha, allow_no_tests, [spec.name], allow_unverified)
-        if not spec.command and not profile_items[spec.name]:
-            why = (f"il comando «{spec.name.rsplit(':', 1)[-1]}» non è in [commands]: "
-                   "dichiaralo, oppure serve /tollgate:approve unverified-tests")
-        if why:
-            details[spec.name] = why
+    profile_items, why = profile_receipts(conn, wid, sha, extra, allow_no_tests,
+                                          allow_unverified)
+    details.update(why)
 
     items = dod.compute_dod(conn, wid, head_sha=sha, allow_no_tests=allow_no_tests,
                             required_commands=required, external=external,
@@ -158,6 +159,24 @@ def _check(state, conn, cwd: Path, now, environ) -> CheckResult:
     events.record_event(conn, "finish_check", {"sha": sha, "ok": green}, now=now, work=wid)
     lines.append(_next_step(level, green))
     return CheckResult(OK if green else RED, lines, items)
+
+
+def profile_receipts(conn, wid: int, sha: str, extra, allow_no_tests: bool,
+                     allow_unverified: bool) -> tuple[dict[str, bool], dict[str, str]]:
+    """Le voci `dod` dei profili attive dalle ricevute su `sha` (anche per `open-pr`) e, per
+    quelle non verdi, il motivo."""
+    items: dict[str, bool] = {}
+    details: dict[str, str] = {}
+    for spec in extra:
+        rows = [r for r in receipts.latest(conn, wid, sha) if r["command"] == spec.name]
+        items[spec.name], why = dod.receipt_verdict(rows, sha, allow_no_tests, [spec.name],
+                                                    allow_unverified)
+        if not spec.command and not items[spec.name]:
+            why = (f"il comando «{spec.name.rsplit(':', 1)[-1]}» non è in [commands]: "
+                   "dichiaralo, oppure serve /tollgate:approve unverified-tests")
+        if why:
+            details[spec.name] = why
+    return items, details
 
 
 def _own_document(wt: Path, work, v) -> bool:

@@ -70,8 +70,8 @@ class FlowLabTest(unittest.TestCase):
         self.assertEqual(json.loads(r.stdout), {"title": "T", "body": "B"})
         self.assertEqual(json.loads(self.gh("issue", "list", "--json", "number").stdout),
                          [{"number": 7}])
-        self.assertEqual(json.loads(self.gh("pr", "list", "--head", "altro").stdout), [])
-        self.assertEqual(len(json.loads(self.gh("pr", "list", "--head", "tg/7-x").stdout)), 1)
+        self.assertEqual(json.loads(self.gh("pr", "list", "--head", "altro", "--json", "number").stdout), [])
+        self.assertEqual(len(json.loads(self.gh("pr", "list", "--head", "tg/7-x", "--json", "number").stdout)), 1)
         r = self.gh("api", "repos/{owner}/{repo}/commits/abc/status")
         self.assertEqual(json.loads(r.stdout)["statuses"][0]["state"], "success")
         self.assertEqual(len(self.fl.gh_calls()), 6)

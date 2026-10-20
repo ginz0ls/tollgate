@@ -11,6 +11,7 @@ from tollgate_core import git
 FETCH_TIMEOUT_S = 120
 LS_REMOTE_TIMEOUT_S = 60
 WRITE_TIMEOUT_S = 60
+PUSH_TIMEOUT_S = 120
 
 
 class GitWriteError(Exception):
@@ -124,6 +125,33 @@ def remote_branches(repo, pattern: str) -> list[str]:
         if ref.startswith("refs/heads/"):
             names.append(ref.removeprefix("refs/heads/"))
     return sorted(n for n in names if fnmatch.fnmatchcase(n, pattern))
+
+
+def push_sha(repo, sha: str, branch: str, *, lease: str | None) -> None:
+    """Spinge esattamente `sha` su `refs/heads/<branch>` di origin. Con `lease` il push è forzato
+    solo se il ramo remoto punta ancora a `lease` (`--force-with-lease`); senza, un ramo remoto
+    che non è antenato di `sha` fa fallire il push."""
+    args = ["push"]
+    if lease:
+        args.append(f"--force-with-lease=refs/heads/{branch}:{lease}")
+    _checked(repo, *args, "origin", f"{sha}:refs/heads/{branch}", timeout=PUSH_TIMEOUT_S)
+
+
+def remote_sha(repo, branch: str) -> str | None:
+    """Lo SHA di `refs/heads/<branch>` su origin, `None` se il ramo non esiste. Un errore
+    (senza rete) è un `GitWriteError`, mai «non esiste»."""
+    out = _checked(repo, "ls-remote", "--heads", "origin", f"refs/heads/{branch}",
+                   timeout=LS_REMOTE_TIMEOUT_S)
+    for line in out.splitlines():
+        sha, _, ref = line.partition("\t")
+        if ref == f"refs/heads/{branch}" and sha:
+            return sha
+    return None
+
+
+def is_ancestor(repo, a: str, b: str) -> bool:
+    """`a` è antenato di `b` (o uguale). Falso anche se `a` non è nel repo locale."""
+    return _run(repo, "merge-base", "--is-ancestor", a, b).returncode == 0
 
 
 def worktree_dir(main: Path, branch: str) -> Path:

@@ -82,6 +82,8 @@ def build_parser() -> argparse.ArgumentParser:
     fp = sub.add_parser("finish", help="chiusura del lavoro (6.4)")
     fsub = fp.add_subparsers(dest="finish_cmd", required=True)
     fsub.add_parser("check", help="copia locale del gate: la DoD voce per voce; verde = review")
+    fo = fsub.add_parser("open-pr", help="spinge lo SHA e apre o aggiorna la PR (6.4)")
+    fo.add_argument("--update", action="store_true", help="richiede una PR già aperta")
     rp = sub.add_parser("review", help="revisione finale (6.4, 8.6)")
     rsub = rp.add_subparsers(dest="review_cmd", required=True)
     rsub.add_parser("prepare", help="apre o riprende il ciclo e scrive i brief dei revisori")
@@ -240,6 +242,12 @@ def main(argv: list[str]) -> int:
                 return 1
             return 0
         if args.cmd == "finish":
+            if args.finish_cmd == "open-pr":
+                from tollgate_flow import openpr
+                opened = openpr.open_pr(state, Path.cwd(), update=args.update,
+                                        argv=_hook_argv(argv, args.cmd))
+                print("\n".join(opened.lines))
+                return opened.code
             from tollgate_flow import finishcheck
             result = finishcheck.check(state, Path.cwd())
             print("\n".join(result.lines))

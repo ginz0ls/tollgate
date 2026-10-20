@@ -55,6 +55,12 @@ def authorize_force(conn, work: int, *, reason: str, now) -> str:
         return key
 
 
+def force_authorized(conn, work: int) -> bool:
+    """C'è un'autorizzazione al push forzato non ancora usata (sola lettura)."""
+    return conn.execute("SELECT 1 FROM intents WHERE work = ? AND action = 'force_push' "
+                        "AND state = 'authorized' LIMIT 1", (work,)).fetchone() is not None
+
+
 def take_force(conn, work: int, *, now) -> str | None:
     """Consuma la più recente autorizzazione: ogni push forzato ne usa una sola."""
     with db.tx(conn):

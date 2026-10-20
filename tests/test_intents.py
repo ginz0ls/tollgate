@@ -63,6 +63,14 @@ class IntentsTest(unittest.TestCase):
         self.assertEqual(intents.take_force(self.conn, self.w, now=T0), k2)
         self.assertEqual(intents.take_force(self.conn, self.w, now=T0), k1)
 
+    def test_force_authorized_does_not_consume(self):
+        self.assertFalse(intents.force_authorized(self.conn, self.w))
+        key = intents.authorize_force(self.conn, self.w, reason="rebase", now=T0)
+        self.assertTrue(intents.force_authorized(self.conn, self.w))
+        self.assertTrue(intents.force_authorized(self.conn, self.w))
+        self.assertEqual(intents.take_force(self.conn, self.w, now=T0), key)
+        self.assertFalse(intents.force_authorized(self.conn, self.w))
+
     def test_pending_lists_requested(self):
         intents.request(self.conn, work=self.w, action="pr", key="pr:1:a", data={}, now=T0)
         intents.request(self.conn, work=self.w, action="pr", key="pr:1:b", data={}, now=T0)
