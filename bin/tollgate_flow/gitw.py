@@ -154,6 +154,30 @@ def is_ancestor(repo, a: str, b: str) -> bool:
     return _run(repo, "merge-base", "--is-ancestor", a, b).returncode == 0
 
 
+def merge_ff_only(wt, ref: str) -> bool:
+    """`git merge --ff-only <ref>`: vero se HEAD avanza (o è già lì), falso se non è un
+    avanzamento rapido o git fallisce."""
+    return _run(wt, "merge", "--ff-only", ref).returncode == 0
+
+
+def rebase(wt, onto: str) -> bool:
+    """`git rebase <onto>`. Falso con un conflitto, e il rebase resta in corso nel worktree
+    (lo annulla `rebase_abort`). Un guasto senza rebase in corso (per esempio modifiche non
+    committate) è un `GitWriteError`."""
+    r = _run(wt, "rebase", onto)
+    if r.returncode == 0:
+        return True
+    if rebase_in_progress(wt):
+        return False
+    raise GitWriteError(f"git rebase {onto}: {(r.stderr or r.stdout).strip()}")
+
+
+def rebase_abort(wt) -> None:
+    """`git rebase --abort`; nulla se non c'è un rebase in corso."""
+    if rebase_in_progress(wt):
+        _checked(wt, "rebase", "--abort")
+
+
 def merge_base(repo, a: str, b: str) -> str | None:
     """Il miglior antenato comune di `a` e `b`; `None` se non c'è o se un riferimento manca."""
     r = _run(repo, "merge-base", a, b)

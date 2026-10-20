@@ -85,11 +85,12 @@ def pr(number=1, state="OPEN", branch=BRANCH, **kw):
 
 
 class OpenCase(unittest.TestCase):
-    def lab(self, *, toml=TOML, level="L1", cycle="ok", finish_act=True, prs=(), **gh):
+    def lab(self, *, toml=TOML, level="L1", cycle="ok", finish_act=True, prs=(), files=None,
+            app=SOMMA, **gh):
         """Lavoro in fase review: piano registrato (L1), task chiusi, `finish check` verde sullo
         SHA di HEAD, ciclo di revisione `ok` su HEAD e l'atto `finish` registrato."""
         fl = FlowLab(issue=7, phase="plan" if level != "L0" else "execution", toml=toml,
-                     level=level)
+                     level=level, files=files)
         self.addCleanup(fl.close)
         env = mock.patch.dict(os.environ, fl.env())
         env.start()
@@ -98,7 +99,7 @@ class OpenCase(unittest.TestCase):
             fl.register_plan(tasks=1)
             fl.commit(PLAN, plan_text(tasks=1), "piano")
         fl.commit("tests/ids.txt", BOTH_OK, "ids")
-        fl.commit("src/app.py", SOMMA, "somma")
+        fl.commit("src/app.py", app, "somma")
         if level != "L0":
             fl.close_tasks()
         gh.setdefault("issues", ISSUES)

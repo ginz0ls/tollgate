@@ -87,6 +87,7 @@ def build_parser() -> argparse.ArgumentParser:
     rp = sub.add_parser("review", help="revisione finale (6.4, 8.6)")
     rsub = rp.add_subparsers(dest="review_cmd", required=True)
     rsub.add_parser("prepare", help="apre o riprende il ciclo e scrive i brief dei revisori")
+    sub.add_parser("sync", help="rimette il ramo sul predefinito e aggiorna la PR (6.5)")
     hp = sub.add_parser("hook", help="solo per hooks/run: adattatore per Claude Code")
     hp.add_argument("event", metavar="evento")
     vp = sub.add_parser("verify", help="esegue i comandi del gate e registra le ricevute (8.1)")
@@ -215,6 +216,11 @@ def main(argv: list[str]) -> int:
                                       argv=_hook_argv(argv, args.cmd))
             print("\n".join(result.lines))
             return result.code
+        if args.cmd == "sync":
+            from tollgate_flow import sync as flow_sync
+            synced = flow_sync.sync(state, Path.cwd(), argv=_hook_argv(argv, args.cmd))
+            print("\n".join(synced.lines))
+            return synced.code
         if args.cmd == "task":
             from tollgate_flow import taskcmd
             try:

@@ -1,0 +1,296 @@
+import json
+import unittest
+from datetime import timedelta
+from unittest import mock
+
+from tests.flowkit import SESSION
+from tests.helpers import git as run_git
+from tests.test_openpr import BRANCH, OpenCase, head, pr, work
+from tollgate_core import acts, clock, git as core_git, intents, phases, reviews, sessions
+from tollgate_flow import gitw, prstate, sync
+
+TWELVE = "".join(f"x{i} = {i}\n" for i in range(1, 13))
+TWELVE_WORK = TWELVE.replace("x2 = 2\n", "x2 = 20\n")
+TWELVE_MAIN = TWELVE.replace("x5 = 5\n", "x5 = 50\n")
+
+
+class SyncCase(OpenCase):
+    def pr_open_lab(self, **kw):
+        """Lavoro in `pr_open`: PR aperta (la numero 1), ramo spinto su origin, identità per i
+        rebase e il predefinito ancora fermo."""
+        fl = self.lab(**kw)
+        fl.git("config", "user.name", "t")
+        fl.git("config", "user.email", "t@example.com")
+        r = self.go(fl)
+        self.assertEqual(r.code, 0, r.lines)
+        self.assertEqual(work(fl)["phase"], "pr_open")
+        self.at = fl.now + timedelta(hours=2)
+        return fl
+
+    def advance_main(self, fl, path="docs/nuovo.md", text="nuovo\n", msg="avanza"):
+        """Un commit sul predefinito di origin, spinto dal checkout principale."""
+        target = fl.main / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text)
+        fl.git("add", "--", path)
+        fl.git("commit", "-qm", msg)
+        fl.git("push", "-q", "origin", "main")
+        return fl.git("rev-parse", "HEAD")
+
+    def sync_act(self, fl, *, session=SESSION):
+        return acts.record_act(fl.conn, type_="sync", typed_text="/tollgate:sync",
+                               session=session, work=fl.work, now=self.at, ttl_minutes=10)
+
+    def run_sync(self, fl, *, act=True, **kw):
+        if act:
+            self.sync_act(fl)
+        sessions.note_cli_call(fl.ts.state, SESSION, str(fl.wt), ["sync"], now=self.at)
+        return sync.sync(fl.ts.state, fl.wt, now=self.at, environ=fl.env(), **kw)
+
+    def intent_states(self, fl, action):
+        return [r[0] for r in fl.conn.execute(
+            "SELECT state FROM intents WHERE work = ? AND action = ? ORDER BY id",
+            (fl.work, action))]
+
+
+class SyncRefusalTest(SyncCase):
+    def test_refused_without_sync_act(self):
+        fl = self.pr_open_lab()
+        self.advance_main(fl)
+        before = head(fl)
+        r = self.run_sync(fl, act=False)
+        self.assertEqual(r.code, sync.REFUSED, r.lines)
+        self.assertIn("/tollgate:sync", " ".join(r.lines))
+        self.assertEqual(head(fl), before)
+        self.assertEqual(self.intent_states(fl, "sync"), [])
+        self.assertEqual(work(fl)["phase"], "pr_open")
+
+    def test_closed_pr_not_cleared_refused_with_hint(self):
+        fl = self.pr_open_lab()
+        self.advance_main(fl)
+        fl.set_gh(prs=[pr(1, "CLOSED")])
+        before = head(fl)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.REFUSED, r.lines)
+        self.assertIn(prstate.CLOSED_HINT, "\n".join(r.lines))
+        self.assertEqual(head(fl), before)
+
+    def test_merged_pr_closes_work_and_refuses(self):
+        fl = self.pr_open_lab()
+        fl.set_gh(prs=[pr(1, "MERGED", mergedAt="2026-10-19T00:00:00Z")])
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.REFUSED, r.lines)
+        self.assertEqual(work(fl)["phase"], "closed")
+
+    def test_wrong_phase_refused(self):
+        fl = self.lab()
+        fl.git("config", "user.name", "t")
+        self.at = fl.now + timedelta(hours=2)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.REFUSED, r.lines)
+        self.assertIn("review", " ".join(r.lines))
+
+
+class SyncRebaseTest(SyncCase):
+    def test_rebase_realigns_base_and_updates_pr(self):
+        fl = self.pr_open_lab()
+        old_head = head(fl)
+        tip = self.advance_main(fl)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.OK, r.lines)
+        new_head = head(fl)
+        self.assertNotEqual(new_head, old_head)
+        self.assertEqual(fl.git("merge-base", "HEAD", "origin/main", repo=fl.wt), tip)
+        w = work(fl)
+        self.assertEqual(w["work_base_sha"], tip)
+        self.assertEqual(w["phase"], "pr_open")
+        self.assertEqual(fl.events("base_realigned")[-1]["to"], tip)
+        self.assertEqual(fl.events("base_realigned")[-1]["cause"], "sync")
+        recorded = {e["sha"] for e in fl.events("commit")}
+        self.assertTrue(set(core_git.rev_list(fl.wt, tip, new_head)) <= recorded)
+        self.assertEqual(fl.events("pr_updated")[-1], {"pr": 1, "sha": new_head})
+        self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), new_head)
+        self.assertEqual(len(self.calls(fl, "pr", "edit")), 1)
+        self.assertEqual(self.calls(fl, "pr", "create")[1:], [])
+        self.assertEqual(self.intent_states(fl, "sync"), ["executed"])
+        self.assertEqual(self.intent_states(fl, "force_push"), ["used"])
+        self.assertEqual(fl.conn.execute("SELECT state FROM acts WHERE type = 'sync'")
+                         .fetchone()[0], "consumed")
+        phases_seen = [json.loads(e["data"]) for e in fl.conn.execute(
+            "SELECT data FROM events WHERE type = 'phase_change' ORDER BY seq")]
+        self.assertIn({"from": "pr_open", "to": "execution", "cause": "sync"}, phases_seen)
+
+    def test_same_patch_id_no_cycle_consumed(self):
+        fl = self.pr_open_lab()
+        cycles = reviews.count(fl.conn, fl.work)
+        self.assertEqual(cycles, 1)
+        self.advance_main(fl)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.OK, r.lines)
+        self.assertEqual(reviews.count(fl.conn, fl.work), cycles)
+        last = reviews.latest(fl.conn, fl.work)
+        self.assertEqual(last["patch_id"],
+                         core_git.patch_id(fl.wt, work(fl)["work_base_sha"], head(fl)))
+
+    def test_nothing_to_rebase_updates_nothing_rewritten(self):
+        fl = self.pr_open_lab()
+        before = head(fl)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.OK, r.lines)
+        self.assertEqual(head(fl), before)
+        self.assertEqual(self.intent_states(fl, "force_push"), [])
+        self.assertEqual(self.intent_states(fl, "sync"), ["executed"])
+
+    def test_stale_pending_sync_intent_completed(self):
+        fl = self.pr_open_lab()
+        self.advance_main(fl)
+        intents.request(fl.conn, work=fl.work, action="sync", key=f"sync:{fl.work}:a-0",
+                        data={}, now=fl.now)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.OK, r.lines)
+        self.assertEqual(intents.pending(fl.conn, fl.work, "sync"), [])
+
+    def test_remote_merge_then_rebase(self):
+        """«Update branch» su GitHub: un merge del predefinito su origin/<ramo>. Si integra con
+        --ff-only, poi il rebase sul predefinito avanzato lo toglie dalla storia."""
+        fl = self.pr_open_lab()
+        self.advance_main(fl, msg="primo")
+        clone = fl.tmp / "clone"
+        run_git(fl.tmp, "clone", "-q", str(fl.origin), str(clone))
+        run_git(clone, "checkout", "-q", "-b", BRANCH, f"origin/{BRANCH}")
+        run_git(clone, "merge", "-q", "--no-ff", "-m", "Update branch", "origin/main")
+        merge = run_git(clone, "rev-parse", "HEAD")
+        run_git(clone, "push", "-q", "origin", BRANCH)
+        tip = self.advance_main(fl, path="docs/altro.md", msg="secondo")
+        self.sync_act(fl)
+        sessions.note_cli_call(fl.ts.state, SESSION, str(fl.wt), ["sync"], now=self.at)
+        with mock.patch.object(gitw, "merge_ff_only", wraps=gitw.merge_ff_only) as ff:
+            r = sync.sync(fl.ts.state, fl.wt, now=self.at, environ=fl.env())
+        self.assertEqual(r.code, sync.OK, r.lines)
+        ff.assert_called_once_with(fl.wt, merge)
+        self.assertFalse(gitw.is_ancestor(fl.wt, merge, head(fl)))
+        self.assertEqual(fl.git("merge-base", "HEAD", "origin/main", repo=fl.wt), tip)
+        self.assertEqual(work(fl)["work_base_sha"], tip)
+        self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), head(fl))
+        self.assertEqual(self.intent_states(fl, "force_push"), ["used"])
+
+    def test_diverged_remote_needs_you(self):
+        fl = self.pr_open_lab()
+        self.advance_main(fl)
+        clone = fl.tmp / "clone"
+        run_git(fl.tmp, "clone", "-q", str(fl.origin), str(clone))
+        run_git(clone, "checkout", "-q", "-b", BRANCH, f"origin/{BRANCH}")
+        run_git(clone, "commit", "-q", "--allow-empty", "-m", "di un altro")
+        run_git(clone, "push", "-q", "origin", BRANCH)
+        fl.git("commit", "-q", "--allow-empty", "-m", "mio", repo=fl.wt)
+        before, remote = head(fl), gitw.remote_sha(fl.wt, BRANCH)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.BLOCKED, r.lines)
+        self.assertEqual(head(fl), before)
+        self.assertNotEqual(remote, before)
+        self.assertFalse(gitw.rebase_in_progress(fl.wt))
+        (block,) = fl.conn.execute("SELECT * FROM blocks WHERE closed IS NULL").fetchall()
+        self.assertEqual(block["type"], "needs_you")
+        self.assertIn("diverg", block["reason"])
+        self.assertEqual(self.intent_states(fl, "force_push"), [])
+
+    def test_conflict_aborts_and_blocks(self):
+        fl = self.pr_open_lab()
+        old_base = work(fl)["work_base_sha"]
+        before = head(fl)
+        self.advance_main(fl, path="src/app.py", text="def somma(a, b):\n    return a + b + 0\n")
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.BLOCKED, r.lines)
+        self.assertFalse(gitw.rebase_in_progress(fl.wt))
+        self.assertEqual(head(fl), before)
+        self.assertEqual(fl.git("status", "--porcelain", "--untracked-files=no", repo=fl.wt), "")
+        w = work(fl)
+        self.assertEqual(w["work_base_sha"], old_base)
+        self.assertEqual((w["phase"], w["phase_before_block"]), ("blocked", "pr_open"))
+        (block,) = fl.conn.execute("SELECT * FROM blocks WHERE closed IS NULL").fetchall()
+        self.assertEqual(block["type"], "needs_you")
+        self.assertTrue(block["reason"].startswith(intents.SYNC_CONFLICT_REASON))
+        self.assertIn("/tollgate:approve rebase", block["reason"])
+        self.assertIn("/tollgate:abandon #7", block["reason"])
+        self.assertIn("/tollgate:approve rebase", "\n".join(r.lines))
+        self.assertEqual(self.intent_states(fl, "force_push"), [])
+        self.assertEqual(self.intent_states(fl, "sync"), ["executed"])
+        self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), before)
+        self.assertEqual(fl.events("base_realigned"), [])
+
+    def test_different_patch_id_asks_new_review(self):
+        fl = self.pr_open_lab_twelve()
+        old_head = head(fl)
+        self.advance_main(fl, path="src/app.py", text=TWELVE_MAIN)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.REVIEW_NEEDED, r.lines)
+        self.assertIn("serve una nuova revisione: /tollgate:finish", "\n".join(r.lines))
+        self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), old_head)       # nessun push
+        self.assertEqual(self.calls(fl, "pr", "edit"), [])
+        self.assertEqual(work(fl)["phase"], "review")
+        self.assertEqual(fl.events("pr_updated"), [])
+        self.assertEqual(reviews.count(fl.conn, fl.work), 1)
+        self.assertTrue(intents.force_authorized(fl.conn, fl.work))      # per il finish che segue
+
+    def test_repeat_after_review_needed_is_not_divergent(self):
+        """Il remoto ha ancora il vecchio push (nostro, poi riscritto): non è una divergenza."""
+        fl = self.pr_open_lab_twelve()
+        self.advance_main(fl, path="src/app.py", text=TWELVE_MAIN)
+        self.assertEqual(self.run_sync(fl).code, sync.REVIEW_NEEDED)
+        self.at += timedelta(minutes=30)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.REVIEW_NEEDED, r.lines)
+        self.assertEqual(fl.conn.execute("SELECT count(*) FROM blocks").fetchone()[0], 0)
+        self.assertEqual(self.intent_states(fl, "force_push"), ["authorized"])
+
+    def pr_open_lab_twelve(self):
+        return self.pr_open_lab(files={"src/app.py": TWELVE}, app=TWELVE_WORK)
+
+    def test_execution_without_open_pr_stops_after_finish_check(self):
+        fl = self.lab()
+        fl.git("config", "user.name", "t")
+        fl.git("config", "user.email", "t@example.com")
+        phases.set_phase(fl.conn, fl.ts.state, fl.work, "execution", "needs_fix", now=fl.now)
+        self.at = fl.now + timedelta(hours=2)
+        self.advance_main(fl)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.OK, r.lines)
+        self.assertIn("PR non ancora aperta: /tollgate:finish", "\n".join(r.lines))
+        self.assertEqual(work(fl)["phase"], "review")
+        self.assertEqual(self.calls(fl, "pr", "create"), [])
+        self.assertIsNone(gitw.remote_sha(fl.wt, BRANCH))
+        self.assertEqual(self.intent_states(fl, "force_push"), [])
+
+    def test_post_bash_ignores_rewritten_commits(self):
+        fl = self.pr_open_lab()
+        self.advance_main(fl)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.OK, r.lines)
+        commits = len(fl.events("commit"))
+        out = fl.bash("git status", post=True, cwd=fl.wt)
+        self.assertEqual(out.exit, 0, out.stderr)
+        self.assertEqual(len(fl.events("commit")), commits)
+        self.assertEqual(fl.conn.execute("SELECT count(*) FROM blocks WHERE closed IS NULL")
+                         .fetchone()[0], 0)
+        # controllo: un commit che nessuno ha registrato, invece, lo vede
+        fl.git("commit", "-q", "--allow-empty", "-m", "nuovo", repo=fl.wt)
+        fl.bash("git commit --allow-empty -m nuovo", post=True, cwd=fl.wt)
+        self.assertEqual(len(fl.events("commit")), commits + 1)
+
+
+class SyncCliTest(SyncCase):
+    def test_cli_sync_end_to_end(self):
+        fl = self.pr_open_lab()
+        tip = self.advance_main(fl)
+        acts.record_act(fl.conn, type_="sync", typed_text="/tollgate:sync", session=SESSION,
+                        work=fl.work, now=clock.now(), ttl_minutes=10)
+        r = fl.cli("sync", cwd=fl.wt)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(work(fl)["work_base_sha"], tip)
+        self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), head(fl))
+        again = fl.cli("sync", cwd=fl.wt)         # senza un nuovo atto: rifiuto
+        self.assertEqual(again.returncode, 1, again.stdout + again.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

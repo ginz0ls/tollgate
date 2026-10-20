@@ -16,7 +16,7 @@ from tollgate_core import (VERSION, active, clock, config, db, git, phases, sess
                            subagents)
 from tollgate_core.paths import State, repo_key
 
-from . import gh, gitw, housekeeping, prereq
+from . import gh, gitw, housekeeping, prereq, sync as flow_sync
 
 OK, REFUSED, NEEDS_CONFIRM, INCOMPLETE = 0, 1, 3, 4
 TRUSTED_AUTHORS = ("OWNER", "MEMBER", "COLLABORATOR")
@@ -131,6 +131,16 @@ def _resume(state, conn, main, ref, cfg, row, session, *, fetched, confirm, reop
     notes.warnings.extend(_prerequisites(state, main, ref, claude_dir, notes))
     _check_main_clean(main, notes)
     _check_default_states(state, main, ref, notes, strict=False)
+    branch = row["branch"]
+    wt = Path(row["worktree"]) if row["worktree"] else gitw.worktree_dir(main, branch)
+    try:
+        interrupted = flow_sync.complete_interrupted(conn, state, row, wt, now=now,
+                                                     session=session)
+    except (sqlite3.Error, git.GitError, gitw.GitWriteError, phases.TransitionError) as e:
+        interrupted = f"completamento del sync interrotto non riuscito: {e}"
+    if interrupted:
+        notes.warnings.append(interrupted)
+        row = phases.get_work(conn, work)       # base e fase possono essere cambiate
     notes.confirms.extend(_pending_intents(conn, work))
     notes.confirms.extend(f"la sessione {s} è viva sullo stesso lavoro"
                           for s in _other_live_sessions(conn, row, session, cfg, now))
@@ -141,8 +151,6 @@ def _resume(state, conn, main, ref, cfg, row, session, *, fetched, confirm, reop
             "per procedere ripeti il comando con --confirm"])
     notes.warnings.extend(f"confermato: {c}" for c in notes.confirms)
 
-    branch = row["branch"]
-    wt = Path(row["worktree"]) if row["worktree"] else gitw.worktree_dir(main, branch)
     recreated = not wt.exists()
     if recreated:
         why = _restore_worktree(main, row, wt, notes)

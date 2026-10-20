@@ -13,7 +13,8 @@ from pathlib import Path
 from tests.flowkit import ORIGIN_URL, SESSION, FlowLab
 from tests.helpers import BIN
 from tests.hookkit import DEFAULT_TOML
-from tollgate_core import VERSION, clock, effects, events, phases, sessions, subagents, tasks
+from tollgate_core import (VERSION, clock, effects, events, intents, phases, sessions, subagents,
+                           tasks)
 from tollgate_flow import gitw, housekeeping
 
 SENTINEL_TITLE = "tollgate: merge non verificato"
@@ -707,6 +708,66 @@ class ResumeTest(StartCase):
         self.assertIn(" ", str(wt))
         self.assertIn(f"git -C {shlex.quote(str(wt))} rebase --abort", out(r))
         self.assertTrue(gitw.rebase_in_progress(wt))
+
+
+    def interrupted_sync(self, fl, *, conflict=False):
+        """Un `sync` che si è fermato dopo l'intento: il predefinito è avanzato (con un conflitto
+        sul file del lavoro, se `conflict`) e il rebase è già partito."""
+        fl.git("config", "user.name", "t")
+        fl.git("config", "user.email", "t@example.com")
+        fl.commit("src/app.py", "def somma(a, b):\n    return b + a\n", "lavoro")
+        old_head, old_base = fl.git("rev-parse", "HEAD", repo=fl.wt), self.rows(fl)[0][
+            "work_base_sha"]
+        path, text = (("src/app.py", "def somma(a, b):\n    return a + b + 0\n") if conflict
+                      else ("docs/nuovo.md", "nuovo\n"))
+        (fl.main / path).write_text(text)
+        fl.git("add", "--", path)
+        fl.git("commit", "-qm", "avanza")
+        fl.git("push", "-q", "origin", "main")
+        self.gh(fl)
+        tip = fl.git("rev-parse", "origin/main")
+        intents.request(fl.conn, work=fl.work, action="sync", key=f"sync:{fl.work}:a-1",
+                        data={"branch": "tg/7-demo", "from": old_head, "to": tip,
+                              "base": old_base}, now=clock.now())
+        done = subprocess.run(["git", "-C", str(fl.wt), "rebase", tip], capture_output=True,
+                              text=True)
+        self.assertEqual(done.returncode != 0, conflict, done.stderr)
+        return old_head, old_base, tip
+
+    def test_interrupted_sync_completed_by_start(self):
+        fl = self.make()
+        fl.goto("pr_open")
+        old_head, old_base, tip = self.interrupted_sync(fl)
+        new_head = fl.git("rev-parse", "HEAD", repo=fl.wt)
+        self.assertNotEqual(new_head, old_head)
+        r = self.resume(fl)                     # nessuna conferma: il sync è completato
+        self.assertIn("sync interrotto completato senza ripetere il rebase", out(r))
+        self.assertNotIn("--confirm", out(r))
+        (row,) = self.rows(fl)
+        self.assertEqual(row["work_base_sha"], tip)
+        self.assertEqual(row["phase"], "execution")
+        self.assertNotIn("--reopen-execution", out(r))
+        self.assertEqual(fl.events("base_realigned"),
+                         [{"from": old_base, "to": tip, "cause": "sync"}])
+        self.assertIn({"sha": new_head}, fl.events("commit"))
+        self.assertEqual(fl.git("rev-parse", "HEAD", repo=fl.wt), new_head)    # niente rebase di nuovo
+        self.assertEqual(fl.conn.execute("SELECT state FROM intents").fetchone()[0], "executed")
+        self.resume(fl)                         # la seconda ripresa non ha più nulla da fare
+        self.assertEqual(len(fl.events("base_realigned")), 1)
+
+    def test_interrupted_sync_with_rebase_in_progress_proposes_abort(self):
+        fl = self.make()
+        old_head, old_base, tip = self.interrupted_sync(fl, conflict=True)
+        self.assertTrue(gitw.rebase_in_progress(fl.wt))
+        r = self.resume(fl, code=3)
+        self.assertIn("(sync) richiesto", out(r))
+        self.assertIn("--confirm", out(r))
+        r = self.resume(fl, "--confirm")
+        self.assertIn(f"git -C {shlex.quote(str(fl.wt))} rebase --abort", out(r))
+        self.assertNotIn("sync interrotto completato", out(r))
+        self.assertTrue(gitw.rebase_in_progress(fl.wt))             # tollgate non lo annulla
+        self.assertEqual(self.rows(fl)[0]["work_base_sha"], old_base)
+        self.assertEqual(fl.conn.execute("SELECT state FROM intents").fetchone()[0], "requested")
 
 
 class HousekeepingTest(StartCase):

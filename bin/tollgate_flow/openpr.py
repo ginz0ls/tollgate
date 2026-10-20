@@ -36,7 +36,7 @@ class OpenResult:
 
 
 @dataclass
-class _Review:
+class Review:
     """Il ciclo di revisione che vale per HEAD (o per lo stesso `patch-id`)."""
     required: bool
     ok: bool
@@ -70,10 +70,10 @@ def _title(issue: int, branch: str) -> str:
     return f"#{issue} {slug.replace('-', ' ')}"
 
 
-def _review(conn, work, cfg, wt, base, head, comps) -> _Review:
+def review_state(conn, work, cfg, wt, base, head, comps) -> Review:
     required = work["level"] != "L0" and comps.get("final_review", True)
     if not required:
-        return _Review(False, True, None, 0)
+        return Review(False, True, None, 0)
     last = reviews.latest(conn, work["id"])
     same = False
     if last is not None:
@@ -84,7 +84,7 @@ def _review(conn, work, cfg, wt, base, head, comps) -> _Review:
     # anche con la revisione non verificata la DoD guarda l'ultimo ciclo chiuso su HEAD (8.7)
     specialists = ([r for r in json.loads(last["reviewers"]) if r != REVIEWER]
                    if on_head else [])
-    return _Review(True, ok, last if same else None, last["number"] if on_head else 0, specialists)
+    return Review(True, ok, last if same else None, last["number"] if on_head else 0, specialists)
 
 
 def _dod_line(item: dod.DodItem, details: dict[str, str]) -> str:
@@ -164,7 +164,7 @@ def _open(state, conn, cwd: Path, update: bool, now, argv, via_sync, environ) ->
         warnings.append("avviso: git fetch origin non riuscito (senza rete?): si prosegue con i "
                         "riferimenti locali")
 
-    review = _review(conn, work, cfg, wt, base, head, comps)
+    review = review_state(conn, work, cfg, wt, base, head, comps)
     if review.required and not review.ok:
         problems.append("nessun ciclo di revisione `ok` su questo SHA: lancia "
                         f"{prog} review prepare")
@@ -321,7 +321,7 @@ def _compute_dod(conn, work, cfg, wt, base, head, review, problems):
     return items, details
 
 
-def _notes(conn, wid: int, review: _Review) -> list[dict]:
+def _notes(conn, wid: int, review: Review) -> list[dict]:
     """I rilievi confermati dell'ultimo ciclo su HEAD che non fermano la PR (10): note."""
     if review.findings_cycle == 0:
         return []
