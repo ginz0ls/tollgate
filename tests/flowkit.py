@@ -12,12 +12,16 @@ from pathlib import Path
 from tests.helpers import BIN, ROOT, git
 from tests.hookkit import DEFAULT_FILES, DEFAULT_TOML, Lab
 from tests.test_check_post_edit import SECTIONS
-from tollgate_core import VERSION, clock, events, phases, sessions, tasks as task_store
+from tollgate_analysis import approvals, auditrules
+from tollgate_core import (VERSION, audits, clock, events, git as core_git, phases, sessions,
+                           tasks as task_store)
 
 SESSION = "sess-flow"
 ORIGIN_URL = "https://github.com/prova/flow.git"
 FAKEGH = ROOT / "tests" / "fakegh.py"
 PLAN = "docs/superpowers/plans/2026-10-16-somma.md"
+SPEC = "docs/superpowers/specs/2026-10-20-prova.md"
+ZERO_COUNTS = {k: 0 for k in auditrules.SEVERITIES}
 GATE_FILES = {f".github/workflows/tollgate-{n}.yml": f"name: tollgate-{n}\n"
               for n in ("guard", "run", "verdict", "base", "sentinel")}
 
@@ -69,6 +73,19 @@ def plan_text(task2="- Create: `docs/uso.md`", tasks=2):
         out += ["### Task 2: Pagina", task2, ""]
     for k in range(3, tasks + 1):
         out += [f"### Task {k}: Extra {k}", f"- Create: `docs/extra-{k}.md`", ""]
+    return "\n".join(out) + "\n"
+
+
+def spec_text(slices: int = 1, pitch: bool = True, note: str = "") -> str:
+    """Spec L2 con `slices` fette previste; senza `pitch` mancano «Tane di coniglio» e «Cosa non
+    fare». `note` cambia il blob senza cambiare la forma."""
+    out = ["# Prova", "", "## Obiettivo", "x", "", "## Fette previste"]
+    out += [f"{k}. Fetta {k}" for k in range(1, slices + 1)]
+    if pitch:
+        out += ["", "## Tane di coniglio", "- nessuna, scelta fatta", "", "## Cosa non fare",
+                "- niente extra"]
+    if note:
+        out += ["", note]
     return "\n".join(out) + "\n"
 
 
@@ -161,6 +178,62 @@ class FlowLab:
         events.record_event(self.conn, "commit", {"sha": sha}, now=self.lab.now,
                             session=SESSION, work=self.work)
         return sha
+
+    def _blob(self, path) -> str:
+        blob = core_git.blob_at(self.wt, "HEAD", path)
+        if blob is None:
+            raise AssertionError(f"{path} non è in HEAD")
+        return blob
+
+    def write_spec(self, slices: int = 1, pitch: bool = True, note: str = "") -> str:
+        """Scrive e committa la spec del banco (`SPEC`); restituisce il blob in HEAD."""
+        self.commit(SPEC, spec_text(slices, pitch, note), "spec")
+        return self._blob(SPEC)
+
+    def write_l2_plan(self, tasks: int = 1) -> str:
+        """Scrive il piano valido in `PLAN` come farebbe Write (l'hook `post_edit` registra il
+        `plan_path`), lo committa e restituisce il blob in HEAD. Richiede la fase `plan`."""
+        path = self.wt / PLAN
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(plan_text(tasks=tasks))
+        r = self.lab.post_edit(path)
+        if r.exit != 0:
+            raise AssertionError(f"piano rifiutato dall'hook: {r.stderr}")
+        if phases.get_work(self.conn, self.work)["plan_path"] != PLAN:
+            raise AssertionError("l'hook non ha registrato il plan_path")
+        self.commit(PLAN, plan_text(tasks=tasks), "piano")
+        return self._blob(PLAN)
+
+    def approve_spec_file(self, slices: int = 1) -> None:
+        """La spec approvata come la lascerebbe `approve spec`: spec_path registrato e
+        `spec-approval.md` committato (il blob è quello della spec in HEAD)."""
+        work = phases.get_work(self.conn, self.work)
+        phases.set_spec_path(self.conn, self.work, SPEC, now=self.lab.now)
+        fields = {"kind": "spec-approval", "path": SPEC, "sha": self._blob(SPEC),
+                  "slices": slices, "adversarial": "closed", "lens": None,
+                  "act_id": "act-1", "approved_at": clock.fmt(self.lab.now)}
+        self.commit(approvals.approval_paths(work["issue"])[0],
+                    approvals.render_approval(fields), "approvazione della spec")
+
+    def closed_round(self, kind: str, counts: dict, *, viewpoint: str | None = None,
+                     sha: str | None = None) -> int:
+        """Un giro chiuso, aperto e chiuso dalla libreria sul blob attuale in HEAD della spec
+        (o del piano, per `plan-adversarial`); con `sha` dato si usa quello. L'esito è quello di
+        `auditrules.outcome`. Restituisce il numero del giro."""
+        counts = {**ZERO_COUNTS, **counts}
+        spec_path = phases.get_work(self.conn, self.work)["spec_path"] or SPEC
+        spec_blob = self._blob(spec_path)
+        doc = self._blob(PLAN) if kind == auditrules.PLAN_KIND else spec_blob
+        self.lab.now += timedelta(seconds=1)
+        number = audits.open_round(self.conn, self.work, kind=kind, sha=sha or doc,
+                                   spec_sha=spec_blob, viewpoint=viewpoint, code="c0de0000",
+                                   now=self.lab.now)
+        self.lab.now += timedelta(seconds=1)
+        audits.close_round(self.conn, self.work, kind=kind, number=number, counts=counts,
+                           outcome=auditrules.outcome(counts),
+                           report_path=f"docs/superpowers/reviews/7/{kind}-{number}.md",
+                           now=self.lab.now)
+        return number
 
     def close_tasks(self) -> None:
         """Ogni task del lavoro `done` con verdetto `approved`, passando per le transizioni."""

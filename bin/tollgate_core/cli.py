@@ -91,6 +91,12 @@ def build_parser() -> argparse.ArgumentParser:
     rp = sub.add_parser("review", help="revisione finale (6.4, 8.6)")
     rsub = rp.add_subparsers(dest="review_cmd", required=True)
     rsub.add_parser("prepare", help="apre o riprende il ciclo e scrive i brief dei revisori")
+    aup = sub.add_parser("audit", help="giri di audit di spec e piano in L2 (6.2)")
+    ausub = aup.add_subparsers(dest="audit_cmd", required=True)
+    aprep = ausub.add_parser("prepare", help="decide il prossimo giro e scrive i brief degli agenti")
+    aprep.add_argument("--confirm", action="store_true",
+                       help="conferma il costo dell'audit a lenti (la prima chiamata esce con 3)")
+    ausub.add_parser("decline", help="l'utente rifiuta il costo dell'audit a lenti")
     sub.add_parser("sync", help="rimette il ramo sul predefinito e aggiorna la PR (6.5)")
     ad = sub.add_parser("adopt", help="ricostruisce un lavoro dal ramo tg/<N>-* (12.4)")
     ad.add_argument("issue", type=_issue_number, metavar="N")
@@ -313,6 +319,19 @@ def main(argv: list[str]) -> int:
                 print(f"tollgate: {e}", file=sys.stderr)
                 return 1
             return 0
+        if args.cmd == "audit":
+            from tollgate_flow import audit
+            try:
+                if args.audit_cmd == "prepare":
+                    prepared = audit.prepare(state, Path.cwd(), confirm=args.confirm)
+                    print("\n".join(prepared.lines))
+                    return prepared.code
+                code, lines = audit.decline(state, Path.cwd())
+            except audit.AuditError as e:
+                print(f"tollgate: {e}", file=sys.stderr)
+                return 1
+            print("\n".join(lines))
+            return code
         if args.cmd == "waiver":
             from . import waiver_cli
             print(waiver_cli.add_waiver(state, Path.cwd(), type_=args.type, file=args.file,

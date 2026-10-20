@@ -14,7 +14,7 @@ from tollgate_hooks.model import deny, record
 CHECK = {"api": 1, "events": ["pre_bash"], "component": None, "order": 5}
 _SIGNALLED = ("start", "act", "finish", "sync", "adopt", "cleanup", "abandon")
 _COORDINATOR_ONLY = ("start", "task", "act", "finish", "review", "sync", "adopt", "cleanup",
-                     "abandon")
+                     "abandon", "audit")
 
 
 def _undecidable(token: str) -> bool:

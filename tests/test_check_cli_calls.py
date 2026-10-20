@@ -151,6 +151,14 @@ class CliCallsTest(unittest.TestCase):
                 self.assertEqual(self.lab.bash(cmd, agent_id="ag-1").exit, 2)
         self.assertFalse(self.signal.exists())
 
+    def test_audit_is_coordinator_only(self):
+        for cmd in (f"'{PROGRAM}' audit prepare", f"python3 \"{PROGRAM}\" audit prepare --confirm",
+                    f"'{PROGRAM}' audit decline"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.lab.bash(cmd, agent_id="ag-1").exit, 2)
+                self.assertEqual(self.lab.bash(cmd).exit, 0)
+        self.assertFalse(self.signal.exists())    # `audit` non legge la sessione: nessun segnale
+
     def test_parse_failure_message_explains(self):
         r = self.lab.bash(f"python3 '{PROGRAM}' task done 1 \"unchiuso", agent_id="ag-1")
         self.assertEqual(r.exit, 2)

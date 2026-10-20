@@ -1,6 +1,6 @@
 import unittest
 
-from tollgate_analysis import brief, plan, report
+from tollgate_analysis import auditrules, brief, plan, report
 
 FENCE_TEXT = "usa ``` e ````` nel testo\n```python\nx = 1\n```"
 
@@ -128,6 +128,74 @@ class VerifierBriefTest(unittest.TestCase):
         self.assertIn("senza discutere con il revisore", out)
         self.assertIn("un rilievo senza prova si scarta", out)
         self.assertIn('"code": "c0de"', out)
+
+
+def audit(**kw):
+    base = dict(issue=7, kind="spec-adversarial", number=2, code="c0de1234",
+                doc_path="docs/superpowers/specs/2026-10-20-prova.md", doc_sha="d" * 40,
+                spec_path="docs/superpowers/specs/2026-10-20-prova.md", spec_sha="d" * 40,
+                reviews_dir="docs/superpowers/reviews/7", issue_file=None,
+                severity={"blocker": "dati persi", "major": "passo che fallisce"},
+                viewpoint=None, method_path=None, tasks=[])
+    base.update(kw)
+    return brief.AuditBrief(**base)
+
+
+def json_line(text):
+    return next(l for l in text.splitlines() if l.startswith('{"v": 1'))
+
+
+class AuditBriefTest(unittest.TestCase):
+    def test_brief_has_code_sha_and_json_line(self):
+        out = brief.audit_brief(audit())
+        self.assertIn("c0de1234", out)
+        self.assertIn("d" * 40, out)
+        self.assertIn("non modificare nessun file", out)
+        self.assertIn("sezione", out)
+        self.assertIn("gravità", out)
+        self.assertIn(brief.DATA_NOTE, out)
+        parsed = auditrules.parse_round_json(
+            json_line(out), kind="spec-adversarial", number=2, code="c0de1234",
+            spec_sha="d" * 40, plan_sha=None, viewpoint=None)
+        self.assertTrue(parsed.valid, parsed.problems)
+        self.assertNotIn("plan_sha", json_line(out))
+
+    def test_spec_adversarial_asks_for_pitch_sections(self):
+        out = brief.audit_brief(audit())
+        for needle in ("Fette previste", "Tane di coniglio", "Cosa non fare", "major"):
+            self.assertIn(needle, out)
+        self.assertIn("senza la scelta", out)
+
+    def test_issue_file_only_when_present(self):
+        self.assertNotIn("issue.md", brief.audit_brief(audit()))
+        out = brief.audit_brief(audit(issue_file=".tollgate-run/7/issue.md"))
+        self.assertIn(".tollgate-run/7/issue.md", out)
+
+    def test_lens_brief_has_viewpoint_and_method(self):
+        out = brief.audit_brief(audit(kind="spec-lens", viewpoint="attacker",
+                                      method_path="/p/skills/spec-audit/references/dimensioni.md"))
+        self.assertIn("attacker", out)
+        self.assertIn("chi attacca", out)
+        self.assertIn("/p/skills/spec-audit/references/dimensioni.md", out)
+        parsed = auditrules.parse_round_json(
+            json_line(out), kind="spec-lens", number=2, code="c0de1234", spec_sha="d" * 40,
+            plan_sha=None, viewpoint="attacker")
+        self.assertTrue(parsed.valid, parsed.problems)
+
+    def test_plan_brief_lists_split_candidates(self):
+        tasks = [{"number": 1, "title": "Somma", "files": 2, "implementer": "tollgate:implementer",
+                  "split_candidate": False, "files_warn": False},
+                 {"number": 2, "title": "Tutto", "files": 9, "implementer": "tollgate:implementer",
+                  "split_candidate": True, "files_warn": True}]
+        out = brief.audit_brief(audit(kind="plan-adversarial", doc_path="docs/superpowers/plans/p.md",
+                                      doc_sha="p" * 40, tasks=tasks))
+        self.assertIn("candidato a essere diviso", out)
+        self.assertEqual(out.count("candidato a essere diviso"), 2)  # istruzione e task 2
+        self.assertIn("p" * 40, out)
+        parsed = auditrules.parse_round_json(
+            json_line(out), kind="plan-adversarial", number=2, code="c0de1234",
+            spec_sha="d" * 40, plan_sha="p" * 40, viewpoint=None)
+        self.assertTrue(parsed.valid, parsed.problems)
 
 
 if __name__ == "__main__":

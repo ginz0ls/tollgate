@@ -127,7 +127,7 @@ def _read_pr(state, main: Path, branch: str, issue: int, warnings: list[str]):
     return pr, _cap_from_block(gh.pr_body(state, main, pr["number"]), issue, warnings), False
 
 
-def _find_plan(main: Path, cfg, sha: str, changes, level: str):
+def find_plan(main: Path, cfg, sha: str, changes, level: str):
     """Il primo file nuovo sotto `docs/superpowers/plans/` che passa plan-check."""
     for path in sorted(c.path for c in changes if c.status == "A" and c.path.startswith(PLANS_DIR)
                        and c.path.endswith(".md")):
@@ -215,7 +215,7 @@ def _gather(state, main: Path, cfg, issue: int, branch: str, sha: str, base: str
                        "concluso (i resti si tolgono con /tollgate:cleanup)", warnings=warnings)
     changes = git.changes(main, base, head=sha, exclude=config.output_excludes(cfg))
     level = _level(state, main, cfg, issue, base, sha, changes, warnings)
-    plan = _find_plan(main, cfg, sha, changes, level) if level != "L0" else None
+    plan = find_plan(main, cfg, sha, changes, level) if level != "L0" else None
     spec_rel, plan_rel = approvals.approval_paths(issue)
     spec_header = plan_header = None
     if level == "L2":

@@ -62,7 +62,7 @@ def _done(*lines: str) -> PrepareResult:
     return PrepareResult([*lines, _next("finish open-pr")])
 
 
-def _launch_line(l: Launch) -> str:
+def launch_line(l: Launch) -> str:
     return (f'agente: {l.agent_type} brief: "{l.brief}"'
             + (f" model: {l.model}" if l.model else ""))
 
@@ -156,7 +156,7 @@ def _resume(state, conn, work, cfg, cycle, wt: Path, base, head, now, names=None
                 _final_brief(conn, work, cfg, cycle, wt, base, head, diff, run_dir, agent,
                              names, must_haves)), encoding="utf-8")
             result.launches.append(_launch(cfg, agent, path))
-        result.lines += [_launch_line(l) for l in result.launches]
+        result.lines += [launch_line(l) for l in result.launches]
         result.lines.append("prossimo passo: lancia i revisori qui sopra (anche in parallelo); "
                             f"quando hanno riportato, rilancia {prog} review prepare")
         return result
@@ -169,7 +169,7 @@ def _resume(state, conn, work, cfg, cycle, wt: Path, base, head, now, names=None
             diff_path=str(diff), findings=[dict(r) for r in rows])), encoding="utf-8")
         result.launches.append(_launch(cfg, VERIFIER, path))
         result.lines += [f"ciclo {n} della revisione finale (stadio verify): {len(rows)} "
-                         "rilievi da verificare", _launch_line(result.launches[0]),
+                         "rilievi da verificare", launch_line(result.launches[0]),
                          "prossimo passo: lancia il verificatore qui sopra; quando ha "
                          f"riportato, rilancia {prog} review prepare"]
         return result
