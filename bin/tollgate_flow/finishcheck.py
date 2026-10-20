@@ -258,6 +258,6 @@ def _approvals(wt: Path, work) -> tuple[bool, str]:
         except git.GitError:
             problems.append(f"{doc} assente in HEAD")
             continue
-        if header["sha"] != blob:
+        if not approvals_mod.is_current(header, blob):
             problems.append(f"{path}: sha diverso da {doc} in HEAD (approvazione superata)")
     return not problems, "; ".join(problems)

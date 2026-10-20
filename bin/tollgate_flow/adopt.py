@@ -21,6 +21,7 @@ from tollgate_core.paths import State, repo_key
 from . import gh, gitw, start as flow_start
 
 OK, REFUSED, INCOMPLETE = 0, 1, 4
+FAILED = object()
 PLANS_DIR = "docs/superpowers/plans/"
 CAP_REASON_MAX = 500
 ERRORS = (sqlite3.Error, phases.TransitionError, config.ConfigError, gh.GhError, git.GitError,
@@ -143,9 +144,23 @@ def _find_plan(main: Path, cfg, sha: str, changes, level: str):
     return None
 
 
-def _approval(main: Path, sha: str, path: str, kind: str) -> dict | None:
+def _blob(main: Path, sha: str, path: str) -> str | None:
+    try:
+        return git.run(main, "rev-parse", f"{sha}:{path}").strip()
+    except git.GitError:
+        return None
+
+
+def _approval(main: Path, sha: str, path: str, kind: str, *, doc: str | None = None) -> dict | None:
+    """L'intestazione di un file di approvazione, solo se è ancora valida: `path` esiste nel ramo
+    (e, con `doc`, è proprio quel documento) e il suo blob è `sha`. Altrimenti non è una prova."""
     header = approvals.parse_approval(git.text_at(main, sha, path) or "")
-    return header if header is not None and header.get("kind") == kind else None
+    if header is None or header.get("kind") != kind:
+        return None
+    target = _safe_rel(header.get("path"))
+    if target is None or (doc is not None and target != doc):
+        return None
+    return header if approvals.is_current(header, _blob(main, sha, target)) else None
 
 
 def _safe_rel(value) -> str | None:
@@ -201,8 +216,14 @@ def _gather(state, main: Path, cfg, issue: int, branch: str, sha: str, base: str
     level = _level(state, main, cfg, issue, base, sha, changes, warnings)
     plan = _find_plan(main, cfg, sha, changes, level) if level != "L0" else None
     spec_rel, plan_rel = approvals.approval_paths(issue)
-    spec_header = _approval(main, sha, spec_rel, "spec-approval") if level == "L2" else None
-    plan_header = _approval(main, sha, plan_rel, "plan-approval") if level == "L2" else None
+    spec_header = plan_header = None
+    if level == "L2":
+        spec_header = _approval(main, sha, spec_rel, "spec-approval")
+        if plan is not None and spec_header is not None:
+            plan_header = _approval(main, sha, plan_rel, "plan-approval", doc=plan[0])
+        spec_sha = plan_header.get("spec_sha") if plan_header else None
+        if spec_sha is not None and spec_sha != spec_header["sha"]:
+            plan_header = None
     phase = _phase(level, pr, plan, spec_header, plan_header)
     if level == "L2" and pr is not None and cap is None and not (spec_header and plan_header):
         warnings.append("L2 con la PR aperta ma senza spec-approval.md o plan-approval.md nel "
@@ -308,14 +329,16 @@ def _adopt(state, conn, main: Path, ref: str, cfg, key: str, issue: int, session
         except (ValueError, gitw.GitWriteError, OSError, sqlite3.Error, db.DbError,
                 phases.TransitionError, git.GitError) as e:
             failed.append(f"{what}: {e}")
+            return FAILED
 
     if ev.pr is not None:
-        step("PR", lambda: phases.set_pr(conn, work, ev.pr["number"], ev.pr.get("url"), now=now))
-        lines.append(f"PR #{ev.pr['number']} aperta: fase pr_open")
+        if step("PR", lambda: phases.set_pr(conn, work, ev.pr["number"], ev.pr.get("url"),
+                                            now=now)) is not FAILED:
+            lines.append(f"PR #{ev.pr['number']} aperta: fase pr_open")
     if ev.cap is not None:
-        step("tetto di livello", lambda: _apply_cap(conn, main, cfg, work, wt, base, ev, now,
-                                                    session))
-        lines.append(f"tetto {ev.cap[0]} ripristinato dalla PR")
+        if step("tetto di livello", lambda: _apply_cap(conn, main, cfg, work, wt, base, ev, now,
+                                                       session)) is not FAILED:
+            lines.append(f"tetto {ev.cap[0]} ripristinato dalla PR")
     if ev.plan is not None:
         step("piano", lambda: _register_plan(conn, state, main, cfg, work, sha, ev, now, session,
                                              lines))

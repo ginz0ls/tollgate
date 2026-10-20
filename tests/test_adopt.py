@@ -1,22 +1,44 @@
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
+from unittest import mock
 
 from tests.flowkit import PLAN, SESSION, plan_text
 from tests.helpers import BIN
 from tests.test_openpr import BRANCH, SOMMA, pr
 from tests.test_start import StartCase, out
 from tollgate_analysis import prblock, waivers
+from tollgate_flow import adopt
 from tollgate_core import acts, clock, git as core_git, phases, scope, sessions
 from tollgate_core.paths import repo_key
 
 L0_FILES = {"src/app.py": SOMMA}
 L1_FILES = {PLAN: plan_text(), "src/app.py": SOMMA, "docs/uso.md": "uso\n"}
 L2_FILES = {**L1_FILES, "src/auth/login.py": "x = 1\n"}
-SPEC_APPROVAL = ("---\nkind: spec-approval\npath: docs/superpowers/specs/s.md\nsha: abc123\n"
-                 "adversarial: true\nlens: sicurezza\n---\nOK\n")
-PLAN_APPROVAL = f"---\nkind: plan-approval\npath: {PLAN}\nsha: abc123\n---\nOK\n"
+SPEC_DOC = "docs/superpowers/specs/s.md"
+SPEC_TEXT = "spec\n"
+
+
+def blob(text):
+    """Lo sha git del contenuto, come lo calcola `git hash-object`."""
+    return subprocess.run(["git", "hash-object", "--stdin"], input=text, capture_output=True,
+                          text=True, check=True).stdout.strip()
+
+
+def spec_approval(sha=None, path=SPEC_DOC):
+    return (f"---\nkind: spec-approval\npath: {path}\nsha: {sha or blob(SPEC_TEXT)}\n"
+            "adversarial: true\nlens: sicurezza\n---\nOK\n")
+
+
+def plan_approval(sha=None, path=PLAN, spec_sha=None):
+    extra = f"spec_sha: {spec_sha}\n" if spec_sha else ""
+    return (f"---\nkind: plan-approval\npath: {path}\nsha: {sha or blob(plan_text())}\n"
+            f"{extra}---\nOK\n")
+
+
+L2_DOCS = {**L2_FILES, SPEC_DOC: SPEC_TEXT}
 SPEC_FILE = "docs/superpowers/reviews/7/spec-approval.md"
 PLAN_FILE = "docs/superpowers/reviews/7/plan-approval.md"
 
@@ -113,25 +135,72 @@ class AdoptPhaseTest(AdoptCase):
                          [(1, "pending", "plan"), (2, "pending", "plan")])
 
     def test_l2_with_plan_approval_stays_execution(self):
-        fl = self.branch_lab({**L2_FILES, SPEC_FILE: SPEC_APPROVAL, PLAN_FILE: PLAN_APPROVAL})
+        fl = self.branch_lab({**L2_DOCS, SPEC_FILE: spec_approval(),
+                              PLAN_FILE: plan_approval(spec_sha=blob(SPEC_TEXT))})
         row = self.adopted(fl)
         self.assertEqual((row["level"], row["phase"]), ("L2", "execution"))
-        self.assertEqual(row["spec_path"], "docs/superpowers/specs/s.md")
+        self.assertEqual(row["spec_path"], SPEC_DOC)
         self.assertEqual(row["plan_path"], PLAN)
         self.assertEqual(len(scope.paths(fl.conn, row["id"])), 3)
 
     def test_l2_without_plan_approval_goes_approval(self):
-        fl = self.branch_lab({**L2_FILES, SPEC_FILE: SPEC_APPROVAL})
+        fl = self.branch_lab({**L2_DOCS, SPEC_FILE: spec_approval()})
         row = self.adopted(fl)
         self.assertEqual((row["level"], row["phase"]), ("L2", "approval"))
         self.assertEqual(row["plan_path"], PLAN)
         self.assertIsNone(row["plan_sha"])
         self.assertEqual(scope.paths(fl.conn, row["id"]), set())
 
+    def test_l2_superseded_or_mismatched_approvals_go_back(self):
+        old_plan = plan_text(task2="- Create: `docs/vecchio.md`")
+        cases = {
+            "piano modificato dopo l'approvazione": (
+                {SPEC_FILE: spec_approval(), PLAN_FILE: plan_approval(sha=blob(old_plan))},
+                "approval"),
+            "approvazione del piano con un altro path": (
+                {SPEC_FILE: spec_approval(), PLAN_FILE: plan_approval(path="docs/altro.md")},
+                "approval"),
+            "spec_sha diverso dalla spec": (
+                {SPEC_FILE: spec_approval(), PLAN_FILE: plan_approval(spec_sha="0" * 40)},
+                "approval"),
+            "spec modificata dopo l'approvazione": (
+                {SPEC_FILE: spec_approval(sha=blob("spec vecchia\n")), PLAN_FILE: plan_approval()},
+                "spec_audit"),
+            "spec approvata ma assente": (
+                {SPEC_FILE: spec_approval(path="docs/superpowers/specs/manca.md"),
+                 PLAN_FILE: plan_approval()}, "spec_audit"),
+        }
+        for name, (files, phase) in cases.items():
+            with self.subTest(name):
+                fl = self.branch_lab({**L2_DOCS, **files})
+                r = self.adopt(fl)
+                self.assertEqual(r.returncode, 0, out(r))
+                row = self.rows(fl)[-1]
+                self.assertEqual((row["level"], row["phase"]), ("L2", phase))
+                self.assertIsNone(row["plan_sha"])
+                self.assertEqual(scope.paths(fl.conn, row["id"]), set())
+
     def test_l2_without_spec_approval_goes_spec_audit(self):
         fl = self.branch_lab(L2_FILES)
         row = self.adopted(fl)
         self.assertEqual((row["level"], row["phase"]), ("L2", "spec_audit"))
+
+    def test_pr_and_cap_lines_only_when_step_succeeded(self):
+        body = prblock.render({"issue": 7, "level_cap": "L1", "level_cap_reason": "x"})
+        fl = self.branch_lab(L0_FILES, push=True, prs=[pr(3, "OPEN", body=body)])
+        with mock.patch.object(phases, "set_pr", side_effect=ValueError("rotto")), \
+                mock.patch.object(phases, "set_level_cap",
+                                  side_effect=phases.TransitionError("no")), \
+                mock.patch.dict(os.environ, fl.env()):
+            self.act(fl)
+            sessions.note_cli_call(fl.ts.state, SESSION, str(fl.main), ["adopt", "7"],
+                                   now=clock.now())
+            r = adopt.adopt(fl.ts.state, fl.main, 7, argv=["adopt", "7"])
+        text = "\n".join(r.lines)
+        self.assertEqual(r.code, adopt.INCOMPLETE, text)
+        self.assertNotIn("aperta: fase pr_open", text)
+        self.assertNotIn("ripristinato dalla PR", text)
+        self.assertIn("registrazione incompleta: PR", text)
 
     def test_approved_waivers_back_pending(self):
         wf = waivers.WaiverFile(7, BRANCH, [waivers.Waiver(

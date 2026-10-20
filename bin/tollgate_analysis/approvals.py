@@ -48,3 +48,9 @@ def parse_approval(text: str) -> dict | None:
     if header.get("kind") not in KINDS or any(not header.get(k) for k in REQUIRED):
         return None
     return header
+
+
+def is_current(header: dict, blob_sha: str | None) -> bool:
+    """L'approvazione vale se `sha` è il blob attuale del documento; un documento assente o
+    modificato dopo l'approvazione la rende superata."""
+    return blob_sha is not None and header.get("sha") == blob_sha
