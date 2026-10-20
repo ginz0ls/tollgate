@@ -75,6 +75,16 @@ def _remote_conflict(conn, wid: int, wt: Path, branch: str, head: str,
             f"oppure abbandona con /tollgate:abandon #{issue}")
 
 
+def _record_commits(conn, wid: int, wt: Path, base: str, *, now, session) -> int:
+    """Gli eventi `commit` dei commit di `base..HEAD` non ancora noti: PostToolUse Bash non li
+    tratta come nuovi."""
+    known = _known_commits(conn, wid)
+    new = [s for s in git.rev_list(wt, base, git.head(wt)) if s not in known]
+    for sha in new:
+        events.record_event(conn, "commit", {"sha": sha}, now=now, session=session, work=wid)
+    return len(new)
+
+
 def _realign(conn, state, wid: int, wt: Path, tip: str, branch: str, key: str, *, now,
              session) -> list[str]:
     """I passi dopo il rebase, ognuno ripetibile (un `sync` interrotto li riprende): base alla
@@ -86,19 +96,16 @@ def _realign(conn, state, wid: int, wt: Path, tip: str, branch: str, key: str, *
     if work["work_base_sha"] != tip:
         phases.set_base(conn, wid, tip, cause="sync", now=now, session=session)
         notes.append(f"base riallineata a {tip[:12]}")
-    known = _known_commits(conn, wid)
-    new = [s for s in git.rev_list(wt, tip, head) if s not in known]
-    for sha in new:
-        events.record_event(conn, "commit", {"sha": sha}, now=now, session=session, work=wid)
+    new = _record_commits(conn, wid, wt, tip, now=now, session=session)
     if new:
-        notes.append(f"{len(new)} commit registrati")
+        notes.append(f"{new} commit registrati")
     if work["phase"] == "pr_open":
         phases.set_phase(conn, state, wid, "execution", "sync", now=now, session=session)
         notes.append("fase execution")
     remote = git.resolve_ref(wt, f"origin/{branch}")
     if (remote is not None and remote != head and not gitw.is_ancestor(wt, remote, head)
             and not intents.force_authorized(conn, wid)):
-        intents.authorize_force(conn, wid, reason="sync", now=now)
+        intents.authorize_force(conn, wid, reason="sync", now=now, lease=remote)
         notes.append("push forzato autorizzato")
     intents.complete(conn, key, outcome="riallineato", now=now)
     return notes
@@ -178,12 +185,14 @@ def _sync(state, conn, cwd: Path, now, argv, environ) -> SyncResult:
                           "base": work["work_base_sha"]}, now=now)
     try:
         divergent = _remote_conflict(conn, wid, wt, branch, head0, work["issue"])
+        if git.head(wt) != head0:       # integrati con --ff-only: noti prima di ogni altro passo
+            _record_commits(conn, wid, wt, work["work_base_sha"], now=now, session=session)
         if divergent is None and not gitw.is_ancestor(wt, tip, git.head(wt)):
             if not gitw.rebase(wt, tip):
                 gitw.rebase_abort(wt)
                 return _block(conn, state, work, act, key, _conflict_reason(
                     wt, ref, tip, work["issue"]), "conflitto nel rebase", warnings, now, session)
-    except gitw.GitWriteError as e:
+    except ERRORS as e:
         intents.complete(conn, key, outcome=f"non riuscito: {e}", now=now)
         raise
     if divergent is not None:

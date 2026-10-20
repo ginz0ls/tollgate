@@ -42,15 +42,17 @@ def complete(conn, key: str, *, outcome: str, now) -> None:
             raise ValueError(f"intento {key} inesistente")
 
 
-def authorize_force(conn, work: int, *, reason: str, now) -> str:
-    """Autorizza un push forzato (da `sync` o `approve rebase`): chiave `force:<lavoro>:<n>`."""
+def authorize_force(conn, work: int, *, reason: str, now, lease: str | None = None) -> str:
+    """Autorizza un push forzato (da `sync` o `approve rebase`): chiave `force:<lavoro>:<n>`.
+    `lease` è lo SHA remoto atteso: il push forzato lo usa come `--force-with-lease`, così un
+    commit arrivato dopo non si sovrascrive."""
     with db.tx(conn):
         n = conn.execute("SELECT count(*) FROM intents WHERE work = ? AND action = 'force_push'",
                          (work,)).fetchone()[0] + 1
         key = f"force:{work}:{n}"
         conn.execute("INSERT INTO intents (work, action, idempotency_key, data, state, at) "
                      "VALUES (?, 'force_push', ?, ?, 'authorized', ?)",
-                     (work, key, json.dumps({"reason": reason}, ensure_ascii=False),
+                     (work, key, json.dumps({"reason": reason, "lease": lease}, ensure_ascii=False),
                       clock.fmt(now)))
         return key
 
@@ -59,6 +61,13 @@ def force_authorized(conn, work: int) -> bool:
     """C'è un'autorizzazione al push forzato non ancora usata (sola lettura)."""
     return conn.execute("SELECT 1 FROM intents WHERE work = ? AND action = 'force_push' "
                         "AND state = 'authorized' LIMIT 1", (work,)).fetchone() is not None
+
+
+def force_lease(conn, work: int) -> str | None:
+    """Lo SHA remoto atteso dell'autorizzazione che `take_force` consumerebbe (sola lettura)."""
+    row = conn.execute("SELECT data FROM intents WHERE work = ? AND action = 'force_push' "
+                       "AND state = 'authorized' ORDER BY id DESC LIMIT 1", (work,)).fetchone()
+    return json.loads(row["data"] or "{}").get("lease") if row else None
 
 
 def take_force(conn, work: int, *, now) -> str | None:

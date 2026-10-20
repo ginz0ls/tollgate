@@ -63,6 +63,16 @@ class IntentsTest(unittest.TestCase):
         self.assertEqual(intents.take_force(self.conn, self.w, now=T0), k2)
         self.assertEqual(intents.take_force(self.conn, self.w, now=T0), k1)
 
+    def test_force_lease_is_the_latest_authorized_one(self):
+        self.assertIsNone(intents.force_lease(self.conn, self.w))
+        intents.authorize_force(self.conn, self.w, reason="a", now=T0, lease="aaa")
+        intents.authorize_force(self.conn, self.w, reason="b", now=T0)
+        self.assertIsNone(intents.force_lease(self.conn, self.w))
+        intents.authorize_force(self.conn, self.w, reason="c", now=T0, lease="ccc")
+        self.assertEqual(intents.force_lease(self.conn, self.w), "ccc")
+        intents.take_force(self.conn, self.w, now=T0)
+        self.assertIsNone(intents.force_lease(self.conn, self.w))
+
     def test_force_authorized_does_not_consume(self):
         self.assertFalse(intents.force_authorized(self.conn, self.w))
         key = intents.authorize_force(self.conn, self.w, reason="rebase", now=T0)

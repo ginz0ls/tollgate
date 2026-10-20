@@ -262,7 +262,7 @@ def _publish(state, conn, work, wt, main, branch, head, remote, diverged, open_p
         if diverged:
             if not intents.force_authorized(conn, work["id"]):
                 raise gitw.GitWriteError("l'autorizzazione al push forzato non c'è più")
-            lease = remote
+            lease = intents.force_lease(conn, work["id"]) or remote
         gitw.push_sha(wt, head, branch, lease=lease)
         if diverged:        # si consuma solo a push riuscito: un guasto non la perde
             intents.take_force(conn, work["id"], now=now)

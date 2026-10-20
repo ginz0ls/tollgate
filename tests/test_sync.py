@@ -174,6 +174,47 @@ class SyncRebaseTest(SyncCase):
         self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), head(fl))
         self.assertEqual(self.intent_states(fl, "force_push"), ["used"])
 
+    def update_branch_remote(self, fl):
+        """«Update branch» su origin/<ramo>: il predefinito (avanzato prima) unito con un merge."""
+        clone = fl.tmp / "clone"
+        run_git(fl.tmp, "clone", "-q", str(fl.origin), str(clone))
+        run_git(clone, "checkout", "-q", "-b", BRANCH, f"origin/{BRANCH}")
+        run_git(clone, "merge", "-q", "--no-ff", "-m", "Update branch", "origin/main")
+        run_git(clone, "push", "-q", "origin", BRANCH)
+        return clone, run_git(clone, "rev-parse", "HEAD")
+
+    def test_integrated_commits_recorded_when_rebase_conflicts(self):
+        """Review Focus 4: dopo l'integrazione --ff-only HEAD sta sulla punta remota; con il
+        conflitto nel rebase quei commit sono comunque noti, e PostToolUse Bash non apre nulla."""
+        fl = self.pr_open_lab()
+        self.advance_main(fl, msg="primo")
+        clone, merge = self.update_branch_remote(fl)
+        self.advance_main(fl, path="src/app.py",
+                          text="def somma(a, b):\n    return a + b + 0\n", msg="conflitto")
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.BLOCKED, r.lines)
+        self.assertEqual(head(fl), merge)                     # l'integrazione è rimasta
+        recorded = {e["sha"] for e in fl.events("commit")}
+        unknown = set(core_git.rev_list(fl.wt, work(fl)["work_base_sha"], head(fl))) - recorded
+        self.assertEqual(unknown, set())
+        commits = len(fl.events("commit"))
+        out = fl.bash("git status", post=True, cwd=fl.wt)
+        self.assertEqual(out.exit, 0, out.stderr)
+        self.assertEqual(len(fl.events("commit")), commits)
+        self.assertEqual(fl.conn.execute("SELECT count(*) FROM blocks WHERE closed IS NULL AND "
+                                         "reason NOT LIKE 'sync:%'").fetchone()[0], 0)
+
+    def test_repeat_after_integrated_merge_is_not_divergent(self):
+        fl = self.pr_open_lab_twelve()
+        self.advance_main(fl, path="docs/uno.md", msg="primo")
+        self.update_branch_remote(fl)
+        self.advance_main(fl, path="src/app.py", text=TWELVE_MAIN, msg="secondo")
+        self.assertEqual(self.run_sync(fl).code, sync.REVIEW_NEEDED)
+        self.at += timedelta(minutes=30)
+        r = self.run_sync(fl)
+        self.assertEqual(r.code, sync.REVIEW_NEEDED, r.lines)
+        self.assertEqual(fl.conn.execute("SELECT count(*) FROM blocks").fetchone()[0], 0)
+
     def test_diverged_remote_needs_you(self):
         fl = self.pr_open_lab()
         self.advance_main(fl)
@@ -242,6 +283,25 @@ class SyncRebaseTest(SyncCase):
         self.assertEqual(r.code, sync.REVIEW_NEEDED, r.lines)
         self.assertEqual(fl.conn.execute("SELECT count(*) FROM blocks").fetchone()[0], 0)
         self.assertEqual(self.intent_states(fl, "force_push"), ["authorized"])
+
+    def test_force_lease_is_remote_tip_at_sync_and_rejects_newer_remote(self):
+        fl = self.pr_open_lab_twelve()
+        old_head = head(fl)
+        self.advance_main(fl, path="src/app.py", text=TWELVE_MAIN)
+        self.assertEqual(self.run_sync(fl).code, sync.REVIEW_NEEDED)
+        self.assertEqual(intents.force_lease(fl.conn, fl.work), old_head)
+        clone = fl.tmp / "clone"
+        run_git(fl.tmp, "clone", "-q", str(fl.origin), str(clone))
+        run_git(clone, "checkout", "-q", "-b", BRANCH, f"origin/{BRANCH}")
+        run_git(clone, "commit", "-q", "--allow-empty", "-m", "a mano")
+        run_git(clone, "push", "-q", "origin", BRANCH)
+        manual = run_git(clone, "rev-parse", "HEAD")
+        phases.set_review_unverified(fl.conn, fl.work, now=fl.now)
+        r = self.go(fl, update=True, via_sync="a-99")
+        self.assertEqual(r.code, 1, r.lines)
+        self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), manual)         # commit remoto intatto
+        self.assertEqual(self.intent_states(fl, "force_push"), ["authorized"])
+        self.assertEqual(self.calls(fl, "pr", "edit"), [])
 
     def pr_open_lab_twelve(self):
         return self.pr_open_lab(files={"src/app.py": TWELVE}, app=TWELVE_WORK)

@@ -486,6 +486,14 @@ class ApproveRebaseTest(ApplyCase):
         ev = [e for e in events.export_events(fl.conn, 0) if e["type"] == "base_realigned"]
         self.assertEqual(ev[-1]["data"]["to"], expected)
 
+    def test_approve_rebase_force_carries_remote_tip_as_lease(self):
+        fl = self.conflict("pr_open")
+        remote = core_git.head(fl.wt)
+        fl.git("push", "-q", "origin", f"{remote}:refs/heads/tg/7-demo", repo=fl.wt)
+        self.act("tollgate:approve", "rebase")
+        self.apply()
+        self.assertEqual(intents.force_lease(fl.conn, fl.work), remote)
+
     def test_approve_rebase_keeps_execution_phase(self):
         fl = self.conflict("execution")
         expected = fl.git("merge-base", "HEAD", core_git.default_ref(fl.main), repo=fl.wt)

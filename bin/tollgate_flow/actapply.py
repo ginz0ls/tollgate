@@ -187,7 +187,11 @@ def _approve_rebase(conn, state, work, act, args, now, session) -> str:
     if phase == "pr_open":
         phases.set_phase(conn, state, work["id"], "execution", "sync", now=now, session=session)
         phase = "execution"
-    intents.authorize_force(conn, work["id"], reason="approve rebase", now=now)
+    try:
+        lease = gitw.remote_sha(wt, work["branch"])
+    except gitw.GitWriteError:
+        lease = None            # open-pr userà lo SHA letto prima del push (decisione 10)
+    intents.authorize_force(conn, work["id"], reason="approve rebase", now=now, lease=lease)
     return (f"base riallineata a {base[:12]}; blocco {block['id']} chiuso; fase {phase}; "
             "push forzato autorizzato per il prossimo open-pr")
 
