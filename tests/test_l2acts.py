@@ -1,11 +1,13 @@
+import json
 import unittest
 from unittest import mock
 
 import tests.test_audit_prepare as tap
-from tests.flowkit import PLAN, SESSION, SPEC, FlowLab, spec_text
+from tests.flowkit import PLAN, SESSION, SPEC, FlowLab, plan_text, spec_text
+from tests.test_finishcheck import TOML as FINISH_TOML
 from tests.test_actapply import ApplyCase
 from tollgate_analysis import approvals, brief as briefs
-from tollgate_core import audits, config, phases, scope
+from tollgate_core import audits, config, phases, scope, subagents, tasks, violations
 from tollgate_flow import actapply, audit, l2acts
 
 ADV, LENS, PLAN_ADV = "spec-adversarial", "spec-lens", "plan-adversarial"
@@ -467,6 +469,195 @@ class ApprovePlanTest(L2Case):
         fl.commit(PLAN, "# Piano senza sezioni\n", "piano rovinato")
         self.assertIn("plan-check", self.refused("plan"))
         self.assertIsNone(self.work()["plan_sha"])
+
+
+class ReopenTest(L2Case):
+    def reopen(self, what: str, reason: str = "il motivo"):
+        self.act("tollgate:reopen", f"{what} {reason}".strip())
+        return self.apply()
+
+    def refused_reopen(self, what: str, reason: str = "il motivo") -> str:
+        with self.assertRaises(actapply.ActApplyError) as cm:
+            self.reopen(what, reason)
+        return str(cm.exception)
+
+    def to_execution(self, **lab_kw):
+        fl = self.to_approval(**lab_kw)
+        self.approve("plan")
+        self.commit_file(PLAN_APPROVAL)
+        self.assertEqual(self.phase(), "execution")
+        return fl
+
+    def locked(self):
+        return violations.locked_docs(self.work())
+
+    def test_reopen_spec_from_plan_unlocks_and_requires_new_approval(self):
+        fl = self.to_approval()
+        self.assertIn(SPEC, self.locked())
+        msg = self.reopen("spec", "manca un caso")
+        self.assertIn("spec_audit", msg)
+        self.assertEqual((self.phase(), self.causes()[-1]), ("spec_audit", "reopen_spec"))
+        self.assertNotIn(SPEC, self.locked())
+        self.assertEqual(fl.pre_edit(fl.wt / SPEC).exit, 0)
+        self.assertIn("vale in fase approval", self.refused("plan"))
+        self.assertTrue((fl.wt / SPEC_APPROVAL).is_file())          # lo storico resta
+
+    def test_reopen_spec_from_execution_resets_plan_and_supersedes_open_round(self):
+        fl = self.to_execution()
+        self.assertTrue(scope.paths(fl.conn, fl.work))
+        audits.open_round(fl.conn, fl.work, kind=PLAN_ADV, sha="0" * 40, spec_sha="0" * 40,
+                          viewpoint=None, code="aaaa0000", now=fl.lab.now)
+        self.reopen("spec")
+        work = self.work()
+        self.assertEqual((work["phase"], work["plan_sha"], work["plan_path"]),
+                         ("spec_audit", None, PLAN))
+        self.assertEqual(scope.paths(fl.conn, fl.work), set())
+        self.assertEqual(fl.conn.execute("SELECT count(*) FROM tasks WHERE work = ?",
+                                         (fl.work,)).fetchone()[0], 0)
+        self.assertEqual(len(fl.events("plan_reset")), 1)
+        self.assertIsNone(audits.open_round_row(fl.conn, fl.work))
+        last = fl.conn.execute("SELECT outcome FROM spec_audit WHERE work = ? AND kind = ? "
+                               "ORDER BY id DESC", (fl.work, PLAN_ADV)).fetchone()
+        self.assertEqual(last["outcome"], "superseded")
+
+    def test_reopen_needs_reason(self):
+        self.to_approval()
+        for args in ("spec", "spec   "):
+            self.act("tollgate:reopen", args)
+            with self.assertRaises(actapply.ActApplyError) as cm:
+                self.apply()
+            self.assertIn("motivo", str(cm.exception))
+        self.assertEqual(self.phase(), "approval")
+
+    def test_reopen_refused_with_running_task_or_writer(self):
+        fl = self.to_execution()
+        self.assertEqual(fl.cli("task", "start", "1", cwd=fl.wt).returncode, 0)
+        for kind in ("spec", "plan"):
+            self.assertIn("task 1 è in corso", self.refused_reopen(kind))
+        self.assertEqual(self.phase(), "execution")
+        self.assertIsNotNone(self.work()["plan_sha"])
+        fl.conn.execute("UPDATE tasks SET state = 'pending' WHERE work = ?", (fl.work,))
+        tasks.add_commit(fl.conn, fl.work, 1, "a" * 40)              # pending, ma con un commit
+        self.assertIn("task 1 è in corso o ha commit non chiusi", self.refused_reopen("plan"))
+        fl.conn.execute("UPDATE tasks SET commits = '[]' WHERE work = ?", (fl.work,))
+        subagents.start(fl.conn, agent_id="a-w", type_="tollgate:implementer", session=SESSION,
+                        work=fl.work, task=None, base_sha=None, fingerprint=None, now=fl.lab.now)
+        self.assertIn("/tollgate:resolve writer", self.refused_reopen("spec"))
+        subagents.finish(fl.conn, "a-w", state="done", now=fl.lab.now)
+        self.reopen("plan")
+        self.assertEqual(self.phase(), "plan")
+
+    def test_reopen_refused_in_other_phases_levels_and_blocked(self):
+        fl = self.lab()
+        self.assertIn("reopen spec vale in fase", self.refused_reopen("spec"))
+        self.assertIn("reopen plan vale in fase", self.refused_reopen("plan"))
+        fl = self.to_approval()
+        self.reopen("plan")                                          # approval -> plan
+        self.assertEqual(self.phase(), "plan")
+        self.assertIn("reopen plan vale in fase", self.refused_reopen("plan"))
+        fl.conn.execute("UPDATE work_items SET phase = 'approval' WHERE id = ?", (fl.work,))
+        block = phases.open_block(fl.conn, fl.ts.state, fl.work, "needs_you", "serve",
+                                  now=fl.lab.now)
+        self.assertIn(f"/tollgate:resolve {block}", self.refused_reopen("spec"))
+
+    def test_reopen_spec_refused_in_l1_and_reopen_plan_in_l0(self):
+        fl = self.make(phase="plan")
+        fl.register_plan()
+        self.assertIn("solo in L2", self.refused_reopen("spec"))
+        self.assertEqual(self.phase(), "execution")
+        fl.conn.execute("UPDATE work_items SET level = 'L0' WHERE id = ?", (fl.work,))
+        self.assertIn("L0", self.refused_reopen("plan"))
+        self.assertEqual(self.phase(), "execution")
+
+    def test_reopen_plan_l1_from_execution(self):
+        fl = self.make(phase="plan")
+        fl.register_plan(tasks=1)
+        first = self.work()["plan_sha"]
+        self.assertTrue(scope.paths(fl.conn, fl.work))
+        self.reopen("plan", "serve una pagina")
+        work = self.work()
+        self.assertEqual((work["phase"], work["plan_sha"], work["plan_path"]),
+                         ("plan", None, PLAN))
+        self.assertEqual((scope.paths(fl.conn, fl.work), self.causes()[-1]),
+                         (set(), "reopen_plan"))
+        self.assertEqual(self.fl.pre_edit(fl.wt / PLAN).exit, 0)
+        (fl.wt / PLAN).write_text(plan_text(tasks=2))
+        self.assertEqual(fl.post_edit(fl.wt / PLAN).exit, 0)        # il piano corretto si registra
+        work = self.work()
+        self.assertEqual(work["phase"], "execution")
+        self.assertNotEqual(work["plan_sha"], first)
+        self.assertIn("docs/uso.md", scope.paths(fl.conn, fl.work))
+
+    def test_reopen_spec_then_new_approval_end_to_end(self):
+        fl = self.lab(toml=FINISH_TOML)
+        fl.write_spec()
+        self.spec_round()
+        self.approve("spec 1")
+        first = self.header(SPEC_APPROVAL)["sha"]
+        self.commit_file(SPEC_APPROVAL)
+        self.assertEqual(self.phase(), "plan")
+        self.assertEqual(fl.pre_edit(fl.wt / SPEC).exit, 2)         # bloccata dopo l'approvazione
+        self.reopen("spec", "la spec dimentica un caso")
+        self.assertEqual(self.phase(), "spec_audit")
+        self.assertEqual(fl.pre_edit(fl.wt / SPEC).exit, 0)
+        blob = fl.write_spec(note="corretta")
+        self.spec_round()
+        self.approve("spec 1")
+        header = self.header(SPEC_APPROVAL)
+        self.assertEqual(header["sha"], blob)
+        self.assertNotEqual(header["sha"], first)
+        self.assertEqual(self.phase(), "plan")
+        self.assertEqual(fl.pre_edit(fl.wt / SPEC).exit, 2)         # di nuovo bloccata
+        fl.git("add", "--", "docs/superpowers/reviews/7", repo=fl.wt)
+        fl.git("commit", "-q", "-m", "approvazione e report", repo=fl.wt)
+        fl.write_l2_plan()
+        self.assertEqual(self.prepare().code, audit.OK)
+        self.assertEqual(fl.report_round(counts=CLEAN).returncode, 0)
+        self.assertEqual(self.prepare().code, audit.OK)
+        self.assertEqual(self.phase(), "approval")
+        self.approve("plan")
+        fl.git("add", "--", "docs/superpowers/reviews/7", repo=fl.wt)
+        fl.git("commit", "-q", "-m", "approvazione del piano e report", repo=fl.wt)
+        fl.commit("tests/ids.txt", "tests.test_app::test_somma ok\ntests.test_app::test_zero ok\n",
+                  "ids")
+        fl.commit("src/app.py", "def somma(a, b):\n    return b + a\n", "somma")
+        fl.close_tasks()
+        r = fl.cli("finish", "check", cwd=fl.wt)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertNotIn("out_of_scope", r.stdout)
+        self.assertNotIn("[no]", r.stdout)
+        self.assertEqual(self.phase(), "review")
+
+    def test_reopen_plan_then_reapprove_registers_new_scope(self):
+        fl = self.to_execution()
+        first = self.work()["plan_sha"]
+        self.assertEqual(scope.paths(fl.conn, fl.work), {"src/app.py", "tests/test_app.py"})
+        self.reopen("plan", "serve la pagina")
+        self.assertEqual((self.phase(), self.work()["plan_sha"]), ("plan", None))
+        self.assertEqual(scope.paths(fl.conn, fl.work), set())
+        self.assertEqual(fl.pre_edit(fl.wt / PLAN).exit, 0)
+        blob = fl.write_l2_plan(tasks=2)
+        self.assertNotEqual(blob, first)
+        self.assertIsNone(self.work()["plan_sha"])                  # in L2 post_edit non registra
+        self.assertEqual(self.prepare().code, audit.OK)
+        self.assertEqual(fl.report_round(counts=CLEAN).returncode, 0)
+        self.assertEqual(self.prepare().code, audit.OK)
+        self.assertEqual(self.phase(), "approval")
+        self.approve("plan")
+        work = self.work()
+        self.assertEqual((work["phase"], work["plan_sha"]), ("execution", blob))
+        self.assertEqual(scope.paths(fl.conn, fl.work),
+                         {"src/app.py", "tests/test_app.py", "docs/uso.md"})
+        self.assertEqual([r["state"] for r in fl.conn.execute(
+            "SELECT state FROM tasks WHERE work = ? ORDER BY number", (fl.work,))],
+            ["pending", "pending"])
+        self.assertEqual(self.header(PLAN_APPROVAL)["sha"], blob)
+        self.commit_file(PLAN_APPROVAL)
+        r = fl.cli("task", "start", "1", cwd=fl.wt)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = fl.cli("task", "start", "2", cwd=fl.wt)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("docs/uso.md", (fl.wt / ".tollgate-run" / "7" / "task-2.md").read_text())
 
 
 class SuspendOnResolveTest(L2Case):

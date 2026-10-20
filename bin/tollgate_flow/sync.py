@@ -129,23 +129,19 @@ def _conflict_reason(wt: Path, ref: str, tip: str, issue: int) -> str:
 
 
 def _in_use(conn, state, work, environ) -> str | None:
-    """Il motivo per cui i commit non si possono riscrivere ora: un task in corso (o non `done`
-    con commit, i cui commit `_range` ritroverebbe vecchi dopo il rebase) o un implementatore che
-    scrive nel worktree (I-2)."""
-    for t in conn.execute("SELECT number FROM tasks WHERE work = ? AND (state IN ('running', "
-                          "'review') OR (state != 'done' AND commits != '[]')) ORDER BY number",
-                          (work["id"],)):
-        return (f"il task {t['number']} è in corso o ha commit non chiusi: chiudi o riporta in "
-                f"attesa il task {t['number']}, poi /tollgate:sync")
-    running = subagents.running(conn, work=work["id"])
-    if running:
+    """Il motivo per cui i commit non si possono riscrivere ora (regola di `subagents.in_use`)."""
+    def load():
         base = work["work_base_sha"] or git.default_ref(git.main_worktree(Path(work["worktree"])))
-        cfg = config.load_config(state, Path(work["worktree"]), base, env=environ)
-        for sub in running:
-            if not config.is_readonly(cfg, sub["type"]):
-                return (f"l'implementatore {sub['id']} sta scrivendo nel worktree: attendi che "
-                        "finisca (o interrompilo con /tollgate:resolve writer), poi /tollgate:sync")
-    return None
+        return config.load_config(state, Path(work["worktree"]), base, env=environ)
+
+    busy = subagents.in_use(conn, work["id"], load)
+    if busy is None:
+        return None
+    if busy.kind == "task":
+        return (f"il task {busy.ident} è in corso o ha commit non chiusi: chiudi o riporta in "
+                f"attesa il task {busy.ident}, poi /tollgate:sync")
+    return (f"l'implementatore {busy.ident} sta scrivendo nel worktree: attendi che "
+            "finisca (o interrompilo con /tollgate:resolve writer), poi /tollgate:sync")
 
 
 def _sync(state, conn, cwd: Path, now, argv, environ) -> SyncResult:

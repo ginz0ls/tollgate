@@ -239,6 +239,8 @@ APPLIERS = {
     ("approve", "rebase"): _approve_rebase,
     ("approve", "spec"): l2acts.approve_spec,
     ("approve", "plan"): l2acts.approve_plan,
+    ("reopen", "spec"): l2acts.reopen,
+    ("reopen", "plan"): l2acts.reopen,
 }
 
 

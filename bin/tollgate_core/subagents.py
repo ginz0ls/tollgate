@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import Callable, NamedTuple
 
-from . import clock, db, tasks
+from . import clock, config, db, tasks
 from .events import record_event
 
 STATES = ("running", "done", "cut", "budget", "interrupted", "tampered")
@@ -104,6 +105,31 @@ def running(conn, *, work: int | None = None) -> list:
         sql += " AND work = ?"
         params.append(work)
     return conn.execute(sql + " ORDER BY started", params).fetchall()
+
+
+class InUse(NamedTuple):
+    """Perché i commit del lavoro non si possono riscrivere né il piano ritirare: `kind` è
+    `task` (`ident` = numero del task) o `writer` (`ident` = id dell'implementatore)."""
+    kind: str
+    ident: int | str
+
+
+def in_use(conn, work: int, load_config: Callable[[], config.Config]) -> InUse | None:
+    """La regola condivisa da `sync` e da `reopen` (I-2): un task `running` o `review`, un task
+    non `done` con commit (che `_range` ritroverebbe vecchi dopo la riscrittura) o un
+    implementatore `running` (non di sola lettura). `load_config` si chiama solo se c'è un
+    subagente in corso."""
+    for t in conn.execute("SELECT number FROM tasks WHERE work = ? AND (state IN ('running', "
+                          "'review') OR (state != 'done' AND commits != '[]')) ORDER BY number",
+                          (work,)):
+        return InUse("task", t["number"])
+    running_now = running(conn, work=work)
+    if running_now:
+        cfg = load_config()
+        for sub in running_now:
+            if not config.is_readonly(cfg, sub["type"]):
+                return InUse("writer", sub["id"])
+    return None
 
 
 def is_stale(row, *, now, stale_minutes: int) -> bool:

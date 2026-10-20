@@ -1,5 +1,6 @@
-"""Atti dell'utente di L2 (spec 6.2, 8.4; decisioni 7, 9, 10, 13 di P3c): `approve spec <fette>`,
-`approve plan` e le sospensioni dei tetti dell'audit scritte da `resolve`.
+"""Atti dell'utente di L2 (spec 6.2, 8.4; decisioni 7, 9, 10, 12, 13 di P3c): `approve spec
+<fette>`, `approve plan`, `reopen spec|plan` e le sospensioni dei tetti dell'audit scritte da
+`resolve`.
 
 Gli applicatori hanno la firma di `actapply.APPLIERS` (`conn, state, work, act, args, now,
 session -> str`). I rifiuti sollevano `Refused`, che `actapply.apply_act` converte in
@@ -12,7 +13,7 @@ from pathlib import Path
 
 from tollgate_analysis import (approvals, auditrules, brief as briefs, profiles as prof,
                                specdoc)
-from tollgate_core import audits, clock, config, db, git, phases, scope
+from tollgate_core import audits, clock, config, db, git, phases, scope, subagents
 from tollgate_core.paths import program_command
 
 from . import audit
@@ -36,8 +37,9 @@ def _cfg(state, work) -> config.Config:
         raise Refused(f"configurazione non valida: {e}") from e
 
 
-def _check_ready(conn, work, phase: str, what: str) -> Path:
+def _check_ready(conn, work, phase: str | tuple[str, ...], what: str) -> Path:
     """Fase giusta (un lavoro bloccato rimanda a `resolve`), worktree presente: dà il worktree."""
+    allowed = (phase,) if isinstance(phase, str) else phase
     if work["phase"] == "blocked":
         block = conn.execute("SELECT id, reason FROM blocks WHERE work = ? AND closed IS NULL "
                              "ORDER BY id DESC LIMIT 1", (work["id"],)).fetchone()
@@ -45,8 +47,8 @@ def _check_ready(conn, work, phase: str, what: str) -> Path:
         ident = block["id"] if block else "<id>"
         raise Refused(f"il lavoro è bloccato{tail}: risolvi con /tollgate:resolve {ident} "
                       f"<nota> prima di {what}")
-    if work["phase"] != phase:
-        raise Refused(f"{what} vale in fase {phase} (fase {work['phase']})")
+    if work["phase"] not in allowed:
+        raise Refused(f"{what} vale in fase {' o '.join(allowed)} (fase {work['phase']})")
     wt = Path(work["worktree"]) if work["worktree"] else None
     if wt is None or not wt.is_dir():
         raise Refused("worktree del lavoro assente")
@@ -249,6 +251,52 @@ def approve_plan(conn, state, work, act, args, now, session) -> str:
     return (f"piano approvato: scope di {len(set(check.scope))} file e {len(check.tasks)} task "
             f"registrati, {rel} scritto, fase execution (avversario del piano: {adversarial}). "
             f"Committa {rel} con i report, poi /tollgate:execute.")
+
+
+# --- reopen spec|plan ------------------------------------------------------------------------
+
+_REOPEN_FROM = {"spec": ("plan", "approval", "execution"), "plan": ("approval", "execution")}
+_REOPEN_TO = {"spec": ("spec_audit", "reopen_spec"), "plan": ("plan", "reopen_plan")}
+
+
+def reopen(conn, state, work, act, args, now, session) -> str:
+    """Riporta la fase a `spec_audit` (solo L2) o a `plan`, supera il giro aperto e toglie la
+    registrazione del piano. I file di approvazione restano come storico (decisione 12)."""
+    what = act["object"]
+    reason = " ".join(args[1:]).strip()
+    if not reason:
+        raise Refused(f"reopen {what} vuole un motivo: /tollgate:reopen {what} <motivo>")
+    wt = _check_ready(conn, work, _REOPEN_FROM[what], f"reopen {what}")
+    target, cause = _REOPEN_TO[what]
+    if what == "spec" and work["level"] != "L2":
+        raise Refused("reopen spec vale solo in L2: la spec c'è solo lì")
+    try:
+        phases.check_transition(work["level"], work["phase"], target, cause)
+    except phases.TransitionError as e:
+        raise Refused(f"reopen {what} non vale in {work['level']}: {e}") from e
+    cfg = _cfg(state, work)
+    busy = subagents.in_use(conn, work["id"], lambda: cfg)
+    if busy is not None and busy.kind == "task":
+        raise Refused(f"il task {busy.ident} è in corso o ha commit non chiusi: chiudi o "
+                      f"riporta in attesa il task {busy.ident}, poi /tollgate:reopen {what}")
+    if busy is not None:
+        raise Refused(f"l'implementatore {busy.ident} sta scrivendo nel worktree: attendi che "
+                      f"finisca (o interrompilo con /tollgate:resolve writer), poi "
+                      f"/tollgate:reopen {what}")
+    open_row = audits.open_round_row(conn, work["id"])
+    if open_row is not None:
+        audits.supersede(conn, work["id"], (open_row["kind"], open_row["number"]), now=now)
+    removed = scope.reset_plan(conn, work["id"], now=now, session=session)   # prima della fase
+    phases.set_phase(conn, state, work["id"], target, cause, now=now, session=session)
+    parts = [f"{what} riaperto ({reason}): fase {target}"]
+    if open_row is not None:
+        parts.append(f"giro {open_row['kind']} {open_row['number']} superato")
+    if removed:
+        parts.append(f"registrazione del piano tolta (task {', '.join(map(str, removed))})")
+    fix = "correggi la spec" if what == "spec" else "correggi il piano"
+    tail = "" if what == "spec" else " (in L1 il piano corretto si registra da solo)"
+    return (", ".join(parts) + f". I file di approvazione restano come storico e non valgono "
+            f"più: {fix}, poi {_program()} audit prepare{tail}.")
 
 
 # --- sospensioni dei tetti, da `resolve` ---------------------------------------------------
