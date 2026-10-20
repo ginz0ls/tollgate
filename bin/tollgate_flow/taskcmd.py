@@ -11,7 +11,7 @@ from pathlib import Path
 
 from tollgate_analysis import (brief as briefs, naming, plan as planmod, profiles as prof,
                                report, size)
-from tollgate_core import clock, config, db, git, phases, sessions, tasks
+from tollgate_core import clock, config, db, git, phases, reviews, scope as scopes, sessions, tasks
 from tollgate_core.paths import program_command
 
 from . import prereq
@@ -61,6 +61,16 @@ def _check_state(row, number: int, fix: bool) -> None:
     if row["review_sha"] is None:
         raise TaskError(f"task {number}: il verdetto è di una revisione già superata, serve "
                         "un nuovo verdetto del revisore")
+
+
+def _fix_files(conn, work, row) -> list[str]:
+    """File dei rilievi di un task di correzione `cycle:<n>` (per l'instradamento); quelli di un
+    task `gate:<sha>` non si conoscono."""
+    kind, _, ref = (row["source"] or "").partition(":")
+    if kind != "cycle" or not ref.isdigit():
+        return []
+    return list(dict.fromkeys(r["file"] for r in reviews.blocking_open(conn, work["id"], int(ref))
+                              if r["file"]))
 
 
 def _related_tests(task, must_haves: list[planmod.MustHave]) -> list[str]:
@@ -113,20 +123,29 @@ def _task_start(state, conn, cwd: Path, number: int, *, fix: bool, claude_dir: P
         cfg = config.load_config(state, main, base)
     except config.ConfigError as e:
         raise TaskError(f"configurazione non valida: {e}") from e
-    plan_text = _plan_text(wt, work)
-    check = planmod.check_plan(
-        plan_text, required_sections=cfg.get("plan.required_sections"),
-        max_scope_files=cfg.get("plan.max_scope_files"),
-        must_have_tests=bool(cfg.data["components"].get("must_have_tests", True)),
-        level=work["level"], profiles=cfg.profiles, active_always=cfg.get("profiles.active"))
-    text = planmod.task_text(plan_text, number)
-    task = next((t for t in check.tasks if t.number == number), None)
-    if text is None or task is None:
-        raise TaskError(f"task {number} non è nel piano {work['plan_path']}")
-    refs = task.must_haves
-    must_haves = [m for m in check.must_haves if refs is None or m.id in refs]
+    if row["kind"] == "fix":
+        # decisione 16: il testo sta in `tasks.task_text`; il piano non c'entra
+        text = row["task_text"]
+        if not text:
+            raise TaskError(f"task {number}: manca il testo del task di correzione")
+        files, scope_files = _fix_files(conn, work, row), sorted(scopes.paths(conn, work["id"]))
+        must_haves, related = [], []
+    else:
+        plan_text = _plan_text(wt, work)
+        check = planmod.check_plan(
+            plan_text, required_sections=cfg.get("plan.required_sections"),
+            max_scope_files=cfg.get("plan.max_scope_files"),
+            must_have_tests=bool(cfg.data["components"].get("must_have_tests", True)),
+            level=work["level"], profiles=cfg.profiles, active_always=cfg.get("profiles.active"))
+        text = planmod.task_text(plan_text, number)
+        task = next((t for t in check.tasks if t.number == number), None)
+        if text is None or task is None:
+            raise TaskError(f"task {number} non è nel piano {work['plan_path']}")
+        refs = task.must_haves
+        must_haves = [m for m in check.must_haves if refs is None or m.id in refs]
+        files, scope_files, related = task.files, task.files, _related_tests(task, must_haves)
 
-    routing = prof.task_routing(task.files, cfg.profiles)
+    routing = prof.task_routing(files, cfg.profiles)
     absent = [s for s in routing.skills
               if not prereq.skill_installed(s, claude_dir=claude_dir, worktree=wt)]
     present = [s for s in routing.skills if s not in absent]
@@ -143,8 +162,8 @@ def _task_start(state, conn, cwd: Path, number: int, *, fix: bool, claude_dir: P
 
     impl_brief = briefs.ImplBrief(
         issue=work["issue"], task=number, name=name, agent_type=routing.implementer,
-        model_hint=hint, task_text=text, scope=task.files,
-        related_tests=_related_tests(task, must_haves), must_haves=must_haves, skills=present,
+        model_hint=hint, task_text=text, scope=scope_files,
+        related_tests=related, must_haves=must_haves, skills=present,
         absent_skills=absent, verify_cmd=f"{program_command(db.BIN_PATH)} verify",
         fix_findings=json.loads(row["review_findings"]) if fix else [], fix_round=round_)
     file_name = f"task-{number}-fix-{round_}.md" if fix else f"task-{number}.md"
@@ -275,14 +294,18 @@ def _review_prepare(state, conn, cwd: Path, number: int) -> Path:
                                    "modifiche prima della revisione")
     base, head = _range(wt, row)
     changes = git.changes(wt, base, head=head)
-    plan_text = _plan_text(wt, work)
-    check = planmod.check_plan(
-        plan_text, required_sections=cfg.get("plan.required_sections"),
-        max_scope_files=cfg.get("plan.max_scope_files"),
-        must_have_tests=bool(cfg.data["components"].get("must_have_tests", True)),
-        level=work["level"], profiles=cfg.profiles, active_always=cfg.get("profiles.active"))
-    task = next((t for t in check.tasks if t.number == number), None)
-    routing = prof.task_routing(task.files if task else [], cfg.profiles)
+    if row["kind"] == "fix":
+        files = _fix_files(conn, work, row)
+    else:
+        plan_text = _plan_text(wt, work)
+        check = planmod.check_plan(
+            plan_text, required_sections=cfg.get("plan.required_sections"),
+            max_scope_files=cfg.get("plan.max_scope_files"),
+            must_have_tests=bool(cfg.data["components"].get("must_have_tests", True)),
+            level=work["level"], profiles=cfg.profiles, active_always=cfg.get("profiles.active"))
+        task = next((t for t in check.tasks if t.number == number), None)
+        files = task.files if task else []
+    routing = prof.task_routing(files, cfg.profiles)
 
     run_dir = wt / ".tollgate-run" / str(work["issue"])
     k = len(list(run_dir.glob("review-*.diff"))) + 1 if run_dir.is_dir() else 1

@@ -69,7 +69,11 @@ def build_parser() -> argparse.ArgumentParser:
     tp = sub.add_parser("task", help="task del piano (6.3)")
     tsub = tp.add_subparsers(dest="task_cmd", required=True)
     ts = tsub.add_parser("start", help="assegna il task a un implementatore e scrive il brief")
-    ts.add_argument("number", type=int, metavar="K")
+    ts.add_argument("number", type=int, metavar="K", nargs="?")
+    ts.add_argument("--from-findings", type=int, metavar="CICLO",
+                    help="task di correzione dai rilievi bloccanti del ciclo")
+    ts.add_argument("--from-gate", action="store_true",
+                    help="task di correzione dall'ultimo commento del gate sulla PR")
     ts.add_argument("--fix", action="store_true", help="giro di correzione dopo un verdetto")
     tr = tsub.add_parser("review-prepare", help="prepara diff e brief del revisore del task")
     tr.add_argument("number", type=int, metavar="K")
@@ -255,6 +259,23 @@ def main(argv: list[str]) -> int:
                     print(f"revisore: {taskcmd.reviewer_type(state, Path.cwd(), args.number)}")
                 elif args.task_cmd == "done":
                     print(taskcmd.task_done(state, Path.cwd(), args.number))
+                elif args.from_findings is not None or args.from_gate:
+                    from tollgate_flow import fixtask
+                    if (args.number is not None or args.fix
+                            or (args.from_findings is not None and args.from_gate)):
+                        print("tollgate: --from-findings, --from-gate e K (con --fix) si "
+                              "escludono a vicenda", file=sys.stderr)
+                        return 2
+                    claude_dir = Path.home() / ".claude"
+                    path, summary = fixtask.from_gate(
+                        state, Path.cwd(), claude_dir=claude_dir) if args.from_gate \
+                        else fixtask.from_findings(state, Path.cwd(), args.from_findings,
+                                                   claude_dir=claude_dir)
+                    print(f"{path}\n{summary}")
+                elif args.number is None:
+                    print("tollgate: serve il numero del task, oppure --from-findings o "
+                          "--from-gate", file=sys.stderr)
+                    return 2
                 else:
                     path, summary = taskcmd.task_start(state, Path.cwd(), args.number,
                                                        fix=args.fix,

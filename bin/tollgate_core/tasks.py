@@ -52,14 +52,16 @@ def _log(conn, row, *, now, session, **extra) -> None:
 
 
 def add_task(conn, work: int, number: int, *, source: str, kind: str = "plan",
-             skills_required: list[str] | None = None, now, session=None) -> None:
+             skills_required: list[str] | None = None, task_text: str | None = None, now,
+             session=None) -> None:
     if kind not in KINDS:
         raise ValueError(f"tipo di task sconosciuto: {kind}")
     with db.tx(conn):
         try:
-            conn.execute("INSERT INTO tasks (work, number, kind, source, state, skills_required) "
-                         "VALUES (?, ?, ?, ?, 'pending', ?)",
-                         (work, number, kind, source, json.dumps(skills_required or [])))
+            conn.execute("INSERT INTO tasks (work, number, kind, source, state, skills_required, "
+                         "task_text) VALUES (?, ?, ?, ?, 'pending', ?, ?)",
+                         (work, number, kind, source, json.dumps(skills_required or []),
+                          task_text))
         except sqlite3.IntegrityError as e:
             raise ValueError(f"task {number} già presente nel lavoro {work}") from e
         _log(conn, get_task(conn, work, number), now=now, session=session)
