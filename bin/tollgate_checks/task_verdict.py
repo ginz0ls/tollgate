@@ -5,9 +5,8 @@ Possiede l'intera chiusura del revisore in attesa: sola lettura, verdetto e riga
 un veto e la riga si chiuderebbe `done` con un verdetto non valido."""
 from __future__ import annotations
 
-from pathlib import Path
-
 import json
+from pathlib import Path
 
 from tollgate_analysis import profiles as prof, report, verdicts
 from tollgate_core import git, subagents
@@ -27,7 +26,7 @@ def _task_files(work, task) -> list[str]:
     if wt is None or not wt.is_dir() or not commits:
         return []
     try:
-        base = git.resolve_ref(wt, f"{commits[0]}^") or git.EMPTY_TREE
+        base = git.range_base(wt, commits[0])
         changes = git.changes(wt, base, head=task["review_sha"])
     except git.GitError:
         return []

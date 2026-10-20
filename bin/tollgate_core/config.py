@@ -191,7 +191,7 @@ def _merge_profile(name: str, raw, warnings: list[str]) -> dict:
                           f"non {'è' if len(unknown) == 1 else 'sono'} in profiles.{name}.rules")
     for key, form in AGENT_FORMS.items():
         value = prof[key]
-        if value and not re.match(rf"^[^:\s]+:{form}-[a-z0-9-]+$", value):
+        if value and not re.fullmatch(rf"[^:\s]+:{form}-[a-z0-9-]+", value):
             warnings.append(f"profilo {name}: {key} «{value}» non ha la forma "
                             f"<plugin>:{form}-<area>: uso l'agente generico")
             prof[key] = ""

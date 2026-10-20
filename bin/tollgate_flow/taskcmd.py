@@ -215,7 +215,7 @@ def _range(wt: Path, row) -> tuple[str, str]:
     commits = json.loads(row["commits"])
     if not commits:
         return head, head
-    return git.resolve_ref(wt, f"{commits[0]}^") or git.EMPTY_TREE, head
+    return git.range_base(wt, commits[0]), head
 
 
 def _ensure_clean(state, work, wt: Path, hint: str) -> None:

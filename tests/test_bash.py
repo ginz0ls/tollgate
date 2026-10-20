@@ -415,10 +415,6 @@ class FixRound2Test(unittest.TestCase):
                 self.assertFalse(pushes_forced(text))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class AbbreviationAndAliasTest(unittest.TestCase):
     """I3 della revisione finale: git accetta il prefisso univoco di un'opzione lunga e gli
     alias definiti con `-c`; le regole di 7.4 devono vederli."""
@@ -531,3 +527,7 @@ class ScriptIndexTest(unittest.TestCase):
                      ["python3", "-c", "print(1)"], ["python3", "-m", "http.server"], []):
             with self.subTest(argv=argv):
                 self.assertIsNone(bash.script_index(argv))
+
+
+if __name__ == "__main__":
+    unittest.main()

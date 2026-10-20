@@ -78,9 +78,23 @@ def locked_docs(work) -> set[str]:
     return out
 
 
+def active_profile_names(cfg: Config, wt: Path, work, *, head: str | None = None) -> list[str]:
+    """I profili attivi sul diff del lavoro (dalla base del lavoro, o da `default_ref` se manca,
+    fino a `head` o alla punta del worktree), senza i file cancellati. Sta qui perché la usano
+    sia `review prepare` sia l'applicazione dei riporti degli hook. Senza base né
+    `default_ref`: nessun profilo. Un diff illeggibile solleva `git.GitError`."""
+    base = work["work_base_sha"] or git.default_ref(wt)
+    if base is None:
+        return []
+    files = [c.path for c in git.changes(wt, base, head=head or git.head(wt))
+             if c.status != "D"]
+    return prof.active_profiles(files, cfg.profiles, cfg.get("profiles.active"))
+
+
 def scope_exempt(cfg: Config, work, rel: str, scope: set[str], *,
                  locked: set[str] | None = None) -> bool:
-    """Esenzioni dallo scope (7.4). I percorsi di `scope` sono nomi letterali (possono
+    """Esenzioni dallo scope (7.4); quella di `docs/superpowers/reviews/<N>/` (report e
+    approvazioni del lavoro) vale a ogni livello, non solo in L2. I percorsi di `scope` sono nomi letterali (possono
     contenere `[ ]`): si confrontano per uguaglianza, mai come pattern. Solo `[scope] always`
     è fatto di pattern. `locked` sono i documenti bloccati (`locked_docs`): chi esamina molti
     file lo calcola una volta sola e lo passa."""

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from tollgate_analysis import brief as briefs, plan as planmod, profiles as prof
-from tollgate_core import clock, config, db, git, reviews, scope, sessions
+from tollgate_core import clock, config, db, git, reviews, scope, sessions, violations
 from tollgate_core.paths import program_command
 
 from . import taskcmd
@@ -109,14 +109,9 @@ def _prepare(state, conn, cwd: Path, now) -> PrepareResult:
     return _open(state, conn, work, cfg, wt, base, head, patch, now)
 
 
-def _profiles(cfg, wt: Path, base: str, head: str) -> list[str]:
-    files = [c.path for c in git.changes(wt, base, head=head) if c.status != "D"]
-    return prof.active_profiles(files, cfg.profiles, cfg.get("profiles.active"))
-
-
 def _open(state, conn, work, cfg, wt, base, head, patch, now) -> PrepareResult:
     must_haves = _must_haves(wt, work, cfg)      # prima di aprire il ciclo: non ne spreca uno
-    names = _profiles(cfg, wt, base, head)
+    names = violations.active_profile_names(cfg, wt, work, head=head)
     reviewers = [REVIEWER]
     if work["level"] == "L2":
         reviewers += prof.final_specialists(names, cfg.profiles)
@@ -142,7 +137,8 @@ def _resume(state, conn, work, cfg, cycle, wt: Path, base, head, now, names=None
     prog = program_command(db.BIN_PATH)
     result = PrepareResult(stage=cycle["stage"])
     if cycle["stage"] == "review":
-        names = names if names is not None else _profiles(cfg, wt, base, head)
+        if names is None:
+            names = violations.active_profile_names(cfg, wt, work, head=head)
         if must_haves is None:
             must_haves = _must_haves(wt, work, cfg)
         reported = json.loads(cycle["reported"])

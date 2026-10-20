@@ -1,6 +1,7 @@
 import json
 import unittest
 
+from tests.helpers import git
 from tests.hookkit import DEFAULT_TOML, SESSION, Lab, sample
 from tests.test_check_writes import with_scope
 from tests.test_verdicts import GOOD
@@ -167,6 +168,50 @@ blocking_rules = ["R-WEB-1"]
         f = dict(GOOD, rule="R-WEB-1")
         self.stop(text=self.verdict(outcome="approved", findings=[f]))
         self.assertEqual(self.task()["verdict"], "changes")
+
+
+class TaskFilesTest(Base):
+    """`_task_files`: i profili si attivano dal diff del task, non solo da `profiles.active`."""
+    toml = DEFAULT_TOML + """
+[profiles.web]
+paths = ["web/**"]
+rules = ["R-WEB-1", "R-WEB-2"]
+blocking_rules = ["R-WEB-1"]
+"""
+
+    def commit_web(self):
+        """Un commit su web/ registrato come commit del task, con la revisione sulla sua punta."""
+        wt = self.lab.wt
+        (wt / "web").mkdir()
+        (wt / "web" / "a.ts").write_text("export const a = 1;\n")
+        git(wt, "add", "-A")
+        git(wt, "commit", "-qm", "web")
+        self.sha = tg_git.head(wt)
+        tasks.add_commit(self.lab.conn, self.lab.work, 1, self.sha)
+        tasks.set_review_prep(self.lab.conn, self.lab.work, 1, sha=self.sha, code=CODE)
+        self.start("r2", REVIEWER)
+
+    def stop_with(self, rule, aid="r2"):
+        f = dict(GOOD, rule=rule)
+        self.stop(aid=aid, text=self.verdict(outcome="approved", findings=[f]))
+        return self.task()["verdict"]
+
+    def test_profile_activated_only_by_paths_on_task_diff(self):
+        self.commit_web()
+        self.assertEqual(self.stop_with("R-WEB-2"), "approved")      # nota e non bloccante
+
+    def test_blocking_rule_of_profile_activated_by_paths(self):
+        self.commit_web()
+        self.assertEqual(self.stop_with("R-WEB-1"), "changes")
+
+    def test_profile_not_activated_without_matching_files(self):
+        self.assertEqual(self.stop_with("R-WEB-2", aid="r1"), "changes")   # ignota: fail-closed
+
+    def test_unreadable_diff_blocks_every_r_rule(self):
+        self.commit_web()
+        self.sha = "0" * 40                                  # la revisione non esiste nel repo
+        tasks.set_review_prep(self.lab.conn, self.lab.work, 1, sha=self.sha, code=CODE)
+        self.assertEqual(self.stop_with("R-WEB-2"), "changes")
 
 
 class StandardOffTest(Base):

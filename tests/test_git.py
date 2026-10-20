@@ -25,6 +25,14 @@ class GitTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
+    def test_range_base_is_parent_or_empty_tree(self):
+        (self.repo / "src" / "b.py").write_text("x\n")
+        g(self.repo, "add", "-A")
+        g(self.repo, "commit", "-qm", "due")
+        second = g(self.repo, "rev-parse", "HEAD")
+        self.assertEqual(git.range_base(self.repo, second), self.base)
+        self.assertEqual(git.range_base(self.repo, self.base), git.EMPTY_TREE)
+
     def test_toplevel_of_missing_path(self):
         self.assertEqual(git.toplevel(self.repo / "src" / "nuova" / "x.py"), self.repo.resolve())
         self.assertIsNone(git.toplevel(self.tmp / "fuori"))

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from tollgate_analysis import approvals, auditrules, brief, profiles as prof
 from tollgate_core import (acts, audits, effects, events, git, phases, reviews, scope, sessions,
-                           subagents, tasks)
+                           subagents, tasks, violations)
 
 REPORT_MAX_CHARS = 60000
 
@@ -73,21 +73,20 @@ def _final_rules(ctx, work, sha: str) -> tuple[set[str], set[str]]:
     """Regole `[blocca]` e note dei profili attivi sul diff del ciclo (decisione 8). Se il diff
     non si legge, nessun profilo è attivo: ogni `R-…` blocca (fail-closed)."""
     wt = Path(work["worktree"]) if work["worktree"] else None
-    base = work["work_base_sha"]
-    files: list[str] = []
-    if wt is not None and wt.is_dir() and base:
+    names: list[str] = []
+    if wt is not None and wt.is_dir():
         try:
-            files = [c.path for c in git.changes(wt, base, head=sha) if c.status != "D"]
+            names = violations.active_profile_names(ctx.config, wt, work, head=sha)
         except git.GitError:
-            files = []
+            names = []
     profs = ctx.config.profiles
-    names = prof.active_profiles(files, profs, ctx.cfg("profiles.active"))
     return prof.blocking_rules(names, profs), prof.known_rules(names, profs)
 
 
 def _review_report(conn, state, ctx, d):
     """Riporto di un revisore finale. Un riporto non più accettabile (ciclo non in stadio
-    review, fonte non attesa o già riportata: una corsa) è ignorato, mai un'eccezione."""
+    review, fonte non attesa o già riportata: una corsa) non si applica, mai un'eccezione: lascia
+    l'evento `veto` con il motivo."""
     wid, n = d["work"], d["cycle"]
     work = phases.get_work(conn, wid)
     cycle = conn.execute("SELECT sha FROM review_cycles WHERE work = ? AND number = ?",
@@ -99,7 +98,10 @@ def _review_report(conn, state, ctx, d):
         stage = reviews.add_report(conn, wid, n, source=d["source"], outcome=d["outcome"],
                                    findings=d["findings"], rejected=d["rejected"],
                                    blocking_rules=blocking, known_rules=known, now=ctx.now)
-    except ValueError:
+    except ValueError as e:
+        events.record_event(conn, "veto", {"event": "subagent_stop", "rule": "final_review",
+                                           "reason": str(e)}, now=ctx.now,
+                            session=ctx.event.session or None, work=wid)
         return
     if stage == "verify" and not reviews.unjudged_ids(conn, wid, n):
         reviews.close_cycle(conn, state, wid, n, now=ctx.now, session=ctx.event.session)

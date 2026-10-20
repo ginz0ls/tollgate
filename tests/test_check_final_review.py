@@ -1,12 +1,14 @@
 import json
 import unittest
 from datetime import timedelta
+from types import SimpleNamespace
 
 from tests.helpers import git
 from tests.hookkit import DEFAULT_TOML, SESSION, Lab, sample
 from tests.test_check_task_verdict import CODE as TASK_CODE
 from tests.test_verdicts import GOOD
-from tollgate_core import git as tg_git, reviews, subagents, tasks
+from tollgate_core import config, git as tg_git, reviews, subagents, tasks
+from tollgate_hooks import apply
 
 REVIEWER = "tollgate:final-reviewer"
 VERIFIER = "tollgate:finding-verifier"
@@ -16,6 +18,12 @@ SEC_TOML = DEFAULT_TOML + """
 [profiles.security]
 paths = ["src/**"]
 final_specialist = "probe:final-security"
+"""
+RULES_TOML = DEFAULT_TOML + """
+[profiles.sec]
+paths = ["src/**"]
+rules = ["R-SEC-1", "R-SEC-2"]
+blocking_rules = ["R-SEC-1"]
 """
 
 
@@ -126,6 +134,33 @@ class ReviewerTest(Base):
         self.assertEqual(self.cycle()["stage"], "review")
         self.assertIn("ha cambiato file", self.open_blocks()[0])
 
+    def test_interrupted_reviewer_that_changed_files_tampered(self):
+        subagents.interrupt(self.lab.conn, "a0", now=self.lab.now + timedelta(minutes=30))
+        (self.lab.wt / "src/app.py").write_text("manomesso\n")
+        self.assertEqual(self.stop(text=self.verdict()).exit, 0)
+        self.assertEqual(self.sub()["state"], "tampered")
+        self.assertEqual(self.findings(), [])
+        self.assertEqual(self.cycle()["stage"], "review")
+        self.assertIn("ha cambiato file", self.open_blocks()[0])
+
+    def test_rejected_report_leaves_trace(self):
+        """Un riporto non più accettabile (qui: il ciclo non è più in stadio review) non si
+        applica, ma lascia l'evento `veto` con il motivo."""
+        conn = self.lab.conn
+        reviews.supersede(conn, self.lab.work, 1, now=self.lab.now)
+        main = tg_git.main_worktree(self.lab.wt)
+        ctx = SimpleNamespace(
+            config=config.load_config(self.lab.ts.state, main, "origin/main"),
+            now=self.lab.now, event=SimpleNamespace(session=SESSION),
+            cfg=lambda k: config.load_config(self.lab.ts.state, main, "origin/main").get(k))
+        apply._review_report(conn, self.lab.ts.state, ctx, {
+            "work": self.lab.work, "cycle": 1, "source": REVIEWER, "outcome": "needs_fix",
+            "findings": [GOOD], "rejected": []})
+        (veto,) = self.lab.events("veto")
+        self.assertEqual((veto["rule"], veto["event"]), ("final_review", "subagent_stop"))
+        self.assertIn("review", veto["reason"])
+        self.assertEqual(self.findings(), [])
+
     def test_handback_report_used_in_auto_mode(self):
         subagents.set_report(self.lab.conn, "a0", self.verdict())
         self.assertEqual(self.stop(text=None).exit, 0)
@@ -192,6 +227,34 @@ class ReviewerTest(Base):
         self.assertEqual(tasks.get_task(c, w, 1)["verdict"], "approved")
         self.assertEqual(self.cycle()["stage"], "review")
         self.assertEqual(self.findings(), [])
+
+
+class RulesTest(Base):
+    toml = RULES_TOML
+
+    def blocking_of(self, rule):
+        self.stop(text=self.verdict(findings=[dict(GOOD, rule=rule)]))
+        (row,) = self.lab.conn.execute("SELECT blocking FROM findings WHERE work = ?",
+                                       (self.lab.work,)).fetchall()
+        return row[0]
+
+    def test_profile_rules_apply_on_work_diff(self):
+        self.assertEqual(self.blocking_of("R-SEC-2"), 0)          # nota e non `[blocca]`
+
+    def test_rules_with_default_ref_fallback(self):
+        """Senza `work_base_sha` la base è `origin/main` (come in `review prepare`): il
+        profilo si attiva lo stesso e la regola nota non blocca."""
+        self.lab.conn.execute("UPDATE work_items SET work_base_sha = NULL WHERE id = ?",
+                              (self.lab.work,))
+        self.lab.conn.commit()
+        self.assertEqual(self.blocking_of("R-SEC-2"), 0)
+
+    def test_unreadable_diff_blocks_every_r_rule(self):
+        self.sha = "0" * 40                                   # la punta del ciclo non esiste
+        self.lab.conn.execute("UPDATE review_cycles SET sha = ? WHERE work = ?",
+                              (self.sha, self.lab.work))
+        self.lab.conn.commit()
+        self.assertEqual(self.blocking_of("R-SEC-2"), 1)          # fail-closed
 
 
 class VerifierTest(Base):

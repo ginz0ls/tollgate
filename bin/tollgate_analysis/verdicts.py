@@ -167,7 +167,8 @@ def parse_verifier_results(text: str | None, *, sha: str, code: str,
     results, unknown = {}, 0
     for r in raw:
         if not isinstance(r, dict) or not isinstance(r.get("id"), str):
-            problems.append("ogni risultato ha un id")
+            if "ogni risultato ha un id" not in problems:
+                problems.append("ogni risultato ha un id")
         elif r["id"] not in ids:
             unknown += 1
         elif r.get("verification") not in VERIFICATIONS:

@@ -7,8 +7,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.helpers import BIN, TempState, git, make_repo
-from tollgate_core import clock, db, events, phases
+from tests.flowkit import SESSION, FlowLab
+from tests.helpers import BIN, ROOT, TempState, git, make_repo
+from tests.hookkit import sample
+from tollgate_core import clock, db, events, paths, phases
 
 T0 = clock.parse("2026-10-08T10:00:00.000000Z")
 
@@ -146,3 +148,48 @@ class StatusReadOnlyTest(CliBase):
         self.assertIn("nessun lavoro attivo", r.stderr)
         self.assertEqual(sorted(p.name for p in self.t.dir.iterdir()), before)
         self.assertFalse(self.t.state.db_path.exists())
+
+
+class ArgvSignalTest(unittest.TestCase):
+    """Il passaggio reale di argv da `cli.main`: il segnale lo scrive l'hook di PreToolUse
+    (hooks/run) e vale per un solo lancio con gli stessi argomenti."""
+
+    def setUp(self):
+        self.fl = FlowLab()
+        self.addCleanup(self.fl.close)
+        sha = self.fl.git("rev-parse", "origin/main")
+        self.fl.set_gh(
+            auth=True, prs=[], issue_list=[],
+            issues={"7": {"number": 7, "title": "Aggiungi export CSV", "body": "b",
+                          "state": "open", "labels": [], "author_association": "OWNER"}},
+            statuses={sha: {"statuses": [{"context": "tollgate/guard", "state": "success"},
+                                         {"context": "tollgate/verdict", "state": "success"}]}})
+
+    def signal(self, *argv):
+        """PreToolUse Bash attraverso hooks/run: scrive il segnale per `argv`."""
+        command = f"{paths.program_command(BIN / 'tollgate')} {' '.join(argv)}"
+        r = subprocess.run([str(ROOT / "hooks" / "run"), "PreToolUse"], env=self.fl.env(),
+                           input=json.dumps(sample("PreToolUse-Bash", session_id=SESSION,
+                                                   cwd=str(self.fl.main),
+                                                   tool_input={"command": command})),
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual((r.returncode, r.stderr), (0, ""), r.stdout)
+
+    def run_start(self, *argv):
+        return subprocess.run([sys.executable, "-B", str(BIN / "tollgate"), "start", *argv],
+                              cwd=str(self.fl.main), env=self.fl.env(), capture_output=True,
+                              text=True, timeout=120)
+
+    def test_second_start_without_new_signal_refused(self):
+        self.signal("start", "7")
+        first = self.run_start("7")
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        second = self.run_start("7")                        # la voce è consumata
+        self.assertEqual(second.returncode, 1, second.stdout + second.stderr)
+        self.assertIn("sessione non riconosciuta", second.stdout + second.stderr)
+
+    def test_level_option_in_argv_matches(self):
+        self.signal("start", "7", "--level", "L1")
+        r = self.run_start("7", "--level", "L1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertNotIn("sessione non riconosciuta", r.stdout + r.stderr)

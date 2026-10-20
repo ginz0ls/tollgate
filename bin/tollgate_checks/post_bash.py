@@ -56,7 +56,7 @@ def decide(event, ctx):
         out.append(record("commit", work=work["id"], sha=sha, head=head))
         if task is not None:
             out.append(record("task_commit", work=work["id"], number=task, sha=sha))
-        parent = git.resolve_ref(wt, f"{sha}^") or git.EMPTY_TREE
+        parent = git.range_base(wt, sha)
         left = commit_violations(ctx, work, wt, parent, sha, git.commit_changes(wt, sha))
         if left:
             problems.append(f"commit {sha[:10]}:\n" + explain(left, ctx))

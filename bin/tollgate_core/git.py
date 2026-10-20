@@ -245,9 +245,14 @@ def changes(repo, base: str, *, head: str | None = None, exclude=()) -> list[Cha
     return out
 
 
+def range_base(repo, first_commit: str) -> str:
+    """La base di un intervallo che comincia da `first_commit`: il suo genitore, o l'albero
+    vuoto se è un commit radice."""
+    return resolve_ref(repo, f"{first_commit}^") or EMPTY_TREE
+
+
 def commit_changes(repo, sha: str) -> list[Change]:
-    parent = resolve_ref(repo, f"{sha}^") or EMPTY_TREE
-    return changes(repo, parent, head=sha)
+    return changes(repo, range_base(repo, sha), head=sha)
 
 
 def diff_size(repo, base: str, *, head: str | None = None, exclude=()) -> int:

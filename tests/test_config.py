@@ -127,6 +127,11 @@ class ProfileNamesTest(unittest.TestCase):
         self.assertIn("profilo web: reviewer «acme:code-review» non ha la forma "
                       "<plugin>:reviewer-<area>: uso l'agente generico", c.warnings)
 
+    def test_trailing_newline_name_falls_back(self):
+        c = self.prof('reviewer = "acme:reviewer-web\\n"\n')
+        self.assertEqual(c.profiles["web"]["reviewer"], "")
+        self.assertEqual(len(c.warnings), 1)
+
     def test_each_key_has_its_own_form(self):
         c = self.prof('agent = "acme:reviewer-web"\nfinal_specialist = "acme:implementer-web"\n')
         self.assertEqual((c.profiles["web"]["agent"], c.profiles["web"]["final_specialist"]),

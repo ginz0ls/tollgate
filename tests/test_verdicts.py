@@ -174,10 +174,6 @@ class ParseTest(unittest.TestCase):
         self.assertFalse(parse(text).valid)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 def final(**over):
     data = {"sha": SHA, "code": CODE, "outcome": "ok", "findings": []}
     data.update(over)
@@ -242,6 +238,11 @@ class VerifierResultsTest(unittest.TestCase):
         self.assertFalse(v.valid)
         self.assertIn("1 id sconosciuti", " ".join(v.problems))
 
+    def test_missing_id_problem_once(self):
+        v = self.parse(self.data([{"verification": "confirmed"}, {"id": 5}, "x"]))
+        self.assertFalse(v.valid)
+        self.assertEqual(v.problems, ["ogni risultato ha un id"])
+
     def test_bad_verification_invalid(self):
         v = self.parse(self.data([{"id": "f-1-1", "verification": "boh"},
                                   {"id": "f-1-2", "verification": "confirmed"}]))
@@ -253,3 +254,7 @@ class VerifierResultsTest(unittest.TestCase):
                      self.data("niente"), "senza json", ""):
             self.assertFalse(self.parse(text).valid, text)
         self.assertFalse(self.parse(None).valid)
+
+
+if __name__ == "__main__":
+    unittest.main()

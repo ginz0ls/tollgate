@@ -273,10 +273,6 @@ class CheckpointCase(unittest.TestCase):
         self.assertEqual(self.step(), "/tollgate:finish")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class CheckpointL2Case(unittest.TestCase):
     """Fasi del percorso L2 (decisione 20): il passo è quello di `audit prepare`, senza giri."""
 
@@ -353,3 +349,7 @@ class CheckpointL2Case(unittest.TestCase):
             self.assertEqual(st.count(f"{self.prog} {subcommand}"), st.count(subcommand), st)
             self.assertTrue(st.count(subcommand), st)
             self.assertNotIn(str(db.BIN_PATH), st.replace(self.prog, ""))
+
+
+if __name__ == "__main__":
+    unittest.main()

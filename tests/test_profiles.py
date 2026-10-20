@@ -82,10 +82,6 @@ class RoutingTest(unittest.TestCase):
         self.assertFalse(r.split_candidate)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class RulesTest(unittest.TestCase):
     PROF = {
         "web": {"rules": ["R-WEB-1", "R-WEB-2"], "blocking_rules": ["R-WEB-1"],
@@ -105,3 +101,7 @@ class RulesTest(unittest.TestCase):
         self.assertEqual(profiles.final_specialists(["lib", "web", "api"], self.PROF),
                          ["p:final-web"])
         self.assertEqual(profiles.final_specialists([], self.PROF), [])
+
+
+if __name__ == "__main__":
+    unittest.main()
