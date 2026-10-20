@@ -195,12 +195,12 @@ class ApproveLevelTest(ApplyCase):
 class ReviewApplyCase(ApplyCase):
     """Cicli di revisione veri, costruiti con le funzioni di `reviews`."""
 
-    def cycle(self, severity="major", *, close=True):
+    def cycle(self, severity="major", *, close=True, findings_n=1):
         fl = self.fl
         n = reviews.open_cycle(fl.conn, fl.work, sha=core_git.head(fl.wt), patch_id=None,
                                code="c0de", reviewers=[REVIEWER], now=fl.now)
         findings = [{"severity": severity, "confidence": 0.9, "file": "src/app.py", "line": 2,
-                     "rule": "R-1", "text": "manca il caso zero"}]
+                     "rule": "R-1", "text": "manca il caso zero"}] * findings_n
         reviews.add_report(fl.conn, fl.work, n, source=REVIEWER, outcome="needs_fix",
                            findings=findings, rejected=[], blocking_rules=set(),
                            known_rules=set(), now=fl.now)
@@ -217,12 +217,12 @@ class ReviewApplyCase(ApplyCase):
         phases.set_phase(self.fl.conn, self.fl.ts.state, self.fl.work, "review",
                          "finish_check_green", now=self.fl.now)
 
-    def cap_reached(self, n=4):
+    def cap_reached(self, n=4, last_findings=1):
         """Quattro cicli contati con `needs_fix`: il quarto apre il blocco dei cicli."""
         for i in range(n):
             if i:
                 self.to_review()
-            self.cycle()
+            self.cycle(findings_n=last_findings if i == n - 1 else 1)
         self.assertEqual(self.open_reasons(), [reviews.CAP_REASON])
 
     def decision(self, fid):
@@ -395,6 +395,17 @@ class ApproveFindingTest(ReviewApplyCase):
         self.assertEqual(self.open_reasons(), [])
         self.assertEqual(self.work()["phase"], "execution")
         self.assertEqual(reviews.latest(fl.conn, fl.work)["outcome"], "ok")
+
+    def test_approve_finding_closes_cap_block_even_if_still_needs_fix(self):
+        fl = self.make(phase="review")
+        self.cap_reached(last_findings=2)
+        last = reviews.latest(fl.conn, fl.work)["number"]
+        self.assertEqual(self.work()["phase"], "blocked")
+        self.act("tollgate:approve", f"finding f-{last}-1 dismiss uno è un falso positivo")
+        self.apply()
+        self.assertEqual(self.open_reasons(), [])
+        self.assertEqual(reviews.latest(fl.conn, fl.work)["outcome"], "needs_fix")
+        self.assertEqual(self.work()["phase"], "execution")       # com'era prima del blocco
 
     def test_approve_finding_needs_reason_and_confirmed(self):
         fl = self.make(phase="review")

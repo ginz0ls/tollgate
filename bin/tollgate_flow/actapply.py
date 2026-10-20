@@ -143,7 +143,7 @@ def _approve_finding(conn, state, work, act, args, now, session) -> str:
     outcome = reviews.recompute_outcome(conn, work["id"], cycle, now=now)
     msg += f"; esito del ciclo {cycle}: {outcome}"
     block = _cycles_block(conn, work["id"])
-    if outcome == "ok" and block is not None:
+    if block is not None:       # spec 10: il blocco si scioglie anche con approve finding
         phase = phases.close_block(conn, state, block["id"], f"approve finding {fid}", now=now,
                                    session=session)
         msg += f"; blocco {block['id']} chiuso, fase {phase}"
