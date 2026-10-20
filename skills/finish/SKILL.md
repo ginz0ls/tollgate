@@ -16,7 +16,10 @@ L'atto `finish` lo registra il hook solo quando l'utente ha digitato `/tollgate:
 
 ## 1. Worktree pulito, poi il controllo
 
-Il controllo e la revisione rifiutano un albero con modifiche non committate. Controlla `git status`: se ci sono file del coordinatore non committati (piano, spec, note), committa prima quelli, poi prosegui. Non modificare codice dei task.
+Il controllo rifiuta un albero con modifiche non committate. Come primo passo controlla `git status`:
+
+- **Worktree non pulito** (file del coordinatore non committati: piano, spec, note): committa quei file, poi di' all'utente di digitare di nuovo `/tollgate:finish` e **fermati**. Un commit dopo l'atto lo fa decadere: l'atto nuovo è legato al nuovo HEAD, e senza di esso `finish open-pr` rifiuta alla fine, dopo tutto il lavoro di controllo e revisione. Non modificare codice dei task.
+- **Worktree pulito**: prosegui con il controllo.
 
 Lancia `<programma> finish check`: esegue il gate e le verifiche dei profili e stampa la Definition of Done voce per voce.
 
@@ -28,21 +31,21 @@ Lancia `<programma> finish check`: esegue il gate e le verifiche dei profili e s
 
 Ripeti fino a quando la riga «prossimo passo» è `finish open-pr`:
 
-1. Lancia `<programma> review prepare`. Se esce con 1 il messaggio è su stderr (`tollgate: …`): riportalo. Un tetto di cicli raggiunto («… cicli di revisione già fatti») si scioglie solo con l'utente: indica `/tollgate:approve rounds <n>` o `/tollgate:approve unverified-review`; per un messaggio su fase o SHA («rilancia /tollgate:finish») di' all'utente di digitare di nuovo `/tollgate:finish`.
+1. Lancia `<programma> review prepare`. Se esce con 1 il messaggio è su stderr (`tollgate: …`): riportalo. Il tetto assoluto («8 cicli di revisione già fatti») si scioglie solo con l'utente e con una strada sola: `/tollgate:approve unverified-review` (`approve rounds` a quel punto rifiuta sempre); per un messaggio su fase o SHA («rilancia /tollgate:finish») di' all'utente di digitare di nuovo `/tollgate:finish`.
 2. L'output ha una o più righe `agente: <tipo> brief: "<percorso>"` con, a volte, ` model: <m>`. Lancia **in primo piano** (mai `run_in_background`) un `Agent` per ogni riga: `subagent_type` = `<tipo>`, `prompt` = il `<percorso>` del brief, `model` solo se la riga lo indica. Le righe dello stesso stadio le lanci insieme, nello stesso messaggio. I revisori sono in sola lettura: aspetta che abbiano finito tutti.
 3. Rilancia `<programma> review prepare`: passa allo stadio successivo (dal revisore al verificatore dei rilievi) oppure chiude il ciclo con `ciclo N chiuso: <esito>` e la riga «prossimo passo».
 
 Come leggere la chiusura del ciclo:
 
 - **`ok`**: «prossimo passo» è `finish open-pr`; esci dal ciclo.
-- **`needs_fix`**: la fase torna `execution`. Lancia `<programma> task start --from-findings <N>` con `N` il numero del ciclo (stampa il brief del task di correzione), poi esegui il ciclo di `/tollgate:execute` su quel task (implementatore, revisione, `task done`). Quando il task è chiuso, chiedi all'utente di digitare di nuovo `/tollgate:finish`: serve un nuovo atto per la nuova versione.
-- **`needs_you`** o un blocco aperto: fermati e di' all'utente cosa può fare. `/tollgate:resolve <id del blocco> <nota>` chiude il blocco; `/tollgate:approve finding <id> <gravità|dismiss> <motivo>` declassa o scarta un rilievo che ritiene sbagliato (poi rilanci `review prepare`); `/tollgate:approve rounds <n>` concede altri cicli o giri di correzione; `/tollgate:approve unverified-review` dichiara la revisione non verificata. Non decidere tu al posto dell'utente.
+- **`needs_fix`**: la fase torna `execution`. Se però l'output o `status` mostrano aperto il blocco «cicli di revisione esauriti» (tetto dei 4 cicli contati), la fase è `blocked` e `task start` rifiuta: **non lanciarlo**, fermati e indica all'utente `/tollgate:resolve <id del blocco>` (concede un ciclo) o `/tollgate:approve rounds <n>`; sbloccato, riprendi da qui. Altrimenti lancia `<programma> task start --from-findings <N>` con `N` il numero del ciclo (stampa il brief del task di correzione), poi esegui il ciclo di `/tollgate:execute` su quel task (implementatore, revisione, `task done`). Quando il task è chiuso, chiedi all'utente di digitare di nuovo `/tollgate:finish`: serve un nuovo atto per la nuova versione.
+- **`needs_you`** o un blocco aperto: fermati e di' all'utente cosa può fare. `/tollgate:resolve <id del blocco> <nota>` chiude il blocco; `/tollgate:approve finding <id> <gravità|dismiss> <motivo>` declassa o scarta un rilievo che ritiene sbagliato (poi rilanci `review prepare`); `/tollgate:approve rounds <n>` concede altri cicli (solo per il blocco «cicli di revisione esauriti», tetto dei 4 cicli contati, entro il totale di 8) o giri di correzione di un task fermo; `/tollgate:approve unverified-review` dichiara la revisione non verificata e vale solo dopo 8 cicli. Non decidere tu al posto dell'utente.
 
 I verdetti dei revisori e dei verificatori li registra il hook: non riscriverli e non discuterli.
 
 ## 3. Apertura della PR
 
-Lancia `<programma> finish open-pr` (con `--update` se il lavoro ha già una PR aperta e va solo aggiornata). Riporta l'URL stampato (`PR #N … : <url>`). Se rifiuta (uscita 1) stampa tutte le condizioni insieme come righe `rifiuto: …`: riportale così come sono e fermati; non aggirarle con `git push` o `gh`.
+Lancia `<programma> finish open-pr` (`--update` è facoltativo: richiede solo che la PR esista già; in fase `review` il comando aggiorna comunque una PR aperta). Se la fase è `pr_open` il comando rifiuta: prima il lavoro deve tornare in `execution` (con `/tollgate:sync` o con `start --reopen-execution`) e passare di nuovo da `finish check`. Riporta l'URL stampato (`PR #N … : <url>`). Se rifiuta (uscita 1) stampa tutte le condizioni insieme come righe `rifiuto: …`: riportale così come sono e fermati; non aggirarle con `git push` o `gh`.
 
 ## Dopo la PR
 

@@ -19,7 +19,7 @@ Lancia dal **checkout principale** (non da un worktree), con Bash:
 Leggi il codice d'uscita e l'output:
 
 - **1, rifiuto**: riporta all'utente le righe `rifiuto:` e fermati. Se indicano `/tollgate:adopt #N` (il ramo `tg/<N>-*` esiste già senza lavoro registrato), di' all'utente di digitarlo: ricostruisce il lavoro dal ramo. Se dicono che la PR è stata chiusa senza merge, le strade sono due: `/tollgate:abandon #N` per abbandonare il lavoro, oppure ripetere `start` con `--confirm`, che scollega la PR chiusa (una nuova la apre `finish open-pr`). Non scegliere tu.
-- **3, serve una conferma**: l'output elenca gli avvisi e le righe `conferma:` (issue chiusa, stati del ramo predefinito non verdi, intenti in sospeso, altra sessione viva). Mostrali **tutti** all'utente e chiedigli se procedere. Solo con il suo sì rilancia lo stesso comando aggiungendo `--confirm`. Non passare `--confirm` di tua iniziativa.
+- **3, serve una conferma**: l'output elenca gli avvisi e le righe `conferma:` (issue chiusa, stati del ramo predefinito non verdi, intenti in sospeso, altra sessione viva). Mostrali **tutti** all'utente e chiedigli se procedere. Solo con il suo sì rilancia lo stesso comando aggiungendo `--confirm`. Non passare `--confirm` di tua iniziativa. Se una riga `conferma:` dice che la PR è stata chiusa senza merge, le strade sono due: `--confirm` scollega la PR chiusa (una nuova la apre `finish open-pr`), oppure `/tollgate:abandon #N` abbandona il lavoro; chiedi all'utente quale.
 - **0, fatto**: procedi al passo 2.
 - **4, registrazione incompleta**: il lavoro è creato ma una registrazione è fallita (righe `avviso: registrazione incompleta: …`). Mostra gli avvisi all'utente e poi procedi come con 0.
 

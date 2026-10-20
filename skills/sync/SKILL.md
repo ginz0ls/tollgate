@@ -16,7 +16,9 @@ Il comando fa `fetch`, integra i commit remoti del ramo, fa il rebase sul predef
 
 - **0**: riallineato (le righe dicono cosa è stato fatto; se la PR non è ancora aperta, indica `/tollgate:finish`).
 - **1, rifiuto**: riporta le righe `rifiuto:` così come sono. Se dicono che il rebase è stato fatto, un nuovo `/tollgate:sync` completa il riallineamento senza ripeterlo.
-- **2, conflitto**: il rebase è annullato, base e fase restano e si è aperto un blocco `needs_you`. Mostra le **due strade**: (a) risolvere il conflitto fuori da tollgate (rebase a mano nel worktree, poi `/tollgate:approve rebase`, che riallinea la base e autorizza il push forzato del prossimo `finish open-pr`), oppure (b) `/tollgate:abandon #N` per chiudere il lavoro. Non risolvere il conflitto al posto dell'utente.
+- **2, blocco `needs_you`** (base e fase restano): leggi la riga `needs_you:` e distingui i due casi, mostrando all'utente le strade che la riga stessa indica. Non risolvere nulla al posto suo.
+  - **«sync: conflitto nel rebase …»**: il rebase è annullato. Strade: (a) risolvere fuori da tollgate (rebase a mano nel worktree, finito), poi `/tollgate:approve rebase`, che riallinea la base e autorizza il push forzato del prossimo `finish open-pr`; oppure (b) `/tollgate:abandon #N`.
+  - **«sync: il ramo remoto … e HEAD … sono divergenti …»**: i commit remoti del ramo non sono integrabili in avanti. `approve rebase` qui rifiuta. Strade: (a) integrare a mano i commit remoti nel worktree e chiudere il blocco con `/tollgate:resolve <id>`; oppure (b) `/tollgate:abandon #N`.
 - **3, serve una nuova revisione**: il rebase ha cambiato il contenuto rispetto all'ultima revisione finale. Indica all'utente di digitare `/tollgate:finish`.
 
 Non lanciare `git push`, `git rebase` o `gh` da solo.

@@ -242,6 +242,9 @@ class ManifestTest(unittest.TestCase):
         text = (ROOT / "skills" / "finish" / "SKILL.md").read_text()
         self.assertIn("committa", text)
         self.assertLess(text.index("committa"), text.index("finish check"))
+        self.assertIn("di' all'utente di digitare di nuovo `/tollgate:finish` e **fermati**", text)
+        self.assertLess(text.index("digitare di nuovo `/tollgate:finish` e **fermati**"),
+                        text.index("<programma> finish check"))
         for needle in ("review prepare", "finish open-pr", "--from-findings", "agente:",
                        "prossimo passo", "/tollgate:resolve", "/tollgate:approve finding",
                        "/tollgate:approve rounds"):

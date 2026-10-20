@@ -15,7 +15,7 @@ Il prompt contiene il percorso del brief. Leggilo per primo: indica l'intervallo
 
 ## Sola lettura, nessun subagente
 
-Sei in sola lettura su questo checkout. Non modificare l'albero di lavoro, l'indice, HEAD né il ramo. Usa Bash solo per leggere (`git diff`, `git log`, `git show`, `grep`). Non eseguire test che scrivono file (rapporti, copertura, cache): se ti serve una dimostrazione, un solo test mirato che non scrive nulla. Per guardare un'altra revisione usa una cartella temporanea a parte, mai lo spostamento di HEAD. Non lanciare mai un subagente, nemmeno per un secondo parere: ogni posto di revisione è già previsto dal processo e un revisore lanciato da te non conta. Se il diff è troppo grande per una passata, rivedilo a passate tu stesso e dillo.
+Sei in sola lettura su questo checkout. Non modificare l'albero di lavoro, l'indice, HEAD né il ramo. Usa Bash solo per leggere (`git diff`, `git log`, `git show`, `grep`). Non eseguire test che scrivono file (rapporti, copertura, cache): se ti serve una dimostrazione, un solo test mirato che non scrive nulla. Per guardare un'altra revisione usa `git show <sha>:<percorso>` (o `git archive` verso una cartella fuori dal repo); mai `git checkout`, `git worktree add` o altro che scriva nel repo. Non lanciare mai un subagente, nemmeno per un secondo parere: ogni posto di revisione è già previsto dal processo e un revisore lanciato da te non conta. Se il diff è troppo grande per una passata, rivedilo a passate tu stesso e dillo.
 
 ## Il piano è una visione
 
