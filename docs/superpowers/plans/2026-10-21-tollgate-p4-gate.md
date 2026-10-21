@@ -1,0 +1,469 @@
+# tollgate P4: gate su GitHub
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Il controllo autorevole su GitHub: il pacchetto `tollgate_gate` (`gate run`, `gate evaluate`, `gate guard`, `gate base-ids`, `gate sentinel`), i cinque workflow con i nomi di `prereq.GATE_FILES` e `.github/tollgate/VERSION`, `init` e `init --update` con la misura della modalità, e `finish check` che usa lo stesso calcolo del gate dietro la stessa interfaccia.
+
+**Architecture:** Il calcolo del gate è una funzione pura, `tollgate_gate.evaluate.evaluate(GateInputs) -> Evaluation`, che riusa le analisi di `tollgate_analysis` e tre moduli senza stato estratti da `tollgate_core` (`runner`, `diffcheck`, `ghcli`). Su GitHub gli ingressi vengono dagli artefatti di `tollgate-run`, dall'evento e dall'API; in locale `finish check` li costruisce dal DB e chiama la stessa funzione. I workflow eseguono la copia del CLI in `.github/tollgate/bin/`, letta sempre dal ramo predefinito tranne in `tollgate-run`, e non interpolano mai testo nelle righe `run:`.
+
+**Tech Stack:** Python ≥ 3.11, solo libreria standard; bash; git; `gh` 2.46 (senza `--slurp`); GitHub Actions (`actions/checkout@v4`, `actions/upload-artifact@v4`, `actions/download-artifact@v4`, `actions/cache@v4`). Test con `unittest` tramite `tests/run` (python3.11 e python3).
+
+**Spec:** `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md`, revisione 24 (la 25 la scrive il Task 17): sezioni 1.2, 3, 3.1, 5 («Nel gate»), 8.2, 8.3, 8.4 («Nel gate gli atti sono dichiarati»), 8.7, 9 per intero, 11.2, 11.4, 13 (righe del gate), 14 (riga «Gate»), 15 (criteri 10, 11, 18, 21, 22, 27, 29, 30, 32-36, 39, 41, 42, 44), 16, 18.1, 18.2, 18.3, 18.5. Piano principale: `docs/superpowers/plans/2026-10-08-tollgate-nucleo-piano-principale.md` (sezione 3: «Gate installato», rinviati di P3a, blocco 18.1, «`finishcheck.check` è l'interfaccia che P4 sostituisce», «Vincoli per P4» di P3b, «Contratti verso il gate» e «Vincoli per P4 emersi in P3c» di P3c; sezione 4: matrice). Registri: `docs/sdd/2026-10-19-tollgate-p3b-chiusura/final-review.md` e `docs/sdd/2026-10-20-tollgate-p3c-percorso-l2/final-review.md` (righe rinviate a P4), `progress.md` di P3c (due casi «parked»). Fatti di GitHub già provati: `docs/verifiche/2026-10-08-p0-esiti.md` (G1-G5), `docs/verifiche/evidenze/gh/gh-evidenze.md`.
+
+## Global Constraints
+
+- Solo libreria standard in `bin/` e nei test (spec 3). Python ≥ 3.11. Ogni task chiude con `tests/run` verde (`python3.11` e `python3`).
+- **Strati** (spec 3, `tests/test_layers.py`, decisione 1): `tollgate_analysis` non importa nulla di tollgate; `tollgate_gate` importa solo `tollgate_analysis` e i moduli senza stato di `tollgate_core` (`__init__`, `clock`, `paths`, `git`, `config`, `runner`, `diffcheck`, `ghcli`), mai `db` né `sqlite3`; `tollgate_flow` importa `tollgate_core`, `tollgate_analysis` e `tollgate_gate`; `tollgate_core` non importa `tollgate_gate`, `tollgate_flow`, `tollgate_hooks` né `tollgate_checks`, tranne `tollgate_core/cli.py`.
+- Scritture nel DB solo con le funzioni di `tollgate_core`; `set_phase`, `open_block` e `close_block` fuori da una transazione; `db.DbError` e `sqlite3.Error` diventano rifiuti, mai traceback.
+- **Programma nei comandi per il modello:** ogni comando in un messaggio della CLI, di un hook, di un brief, di una skill o di un agente usa `tollgate_core.paths.program_command`; le skill scrivono `python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"`.
+- La configurazione si legge dalla base del lavoro o dalla punta del ramo predefinito, mai dal working tree; **nel gate sempre dalla punta del ramo predefinito** (9.2). Gli hook non usano la rete.
+- **Testo non fidato** (corpo della PR, issue, commenti, rilievi, nomi di rami, messaggi dei comandi): mai in un argomento di `git` o `gh`, mai interpolato in una riga `run:` di un workflow (nessuna `${{ … }}` dentro `run:`). Va su file o in variabili d'ambiente, nei commenti in un recinto più lungo di ogni sequenza di backtick, marcato come dato (`prbody.neutralize`).
+- Nessuna rete nei test: `gh` è `tests/fakegh.py` con `TOLLGATE_GH` e la sentinella. Nessun test tocca `~/.local/state/tollgate`, `~/.claude/settings.json` o `~/.claude/plugins/`. I test non lanciano `claude`.
+- **GitHub vero solo nel Task 1 e nel Task 16**, eseguiti dal controller, solo sui repo `ginz0ls/tollgate-p4-protected` (pubblico) e `ginz0ls/tollgate-p4-detect` (privato) e solo con le operazioni della decisione 25. Un `claude -p` solo nel Task 16.
+- Identificatori in inglese, testi per l'utente in italiano. Nessun `__pycache__` nel repo (`-B`). Commit dopo ogni task.
+
+## Decisioni di questo piano
+
+Scelte che la spec lascia aperte o che il codice reale impone, con il costo se sbagliate. Il Task 17 le riporta nella revisione 25 della spec.
+
+1. **Strati di `tollgate_gate`.** Il gate gira su GitHub senza DB locale: `tollgate_gate` importa `tollgate_analysis` e solo `tollgate_core.{clock, paths, git, config, runner, diffcheck, ghcli}` più `tollgate_core.VERSION`. `tollgate_flow` può importare `tollgate_gate` (il gate sta sotto il flusso). `tests/test_layers.py` riceve tre regole: elenco ammesso per `tollgate_gate` (analisi AST, anche dentro le funzioni); `tollgate_core` non importa `tollgate_gate` (salvo `cli.py`); e un controllo a runtime: un processo `python3 -B -c` che importa ogni modulo di `tollgate_gate` non ha in `sys.modules` né `tollgate_core.db` né `sqlite3`. Costo: tre moduli estratti (decisione 2).
+2. **Moduli senza stato** (estratti, con i vecchi nomi ancora importabili dai moduli di origine, così nessun chiamante cambia):
+   - `tollgate_core/runner.py`: `CommandSpec`, `gate_commands`, `dod_commands`, `receipt_state`, `clean_env`, `counts_green`, `report_path` (oggi `_report_path`), `run_one` (oggi `_run_one`), `executed_ids(junit) -> set[str]` (eseguiti e non saltati, compresi i falliti: `(ids_run ∪ ids_failed) − ids_skipped`); `verify.py` li importa da lì.
+   - `tollgate_core/ghcli.py`: `GhError`, `GH_ENV`, `GH_TIMEOUT_S`, `REQUIRED_CONTEXTS`, `SENTINEL_TITLE`, `gh_cmd`, `run`, `run_json`, `run_json_lines`, `decode_json_values`, più `api(state, cwd, path, *, method="GET", fields=None, input_file=None, include=False, paginate=False, jq=None) -> ApiResult(status: int | None, data, stderr: str)`; `tollgate_flow/gh.py` li importa da lì.
+   - `tollgate_core/diffcheck.py`: il calcolo puro di `violations.diff_violations` (decisione 9); `violations.diff_violations` e `violations.scope_exempt` restano con la stessa firma e lo chiamano.
+   - `tollgate_flow/l2tree.py` passa in `tollgate_gate/l2tree.py`; `tollgate_flow/l2tree.py` resta come modulo che ne importa i nomi (`listing`, `spec_approvals`, `locate`, `spec_approval`, `collect`, `CURRENT`, `STALE`, `MISSING`).
+   Costo: nessuno per i chiamanti; un import in più per modulo.
+3. **Un solo calcolo per gate e `finish check`.** `tollgate_gate.evaluate.evaluate(inputs: GateInputs) -> Evaluation` è l'unico punto in cui si decidono le voci rosse e quelle di `attenzione` (lezione di P3b e P3c: un fatto condiviso si calcola in un posto). Le voci si dividono in famiglie: `commands`, `base_ids`, `diff` (test-guard, scope, piano registrato), `level`, `l2`, `must_have`, `issue`, `declared` (DoD dichiarata, rilievi, atti), `guard_local` (file di tollgate e workflow del progetto, solo in locale: su GitHub è `gate guard`). `GateInputs.where` vale `"github"` o `"local"`: in locale non girano `issue`, `declared` e `base_ids` (6.4: «senza identificativi della base»; DoD e rilievi li calcola `finish check` dal DB). Costo: `finish check` diventa più severo (livello sotto il minimo, file di tollgate), come vuole la spec («copia locale del gate»).
+4. **Ingressi su GitHub.** Configurazione: `config.load_config_at(repo, <SHA della punta del predefinito>)` (mai il working tree); `base_sha` = `git merge-base <punta del predefinito> <testa>`; diff `base_sha..head_sha`; blocco dichiarato = `prblock.parse(<corpo della PR>)` (l'**ultimo** blocco; `None` se manca o non è valido); issue con `GET repos/<o>/<r>/issues/<N>` (`issues: read`); deroghe da `.tollgate/waivers/<N>.toml` in testa, valide solo se `branch` è il ramo della PR (8.3). La PR si trova da `workflow_run.pull_requests` o, se vuoto, con `GET commits/<sha>/pulls`; una PR da fork (`head.repo.full_name` diverso dal repo) è trattata come ramo non `tg/*`. Costo: una PR da fork con un ramo `tg/*` riceve solo i controlli sui test.
+5. **Stati pubblicati.** `tollgate/verdict` e `tollgate/attention` sempre espliciti (`success`, `failure`, `error`), con `description` di al più 140 caratteri scritta da tollgate; `tollgate/guard`, `tollgate/base`, `tollgate/sentinel`. Prima di pubblicare `verdict` controlla (9.1): `workflow_run.path == ".github/workflows/tollgate-run.yml"`, `workflow_run.event == "pull_request"`, lo SHA è ancora la testa della PR, la PR punta al predefinito. Uno SHA superato o un artefatto non valido → `error` su quello SHA; PR verso un altro ramo → `success` con «non applicabile: la PR non punta al ramo predefinito» su `verdict` e `attention`. Tutti gli stati con `GITHUB_TOKEN` (`github-actions[bot]`, verificato in P0). Costo: nessuno.
+6. **Voci rosse di `verdict`** (9.2, criteri 10, 22, 29, 30, 32, 33, 36, 42): comandi del gate (globali e dei profili attivi, configurazione del predefinito) `red`, `empty` o `uncounted` senza `allow_no_tests` (8.1), `unverified` senza un atto `approve unverified-tests` nel campo `acts` del blocco; identificativi della base mancanti nella testa (uno `skipped` è mancante), salvo deroghe `test` che li elencano tutti; test-guard non derogato; file fuori scope (solo PR `tg/*`); per una PR `tg/*`: blocco assente o non valido, issue che non torna (decisione 8), piano registrato (`plan_sha`) assente dalla storia della testa in L1 e L2, livello dichiarato sotto il minimo senza tetto, file di approvazione o report L2 richiesti mancanti (decisione 10), must-have con test assente o rosso nel JUnit della testa (componente `must_have_tests` acceso), voce `false` nel campo `dod` dichiarato (componente `definition_of_done` acceso), rilievo bloccante dell'ultimo ciclo senza `approve finding` (decisione 11). Costo: nessuno.
+7. **`attenzione` a due gruppi** (9.2, criterio 44). `tollgate_gate.attention.GROUPS: dict[str, str]`, chiave → `"read"` («da leggere») o `"info"` («informative»). «Da leggere»: `waiver_test`, `waiver_ci`, `waiver_threshold`, `waiver_command`, `waiver_pattern`, `waiver_scope_over_two`, `level_cap`, `review_unverified`, `audit_suspended`, `audit_off`, `components_off`, `findings_overridden`, `unverified_tests`, `manual_must_have`, `sentinel_open`, `off_periods`, `plan_changed` (criterio 36, con il diff del piano), `approval_stale` (approvazione con `sha` diverso dalla testa, con il diff), `no_tests_counted` (una ricevuta `empty` o `uncounted` contata verde grazie ad `allow_no_tests`, criteri 10 e 30), `not_tg_branch`, `tollgate_config`, `ci_waived_workflow`, `base_ids_from_run` (decisione 12). «Informative»: `waiver_scope`, `allow_no_tests`, `task_over_warn`, `skills_absent`, `lockfile_without_manifest`, `no_issue`, `base_failing_on_head`. `verification_watch` è solo un elenco nel commento. `tollgate/attention` è `failure` se c'è almeno una voce «da leggere», altrimenti `success` con «solo note informative» o «nessuna voce». **Conflitti della spec risolti qui** (rev 25): 9.2 mette «PR non `tg/*`» e «PR `tollgate-config/*`» tra le informative, mentre 1.2, 9.4, 13 e il criterio 10 vogliono `attenzione` rosso: vince il rosso (sono le PR senza controlli di scope); 9.2 mette `allow_no_tests` tra le informative, mentre 2, 8.1 e i criteri 10 e 30 vogliono il rosso con zero test: `allow_no_tests` acceso con ricevute tutte `green` è informativo, una ricevuta contata verde solo grazie ad `allow_no_tests` è «da leggere». Costo: le PR di Dependabot hanno sempre `attenzione` rosso, come dice 13.
+8. **Issue della PR** (9.2, criterio 33). `tollgate_analysis.prref`: `issue_from_branch(ref) -> int | None` (`^tg/(\d+)-`), `closes_issue(body) -> int | None` (la prima riga `Closes #N`, `Fixes #N` o `Resolves #N` e varianti, senza distinzione di maiuscole). Ramo `tg/<N>-*`: rosso se `closes_issue` ≠ N, se `block["issue"]` ≠ N o se l'issue non è `open`; senza issue valida nessuna deroga si applica. Altri rami: con `Closes #M` l'issue deve esistere ed essere aperta (altrimenti rosso); **senza** nessun `Closes` la PR non è rossa per questo: voce informativa `no_issue` e nessuna deroga (la spec dice «rosso se non torna», ma ogni PR di Dependabot sarebbe rossa, contro 13). Costo: una PR manuale senza issue passa con i soli controlli sui test e `attenzione` rosso (`not_tg_branch`).
+9. **Scope nel gate** (vincolo P3b (1), contratto P3c (6), criterio 36). `diffcheck.diff_findings(cfg, *, repo, issue, level, base_ref, head_ref, changes, scope, locked, registered_plan, approved_spec, waiver_file, components) -> list[Violation]`: `scope` è `set[str] | None` (`None` = nessun controllo di scope); `locked` i documenti bloccati; `registered_plan = (percorso, blob)` esente solo se il blob in testa è quello; `approved_spec = (percorso, sha dell'approvazione)` esente solo se il blob in testa coincide (oggi `finishcheck._own_document`, che sparisce); i file sotto `docs/superpowers/reviews/<issue>/` sempre esenti. In locale lo scope viene dal DB, nel gate da `plan.check_plan(<testo del blob plan_sha>).scope` e `locked = {plan, spec}` dichiarati (in una PR la fase è sempre dopo `plan`). `plan_sha` diverso dal blob del piano in testa → voce `plan_changed` con il diff unificato (`difflib`, al più 200 righe) e lo scope resta quello di `plan_sha`. Costo: nessuno.
+10. **L2 nel gate** (contratti P3c (1)-(4), vincoli P3c (1)-(3), caso (d)). `approvals.check_l2_detail(...) -> list[L2Problem]` con `L2Problem(kind: Literal["missing", "stale"], text: str)`; `check_l2` resta (`[p.text for p in check_l2_detail(...)]`). `missing` (approvazione o report richiesto assente, intestazione non valida, `slices` non intero) → rosso; `stale` (`sha` diverso dalla testa) → `approval_stale`, perché la spec o il piano cambiati sono già fuori scope (decisione 9). **Caso (d), più severo, anche per `finish check`:** con l'avversario o le lenti accesi serve almeno un report della spec (`spec-adversarial` o `spec-lens`) con `spec_sha` uguale allo `sha` dell'approvazione (6.2 punto 4 lo garantisce già alla `approve spec`); con l'avversario del piano acceso serve un `plan-adversarial` con `plan_sha` uguale allo `sha` di `plan-approval.md`. Inoltre (righe 2 e 3 di P3c): `plan-approval.md` con `path` diverso da `plan_path` è `missing`; i report del piano non si cercano se `plan-approval.md` è superato. `spec_reviews_dir` dichiarato diverso dalla cartella trovata → `approval_stale`. Il limite «`lens: suspended` non distingue tetto e rifiuto del costo» (vincolo P3c (3)) resta: la voce dice «audit a lenti sospeso» in entrambi i casi. Costo: un report scritto su una spec poi cambiata non basta più.
+11. **Rilievi e DoD dichiarata** (vincoli P3b (3), (4), (6)). Ultimo ciclo = `block["verdict"]["cycles"]`; un rilievo `f-<c>-<n>` è dell'ultimo ciclo se `c` coincide. È bloccante se `verification == "confirmed"`, `blocking` non è `false` (campo nuovo del blocco, decisione 21; assente = bloccante, fail-closed), gravità effettiva `blocker` o `major` (`user_decision` nullo o `downgraded:blocker|major`): rosso **anche con** `verdict.unverified`. `dismissed` o declassati sotto `major` → `findings_overridden`. Le voci di `dod.items` a `false` → rosso; le voci ricalcolate dal gate (`receipt`, `guard_scope`, `must_have`, `approvals`) prevalgono su quelle dichiarate. Costo: nessuno.
+12. **Identificativi della base** (9.1, 9.5, criteri 10 e 32, componente `base_test_ids`). Formato `ids.json`: `{"v": 1, "tree": <albero>, "sha": <commit>, "ids": [...], "commands": {nome: stato}}`. Chiave di cache `tollgate-ids-<albero>`. `tollgate-base` (push sul predefinito) ripristina la cache dell'albero e riesegue la suite solo se manca, poi salva. `tollgate-run` ha un job `base` che ripristina la cache dell'albero di `merge-base` e solo se manca esegue la suite della base con `persist-credentials: false` e la carica come artefatto `tollgate-base-ids`. `tollgate-verdict` usa la cache se c'è, altrimenti l'artefatto (voce `base_ids_from_run`); dopo un `verdict` `success` salva in cache gli identificativi della testa per il suo albero (merge squash). Limite dichiarato (1.2, rev 25): gli identificativi calcolati da un run della PR, e quelli della testa messi in cache, vengono da codice della PR. Con `base_test_ids = false` nessuna delle due cose gira e la famiglia `base_ids` è saltata, con `components_off`. Costo: la prima PR di un albero nuovo paga la suite della base.
+13. **Artefatti** (9.1). `tollgate-run` carica `tollgate-run` con `results.json` (`{"v": 1, "applicable": bool, "sha", "config_sha", "commands": [{"name", "state", "exit", "tests_run", "tests_skipped", "report": "junit/<n>.xml" | null}]}`), i JUnit e i log troncati a 1 MB. `tollgate_gate.artifacts.validate(root: Path) -> list[str]`: percorsi con `..`, assoluti o collegamenti simbolici, file oltre 50 MB, totale oltre 200 MB, XML con `DOCTYPE` o entità (`junit.parse_junit` li rifiuta già) → problemi → `error`. Gli artefatti si leggono in una cartella temporanea, come dati. Costo: nessuno.
+14. **Commenti** (9.2 «Il commento», 18.1, righe 47, 68 e 69 di P3b). Il commento di `verdict` comincia con `<!-- tollgate-verdict sha=<40 esadecimali> -->` (`comment.marker(sha)`); `fixtask.GATE_MARKER` resta il prefisso. Uno per SHA: se esiste un commento di `github-actions[bot]` con lo stesso marcatore lo si modifica, altrimenti se ne crea uno; prima di scrivere si ricontrolla che lo SHA sia ancora la testa (altrimenti nessuna scrittura). Sezioni: esito, «Da leggere», «Informative» (in `<details>`), voci rosse, `verification_watch`, diff del piano o delle approvazioni. Ogni testo non scritto da tollgate passa da `prbody.neutralize`. Tetto totale 60.000 caratteri (`comment.MAX_BODY`), con «… (troncato: N voci)» (GitHub accetta 65.536). Lo stesso tetto totale va in `prbody.render` (riga 47): le sezioni si troncano, il blocco JSON resta intero. `gate guard` scrive, solo se rosso, un commento con `<!-- tollgate-guard sha=<sha> -->`. `task start --from-gate` (riga 68) usa lo SHA del marcatore per `gate:<sha>` e (riga 69) considera solo i commenti di `github-actions[bot]` (campo `author.login` di `gh pr view --json comments`, verificato nel Task 1). Costo: nessuno.
+15. **`gate guard`** (9.2 righe 1-2, 9.4, criterio 10 «guard rosso»). File di tollgate (spec 0: `tollgate.toml`, `.github/workflows/tollgate-*.yml`, `.github/actions/tollgate-*/**`, `.github/tollgate/**`) uguali, per insieme di percorsi e blob, tra la testa e la punta del predefinito; eccezione: ramo `tollgate-config/*` che tocca solo file di tollgate e `.tollgate/waivers/**` (altrimenti rosso). Workflow del progetto nuovi o modificati: rosso se dichiarano `statuses: write`, `checks: write` o `write-all` (a qualunque livello), usano `pull_request_target` o `workflow_run`, o mancano di un blocco `permissions` di primo livello. L'analisi è `tollgate_analysis.workflows.problems(text) -> list[str]`, testuale e fail-closed: un file che non si legge è rosso. Un workflow del progetto modificato senza problemi vuole la deroga `ci` (8.3): la vede `verdict` (`ci_waived_workflow`, «da leggere»). Costo: un workflow con `permissions` solo nei job è rosso.
+16. **`gate sentinel` e `tollgate-base` in `detect`** (9.1, 9.3, criteri 10 e 34). Commit nuovi: `git rev-list <before>..<after>` (con `before` tutto zeri: solo `after`); si ignorano il commit che introduce per la prima volta `.github/workflows/tollgate-sentinel.yml` e i precedenti. Per ogni commit `GET commits/<sha>/pulls`: rosso se nessuna PR unita lo contiene, o se la testa della PR non ha `tollgate/guard` e `tollgate/verdict` `success` scritti da `github-actions[bot]` (campo `creator.login` degli stati: uno stato pubblicato con il token dell'utente non conta). Rosso → stato `tollgate/sentinel` `failure` sul commit e un commento sull'**unica** issue aperta «tollgate: merge non verificato», creata se manca. Le issue aperte si cercano con `api --paginate repos/<o>/<r>/issues?state=open&per_page=100` filtrando il titolo esatto e scartando le PR (rinviato di P3a, riga 56: niente più `--limit 100`); `gh.sentinel_issues` usa la stessa funzione. `tollgate-base` in `detect` pubblica `tollgate/base` e, se la suite fallisce, commenta la stessa issue. Con `sentinel = false` il job esce subito. Costo: un push di molti commit fa una GET per commit.
+17. **Workflow** (9.1). Modelli in `gate/workflows/tollgate-{guard,run,verdict,base,sentinel}.yml`; la copia del CLI in `.github/tollgate/bin/` (l'intera cartella `bin/` senza `__pycache__`), `.github/tollgate/VERSION` (`tollgate_core.VERSION`) e `.github/tollgate/FINGERPRINT` (`sha256` del contenuto di `bin/`, `tollgate_gate.install.fingerprint(root)`). Ogni riga `run:` lancia `python3 .github/tollgate/bin/tollgate gate <sottocomando> --event "$GITHUB_EVENT_PATH" …` senza espressioni: numeri, SHA e nomi li legge Python dall'evento. Le espressioni `${{ }}` stanno solo in `with:`, `if:` e `concurrency:`. Le azioni sono alla versione maggiore `@v4` (limite dichiarato; il fissaggio per SHA è P5). Costo: nessuno.
+18. **`init`** (11.2, 9.3, 9.5, 9.6, criteri 11 e 34). `tollgate init --propose [--merges-per-month N] [--service NOME=IMMAGINE]...` e `tollgate init --update`, in `tollgate_flow/init.py` (legge le ricevute dal DB per la stima). Scrive in `docs/superpowers/tollgate-init/`: `README.md` (passi dell'utente, modalità, stima, token separato, jest-junit), `files/` con l'albero da copiare (`tollgate.toml` da `templates/tollgate.toml` se manca sul predefinito, altrimenti quello esistente con `[gate] mode` aggiornato; workflow; `.github/tollgate/**`), e in `protected` `protection.json` e `protect.sh`. Modalità: `tollgate_gate.protection.classify(status: int | None, message: str) -> Literal["detect", "protected", "protected_unset", "undetermined"]` sulla GET di protezione fatta con `gh api --include` (forma provata nel Task 1): 403 con «Upgrade to GitHub Pro or make this repository public» → `detect`; 200 → `protected` (con i campi mancanti di `protection.missing(data) -> list[str]`); 404 con «Branch not protected» → `protected_unset` (scritto `protected` e comando proposto); tutto il resto → `undetermined`, mai `protected`. `protect.sh` legge `app_id` dal check-run di `tollgate-base` sul commit che installa i workflow (`.app.id`) e si ferma se non lo trova; non usa mai `-1`. Stima: durata dell'ultima esecuzione completa dei comandi del gate dalle ricevute (`receipts.duration`), altrimenti «non misurata»; minuti al mese = (base + gate) × merge al mese, con il riferimento dei 2.000 minuti di Free. `--update` scrive solo i file che differiscono dalla punta del predefinito e il ramo suggerito `tollgate-config/<versione>`. L'agente non scrive mai i file di tollgate: li copi tu. Costo: nessuno.
+19. **`start` legge la protezione** (9.3, criterio 11 terza parte). In `protected` `start` chiama `protection.read(state, repo, branch) -> ProtectionRead(kind, missing, note)`: 200 → avvisi con i campi mancanti; 403 per permessi o rete assente → «protezione non leggibile con queste credenziali: proseguo», mai un rifiuto. Costo: una GET a ogni avvio in `protected`.
+20. **`finish check` usa il gate** (rischio 2 del piano principale, interfaccia di P3b). Firma, codici (`OK` 0, `RED` 1, `REFUSED` 2) e contratto di `finish_report` invariati (`{"items": {chiave: bool | null}, "manual": [...]}`), più un campo nuovo `"gate": {"red": [chiave, ...], "attention": [chiave, ...]}` che `open-pr` ignora. Dopo `verify.run_gate`, `finish check` costruisce `GateInputs(where="local", …)` (configurazione della base del lavoro, ricevute di questa esecuzione, blocco dichiarato da `openpr.facts` con import nella funzione, issue da `gh.issue` se leggibile, altrimenti solo il diff per il livello minimo con un avviso) e chiama `evaluate`. `guard_scope` viene dalla famiglia `diff`, `must_have` da `must_have`, `approvals` da `l2`: lo stesso calcolo del gate. Verde = DoD verde **e** nessuna voce rossa del gate. Le voci di `attenzione` si stampano come «da leggere» o «informative». Costo: un livello sotto il minimo senza tetto ora rende rosso `finish check`.
+21. **Campi nuovi del blocco 18.1** (un campo nuovo non cambia `schema_version`): in `findings[]` il campo `blocking` (da `findings.blocking`); `tasks_over`: `[{"task", "lines", "size_reason"}]` dei task oltre `task_lines_warn` (righe da `size.task_lines` sui commit del task, `size_reason` dall'ultimo report dell'implementatore del task); `skills_absent`: `[{"task", "skills"}]`, dall'evento nuovo `skills_absent` {task, skills} che `task start` registra quando toglie skill assenti. `prblock.FIELDS` cresce di due voci in coda. Il gate: `task_over_warn` e `skills_absent` informative, un task oltre `task_lines_max` con `size_reason` informativo con il motivo (criterio 39). Costo: un evento in più.
+22. **Casi lasciati da P3c.** (a) **L'approvazione corrente vince**: `approvals.locate_spec_approval` con `spec_blob` dato restituisce prima un'approvazione con `sha == spec_blob` (la propria, poi la issue più bassa), e solo se nessuna è corrente la propria con lo stesso `path`; con `spec_blob = None` resta com'è. Così `l2tree.spec_approval` risponde `CURRENT` quando un'altra issue ha approvato esattamente quel contenuto (l'approvazione è legata al contenuto, 0 «SHA di un file»). (b) In `approval` `audit prepare` e `peek` controllano la spec con `l2tree.spec_approval` anche con `plan_adversary` spento: spec cambiata → rifiuto «spec cambiata dopo approve spec: /tollgate:reopen spec» (stesso testo di `approve plan`). (c) m-2: `audits.open_round(..., min_number: int = 1)` e `audit prepare` passa uno più il numero più alto dei report di quel tipo in `reviews/<N>/` a HEAD, così dopo un DB perso un report committato non si sovrascrive; m-3: limite dichiarato in 12.4 (un `adopt` dopo `reopen` con il documento identico ripristina la fase dell'approvazione; il documento è quello approvato); m-4: il rifiuto per un documento registrato e assente nomina il percorso registrato e dice che il nome non si cambia. (d) decisione 10. Costo: (a) cambia l'esito di `test_l2tree`/`test_approvals` sul caso «propria superata, altra corrente».
+23. **Componenti nel gate** (criteri 18 e 35). Configurazione del predefinito: ogni chiave di `[components]` a `false` → voce `components_off` («da leggere») con l'elenco; `definition_of_done = false` salta l'intera famiglia `declared`, rilievi compresi, come `open-pr` in locale («con `definition_of_done` spento la DoD si stampa e non ferma», 6.4); `base_test_ids = false` decisione 12; `sentinel = false` decisione 16; `must_have_tests = false` salta `must_have`; `spec_audit = false` toglie i report a lenti richiesti e, con `spec_audit` del blocco `off`, dà `audit_off`; `spec_audit` del blocco `suspended` → `audit_suspended` (contratto P3c (5)). Costo: un repo con componenti spenti ha sempre `attenzione` rosso, come vuole 9.2.
+24. **Righe rinviate ripresi qui** (dettaglio nella tabella «Copertura»): P3c righe 16 (percorsi con backtick rifiutati da `audit._check_path`), 19 (spec illeggibile in `audit_round._mechanical` → un `major` «spec non leggibile», fail-closed), 22 e 34 (test), 29 (`peek` con `NEEDS_CONFIRM` dice «serve la conferma del costo: lancia … audit prepare»), `git.ls_files_at` e `git.text_at` rifiutano un riferimento che comincia con `-` (vincolo P3c (6)). Rinviati con motivo: P3c righe 11 e 12, 20, 13, 15, 24-28, 36 e la duplicazione «base o predefinito più `load_config`» (vincolo P3c (6)) a P5; dettaglio in «Copertura».
+25. **GitHub vero: repo e operazioni ammesse** (scelta dell'utente del 21/10/2026: due repo nuovi, controller in prima persona; operazioni decise qui su sua delega). Repo: `ginz0ls/tollgate-p4-protected` (pubblico, modalità `protected`) e `ginz0ls/tollgate-p4-detect` (privato, GitHub Free, modalità `detect`), creati dal Task 1. **Ammesse, solo su quei due repo e solo dal controller:** `gh repo create` dei due nomi (una volta); `git push` di rami e di `main` (mai forzato su `main`); `gh pr create|edit|close|merge|view|list|comment`; `gh issue create|close|comment|view|list`; `gh run list|view|download|watch`; `gh api` in lettura sui due repo, `POST statuses` (prova del token personale, criterio 10) e `PUT|DELETE branches/main/protection` **solo** su `tollgate-p4-protected`; `gh auth status` (sola lettura, nessun token stampato). **Vietate:** cancellare i repo (li cancella l'utente, come in P0: il token non ha `delete_repo`, e `gh auth refresh` è vietato), ogni comando su altri repo, `gh auth` diverso da `status`, `gh api user`, segreti, cambiare la visibilità. Costo: minuti di Actions sul privato (stima nel Task 16, sotto i 200).
+26. **Prova reale** (Task 16): criterio 10 su entrambi i repo con uno script (`spikes/run-p4-gate.sh`) che apre una PR per caso e aspetta gli stati; criterio 11 con `init` sui due repo; e un `claude -p` del flusso L1 fino a PR e verdetto sul repo `protected` con `gh` vero (sostituisce `spikes/run-p3c-flow.sh` per la prova con il modello, decisione 27), più un passo senza rete che controlla il `PATH` della shell del tool Bash di `claude` con lo shim di `gh` (vincolo P3c (4)). Costo: circa 150-250k token per il `claude -p`.
+27. **Script della prova di P3c.** `spikes/run-p4-flow.sh` deriva da `spikes/run-p3c-flow.sh`: il passo `shim` (senza rete, `gh` finto) chiede al modello `command -v gh` e lo script confronta l'uscita del tool con lo shim; i passi `start`, `execute`, `finish` usano il `gh` vero solo sul repo `protected` (`git remote get-url --push origin` controllato prima di ogni passo, e `TOLLGATE_GH` non impostata). `run-p3c-flow.sh` resta com'è, superato. Costo: nessuno.
+
+## Review Focus
+
+Ogni voce è uno stato scritto da un comando e letto da un altro, o un ingresso che la spec implica e nessun test di unità vede (lezione delle revisioni finali di P3b e P3c). Il test che la fissa è nel task indicato.
+
+1. **Gate e `finish check` sullo stesso albero** (decisioni 3, 9, 10, 20): un repo con un file fuori scope, un piano cambiato dopo la registrazione e una spec L2 approvata deve dare le stesse voci rosse da `finish check` e da `gate evaluate` (famiglie condivise). Test: Task 13 `test_finish_check_and_gate_agree`.
+2. **Blocco 18.1** (scritto da `open-pr`, letto da `evaluate` e da `adopt`): l'ultimo blocco vince; un corpo con un blocco citato prima e uno valido dopo dà il secondo; un blocco rotto in coda → rosso «blocco JSON assente o non valido»; i campi nuovi `blocking`, `tasks_over`, `skills_absent` arrivano dal programma vero fino al gate. Test: Task 5 `test_last_block_and_broken_block`, Task 13 `test_open_pr_block_feeds_gate`.
+3. **Commento del gate** (scritto da `gate evaluate`, letto da `task start --from-gate`): il marcatore porta lo SHA giudicato; un secondo `--from-gate` dopo un nuovo commit usa quello SHA, non HEAD; un commento con il marcatore scritto da un altro autore è ignorato. Test: Task 13 `test_from_gate_uses_marker_sha_and_bot_author`.
+4. **Stati e sentinella** (scritti da `guard`, `verdict` e dal token dell'utente; letti da `sentinel` e da `start`): uno stato `success` di `tollgate/verdict` con `creator.login` diverso da `github-actions[bot]` non rende verificato un merge. Test: Task 10 `test_status_from_user_token_not_trusted`.
+5. **Cache degli identificativi** (scritta da `tollgate-base` e da `verdict`, letta da `run` e `verdict`): senza cache si usa l'artefatto e compare `base_ids_from_run`; con la cache dell'albero di `merge-base` l'artefatto si ignora; un `ids.json` con `tree` diverso dall'albero cercato è ignorato. Test: Task 9 `test_base_ids_source_order`.
+6. **Approvazioni L2 tra fette** (lette da `finish check`, `open-pr`, `audit prepare`, `approve plan` e dal gate): con la propria approvazione superata e quella di un'altra issue corrente tutti i comandi rispondono «corrente» (caso (a)). Test: Task 3 `test_current_beats_own_stale`, Task 14 `test_later_slice_with_other_current_approval_end_to_end`.
+7. **PR inattese**: PR da fork con ramo `tg/*`, PR verso un ramo non predefinito, SHA superato durante `verdict`, configurazione del predefinito non valida (→ `error` con il motivo, mai un traceback). Test: Task 9 `test_fork_pr_treated_as_manual`, `test_superseded_sha_is_error`, `test_invalid_default_config_is_error`.
+
+## Mappa dei file
+
+| File | Responsabilità |
+|---|---|
+| `docs/verifiche/2026-10-21-p4-verifiche.md`, `docs/verifiche/evidenze/gh-p4/`, `spikes/gh-p4/` | Task 1: fatti nuovi di GitHub e `gh` 2.46 |
+| `bin/tollgate_core/{runner,ghcli,diffcheck}.py` (nuovi) | Moduli senza stato (decisione 2) |
+| `bin/tollgate_core/{verify,violations,git,audits}.py`, `bin/tollgate_flow/gh.py` | Importano dai moduli nuovi; `ls_files_at` e `text_at` protetti; `open_round(min_number=)` |
+| `bin/tollgate_analysis/{workflows,prref}.py` (nuovi) | Regole dei workflow del progetto; issue dal ramo e dal corpo |
+| `bin/tollgate_analysis/{approvals,prblock,prbody}.py` | `check_l2_detail`, caso (a) e (d); campi nuovi; tetto del corpo |
+| `bin/tollgate_gate/__init__.py` | Pacchetto |
+| `bin/tollgate_gate/{model,attention,evaluate}.py` | Ingressi, gruppi, calcolo puro |
+| `bin/tollgate_gate/{comment,artifacts,run,baseids,guard,github,sentinel,protection,install,l2tree,cli}.py` | Commento, artefatti, sottocomandi, I/O verso GitHub, misura della protezione, impronta del CLI |
+| `bin/tollgate_core/cli.py` | Sottocomandi `gate …` e `init` |
+| `bin/tollgate_flow/{finishcheck,openpr,fixtask,taskcmd,start,audit,init}.py`, `bin/tollgate_flow/l2tree.py` | `finish check` sul gate, campi del blocco, marcatore, evento, protezione in `start`, casi P3c, `init` |
+| `bin/tollgate_checks/audit_round.py` | Riga 19 di P3c |
+| `gate/workflows/tollgate-*.yml`, `templates/tollgate.toml` | Modelli proposti da `init` |
+| `skills/init/SKILL.md`; `skills/{finish,start,status,execute}/SKILL.md` | Skill nuova e aggiornate |
+| `tests/test_*.py`, `tests/gatekit.py` (nuovo), `tests/fakegh.py` | Un file per modulo; banco del gate; `gh` finto con statuses, commenti, protezione |
+| `spikes/run-p4-gate.sh`, `spikes/run-p4-flow.sh`, `spikes/p4/` | Task 16 |
+| `docs/verifiche/2026-10-21-p4-prova-gate.md`, `docs/verifiche/2026-10-21-p4-prova-flusso.md` | Rapporti del Task 16 |
+
+---
+
+### Task 1: Verifiche reali su GitHub (controller)
+
+Solo i fatti non ancora provati e necessari al disegno. Già provati in P0 e **non** da riprovare: 403 «Upgrade to GitHub Pro…» su protezione e rulesets del privato, 404 «Branch not protected», `actions: read` per gli artefatti nei privati, `pull_request_target` con la definizione del predefinito, `app_id` 15368 e la sorgente fissata, `workflow_run` per Dependabot, `creator.login = github-actions[bot]` degli stati scritti con `GITHUB_TOKEN`.
+
+**Files:**
+- Create: `spikes/gh-p4/run-p4-checks.sh`, `spikes/gh-p4/workflows/probe-{target,run,verdict,base}.yml`, `docs/verifiche/2026-10-21-p4-verifiche.md`, `docs/verifiche/evidenze/gh-p4/` (uscite grezze)
+
+**Chi:** un implementatore sonnet scrive script e workflow sonda **senza rete** (`bash -n`, prova con un `gh` finto); il controller li esegue (decisione 25).
+
+**Regole dello script** (lezione dell'incidente di P0): le uscite si scrivono direttamente in `docs/verifiche/evidenze/gh-p4/` del worktree, mai in `/tmp`, e nessuna cartella di uscite si cancella; prima di ogni comando lo script controlla che il repo bersaglio sia uno dei due della decisione 25 e si ferma altrimenti; nessun `gh api user`.
+
+| Id | Fatto da provare | Come | Dove incide |
+|---|---|---|---|
+| V1 | Campi JSON di `gh` 2.46: `pr list --json headRefOid,mergedAt,isCrossRepository,mergeStateStatus`, `pr view --json comments` con `author.login` e `body` | Una PR sul repo `protected`, un commento | `gh.pr_for_branch`, `fixtask` (decisione 14), Task 16 |
+| V2 | Forma di `gh api --include` con risposta 403 e 404 (riga di stato, dove finisce il corpo, codice d'uscita) | GET di protezione su `detect` (403) e su `protected` non protetto (404) | `protection.classify` (decisione 18) |
+| V3 | Campi dell'evento `workflow_run` (`path`, `event`, `head_sha`, `head_branch`, `pull_requests[].number`, `pull_requests[].base.ref`) e di `pull_request_target` (`pull_request.head.sha`, `head.ref`, `head.repo.full_name`, `base.ref`, `number`); `git fetch origin refs/pull/<n>/head` dentro `pull_request_target` | Sonde `probe-target`, `probe-run` → `probe-verdict` che salvano le chiavi (non i valori di testo) | `github.pr_from_event` (Task 9), `guard` |
+| V4 | `actions/cache@v4`: una voce salvata da un job `workflow_run` (ambito del predefinito) si ripristina in un job `pull_request` e in un job `push` del predefinito | `probe-verdict` salva `probe-<tree>`, `probe-run` di una seconda PR e `probe-base` la ripristinano | Decisione 12 |
+| V5 | `GET commits/<sha>/pulls` per un commit di merge, un merge squash e un push diretto | Tre commit sul repo `protected` | Decisione 16 |
+| V6 | Uno stato scritto con `GITHUB_TOKEN` in un job `push` e in `pull_request_target` ha `creator.login = github-actions[bot]`; nome del check-run del job di `probe-base` e `.app.id` | `GET commits/<sha>/statuses`, `GET commits/<sha>/check-runs` | Decisioni 5, 16, 18 |
+
+- [ ] **Step 1 (implementatore, senza rete):** script con i modi `prepara` (crea i due repo, se mancano, con `--add-readme`; spinge le sonde), `v1` … `v6`, `raccogli`, `pulisci-sonde` (un commit che toglie i workflow sonda da entrambi i repo, senza toccare la storia). `bash -n` e una corsa con `PATH` che punta a un `gh` finto che registra gli argomenti: nessun comando nomina un repo diverso dai due.
+- [ ] **Step 2 (controller):** `gh auth status` (scope `repo` e `workflow`), poi `prepara`, `v1`-`v6`, `raccogli`, `pulisci-sonde`. Un fatto che non si ottiene si scrive «non determinato», con la causa.
+- [ ] **Step 3: Rapporto** `docs/verifiche/2026-10-21-p4-verifiche.md`: tabella `Id | Fatto | Esito | Evidenza | Conseguenza per il piano`, versioni (`gh --version`, `claude --version`), minuti di Actions consumati. Se un esito smentisce una decisione, una riga «da correggere nel Task N» e una `Ruling:` nel ledger prima di lanciare quel task.
+- [ ] **Step 4: Commit** «tollgate P4: verifiche reali su GitHub (campi di gh, eventi, cache, commit e PR)».
+
+---
+
+### Task 2: Moduli senza stato, pacchetto `tollgate_gate` e strati
+
+**Files:**
+- Create: `bin/tollgate_core/runner.py`, `bin/tollgate_core/ghcli.py`, `bin/tollgate_core/diffcheck.py`, `bin/tollgate_gate/__init__.py`, `bin/tollgate_gate/l2tree.py`, `tests/test_runner.py`, `tests/test_ghcli.py`, `tests/test_diffcheck.py`
+- Modify: `bin/tollgate_core/verify.py`, `bin/tollgate_core/violations.py`, `bin/tollgate_core/git.py`, `bin/tollgate_flow/gh.py`, `bin/tollgate_flow/l2tree.py`, `bin/tollgate_flow/finishcheck.py` (solo `_own_document` → `diffcheck`), `tests/test_layers.py`, `tests/test_git.py`
+
+**Interfaces:**
+- Produces in `runner.py`: i nomi della decisione 2, con `run_one(spec: CommandSpec, *, root: Path, files: list[str], env: dict, timeout_s: int, allow_no_tests: bool, log_dir: Path, tag: str) -> tuple[str, int, Junit | None, float, str, Path]` (la firma di oggi) e `executed_ids(junit: Junit) -> set[str]`.
+- Produces in `ghcli.py`: i nomi della decisione 2; `ApiResult(status: int | None, data: object, stderr: str)`; `api(...)` usa `--include` solo se richiesto e legge la riga di stato nella forma provata da V2.
+- Produces in `diffcheck.py`: `diff_findings(cfg: Config, *, repo: Path, issue: int, level: str, base_ref: str, head_ref: str | None, changes, scope: set[str] | None, locked: set[str], registered_plan: tuple[str, str] | None, approved_spec: tuple[str, str] | None, waiver_file: WaiverFile | None, components: Mapping[str, bool]) -> list[Violation]`; `scope_exempt_rel(cfg: Config, *, issue: int, rel: str, scope: set[str], locked: set[str]) -> bool`.
+- `violations.diff_violations(cfg, conn, work, wt, base_ref, head_ref, changes, *, components)` invariata, ora: `scope` dal DB (o `None` in L0 o senza `plan_sha`), `locked_docs(work)`, `registered_plan = (plan_path, plan_sha)`, `approved_spec` dall'approvazione trovata a `head_ref` (oggi in `finishcheck`), `waiver_file(work)`.
+
+- [ ] **Step 1: Test** `test_layers.py`: `test_gate_imports_allowlist` (un modulo finto in `tollgate_gate` che importa `tollgate_core.db` è segnalato; la regola usa `imported`); `test_core_does_not_import_gate`; `test_gate_runtime_has_no_db` (processo `python3 -B -c` con `sys.path` su `bin/` che importa ogni modulo di `tollgate_gate` e stampa `'tollgate_core.db' in sys.modules or 'sqlite3' in sys.modules` → `False`); `test_flow_may_import_gate`.
+- [ ] **Step 2: Test** `test_runner.py::test_executed_ids` (falliti contati, saltati esclusi); `test_verify_names_still_importable` (`from tollgate_core.verify import CommandSpec, gate_commands, dod_commands, counts_green`). `test_ghcli.py`: `test_api_include_status_parsed` (con il `gh` finto: 403 e 404 nella forma di V2 → `status` e `data["message"]`); `test_flow_gh_reexports`. `test_diffcheck.py`: `test_same_result_as_diff_violations` (banco `FlowLab` L1 con un file fuori scope, uno sotto `reviews/<N>/` e il piano registrato committato: stesse violazioni); `test_approved_spec_exempt_only_on_same_blob`; `test_scope_none_skips_scope`. `test_git.py::test_refs_starting_with_dash_refused` (`ls_files_at` e `text_at` con `-x` → `GitError`, nessun processo lanciato).
+- [ ] **Step 3: Fallimento, estrazione, verifica, `tests/run`** (i test esistenti di `verify`, `violations`, `finishcheck`, `gh` e `l2tree` devono passare senza modifiche).
+- [ ] **Step 4: Commit** «tollgate P4: moduli senza stato (runner, ghcli, diffcheck), pacchetto tollgate_gate, strati».
+
+---
+
+### Task 3: Analisi pura: approvazioni L2, workflow del progetto, issue della PR
+
+**Files:**
+- Create: `bin/tollgate_analysis/workflows.py`, `bin/tollgate_analysis/prref.py`, `tests/test_workflows.py`, `tests/test_prref.py`
+- Modify: `bin/tollgate_analysis/approvals.py`, `tests/test_approvals.py`, `tests/test_l2tree.py`
+
+**Interfaces:**
+- Produces in `approvals.py`: `L2Problem(kind: str, text: str)` (`MISSING = "missing"`, `STALE = "stale"`); `check_l2_detail(files, *, issue, spec_path, spec_blob, plan_path, plan_blob) -> list[L2Problem]` (decisione 10); `check_l2` invariata nella firma, sopra `check_l2_detail`; `locate_spec_approval` con l'ordine del caso (a) (decisione 22).
+- Produces in `workflows.py`: `problems(text: str) -> list[str]` (decisione 15); `FORBIDDEN_EVENTS = ("pull_request_target", "workflow_run")`, `FORBIDDEN_PERMISSIONS = ("statuses: write", "checks: write", "write-all")`.
+- Produces in `prref.py`: `issue_from_branch(ref: str) -> int | None`, `closes_issue(body: str) -> int | None`, `is_tg_branch(ref) -> bool`, `is_config_branch(ref) -> bool` (`tollgate-config/`).
+
+- [ ] **Step 1: Test** `test_approvals.py`:
+  - `test_current_beats_own_stale` (propria con `sha` X, issue 3 con `sha` Y, `spec_blob` Y → la 3; `spec_blob` X → la propria; `spec_blob` None → la propria);
+  - `test_check_l2_detail_kinds` (approvazione assente → `missing`; `sha` diverso → `stale`; `slices: "tre"` → `missing`; `plan-approval.md` con `path` diverso da `plan_path` → `missing`; `plan-approval.md` superato e nessun report del piano → un solo problema `stale`, nessun «report del piano mancante»);
+  - `test_reports_bound_to_approved_sha` (caso (d): un solo `spec-adversarial-1.md` con `spec_sha` vecchio → `missing` «nessun report della spec sullo sha approvato»; con `adversarial: off` e `lens: off` → nessuno; `plan-adversarial` con `plan_sha` vecchio → `missing`);
+  - `test_check_l2_messages` (riga 7 di P3c: asserzioni sul testo di ogni problema, compreso il caso dell'approvazione propria con `path` diverso).
+- [ ] **Step 2: Test** `test_l2tree.py::test_spec_approval_current_when_other_issue_approved_same_blob` (`CURRENT` con la propria superata e la 9 corrente).
+- [ ] **Step 3: Test** `test_workflows.py`: `test_clean_workflow` (`permissions: {contents: read}` e `on: push` → `[]`); `test_forbidden_events` (anche in forma di elenco e di mappa); `test_forbidden_permissions_any_level` (`statuses: write` dentro un job, `permissions: write-all`); `test_missing_top_level_permissions`; `test_comments_and_strings_ignored` (`# pull_request_target` in un commento non conta; in una stringa di `run:` conta: fail-closed); `test_unreadable_is_a_problem` (testo con tabulazioni di rientro o byte non UTF-8). `test_prref.py`: `test_issue_from_branch` (`tg/7-x` → 7; `tg/x` → None); `test_closes_issue_variants` (`Closes #3`, `fixes #3`, `Resolves #3`; la prima riga vince; `#3` senza parola chiave → None).
+- [ ] **Step 4: Fallimento, implementazione, verifica, `tests/run`.** I test esistenti di `finish check` e di `audit prepare` che dipendono dall'ordine di `locate_spec_approval` si aggiornano con una riga nel report.
+- [ ] **Step 5: Commit** «tollgate P4: approvazioni L2 dettagliate (corrente vince, report sullo sha approvato), regole dei workflow, issue della PR».
+
+---
+
+### Task 4: Ingressi, gruppi di `attenzione` e calcolo: comandi, base, diff, piano
+
+**Files:**
+- Create: `bin/tollgate_gate/model.py`, `bin/tollgate_gate/attention.py`, `bin/tollgate_gate/evaluate.py`, `tests/gatekit.py`, `tests/test_gate_evaluate.py`
+
+**Interfaces:**
+- Produces in `model.py`:
+  - `CommandResult(name: str, state: str, exit: int | None, tests_run: int | None, junit: Junit | None)`;
+  - `PrFacts(number: int, head_sha: str, head_ref: str, base_ref: str, default_branch: str, body: str, cross_repo: bool)`;
+  - `IssueFacts(number: int, state: str, labels: tuple[str, ...])`;
+  - `GateInputs(where: str, repo: Path, cfg: Config, base_sha: str, head_sha: str, pr: PrFacts | None, block: dict | None, issue: IssueFacts | None, commands: list[CommandResult] | None, base_ids: set[str] | None, base_ids_source: str | None, waiver_text: str | None, sentinel_open: list[int])`;
+  - `Item(key: str, family: str, text: str, data: str = "")` (`data` è testo non fidato, solo per il commento);
+  - `Evaluation(red: list[Item], attention: list[Item], watch: list[str], errors: list[str])` con le proprietà `verdict_state` (`error` se `errors`, `failure` se `red`, altrimenti `success`) e `attention_state` (decisione 7).
+- Produces in `attention.py`: `GROUPS` (decisione 7), `READ = "read"`, `INFO = "info"`, `group(key) -> str` (`KeyError` per una chiave sconosciuta: ogni voce ha un gruppo).
+- Produces in `evaluate.py`: `evaluate(inputs: GateInputs) -> Evaluation`; in questo task le famiglie `commands`, `base_ids`, `diff` (con `plan_changed` e lo scope da `plan_sha`), `must_have` e le voci di deroga (`waiver_*`). Le famiglie `level`, `l2`, `issue`, `declared`, `guard_local` sono del Task 5.
+- Produces in `tests/gatekit.py`: `GateLab` (repo git temporaneo con `origin` nudo locale, `tollgate.toml` sul predefinito, ramo `tg/7-x`), `GateLab.inputs(**override) -> GateInputs`, `GateLab.block(**override) -> dict` (da `prblock.build` con valori validi), `GateLab.junit(ids_run, ids_skipped=(), ids_failed=()) -> Junit`.
+
+- [ ] **Step 1: Test** `test_gate_evaluate.py::CommandsTest`: `test_red_empty_uncounted_unverified` (ogni stato → voce rossa `commands`; `empty` con `allow_no_tests` → verde più `no_tests_counted`; `unverified` con un atto `approve unverified-tests` nel blocco → verde più `unverified_tests`); `test_or_true_with_failure_is_red` (criterio 10: uscita 0, JUnit con un fallito → `red`); `test_profile_gate_command_required` (criterio 29: profilo con `paths = ["web/**"]`; diff su `web/` senza il risultato `profile:web:lint` → rosso «manca»; diff fuori da `web/` → non richiesto).
+- [ ] **Step 2: Test** `BaseIdsTest`: `test_missing_base_id_is_red`; `test_skipped_in_head_is_missing` (criterio 32); `test_test_waiver_covers_only_with_all_ids` (8.3, 18.2); `test_component_off_skips` (`base_test_ids = false` → nessuna voce `base_ids`, `components_off`); `test_local_has_no_base_ids` (`where="local"`).
+- [ ] **Step 3: Test** `DiffTest`: `test_testguard_on_every_pr` (criterio 10: test cancellato e `.skip` aggiunto → rosso anche su un ramo non `tg/*`); `test_out_of_scope_tg_only` (file fuori scope → rosso su `tg/7-x`, nessuna voce su `fix/x`); `test_plan_changed_after_registration` (criterio 36: piano in testa con un file in più → quel file è fuori scope e `plan_changed` porta il diff); `test_waiver_of_other_issue_ignored` (criterio 10: deroga in `.tollgate/waivers/3.toml` su una PR dell'issue 7 → la violazione resta); `test_waiver_branch_must_match` (8.3); `test_waiver_groups` (criterio 44: una sola deroga `scope` → solo `waiver_scope` informativa, `attention_state == "success"`; una deroga `test` → `waiver_test` «da leggere», `failure`; tre deroghe `scope` → `waiver_scope_over_two`; deroga per pattern → `waiver_pattern`, criterio 21); `test_reviews_dir_exempt` (contratto P3c (6)).
+- [ ] **Step 4: Test** `MustHaveTest`: `test_must_have_recomputed_from_head_junit` (criterio 42: `M1 — test: tests.test_x::test_a` assente → rosso, rosso nel JUnit → rosso, verde → nessuna voce; `— test: manuale` → `manual_must_have`); `test_component_off`.
+- [ ] **Step 5: Fallimento, implementazione, verifica, `tests/run`, commit** «tollgate P4: calcolo del gate (comandi, base, diff, piano, must-have) e gruppi di attenzione».
+
+---
+
+### Task 5: Calcolo: livello, L2, issue, DoD dichiarata, componenti, file di tollgate
+
+**Files:**
+- Modify: `bin/tollgate_gate/evaluate.py`
+- Test: `tests/test_gate_evaluate.py`
+
+**Interfaces:**
+- Consumes: `model`, `attention` (Task 4); `approvals.check_l2_detail`, `prref` (Task 3); `level.diff_level`, `level.labels_level`, `profiles.min_level`, `profiles.active_profiles`; `workflows.problems`.
+- Produces in `evaluate.py`: le famiglie `level`, `l2`, `issue`, `declared`, `guard_local`, le voci `components_off`, `audit_*`, `off_periods`, `sentinel_open`, `not_tg_branch`, `tollgate_config`, `lockfile_without_manifest`, `task_over_warn`, `skills_absent`; `TOLLGATE_FILE_GLOBS` e `tollgate_files_changed(repo, base_ref, head_ref) -> list[str]` (riusata da `gate guard` nel Task 8).
+
+- [ ] **Step 1: Test** `LevelTest` (criterio 22): `test_declared_below_minimum_without_cap_is_red` (`level: "L1"`, percorso sensibile → rosso); `test_with_cap_is_attention` (`level_cap` dichiarato → `level_cap` «da leggere», nessun rosso); `test_labels_and_profile_min_level` (etichetta `security` → minimo L2; `min_level = "L2"` di un profilo attivo).
+- [ ] **Step 2: Test** `L2Test`: `test_missing_report_is_red` (criterio 10: «report L2 mancante»); `test_stale_approval_is_attention_with_diff`; `test_spec_audit_off_three_slices_attention_not_red` (criterio 35: `spec_audit = false` sul predefinito, blocco con `lens: "off"`, nessun `spec-lens-*.md` → nessun rosso, `components_off` e `audit_off`); `test_suspended_is_attention` (`adversarial: "suspended"` → `audit_suspended`); `test_later_slice_reports_in_other_folder` (`spec_reviews_dir` dell'issue 3).
+- [ ] **Step 3: Test** `IssueTest` (criterio 33, decisione 8): `test_tg_branch_with_other_closed_issue_is_red_and_no_waivers` (`tg/7-x` con «Closes #3», issue 3 chiusa, deroghe in `waivers/3.toml` e `waivers/7.toml` → rosso e nessuna deroga applicata); `test_block_issue_mismatch`; `test_manual_pr_without_closes` (`fix/x` senza `Closes` → `no_issue`, `not_tg_branch`, nessun rosso dall'issue); `test_config_branch` (`tollgate-config/0.2.0` → nessuno scope né test-guard, `tollgate_config` «da leggere», elenco delle chiavi di `tollgate.toml` cambiate e `FINGERPRINT` nella voce).
+- [ ] **Step 4: Test** `DeclaredTest` (decisione 11, criterio 41): `test_blocking_finding_last_cycle_red_even_unverified`; `test_old_cycle_finding_ignored`; `test_blocking_missing_is_blocking`; `test_dismissed_is_attention`; `test_declared_dod_false_is_red_unless_component_off`; `test_recomputed_items_override_declared` (`dod.items.receipt = false` con i comandi verdi → nessun rosso); `test_block_missing_on_tg_is_red`; `test_tasks_over_and_skills_absent_info` (criterio 39).
+- [ ] **Step 5: Test** `LocalTest`: `test_local_skips_issue_declared_base` (`where="local"`: nessuna voce delle tre famiglie); `test_guard_local_tollgate_file_changed` (`tollgate.toml` cambiato nel diff → rosso `guard_local` solo in locale; su GitHub nessuna voce, lo fa `guard`).
+- [ ] **Step 6: Fallimento, implementazione, verifica, `tests/run`, commit** «tollgate P4: calcolo del gate (livello, L2, issue, DoD dichiarata, componenti)».
+
+---
+
+### Task 6: Commento del gate e tetto del corpo della PR
+
+**Files:**
+- Create: `bin/tollgate_gate/comment.py`, `tests/test_gate_comment.py`
+- Modify: `bin/tollgate_analysis/prbody.py`, `tests/test_prbody.py`
+
+**Interfaces:**
+- Produces in `comment.py`: `MARKER_PREFIX = "<!-- tollgate-verdict"` (uguale a `fixtask.GATE_MARKER`, controllato da un test), `GUARD_PREFIX = "<!-- tollgate-guard"`, `MAX_BODY = 60000`; `marker(sha: str) -> str`; `marker_sha(body: str) -> str | None` (40 esadecimali, altrimenti `None`); `render(sha: str, ev: Evaluation, *, plan_diff: str = "", approval_diff: str = "") -> str`; `render_guard(sha: str, problems: list[str]) -> str`.
+- Produces in `prbody.py`: `MAX_BODY = 60000`; `render(...)` invariata nella firma, con il tetto totale (le sezioni si accorciano voce per voce, il blocco JSON resta intero e ultimo).
+
+- [ ] **Step 1: Test** `test_gate_comment.py`: `test_marker_first_line_with_sha`; `test_marker_sha_rejects_bad` (SHA corto, maiuscole non esadecimali, assente); `test_groups_order` (le voci «da leggere» prima, le informative in `<details>`); `test_neutralized` (criterio 27: una deroga con ```` ``` ```` e `@utente` nel testo → recinto più lungo, nessuna menzione attiva, nessun `-->`); `test_cap` (1.000 voci lunghe → `len(body) <= MAX_BODY` e «troncato»); `test_marker_matches_fixtask`.
+- [ ] **Step 2: Test** `test_prbody.py::test_total_cap_keeps_block` (riga 47: 200 rilievi da 2.000 caratteri → corpo entro `MAX_BODY`, `prblock.parse` restituisce il blocco intero).
+- [ ] **Step 3: Fallimento, implementazione, verifica, `tests/run`, commit** «tollgate P4: commento del gate con lo SHA nel marcatore; tetto del corpo della PR».
+
+---
+
+### Task 7: `gate run`, `gate base-ids` e artefatti
+
+**Files:**
+- Create: `bin/tollgate_gate/run.py`, `bin/tollgate_gate/baseids.py`, `bin/tollgate_gate/artifacts.py`, `bin/tollgate_gate/cli.py`, `tests/test_gate_run.py`, `tests/test_gate_artifacts.py`
+- Modify: `bin/tollgate_core/cli.py` (sottoparser `gate`), `tests/test_cli.py`
+
+**Interfaces:**
+- Consumes: `runner` (Task 2), `config.load_config_at`.
+- Produces: `run.run(repo: Path, *, config_sha: str, base_sha: str, out: Path, environ: Mapping[str, str], applicable: bool) -> int` (scrive `out/results.json`, `out/junit/`, `out/logs/`; 0 sempre che il file sia scritto, 1 solo se non si può scrivere; lo stato lo decide `verdict`); `baseids.compute(repo, *, config_sha, sha, out, environ) -> dict` (il formato della decisione 12) e `baseids.load(path, *, tree: str) -> set[str] | None` (`None` se illeggibile o con `tree` diverso); `artifacts.validate(root: Path, *, max_file=50 * 2**20, max_total=200 * 2**20) -> list[str]`, `artifacts.read_results(root) -> tuple[list[CommandResult] | None, bool, list[str]]` (risultati, `applicable`, problemi); `cli.main(args) -> int` per `gate run|base-ids|guard|evaluate|sentinel` (gli ultimi tre nei Task 8-10).
+- CLI: `tollgate gate run --event <file> --out <dir>`, `tollgate gate base-ids --sha <sha> --out <dir> [--event <file>] [--publish]`. `gate run` legge dall'evento `pull_request.base.ref`, la punta del predefinito (`repository.default_branch`, `git rev-parse origin/<predefinito>`) e scrive `applicable: false` se la PR non punta al predefinito, senza eseguire nulla. Il sottocomando `gate` non apre il DB e non crea la cartella di stato.
+
+- [ ] **Step 1: Test** `test_gate_run.py`: `test_results_shape` (banco con un comando che scrive JUnit: `results.json` con i campi della decisione 13, JUnit copiato); `test_not_applicable_runs_nothing`; `test_config_from_default_tip_not_head` (la testa cambia `[commands]` → si eseguono i comandi del predefinito); `test_no_state_created` (`HOME` e `TOLLGATE_STATE` temporanei: nessuna cartella creata, nessun `tollgate_core.db` caricato); `test_base_ids_format_and_tree`; `test_load_rejects_other_tree`.
+- [ ] **Step 2: Test** `test_gate_artifacts.py`: `test_dotdot_absolute_symlink_rejected`; `test_size_limits` (con limiti piccoli passati per parametro); `test_xml_entity_rejected` (criterio 10 `error`); `test_valid_dir`.
+- [ ] **Step 3: Fallimento, implementazione, verifica, `tests/run`, commit** «tollgate P4: gate run e base-ids senza stato, artefatti validati».
+
+---
+
+### Task 8: `gate guard`
+
+**Files:**
+- Create: `bin/tollgate_gate/guard.py`, `bin/tollgate_gate/github.py`, `tests/test_gate_guard.py`
+- Modify: `bin/tollgate_gate/cli.py`, `tests/fakegh.py` (stati, commenti delle issue, `refs/pull`)
+
+**Interfaces:**
+- Consumes: `evaluate.tollgate_files_changed`, `workflows.problems`, `prref`, `comment.render_guard`, `ghcli.api`.
+- Produces in `github.py` (solo `ghcli`, tutti con `repo_slug` da `GITHUB_REPOSITORY`): `read_event(path) -> dict`; `pr_from_event(event) -> PrFacts | None`; `set_status(state, cwd, slug, sha, *, context, status, description) -> None`; `statuses(state, cwd, slug, sha) -> list[dict]` (con `creator.login`); `issue(state, cwd, slug, n) -> IssueFacts | None`; `pr_comments(state, cwd, slug, n) -> list[dict]` (REST, con `id`, `user.login`, `body`); `upsert_comment(state, cwd, slug, n, *, prefix: str, body_file: Path) -> None` (decisione 14: cerca per prefisso e autore `github-actions[bot]`); `prs_for_commit(state, cwd, slug, sha) -> list[dict]`; `open_sentinel_issues(state, cwd, slug) -> list[int]`; `comment_issue(...)`, `create_issue(...)`. Il testo dei commenti passa sempre da file (`-F body=@<file>`).
+- Produces in `guard.py`: `check(repo: Path, *, base_tip: str, head: str, head_ref: str) -> list[str]` (decisione 15); `run(event_path: Path, *, publish: bool, environ) -> int` (fa `git fetch origin refs/pull/<n>/head`, pubblica `tollgate/guard` e, se rosso, il commento).
+
+- [ ] **Step 1: Test** `test_gate_guard.py` (criterio 10, «guard rosso»): `test_tollgate_toml_changed`; `test_verdict_workflow_changed_outside_config_branch`; `test_config_branch_only_tollgate_files_passes` e `test_config_branch_with_code_is_red`; `test_project_workflow_rules` (aggiunto con `statuses: write`, con `checks: write`, con `pull_request_target`, con `workflow_run`, senza `permissions` → cinque problemi distinti); `test_project_workflow_modified_ok_passes` (`permissions: contents: read` → guard verde; la deroga `ci` la chiede `verdict`, criterio 10 «verde con attenzione»); `test_publish_uses_files_not_args` (con il `gh` finto: nessun argomento contiene testo del corpo o del nome del ramo; il commento è passato con `body=@`); `test_fork_pr` (ramo `tg/7-x` da un fork: le regole valgono uguali).
+- [ ] **Step 2: Fallimento, implementazione, verifica, `tests/run`, commit** «tollgate P4: gate guard (file di tollgate, workflow del progetto, tollgate-config)».
+
+---
+
+### Task 9: `gate evaluate` su GitHub
+
+**Files:**
+- Create: `tests/test_gate_github.py`
+- Modify: `bin/tollgate_gate/github.py`, `bin/tollgate_gate/cli.py`, `bin/tollgate_gate/evaluate.py` (solo la funzione di ingresso `from_github`)
+
+**Interfaces:**
+- Produces in `evaluate.py`: `from_github(repo: Path, event: dict, *, artifacts: Path, base_ids_cache: Path | None, base_ids_artifact: Path | None, state, environ) -> tuple[GateInputs | None, list[str], str | None]` (ingressi, errori, motivo di «non applicabile»); `run(event_path, *, artifacts, base_ids_cache, base_ids_artifact, publish, environ) -> int`, che pubblica `tollgate/verdict`, `tollgate/attention` e il commento, e scrive `ids.json` della testa per la cache solo con `verdict` `success` (decisione 12).
+- CLI: `tollgate gate evaluate --event <file> --artifacts <dir> [--base-ids-cache <file>] [--base-ids-artifact <dir>] [--publish] [--head-ids-out <file>]`.
+
+- [ ] **Step 1: Test** `test_gate_github.py` (banco `GateLab` più il `gh` finto con PR, issue, stati e commenti; evento `workflow_run` scritto dal test nella forma di V3):
+  - `test_clean_pr_green` (criterio 10 «PR pulita»: `verdict` e `attention` `success`, commento con il marcatore);
+  - `test_prechecks` (`workflow_run.path` diverso, `event` diverso da `pull_request` → `error`; PR verso `other` → «non applicabile» su entrambi);
+  - `test_superseded_sha_is_error` (la PR ha una testa nuova: `error` sullo SHA vecchio, nessun commento scritto);
+  - `test_invalid_artifact_is_error` (`../` e XML con entità, criterio 10);
+  - `test_invalid_default_config_is_error` (motivo nella descrizione, uscita 0, niente traceback);
+  - `test_fork_pr_treated_as_manual` (decisione 4);
+  - `test_base_ids_source_order` (Review Focus 5);
+  - `test_comment_updated_not_duplicated` (due esecuzioni sullo stesso SHA → un commento; un commento con lo stesso marcatore di un altro autore resta intatto);
+  - `test_head_ids_cached_only_on_success`;
+  - `test_sentinel_issue_open_in_attention` (`sentinel_open` «da leggere»).
+- [ ] **Step 2: Fallimento, implementazione, verifica, `tests/run`, commit** «tollgate P4: gate evaluate su GitHub (controlli preliminari, stati, commento, cache della testa)».
+
+---
+
+### Task 10: `gate sentinel`, base in `detect` e issue di sentinel
+
+**Files:**
+- Create: `bin/tollgate_gate/sentinel.py`, `tests/test_gate_sentinel.py`
+- Modify: `bin/tollgate_gate/baseids.py` (`--publish`), `bin/tollgate_gate/cli.py`, `bin/tollgate_flow/gh.py` (`sentinel_issues` → `github.open_sentinel_issues`, rinviato di P3a riga 56), `tests/test_gh.py`
+
+**Interfaces:**
+- Produces: `sentinel.unverified(repo, *, before: str, after: str, prs_for_commit, statuses) -> list[tuple[str, str]]` (commit e motivo; funzioni di lettura passate come parametri per i test); `sentinel.run(event_path, *, publish, environ) -> int`; `baseids.publish(...)` (in `detect`: `tollgate/base`, commento sull'issue se la suite fallisce).
+- CLI: `tollgate gate sentinel --event <file> [--publish]`.
+
+- [ ] **Step 1: Test** `test_gate_sentinel.py` (criteri 10 e 34, decisione 16): `test_direct_push_red_and_issue` (commit senza PR → stato `failure` e issue creata); `test_merge_of_red_verdict` (PR unita con `verdict` `failure` → rosso); `test_status_from_user_token_not_trusted` (Review Focus 4); `test_first_install_ignored` (il commit che aggiunge `tollgate-sentinel.yml` e i precedenti non aprono l'issue); `test_single_issue_reused` (secondo allarme → commento sulla stessa issue); `test_before_all_zeros`; `test_component_off_exits`; `test_base_failure_comments_issue_in_detect`.
+- [ ] **Step 2: Test** `test_gh.py::test_sentinel_issues_paginated` (110 issue aperte, quella di sentinel alla 105 → trovata; le PR scartate).
+- [ ] **Step 3: Fallimento, implementazione, verifica, `tests/run`, commit** «tollgate P4: sentinel, tollgate/base in detect, issue di sentinel paginate».
+
+---
+
+### Task 11: I cinque workflow e l'installazione
+
+**Files:**
+- Create: `gate/workflows/tollgate-guard.yml`, `gate/workflows/tollgate-run.yml`, `gate/workflows/tollgate-verdict.yml`, `gate/workflows/tollgate-base.yml`, `gate/workflows/tollgate-sentinel.yml`, `bin/tollgate_gate/install.py`, `tests/test_gate_workflows.py`
+
+**Interfaces:**
+- Consumes: `prereq.GATE_FILES` (i nomi **esatti**), i sottocomandi dei Task 7-10.
+- Produces in `install.py`: `WORKFLOWS_DIR = "gate/workflows"`; `fingerprint(bin_root: Path) -> str`; `files(plugin_root: Path, *, services: dict[str, str]) -> dict[str, bytes]` (percorso nel repo del progetto → contenuto: i cinque workflow, `.github/tollgate/VERSION`, `.github/tollgate/FINGERPRINT`, `.github/tollgate/bin/**` senza `__pycache__`), servizi inseriti nel job `head` di `tollgate-run`.
+
+Contenuto dei workflow (9.1, decisioni 5, 12, 16, 17):
+- `tollgate-guard`: `on: pull_request_target`; `permissions: {contents: read, statuses: write, pull-requests: write}`; checkout del predefinito (`fetch-depth: 0`); `gate guard --event "$GITHUB_EVENT_PATH" --publish`.
+- `tollgate-run`: `on: pull_request` (nessun `paths` né `branches`); `permissions: {contents: read}`; `concurrency: {group: tollgate-run-${{ github.event.pull_request.number }}, cancel-in-progress: true}`; job `head`: checkout di `github.event.pull_request.head.sha` (in `with:`), `fetch-depth: 0`, `persist-credentials: false`, `setup` dalla configurazione del predefinito, `gate run`, `upload-artifact` `tollgate-run`; job `base`: `actions/cache/restore` di `tollgate-ids-<albero di merge-base>` (chiave calcolata da un passo che scrive in `$GITHUB_OUTPUT`), solo se manca checkout della base con `persist-credentials: false`, `gate base-ids`, upload `tollgate-base-ids`.
+- `tollgate-verdict`: `on: workflow_run: {workflows: [tollgate-run], types: [completed]}`; `permissions: {contents: read, statuses: write, pull-requests: write, actions: read, issues: read}`; checkout del predefinito; `download-artifact` dei due artefatti con `run-id` e `github-token`; `actions/cache/restore` della base; `gate evaluate … --publish --head-ids-out`; `actions/cache/save` solo se il file esiste.
+- `tollgate-base`: `on: push` sul predefinito; `permissions: {contents: read, statuses: write, issues: write}`; cache dell'albero; `gate base-ids --publish` (in `detect`); `actions/cache/save`.
+- `tollgate-sentinel`: `on: push` sul predefinito; `permissions: {contents: read, statuses: write, issues: write, pull-requests: read}`; checkout `fetch-depth: 0`; `gate sentinel --event "$GITHUB_EVENT_PATH" --publish`.
+
+- [ ] **Step 1: Test** `test_gate_workflows.py` (letti con `workflows.problems` e un lettore di righe del test, senza librerie YAML): `test_names_match_gate_files`; `test_permissions_exact` (ogni workflow con l'insieme esatto di 9.1); `test_events_exact`; `test_no_expression_in_run` (nessuna `${{` in una riga di un blocco `run:`); `test_pr_code_only_in_run_workflow` (solo `tollgate-run` fa checkout della testa della PR, e sempre con `persist-credentials: false`); `test_run_has_no_paths_filter_and_concurrency`; `test_fingerprint_stable_and_ignores_pycache`; `test_install_files_contains_gate_files_and_version` (`VERSION` uguale a `tollgate_core.VERSION`).
+- [ ] **Step 2: Fallimento, scrittura, verifica, `tests/run`, commit** «tollgate P4: i cinque workflow del gate e i file da installare».
+
+---
+
+### Task 12: `init`, misura della modalità, protezione letta da `start`
+
+**Files:**
+- Create: `bin/tollgate_gate/protection.py`, `bin/tollgate_flow/init.py`, `templates/tollgate.toml`, `tests/test_protection.py`, `tests/test_init.py`
+- Modify: `bin/tollgate_core/cli.py` (`init --propose|--update`), `bin/tollgate_flow/start.py`, `tests/test_start.py`, `tests/fakegh.py` (risposte della GET di protezione e dei check-run)
+
+**Interfaces:**
+- Produces in `protection.py`: `classify(status: int | None, message: str) -> str` (decisione 18), `REQUIRED_FIELDS`, `missing(data: dict, *, contexts=REQUIRED_CONTEXTS) -> list[str]` (PR obbligatoria, i due controlli con `app_id` diverso da `-1`, `strict`, `enforce_admins`, niente push forzato né cancellazione), `protection_body(app_id: int) -> dict`, `ProtectionRead(kind, missing, note)`, `read(state, cwd, branch) -> ProtectionRead`.
+- Produces in `init.py`: `propose(state, cwd, *, update: bool, merges_per_month: int, services: dict[str, str], now=None) -> InitResult(code, lines, folder)`; codici `OK` 0, `REFUSED` 1.
+- CLI: `tollgate init --propose [--merges-per-month N] [--service NOME=IMMAGINE]...`, `tollgate init --update`.
+
+- [ ] **Step 1: Test** `test_protection.py` (con le forme di V2 e di P0): `test_classify` (403 «Upgrade to GitHub Pro…» → `detect`; 403 «Must have admin rights to Repository.» → `undetermined`; 200 → `protected`; 404 «Branch not protected» → `protected_unset`; `None` (rete) → `undetermined`); `test_missing_fields` (protezione senza `strict` e con `app_id: -1` → due voci); `test_body_never_minus_one`.
+- [ ] **Step 2: Test** `test_init.py`: `test_detect_proposal` (criterio 11: 403 → `tollgate.toml` con `mode = "detect"`, nessun `protect.sh`); `test_protected_unset_proposes_command` (404 → `protected`, `protect.sh` che legge `.app.id` dal check-run di `tollgate-base` e si ferma se manca); `test_token_without_admin_undetermined` (criterio 34: nessun file con `protected`, messaggio che chiede le credenziali dell'utente); `test_files_tree` (i file di `install.files`, `README.md` con i passi in ordine: copia, commit sul predefinito, poi `protect.sh`); `test_minutes_estimate` (con ricevute nel DB e senza); `test_jest_junit_hint`; `test_update_only_changed_files` (`--update` con una versione vecchia sul predefinito → solo i file diversi e il ramo `tollgate-config/<versione>`); `test_untrusted_names` (un nome di servizio con caratteri non ammessi è rifiutato: `^[a-z0-9-]+$` per il nome, immagine senza spazi).
+- [ ] **Step 3: Test** `test_start.py::ProtectionTest`: `test_protected_missing_fields_warned` (criterio 11, terza parte); `test_unreadable_protection_continues`; `test_detect_does_not_read_protection`.
+- [ ] **Step 4: Fallimento, implementazione, verifica, `tests/run`, commit** «tollgate P4: init con la misura della modalità e la proposta dei file; protezione letta da start».
+
+---
+
+### Task 13: `finish check` sul gate, campi del blocco, commento letto da `--from-gate`
+
+**Files:**
+- Modify: `bin/tollgate_flow/finishcheck.py`, `bin/tollgate_flow/openpr.py`, `bin/tollgate_analysis/prblock.py`, `bin/tollgate_flow/taskcmd.py` (evento `skills_absent`), `bin/tollgate_flow/fixtask.py`, `bin/tollgate_core/events.py` (tipo nuovo)
+- Test: `tests/test_finishcheck.py`, `tests/test_openpr.py`, `tests/test_prblock.py`, `tests/test_fixtask.py`, `tests/test_criteria_p4.py` (nuovo, la classe `AgreementTest`)
+
+**Interfaces:**
+- Consumes: `evaluate.evaluate`, `model.GateInputs` (Tasks 4-5), `comment.marker_sha` (Task 6).
+- Produces: `finishcheck.check` invariata (firma, codici, `CheckResult`); `finishcheck._gate_inputs(state, conn, work, cfg, wt, sha, run, *, now, environ) -> GateInputs`; `finish_report["gate"]` (decisione 20); `prblock.FIELDS` con `tasks_over` e `skills_absent` in coda; `openpr.facts` con `findings[].blocking`, `tasks_over`, `skills_absent`; evento `skills_absent` {task, skills}; `fixtask.from_gate` con `source = "gate:<sha del marcatore>"` e solo commenti di `github-actions[bot]`.
+
+- [ ] **Step 1: Test** `test_finishcheck.py`: `test_contract_unchanged` (codici e chiavi di `items` come prima su un lavoro L1 verde; `gate` presente); `test_level_below_minimum_is_red` (decisione 20); `test_tollgate_file_changed_is_red`; `test_attention_printed_in_groups`; `test_issue_unreadable_warns_and_continues`.
+- [ ] **Step 2: Test** `test_openpr.py::test_block_new_fields` e `test_prblock.py::test_fields_order_with_new_fields` (le due voci in coda; un blocco vecchio senza le due voci si legge ancora).
+- [ ] **Step 3: Test** `test_fixtask.py`: `test_from_gate_uses_marker_sha_and_bot_author` (Review Focus 3); `test_marker_without_sha_refused` (commento con il solo prefisso → rifiuto «commento del gate senza SHA»).
+- [ ] **Step 4: Test** `test_criteria_p4.py::AgreementTest`: `test_finish_check_and_gate_agree` (Review Focus 1: `FlowLab` L2 con un file fuori scope, piano cambiato dopo la registrazione e spec approvata; `finish check` dal programma vero e `evaluate` con `where="github"` sugli stessi commit danno lo stesso insieme di chiavi rosse nelle famiglie `diff`, `l2`, `must_have`, `level`); `test_open_pr_block_feeds_gate` (Review Focus 2: corpo scritto da `open-pr` nel `gh` finto, letto da `gate evaluate` → `findings[].blocking`, `tasks_over`, `skills_absent` arrivati).
+- [ ] **Step 5: Fallimento, implementazione, verifica, `tests/run`, commit** «tollgate P4: finish check usa il calcolo del gate; campi nuovi del blocco; marcatore letto da --from-gate».
+
+---
+
+### Task 14: Casi lasciati da P3c e rinviati del percorso L2
+
+**Files:**
+- Modify: `bin/tollgate_flow/audit.py` (casi (b), m-2, m-4, righe 16 e 29), `bin/tollgate_core/audits.py` (`open_round(min_number=)`), `bin/tollgate_flow/l2acts.py` (m-4), `bin/tollgate_checks/audit_round.py` (riga 19)
+- Test: `tests/test_audit_prepare.py`, `tests/test_audits.py`, `tests/test_l2acts.py`, `tests/test_check_audit_round.py`, `tests/test_criteria_p3c.py`, `tests/test_actapply.py`
+
+**Interfaces:**
+- Consumes: `l2tree.spec_approval` con il caso (a) (Task 3).
+- Produces: `audits.open_round` con la firma attuale più il parametro per parola chiave `min_number: int = 1` (il numero del giro è `max(numero dal DB, min_number)`); `audits.open_round_row` uguale; `audit.prepare` passa `min_number`.
+
+- [ ] **Step 1: Test** `test_audit_prepare.py`: `test_approval_with_plan_adversary_off_and_spec_changed` (caso (b): rifiuto con «/tollgate:reopen spec», uguale ad `approve plan`; `peek` dice lo stesso); `test_numbering_after_lost_db` (caso m-2: `plan-adversarial-1.md` e `-2.md` committati, DB nuovo → il giro aperto è il 3); `test_registered_path_missing_named` (m-4); `test_backtick_path_refused` (riga 16); `test_peek_needs_confirm_says_confirm` (riga 29).
+- [ ] **Step 2: Test** `test_check_audit_round.py::test_unreadable_spec_adds_major` (riga 19); `test_criteria_p3c.py::test_plan_cap_chain_to_approve_plan` (riga 22: due giri del piano non puliti → `needs_you`, `resolve` → sospeso, `audit prepare` porta ad `approval`, `approve plan` accettato con `adversarial: suspended`); `test_actapply.py::test_superseded_refusal_leaves_block_and_act` (riga 34: dopo il rifiuto il blocco resta aperto e l'atto è consumato, come dice 8.4); `test_criteria_p3c.py::test_later_slice_with_other_current_approval_end_to_end` (Review Focus 6: `start 12 --spec`, propria approvazione assente, issue 3 superata, issue 9 corrente → `audit prepare` in `plan` apre il giro del piano e `finish check` dà `approvals` vera).
+- [ ] **Step 3: Fallimento, implementazione, verifica, `tests/run`, commit** «tollgate P4: casi lasciati da P3c (approvazione corrente, approval con avversario spento, numerazione dopo DB perso) e rinviati del percorso L2».
+
+---
+
+### Task 15: Skill `init`, skill aggiornate, contratto tra skill e codice
+
+Le skill si scrivono dopo i sottocomandi (lezione di P3b): ogni codice e ogni passo citati vengono dalle costanti dei Task 7-13.
+
+**Files:**
+- Create: `skills/init/SKILL.md`
+- Modify: `skills/finish/SKILL.md` (voci del gate in `finish check`, «da leggere» e «informative»), `skills/start/SKILL.md` (avvisi di protezione e di modalità), `skills/status/SKILL.md` (issue di sentinel), `skills/execute/SKILL.md` (`task start --from-gate` legge lo SHA del commento), `tests/test_skill_contract.py`, `tests/test_manifest.py`
+
+Contenuto di `skills/init/SKILL.md` (anche il modello, «solo proposta»): lancia `python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate" init --propose` (chiedendo prima all'utente i servizi dei test, 9.6, e il ritmo di merge per la stima); riferisce la modalità misurata; con «non determinata» chiede all'utente di rilanciare con le sue credenziali (`! …`); elenca i passi dell'utente dal `README.md` della proposta: copiare `files/` nel repo (i file di tollgate sono protetti: li copia l'utente), committare sul predefinito **prima** della protezione, poi lanciare `protect.sh` in `protected`; consiglia il token separato per l'agente; `--update` prepara un ramo `tollgate-config/<versione>` che l'utente apre come PR. Codici: `- **0, …**` proposta scritta; `- **1, …**` rifiuto con il motivo. Mai copiare i file al posto dell'utente, mai lanciare `protect.sh`.
+
+- [ ] **Step 1: Test** `test_skill_contract.py`: la riga `init` nella tabella `(skill, sezione, modulo, costanti)` con `init.OK`, `init.REFUSED`; ogni sottocomando nominato nelle skill (`init`, `gate`) esiste nel parser; nessuna skill contiene «P4». `test_manifest.py::test_init_model_invocable`.
+- [ ] **Step 2: Fallimento, scrittura, `tests/run`;** se `claude` è disponibile `claude plugin validate --strict .` (esito nel report).
+- [ ] **Step 3: Commit** «tollgate P4: skill init e skill aggiornate, contratto tra skill e codice».
+
+---
+
+### Task 16: Prova reale su GitHub: criteri 10 e 11, flusso con `claude -p` (controller)
+
+Il controller esegue in prima persona; un implementatore sonnet scrive gli script **senza rete** e senza `claude -p` (giri di correzione compresi: il brief di ogni giro elenca i modi dello script vietati, cioè tutti tranne `bash -n` e `controlla`).
+
+**Files:**
+- Create: `spikes/run-p4-gate.sh`, `spikes/p4/make_case.py` (costruisce rami, file e corpo della PR di ogni caso, con il blocco da `prblock.render`), `spikes/run-p4-flow.sh`, `docs/verifiche/2026-10-21-p4-prova-gate.md`, `docs/verifiche/2026-10-21-p4-prova-flusso.md`
+
+**Regole di cautela (vanno nel brief e negli script):** solo i due repo della decisione 25; prima di ogni comando lo script controlla `git remote get-url --push origin` e il nome del repo e si ferma altrimenti; nessun push forzato su `main`; le uscite in `docs/verifiche/evidenze/gh-p4/`, mai cancellate; nessuna cancellazione di repo; `claude -p` solo in `run-p4-flow.sh`, solo da `/tmp/tollgate-p4/flow`, con `--plugin-dir`; mai `pkill`, `killall` o `kill` per pattern.
+
+- [ ] **Step 1 (implementatore): `spikes/run-p4-gate.sh`** con i modi `controlla` (senza rete: elenco dei casi e dei comandi, con un `gh` finto), `installa <repo>` (`bin/tollgate init --propose` nel clone, copia di `files/`, commit su `main`, attesa di `tollgate-base`), `protezione` (solo `protected`: `protect.sh`), `caso <nome>` (ramo, PR, attesa degli stati con un tetto di 15 minuti, raccolta di stati, commento e `mergeStateStatus`), `raccogli`. Un progetto Python minimo con `unittest` e JUnit (`tools/unittest_junit.py` della prova di P3b), un profilo `web` con `paths = ["web/**"]` e un comando di gate, `allow_no_tests = false`.
+- [ ] **Step 2 (controller): criterio 11.** `init` sul privato → `detect` e `start` lo mostra (`bin/tollgate start` con lo stato di prova, rifiuto o avviso registrati); sul pubblico non protetto → `protected` e `protect.sh` proposto; dopo `protect.sh` con un campo tolto a mano (`strict`) → `start` segnala il campo mancante, poi la protezione si rimette completa.
+- [ ] **Step 3 (controller): criterio 10 sul repo `protected`.** Un caso per riga, con l'esito atteso: verdi (PR pulita; `tollgate-config/*` con `attenzione` rosso; ramo non `tg/*` con `attenzione` rosso); `verdict` rosso (test tolti, `skip`, file fuori scope, identificativo della base mancante, `vitest run || true` con un test che fallisce (qui `unittest … || true`), livello sotto il minimo senza tetto, report L2 mancante); deroga nel file di un'altra issue; `guard` rosso (cinque varianti di workflow, `tollgate.toml` cambiato, `tollgate-verdict.yml` modificato); verde con `attenzione` (workflow modificato con `contents: read` e deroga `ci`); `attenzione` rosso (deroga `test`, piano diverso dal primo, tetto di livello, `allow_no_tests` con zero test); `error` (`../` in un artefatto e XML con entità: un ramo che cambia `tools/` per scrivere quei file nel report; SHA superato: un secondo push durante `run`); «non applicabile» (PR verso `other`); e lo stato `tollgate/verdict` pubblicato con il token personale su una PR rossa → `mergeStateStatus` resta `BLOCKED`.
+- [ ] **Step 4 (controller): repo `detect`.** Installazione (il primo push non apre l'issue, criterio 34); PR pulita; merge di una PR con `verdict` rosso → `tollgate/sentinel` rosso e issue; push diretto su `main` → stesso esito, commento sulla stessa issue; criterio 33 (`tg/7-x` con «Closes #3» chiusa).
+- [ ] **Step 5 (implementatore, poi controller): `spikes/run-p4-flow.sh`** (decisione 27): `prepara` (clone del repo `protected` in `/tmp/tollgate-p4/flow`, stato di prova con la sentinella, nessuna `TOLLGATE_GH`, issue di prova creata dal controller), `shim` (senza rete, `gh` finto: il modello lancia `command -v gh`; lo script confronta l'uscita del tool, letta dall'uscita `stream-json`, con lo shim), `passo1` (`/tollgate:start #N`), `passo2` (dal worktree: piano e `/tollgate:execute`), `passo3` (dal worktree: `/tollgate:finish` fino a `open-pr` con il `gh` vero), `attendi` (stati della PR), `passo4` (se `verdict` è rosso: `/tollgate:start #N` e `task start --from-gate`, un solo giro), `registra`. Esito atteso: PR aperta dal flusso, `tollgate/guard` e `tollgate/verdict` `success`, commento con il marcatore e lo SHA della testa.
+- [ ] **Step 6: Rapporti.** `2026-10-21-p4-prova-gate.md`: per ogni caso PR, SHA, stati con autore, esito atteso e ottenuto, minuti di Actions; un caso non ottenuto si scrive «non riuscito» con la causa, mai «riuscito». `2026-10-21-p4-prova-flusso.md`: versione di `claude`, sessioni (id e cartella), passi, veti, PR, stati, token (`bin/tollgate stats`), `PATH` del tool Bash, ciò che resta non esercitato. Un difetto di questo piano si corregge con un commit e un test che lo copre, poi si ripete **solo** il caso interessato; un esito ottenuto in più tentativi si dichiara composito.
+- [ ] **Step 7: Commit** «tollgate P4: prova reale del gate sui due repo e del flusso con claude -p».
+
+---
+
+### Task 17: Criteri, revisione 25 della spec, piano principale
+
+**Files:**
+- Modify: `tests/test_criteria_p4.py`, `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 25), `docs/superpowers/plans/2026-10-08-tollgate-nucleo-piano-principale.md`
+
+- [ ] **Step 1: Test dal programma vero** (`test_criteria_p4.py`, `bin/tollgate gate …` lanciato come processo su `GateLab` con il `gh` finto; il `gh` vero non si usa): `test_criterion_10_matrix` (una sottoprova per riga del criterio 10 che i test non coprono già da `bin/tollgate`, con lo stato pubblicato atteso); `test_criterion_44_groups_end_to_end`; `test_criterion_35_gate`; `test_components_in_gate` (criterio 18: `definition_of_done`, `base_test_ids`, `sentinel`).
+- [ ] **Step 2: Matrice.** Nel piano principale la tabella «Prove dei criteri di P4» (formato `file::Classe.metodo`, più le righe dei rapporti del Task 16 per ciò che solo GitHub prova) per 10, 11, 18 (`definition_of_done` nel gate, `base_test_ids`, `sentinel`), 21, 22, 27, 29, 30, 32, 33, 34, 35, 36, 39 (`attenzione` per `size_reason`), 41, 42, 44, e le note «(P4)» delle tabelle di P2, P3a, P3b e P3c annotate come chiuse. Un criterio senza test è un buco: il test si aggiunge nel modulo che possiede il codice.
+- [ ] **Step 3: Revisione 25 della spec:** decisioni 1-27 nelle sezioni 1.2 (identificativi della base da codice della PR, azioni a versione maggiore), 3 e 3.1 (`tollgate_gate`, strati, `gate sentinel`, `init`), 5, 8.3, 8.7 (`check_l2_detail`, report sullo sha approvato), 9.1-9.6 (forma reale dei workflow, artefatti, cache, controlli preliminari, gruppi di `attenzione` con i conflitti risolti, issue senza `Closes`, sentinella con `creator.login`), 11.2 (proposta, classificazione, `protect.sh`), 12.4 (m-3), 13, 16 (esiti dei Task 1 e 16), 18.1 (campi nuovi, marcatore con lo SHA), 18.4 (`skills_absent`), 20 (riga 25).
+- [ ] **Step 4: Piano principale:** «Stato» (P4 chiuso sul ramo, merge in attesa dell'OK dell'utente, numero di test); sezione 2; sezione 3 con i moduli reali di P4, i contratti P4 → P5 e i rinviati della revisione finale.
+- [ ] **Step 5: Suite completa e commit.** `tests/run` e `python3 -B -W error::ResourceWarning -m unittest discover -s tests -t .` verdi, nessun «unclosed database».
+
+```bash
+git add tests/test_criteria_p4.py docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md docs/superpowers/plans/2026-10-08-tollgate-nucleo-piano-principale.md
+git commit -m "tollgate P4: prove dei criteri, spec rev 25, piano principale"
+```
+
+---
+
+## Copertura: criteri, vincoli e rinviati → task
+
+| Voce | Task |
+|---|---|
+| Criterio 10 Gate su GitHub (tutte le righe; stato del token personale in `protected`) | 4, 5, 7, 8, 9, 10, 16, 17 |
+| Criterio 11 Protezione e modalità | 12, 16 |
+| Criterio 18 Componenti: `definition_of_done` nel gate, `base_test_ids`, `sentinel` | 4, 5, 9, 10, 17 |
+| Criterio 21 Deroga per pattern in `attenzione` | 4 |
+| Criterio 22 Livello sotto il minimo nel gate (`verdict` rosso, con tetto `attenzione`) | 5, 13 |
+| Criterio 27 Neutralizzazione | 6 |
+| Criterio 29 `gate` del profilo eseguito nel gate | 4, 7, 16 |
+| Criterio 30 `allow_no_tests` con zero test: verde con `attenzione` rosso | 4, 16 |
+| Criterio 32 `skipped` nel JUnit della testa | 4 |
+| Criterio 33 Issue e deroghe nel gate | 5, 16 |
+| Criterio 34 `init` senza amministrazione; primo push con `tollgate-sentinel` | 10, 12, 16 |
+| Criterio 35 Componenti spenti nel gate | 5, 17 |
+| Criterio 36 Piano registrato nel gate | 4, 16 |
+| Criterio 39 `attenzione` per `size_reason` | 5, 13 |
+| Criterio 41 DoD nel gate | 5, 13 |
+| Criterio 42 Must-have ricalcolati dal JUnit nel gate | 4 |
+| Criterio 44 `attenzione` a due gruppi | 4, 6, 17 |
+| Gate installato: `prereq.GATE_FILES`, `VERSION`, `gh.REQUIRED_CONTEXTS` (P3a) | 11, 12 |
+| P3a riga 56: `sentinel_issues` con `--limit 100` | 10 |
+| Blocco 18.1 letto con `prblock.parse` (ultimo blocco); marcatore `<!-- tollgate-verdict` con lo SHA (P3b) | 5, 6, 13 |
+| `finishcheck.check` sostituita dietro la stessa interfaccia; rischio 2; «P4 → P3: `gate run` locale» | 13 |
+| Vincoli per P4 di P3b (1) scope L2, (2) SHA nel marcatore, (3) DoD dei rilievi sull'ultimo ciclo, (4) voci ricalcolate e dichiarate, bloccante con `review_unverified`, (5) campi di `gh`, (6) `rules`/`blocking_rules` | (1) 2, 4; (2) 6, 13; (3) 5; (4) 5; (5) 1; (6) 5, 13 (campo `blocking`) |
+| Contratti verso il gate di P3c (1) `check_l2`, (2) `locate_spec_approval`, (3) intestazioni, (4) `spec_reviews_dir`, `plan_reviews_dir`, `spec_audit`, (5) `suspended`/`off` in `attenzione`, (6) `reviews/<N>/` esenti | 3, 5 |
+| Vincoli per P4 di P3c (1) report non legati allo `spec_sha`, (2) `check_l2` e piano superato, `path`, `slices`, (3) `lens: suspended` ambiguo, (4) `PATH` del tool Bash, (5) parti non esercitate dalla prova di P3c, (6) rinviati dei task | (1) 3; (2) 3; (3) dichiarato (decisione 10); (4) 16; (5) `/tollgate:finish` e la PR con il modello nel 16 (in L1); audit a lenti, `reopen`, `--spec`, tetti, più fette con il modello → **P5** (eval), perché i test dal programma vero li coprono e una prova con il modello costa più di 500k token; (6) righe sotto |
+| Caso (a) propria superata contro altra corrente | 3, 14 |
+| Caso (b) `approval` con `plan_adversary` spento e spec cambiata | 14 |
+| Caso (c) m-2, m-3, m-4 | 14 (m-2, m-4); m-3 dichiarato in 12.4 (17) |
+| Caso (d) report della spec legati allo `spec_sha` | 3 |
+| P3b righe 4, 47, 68, 69 | 1, 6, 13, 13 |
+| P3c righe 2, 3, 4, 7 | 3 |
+| P3c righe 16, 19, 22, 29, 34, 39 | 14 (16, 19, 22, 29, 34); 16 (39) |
+| P3c riga 11 (`v` nella riga dei giri) | **P5**: serve solo quando esisterà una versione 2 della riga |
+| P3c riga 12 (`close_round` non valida `outcome` e `counts`) | **P5**: un solo chiamante, che passa valori calcolati |
+| P3c riga 20 (dopo «report non scritto» solo il veto) | **P5**: il giro resta aperto e `audit prepare` lo ristampa, nessun lavoro fermo |
+| P3c righe 13, 15, 24-28, 36; duplicazione «base o predefinito più `load_config`» | **P5**: posizione di test, refactoring e testo senza guasti |
+| Vincolo P3c (6): `ls_files_at` con riferimento `-…`; backtick nei percorsi del brief | 2; 14 |
+| Fatti di GitHub nuovi (V1-V6) | 1 |
+| Spec 9.1-9.6, 11.2, 13 (righe del gate), 14 (riga «Gate»), 18.1 | 4-12, 16 |
+| Review Focus 1-7 | 13, 5 e 13, 13, 10, 9, 3 e 14, 9 |
+| Regole degli strati in `test_layers.py` | 2 |
