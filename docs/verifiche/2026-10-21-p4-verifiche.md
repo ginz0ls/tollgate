@@ -18,7 +18,7 @@ Account `ginz0ls`, scope del token `gist`, `read:org`, `repo`, `workflow` (`prep
 ## Repo e stato finale
 
 - `ginz0ls/tollgate-p4-protected` (pubblico) e `ginz0ls/tollgate-p4-detect` (privato) creati da `prepara` (`prepara-*-crea.out`).
-- Stato finale: sonde tolte dai due repo (`pulisci-protected.txt`, commit `349020d`; `pulisci-detect.txt`, commit `a0c1e5f`); nessuna PR aperta (la #1 di `protected` è stata chiusa dal controller, `chiusura-pr1.out`; le altre le chiudono i modi stessi o `gh pr merge`). I repo restano: li cancella l'utente.
+- Stato finale: sonde tolte dai due repo (`pulisci-protected.txt`, commit `a0c1e5f`; `pulisci-detect.txt`, commit `349020d`); nessuna PR aperta (la #1 di `protected` è stata chiusa dal controller, `chiusura-pr1.out`; le altre le chiudono i modi stessi o `gh pr merge`). I repo restano: li cancella l'utente.
 
 ## Minuti di Actions
 

@@ -24,53 +24,10 @@ die() { echo "errore: $*" >&2; exit 1; }
 
 # ---------------------------------------------------------------- guardie
 
-repo_ok() { [ "$1" = "$PROT" ] || [ "$1" = "$DET" ]; }
-
-# Prima di ogni gh: solo i due repo, solo le operazioni della decisione 25 che servono qui.
-# Lo script non scrive mai con `gh api` (nessun -X, -f, -F, --input) e non usa mai `gh api user`.
+# Prima di ogni gh: lista degli ammessi della decisione 25, unica fonte in ghguard.py (la usa anche check_gh_log).
 guard_args() {
-  local first="${1:-}" second="${2:-}" a prev="" has_repo=0 skip=0 ep=""
-  case "$first" in
-    --version) ;;
-    auth) [ "$second" = status ] || die "gh auth $second vietato" ;;
-    repo)
-      case "$second" in
-        create|clone|view) repo_ok "${3:-}" || die "gh repo $second: repo non ammesso (${3:-vuoto})" ;;
-        *) die "gh repo $second vietato" ;;
-      esac ;;
-    api|pr|issue|run) ;;
-    *) die "gh $first non ammesso" ;;
-  esac
-  for a in "$@"; do
-    case "$a" in
-      --visibility|--visibility=*) die "opzione vietata: $a" ;;
-    esac
-    case "$prev" in
-      -R|--repo) repo_ok "$a" || die "repo non ammesso: $a"; has_repo=1 ;;
-    esac
-    if [ "$first" = api ]; then
-      case "$a" in
-        -X|--method|-f|-F|--field|--raw-field|--input|graphql|user|/user) die "gh api: $a non ammesso" ;;
-      esac
-    fi
-    prev="$a"
-  done
-  case "$first" in
-    pr|issue|run) [ "$has_repo" = 1 ] || die "gh $first senza --repo: mi fermo" ;;
-    api)
-      for a in "${@:2}"; do
-        if [ "$skip" = 1 ]; then skip=0; continue; fi
-        case "$a" in
-          --jq|-q|-H|--header|--hostname|--cache|-t|--template) skip=1 ;;
-          -*) ;;
-          *) [ -n "$ep" ] || ep="$a" ;;
-        esac
-      done
-      case "$ep" in
-        "repos/$PROT"|"repos/$PROT/"*|"repos/$PROT?"*|"repos/$DET"|"repos/$DET/"*|"repos/$DET?"*) ;;
-        *) die "gh api: endpoint non ammesso ($ep)" ;;
-      esac ;;
-  esac
+  local msg
+  msg="$(python3 -I "$here/ghguard.py" check -- "$@" 2>&1)" || die "gh $*: $msg"
 }
 
 # Un remoto git diverso dal repo atteso ferma lo script prima di ogni git che parla con la rete.
@@ -688,55 +645,43 @@ FAKE
   chmod +x "$1"
 }
 
-# Controlla il registro dei comandi del gh finto: solo i due repo, nessuna operazione vietata
+# Controlla il registro dei comandi del gh finto con la stessa lista degli ammessi di guard_args
 check_gh_log() { # <registro>
-  python3 -I - "$1" <<'PY'
-import re, sys
-PROT = "ginz0ls/tollgate-p4-protected"; DET = "ginz0ls/tollgate-p4-detect"; OK = {PROT, DET}
-WRITE_OPTS = {"-X", "--method", "-f", "-F", "--field", "--raw-field", "--input"}
-bad, n, subs = [], 0, {}
-for line in open(sys.argv[1]):
-    args = line.rstrip("\n").split("\t")
-    if args and args[-1] == "":
-        args = args[:-1]
-    if not args:
-        continue
-    n += 1
-    f, joined = args[0], " ".join(args)
-    key = " ".join(args[:2]) if f in ("repo", "auth", "pr", "run", "issue") else f
-    subs[key] = subs.get(key, 0) + 1
-    if f == "api" and any(a in ("user", "/user", "graphql") for a in args[1:]):
-        bad.append(("gh api user/graphql", joined))
-    if f == "api" and any(a in WRITE_OPTS for a in args):
-        bad.append(("gh api in scrittura", joined))
-    if f == "auth" and args[1:2] != ["status"]:
-        bad.append(("gh auth diverso da status", joined))
-    if f == "repo" and (len(args) < 3 or args[1] not in ("create", "clone", "view") or args[2] not in OK):
-        bad.append(("gh repo non ammesso", joined))
-    if f in ("secret", "ssh-key", "gpg-key", "extension", "config"):
-        bad.append(("comando vietato", joined))
-    if f in ("pr", "run", "issue") and "--repo" not in args:
-        bad.append(("manca --repo", joined))
-    if any(a.startswith("--visibility") for a in args):
-        bad.append(("--visibility", joined))
-    for i, a in enumerate(args):
-        m = re.match(r"/?repos/([^/]+)/([^/?]+)", a)
-        if m and "%s/%s" % (m[1], m[2]) not in OK:
-            bad.append(("repo non ammesso", joined))
-        if a in ("--repo", "-R") and (i + 1 >= len(args) or args[i + 1] not in OK):
-            bad.append(("repo non ammesso", joined))
-    for t in re.findall(r"ginz0ls/[\w.-]+", joined):
-        if t not in OK:
-            bad.append(("repo non ammesso", joined))
-if n == 0:
-    bad.append(("registro vuoto", ""))
-print("comandi gh registrati: %d" % n)
-for k in sorted(subs):
-    print("  %4d  gh %s" % (subs[k], k))
-for why, cmd in bad:
-    print("VIOLAZIONE (%s): %s" % (why, cmd))
-sys.exit(1 if bad else 0)
-PY
+  python3 -I "$here/ghguard.py" log "$1"
+}
+
+# Prova negativa: ogni comando vietato deve fermare guard_args e dare una violazione in check_gh_log
+check_negativi() { # <cartella>
+  local T="$1" n=0 stopped=0 viol cmd
+  local -a forbidden=(
+    "api user" "api /user" "api graphql"
+    "api --method=POST repos/$PROT/issues" "api -XPOST repos/$PROT/issues" "api -X POST repos/$PROT/issues"
+    "api -fstate=x repos/$PROT/statuses/abc" "api -F a=b repos/$PROT/issues" "api --field=a=b repos/$PROT/issues"
+    "api --raw-field=a=b repos/$PROT/issues" "api --input=x repos/$PROT/issues" "api -H X:y repos/$PROT"
+    "api repos/$PROT/../../user" "api repos/$PROT//x" "api repos/$PROT/%2e%2e/x" "api repos/${OWNER}/altro/x" "api repos/${PROT}x/y"
+    "run delete 1 --repo $PROT" "run cancel 1 --repo $PROT" "run rerun 1 --repo $PROT" "run list"
+    "pr review 1 --repo $PROT" "pr ready 1 --repo $PROT" "pr checkout 1 --repo $PROT" "pr list" "pr list --repo ${OWNER}/altro"
+    "pr merge 1 --repo $PROT --admin" "issue delete 1 --repo $DET" "issue transfer 1 --repo $DET" "issue pin 1 --repo $DET"
+    "repo create $PROT --public --source=." "repo create $PROT --public --push" "repo create ${OWNER}/altro --public"
+    "repo create $PROT --private --add-readme --visibility public" "repo create $PROT" "repo delete $PROT"
+    "repo edit $PROT --visibility public" "repo fork $PROT" "auth login" "auth refresh" "auth status --show-token"
+    "secret set X" "ssh-key add" "extension install x" "--version --help"
+  )
+  : > "$T/negativi.log"
+  for cmd in "${forbidden[@]}"; do
+    n=$((n + 1))
+    # shellcheck disable=SC2086
+    if ( guard_args $cmd ) >/dev/null 2>&1; then
+      echo "  NON FERMATO da guard_args: $cmd"
+    else
+      stopped=$((stopped + 1))
+    fi
+    # shellcheck disable=SC2086
+    printf '%s\t' $cmd >> "$T/negativi.log"; printf '\n' >> "$T/negativi.log"
+  done
+  viol="$(check_gh_log "$T/negativi.log" | grep -c '^VIOLAZIONE')"
+  echo "  guard_args: $stopped fermati su $n; check_gh_log: $viol violazioni su $n"
+  [ "$stopped" = "$n" ] && [ "$viol" -ge "$n" ]
 }
 
 # Nessuna ${{ }} dentro le righe run: dei workflow sonda (decisione 17); il YAML deve leggersi
@@ -791,6 +736,8 @@ modo_controlla() {
   done
   echo "--- registro dei comandi gh"
   check_gh_log "$P4_FAKE_LOG" || rc=1
+  echo "--- prova negativa della guardia"
+  check_negativi "$T" || { echo "PROVA NEGATIVA FALLITA"; rc=1; }
   echo "--- remoti dei cloni"
   for f in protected detect; do
     url="$(git -C "$T/work/$f" remote get-url --push origin 2>&1)"
