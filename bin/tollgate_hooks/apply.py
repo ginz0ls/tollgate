@@ -123,13 +123,14 @@ def _finding_verify(conn, state, ctx, d):
 
 
 def _write_atomic(path: Path, text: str) -> None:
-    """Scrive `path` con un file temporaneo accanto e `os.replace`; `OSError` se non riesce."""
+    """Scrive `path` con un file temporaneo accanto e `os.replace`; `OSError` o `ValueError` (testo
+    non codificabile) se non riesce, e in ogni caso il temporaneo non resta."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.name}.tmp")
     try:
         tmp.write_text(text, encoding="utf-8")
         os.replace(tmp, path)
-    except OSError:
+    except (OSError, ValueError):
         try:
             tmp.unlink()
         except OSError:
@@ -202,7 +203,7 @@ def _audit_report(conn, state, ctx, d):
             raise FileNotFoundError("worktree assente")
         _write_atomic(wt / rel, approvals.render_report(
             fields, _report_body(title, d["body"], d.get("extra") or [])))
-    except OSError as e:
+    except (OSError, ValueError) as e:
         _audit_veto(conn, ctx, wid, f"report non scritto: {e}")
         return
     audits.close_round(conn, wid, kind=kind, number=number, counts=counts, outcome=outcome,
@@ -216,7 +217,7 @@ def _audit_report(conn, state, ctx, d):
         try:
             _write_atomic(wt / approvals.REVIEWS_DIR / str(work["issue"]) / "spec-lens-stato.md",
                           text)
-        except OSError as e:
+        except (OSError, ValueError) as e:
             _audit_veto(conn, ctx, wid, f"stato delle lenti non scritto: {e}")
     _cap_block(conn, state, ctx, wid, kind, number, counts)
 

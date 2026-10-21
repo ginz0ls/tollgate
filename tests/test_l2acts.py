@@ -93,7 +93,9 @@ class ApproveSpecTest(L2Case):
         fl = self.lab()
         fl.write_spec()
         self.spec_round(MAJOR)
-        self.assertIn("blocker o major", self.refused("spec 1"))
+        msg = self.refused("spec 1")
+        self.assertIn("blocker o major", msg)
+        tap.assert_program_before_prepare(self, msg)
         self.assertEqual(self.phase(), "spec_audit")
         fl.write_spec(note="corretta")
         self.spec_round(CLEAN)
@@ -426,7 +428,33 @@ class ApprovePlanTest(L2Case):
     def test_dirty_plan_round_refused(self):
         fl = self.to_approval()
         fl.closed_round(PLAN_ADV, MAJOR)
-        self.assertIn("blocker o major", self.refused("plan"))
+        msg = self.refused("plan")
+        self.assertIn("blocker o major", msg)
+        tap.assert_program_before_prepare(self, msg)
+
+    def test_plan_changed_after_last_round_points_to_reopen_plan(self):
+        fl = self.to_approval()
+        fl.commit(PLAN, plan_text(tasks=2), "piano cambiato fuori dai guardrail")
+        msg = self.refused("plan")
+        self.assertIn("cambiati dopo l'ultimo giro", msg)
+        self.assertIn("/tollgate:reopen plan", msg)
+        tap.assert_program_before_prepare(self, msg)
+
+    def test_later_slice_prepare_and_approve_plan_agree(self):
+        fl = self.lab("plan")
+        blob = fl.write_spec()
+        phases.set_spec_path(fl.conn, fl.work, SPEC, now=fl.lab.now)
+        for issue, sha in ((3, "0" * 40), (5, blob)):
+            fields = {"kind": "spec-approval", "path": SPEC, "sha": sha, "slices": 3}
+            fl.commit(approvals.approval_paths(issue)[0], approvals.render_approval(fields),
+                      f"approvazione {issue}")
+        fl.write_l2_plan()
+        self.assertEqual(self.prepare().code, audit.OK)
+        self.assertEqual(fl.report_round(counts=CLEAN).returncode, 0)
+        self.assertEqual(self.prepare().code, audit.OK)
+        self.assertEqual(self.phase(), "approval")
+        self.approve("plan")
+        self.assertEqual(self.phase(), "execution")
 
     def test_open_round_refused(self):
         fl = self.to_approval()

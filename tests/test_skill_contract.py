@@ -73,6 +73,11 @@ class SkillContractTest(unittest.TestCase):
         fixed = squash(audit.STEPS["resolve"].partition("<")[0])
         self.assertIn(fixed + " `<id>`", text)
 
+    def test_caps_section_says_resolve_always_suspends(self):
+        text = squash(section(skill_text("spec-audit"), "## I tetti"))
+        self.assertIn("In entrambi i casi il `resolve` sospende; per l'audit a lenti la "
+                      "sospensione è definitiva", text)
+
     def test_program_subcommands_exist_in_parser(self):
         parser = cli.build_parser()
         top = next(a for a in parser._actions if a.dest == "cmd").choices

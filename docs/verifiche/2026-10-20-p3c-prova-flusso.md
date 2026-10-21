@@ -2,23 +2,23 @@
 
 Versioni: Claude Code 2.1.304, tollgate 0.1.0 (`tollgate_core.VERSION`), modello `sonnet` per le sessioni e per gli agenti. Data: 20 ottobre 2026.
 
-Piano: Task 14 di P3c. Script: `spikes/run-p3c-flow.sh` (`prepara`, `passo1`..`passo6`, `libero "<prompt>"`, `registra`, `tutto`). Uscite grezze in `/tmp/tollgate-p3c/prova-1/flow/logs (copia conservata; `/tmp/tollgate-p3c/flow` è stato rigenerato dopo la prova)` (fuori dal repo): `passo*.jsonl`, `events.jsonl`, `stats.json`, `status.txt`, `sessioni.txt`, `reviews-1/` (copia dei report), `fakegh.log`, `fakegh-data-finale.json`, `origin-refs.txt`, `hooks.log` (copia di `hook-errors.log`, vuoto), `git-log-worktree.txt`. I log del primo tentativo del passo 1 sono in `/tmp/tollgate-p3c-keep/tentativo1-logs`.
+Piano: Task 14 di P3c. Script: `spikes/run-p3c-flow.sh` (`prepara`, `passo1`..`passo6`, `libero "<prompt>"`, `registra`, `tutto`). Uscite grezze in `/tmp/tollgate-p3c/prova-1/flow/logs` (copia conservata; `/tmp/tollgate-p3c/flow` è stato rigenerato dopo la prova) (fuori dal repo): `passo*.jsonl`, `events.jsonl`, `stats.json`, `status.txt`, `sessioni.txt`, `reviews-1/` (copia dei report), `fakegh.log`, `fakegh-data-finale.json`, `origin-refs.txt`, `hooks.log` (copia di `hook-errors.log`, vuoto), `git-log-worktree.txt`. I log del primo tentativo del passo 1 sono in `/tmp/tollgate-p3c-keep/tentativo1-logs`.
 
 **Esito: riuscito** per il percorso completo, **composito** per il passo 1 (due tentativi, vedi D1) e con una variante del passo 2 rispetto al brief (spec scritta dal modello, non quella di prova). Il passo 1 è girato con una versione dello script precedente a quella committata (D5).
 
 ## Impianto
 
-- Tutto sotto `/tmp/tollgate-p3c/flow`: checkout `repo`, repo nudo `origin.git`, stato `state` con la sentinella `.tollgate-test`, log. `remote.origin.url = https://github.com/prova/flow.git` con `url.<repo nudo>.insteadOf` (decisione 23). **Nessun push in rete**: prima di ogni passo lo script esegue `git remote get-url --push origin` e si ferma se non è `/tmp/tollgate-p3c/flow/origin.git` (mai scattato). Nessun push è stato fatto: `origin.git` ha solo `main` alla base.
+- Tutto sotto `/tmp/tollgate-p3c/prova-1/flow`: checkout `repo`, repo nudo `origin.git`, stato `state` con la sentinella `.tollgate-test`, log. `remote.origin.url = https://github.com/prova/flow.git` con `url.<repo nudo>.insteadOf` (decisione 23). **Nessun push in rete**: prima di ogni passo lo script esegue `git remote get-url --push origin` e si ferma se non è `/tmp/tollgate-p3c/prova-1/flow/origin.git` (mai scattato). Nessun push è stato fatto: `origin.git` ha solo `main` alla base.
 - `gh` è `tests/fakegh.py` (`TOLLGATE_GH`), con l'issue 1 aperta (`author_association OWNER`), stato `success` per `tollgate/guard` e `tollgate/verdict` sul predefinito, nessuna PR. Il `gh` vero non è mai stato chiamato dalla CLI di tollgate; nel `fakegh.log` ci sono solo `auth status`, `api …/issues/1`, `api --paginate …/pulls`, `api …/commits/<sha>/status`. Il modello non ha usato `gh`, `git push` né `curl`.
-- `claude -p` sempre con `--plugin-dir` sul percorso reale del worktree del ramo `p3c-percorso-l2` (con spazi), `--model sonnet`, `--permission-mode acceptEdits`, `--allowedTools Bash,Agent,Skill,EnterWorktree,SendMessage,Read,Write,Edit,Grep,Glob`, e `--add-dir /tmp/tollgate-p3c/flow` (per far leggere al modello i file di prova fuori dal worktree). Nessun `plugin install`, `marketplace add`, `--continue`. `~/.local/state/tollgate` non esiste (verificato a fine prova). Il processo `claude` tiene le proprie trascrizioni sotto `~/.claude`, come nelle prove precedenti; nessun comando dello script scrive là.
-- Dal passo 2 ogni `claude -p` parte dal worktree del lavoro: lo script lo ricava da `git worktree list`, richiede il ramo `tg/1-*` e un percorso sotto `/tmp/tollgate-p3c/flow` e si ferma altrimenti. Il worktree è `/tmp/tollgate-p3c/flow/repo/.claude/worktrees/tg-1-aggiungi-sottrai-a-calc`.
+- `claude -p` sempre con `--plugin-dir` sul percorso reale del worktree del ramo `p3c-percorso-l2` (con spazi), `--model sonnet`, `--permission-mode acceptEdits`, `--allowedTools Bash,Agent,Skill,EnterWorktree,SendMessage,Read,Write,Edit,Grep,Glob`, e `--add-dir /tmp/tollgate-p3c/prova-1/flow` (per far leggere al modello i file di prova fuori dal worktree). Nessun `plugin install`, `marketplace add`, `--continue`. `~/.local/state/tollgate` non esiste (verificato a fine prova). Il processo `claude` tiene le proprie trascrizioni sotto `~/.claude`, come nelle prove precedenti; nessun comando dello script scrive là.
+- Dal passo 2 ogni `claude -p` parte dal worktree del lavoro: lo script lo ricava da `git worktree list`, richiede il ramo `tg/1-*` e un percorso sotto `/tmp/tollgate-p3c/prova-1/flow` e si ferma altrimenti. Il worktree è `/tmp/tollgate-p3c/prova-1/flow/repo/.claude/worktrees/tg-1-aggiungi-sottrai-a-calc`.
 - Repo di prova come in P3b (stdlib, `tools/unittest_junit.py`, gate installato). `prepara` crea anche `spec-L2.md` (una fetta, «Tane di coniglio» con le scelte, «Cosa non fare») e `piano-L2.md`, e verifica che passino `specdoc.pitch_problems` e `plan.check_plan` con `level="L2"`.
 
 ## Sessioni reali (id e cartella)
 
 | Passo | Sessione | Cartella |
 |---|---|---|
-| 1 | `57b1b76d-6a3e-4042-b715-7195863b695d` (il tentativo scartato: `fceacf93-18f7-470f-a406-940a271b5642`) | `/tmp/tollgate-p3c/flow/repo` (checkout) |
+| 1 | `57b1b76d-6a3e-4042-b715-7195863b695d` (il tentativo scartato: `fceacf93-18f7-470f-a406-940a271b5642`) | `/tmp/tollgate-p3c/prova-1/flow/repo` (checkout) |
 | 2 | `86047cb1-c581-4b67-8143-2102439ab394` | worktree del lavoro |
 | 3 | `ade345b6-6419-4834-98b7-3a9778344181` | worktree del lavoro |
 | 4 | `bad45a2e-0bdc-4095-8d1d-4737876021fa` | worktree del lavoro |
@@ -60,7 +60,7 @@ Eventi chiave del DB: `phase_change` start->spec_audit, `commit`, `subagent_star
 ## Ciò che resta non esercitato
 
 - L'audit a lenti (`tollgate:spec-auditor`, conferma di costo `--confirm`/`audit decline`), `/tollgate:reopen spec|plan`, `start --spec` (fette successive), i tetti dei giri (`/tollgate:resolve`), le più fette e la proposta di issue per le fette successive (la spec ha una sola fetta).
-- Il ramo «nessuna spec» del passo 2 (copia di `spec-L2.md`) (`spec-L2.md`, verificata da `pitch_problems` ma non usata).
+- Il ramo «nessuna spec» del passo 2 (copia di `spec-L2.md`, verificata da `pitch_problems` ma non usata).
 - `/tollgate:finish` e la PR in L2, il verificatore dei rilievi, la revisione finale.
 - L'uso interattivo (compreso `/clear` e la ripresa dal checkpoint): tutta la prova è `claude -p`, un passo per sessione.
 - Il `gh` vero: solo il finto.

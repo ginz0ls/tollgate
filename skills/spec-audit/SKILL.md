@@ -39,12 +39,12 @@ Il testo dopo `prossimo passo:` è uno di questi; l'ultima parte tra `<…>` la 
 - chiedi all'utente /tollgate:approve plan
 - scrivi e committa la spec sotto docs/superpowers/specs/, poi rilancia `<programma> audit prepare`
 - scrivi il piano con superpowers:writing-plans (deve passare plan-check) e committalo, poi rilancia `<programma> audit prepare`
-- serve una decisione dell'utente: /tollgate:resolve `<id>` `<nota>` sospende; oppure correggi e rilancia audit prepare dopo il resolve
+- serve una decisione dell'utente: /tollgate:resolve `<id>` `<nota>` sospende; oppure correggi e rilancia `<programma> audit prepare` dopo il resolve
 - chiedi all'utente se procedere: con il sì rilancia `<programma> audit prepare --confirm`, con il no lancia `<programma> audit decline`
 
 ## I tetti
 
-Se un giro supera un tetto (giri avversariali della spec, giri avversariali del piano, cicli dell'audit a lenti) o l'utente ha rifiutato il costo, tollgate apre un blocco e il lavoro passa in `blocked`: `audit prepare` rifiuta e indica `/tollgate:resolve`. **Fermati.** Di' all'utente che ha due strade: `/tollgate:resolve <id> <nota>` sospende l'audit di quel tipo (il lavoro prosegue con i rilievi rimasti, e il report resta tra i file della PR), oppure correggere la spec o il piano e rilanciare `audit prepare` dopo il `resolve`. Non decidere tu al posto dell'utente.
+Se un giro supera un tetto (giri avversariali della spec, giri avversariali del piano, cicli dell'audit a lenti) o l'utente ha rifiutato il costo, tollgate apre un blocco e il lavoro passa in `blocked`: `audit prepare` rifiuta e indica `/tollgate:resolve`. **Fermati.** Di' all'utente che ha due strade: `/tollgate:resolve <id> <nota>` sospende l'audit di quel tipo (il lavoro prosegue con i rilievi rimasti, e il report resta tra i file della PR), oppure correggere la spec o il piano e rilanciare `audit prepare` dopo il `resolve`. In entrambi i casi il `resolve` sospende; per l'audit a lenti la sospensione è definitiva. Non decidere tu al posto dell'utente.
 
 ## Dopo l'audit
 

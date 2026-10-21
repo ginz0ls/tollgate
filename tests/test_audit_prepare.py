@@ -4,8 +4,9 @@ from unittest import mock
 from tests.flowkit import PLAN, SPEC, ZERO_COUNTS, FlowLab, plan_text
 from tests.hookkit import DEFAULT_TOML
 from tollgate_analysis import approvals, auditrules
-from tollgate_core import audits, git as core_git, phases
-from tollgate_flow import audit
+from tollgate_core import audits, db, git as core_git, phases
+from tollgate_core.paths import program_command
+from tollgate_flow import audit, l2tree
 
 ADV = "tollgate:spec-adversary"
 LENS = "tollgate:spec-auditor"
@@ -17,6 +18,12 @@ CLEAN: dict = {}
 def fixed(key: str) -> str:
     """La parte fissa del passo, prima del primo segnaposto."""
     return audit.STEPS[key].split("<")[0]
+
+
+def assert_program_before_prepare(case, text: str) -> None:
+    """Ogni «audit prepare» di un messaggio è preceduto dal programma (`program_command`)."""
+    prog = program_command(db.BIN_PATH)
+    case.assertEqual(text.count("audit prepare"), text.count(f"{prog} audit prepare"), text)
 
 
 class AuditCase(unittest.TestCase):
@@ -555,6 +562,119 @@ class PlanRoundsTest(AuditCase):
         r = self.prepare()
         self.assertIn("candidato a essere diviso", r.launches[0].brief.read_text().split(
             "## Cosa controllare")[1].split("## Rilievi")[0].split("- Task 1")[1])
+
+
+class SpecApprovalOfLaterSliceTest(AuditCase):
+    """I-1: con due approvazioni della stessa spec (la più bassa superata) `audit prepare` cerca
+    come `approve plan`: prima con il blob attuale, poi senza solo per distinguere i rifiuti."""
+
+    def two_approvals(self, stale_issue=3, current_issue=9):
+        fl = self.lab("plan")
+        blob = fl.write_spec()
+        phases.set_spec_path(fl.conn, fl.work, SPEC, now=fl.lab.now)
+        for issue, sha in ((stale_issue, "0" * 40), (current_issue, blob)):
+            fields = {"kind": "spec-approval", "path": SPEC, "sha": sha, "slices": 3}
+            fl.commit(approvals.approval_paths(issue)[0], approvals.render_approval(fields),
+                      f"approvazione {issue}")
+        return fl, blob
+
+    def state(self, spec_blob):
+        return l2tree.spec_approval(self.fl.wt, "HEAD", issue=7, spec_path=SPEC,
+                                    spec_blob=spec_blob)
+
+    def test_helper_current_from_another_issue_beats_stale_lower_one(self):
+        fl, blob = self.two_approvals()
+        status, found = self.state(blob)
+        self.assertEqual(status, l2tree.CURRENT)
+        self.assertEqual(found[0], approvals.approval_paths(9)[0])
+
+    def test_helper_only_stale_other_issue(self):
+        fl, blob = self.two_approvals()
+        status, found = self.state("1" * 40)
+        self.assertEqual((status, found), (l2tree.STALE, None))
+
+    def test_helper_own_stale_approval(self):
+        fl, blob = self.two_approvals()
+        fields = {"kind": "spec-approval", "path": SPEC, "sha": "0" * 40, "slices": 1}
+        fl.commit(approvals.approval_paths(7)[0], approvals.render_approval(fields), "propria")
+        status, found = self.state(blob)
+        self.assertEqual((status, found[0]), (l2tree.STALE, approvals.approval_paths(7)[0]))
+
+    def test_helper_none(self):
+        fl = self.lab("plan")
+        fl.write_spec()
+        self.assertEqual(self.state(fl._blob(SPEC)), (l2tree.MISSING, None))
+
+    def test_prepare_in_plan_accepts_later_slice_approval(self):
+        fl, blob = self.two_approvals()
+        fl.write_l2_plan()
+        r = self.prepare()
+        self.assertEqual(r.code, audit.OK, self.text(r))
+        self.assertEqual([x.agent_type for x in r.launches], [PLAN_ADV])
+
+    def test_peek_does_not_say_reopen_spec(self):
+        fl, blob = self.two_approvals()
+        fl.write_l2_plan()
+        step = audit.peek(fl.conn, self.work())
+        self.assertNotIn("reopen", step)
+
+    def test_prepare_and_approve_plan_agree_on_stale_only(self):
+        fl, blob = self.two_approvals()
+        fl.write_spec(note="spec cambiata dopo le approvazioni")
+        fl.write_l2_plan()
+        r = self.prepare()
+        self.assertEqual(r.code, audit.REFUSED)
+        self.assertIn("spec cambiata dopo approve spec", self.text(r))
+
+
+class ApprovalPhaseTest(AuditCase):
+    """m-1: in `approval` piano e spec in HEAD si confrontano con l'ultimo giro del piano."""
+
+    def approval_lab(self):
+        fl = self.plan_lab()
+        fl.write_l2_plan()
+        fl.closed_round("plan-adversarial", CLEAN)
+        fl.goto("approval")
+        return fl
+
+    def test_unchanged_prints_approve_plan(self):
+        fl = self.approval_lab()
+        r = self.prepare()
+        self.assertEqual((r.code, r.launches), (audit.OK, []))
+        self.assertIn(fixed("approve_plan"), r.lines[-1])
+        self.assertIn(fixed("approve_plan"), audit.peek(fl.conn, self.work()))
+
+    def test_plan_changed_in_head_points_to_reopen_plan(self):
+        fl = self.approval_lab()
+        fl.commit(PLAN, plan_text(tasks=2), "piano cambiato fuori dai guardrail")
+        r = self.prepare()
+        self.assertEqual(r.code, audit.REFUSED)
+        self.assertIn("/tollgate:reopen plan", self.text(r))
+        self.assertIn("/tollgate:reopen plan", audit.peek(fl.conn, self.work()))
+        self.assertEqual(self.work()["phase"], "approval")
+
+    def test_spec_changed_in_head_points_to_reopen_plan(self):
+        fl = self.approval_lab()
+        fl.write_spec(note="spec cambiata in approval")
+        r = self.prepare()
+        self.assertEqual(r.code, audit.REFUSED)
+        self.assertIn("/tollgate:reopen plan", self.text(r))
+        self.assertIn("/tollgate:reopen plan", audit.peek(fl.conn, self.work()))
+
+    def test_plan_adversary_off_never_refuses(self):
+        fl = self.plan_lab(toml=self.off("plan_adversary"))
+        fl.write_l2_plan()
+        fl.goto("approval")
+        fl.commit(PLAN, plan_text(tasks=2), "piano cambiato")
+        r = self.prepare()
+        self.assertEqual(r.code, audit.OK)
+
+
+class ProgramInMessagesTest(AuditCase):
+    def test_resolve_step_names_the_program(self):
+        self.lab()
+        assert_program_before_prepare(self, audit._step_text("resolve", id=3))
+        self.assertIn("audit prepare", audit._step_text("resolve", id=3))
 
 
 class RefusalsTest(AuditCase):

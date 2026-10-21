@@ -111,8 +111,8 @@ def _adversarial_check(conn, work, cfg, blob: str) -> str:
                       f"lancia {_program()} audit prepare")
     if not audit.passed(conn, work["id"], last, ADV_KIND):
         raise Refused(f"l'ultimo giro avversariale ({last['number']}) ha blocker o major: "
-                      "correggi la spec e rilancia audit prepare, oppure /tollgate:resolve se "
-                      "il tetto è raggiunto")
+                      f"correggi la spec e rilancia {_program()} audit prepare, oppure "
+                      "/tollgate:resolve se il tetto è raggiunto")
     return _outcome_label(last)
 
 
@@ -184,18 +184,15 @@ def approve_spec(conn, state, work, act, args, now, session) -> str:
 
 def _spec_approved(wt: Path, work, spec_blob: str) -> None:
     """D3: l'approvazione della spec si cerca nei file in HEAD, con lo `sha` attuale."""
-    files = l2tree.spec_approvals(wt, "HEAD")
-    where = {"issue": work["issue"], "spec_path": work["spec_path"]}
-    found = approvals.locate_spec_approval(files, spec_blob=spec_blob, **where)
-    if found is None and approvals.locate_spec_approval(files, spec_blob=None, **where):
+    status, _ = l2tree.spec_approval(wt, "HEAD", issue=work["issue"],
+                                     spec_path=work["spec_path"], spec_blob=spec_blob)
+    if status == l2tree.STALE:
         raise Refused("spec cambiata dopo approve spec: /tollgate:reopen spec")
-    if found is None:
+    if status == l2tree.MISSING:
         own = approvals.approval_paths(work["issue"])[0]
         if (wt / own).exists():
             raise Refused(f"committa {own} prima di approve plan")
         raise Refused("la spec non ha un file di approvazione nel ramo: /tollgate:reopen spec")
-    if not approvals.is_current(found[1], spec_blob):
-        raise Refused("spec cambiata dopo approve spec: /tollgate:reopen spec")
 
 
 def _plan_adversarial(conn, work, cfg, plan_blob: str, spec_blob: str) -> str:
@@ -205,11 +202,10 @@ def _plan_adversarial(conn, work, cfg, plan_blob: str, spec_blob: str) -> str:
     if last is None:
         raise Refused(f"nessun giro dell'avversario del piano: lancia {_program()} audit prepare")
     if last["sha"] != plan_blob or last["spec_sha"] != spec_blob:
-        raise Refused(f"il piano o la spec sono cambiati dopo l'ultimo giro dell'avversario "
-                      f"({last['number']}): lancia {_program()} audit prepare")
+        raise Refused(audit.PLAN_CHANGED.format(number=last["number"]))
     if not audit.passed(conn, work["id"], last, PLAN_KIND):
         raise Refused(f"l'ultimo giro dell'avversario del piano ({last['number']}) ha blocker o "
-                      "major: correggi il piano e rilancia audit prepare, oppure "
+                      f"major: correggi il piano e rilancia {_program()} audit prepare, oppure "
                       "/tollgate:resolve se il tetto è raggiunto")
     return _outcome_label(last)
 

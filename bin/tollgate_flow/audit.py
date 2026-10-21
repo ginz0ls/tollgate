@@ -47,8 +47,10 @@ STEPS = {
     "write_plan": "scrivi il piano con superpowers:writing-plans (deve passare plan-check) e "
                   "committalo, poi rilancia <programma> audit prepare",
     "resolve": "serve una decisione dell'utente: /tollgate:resolve <id> <nota> sospende; "
-               "oppure correggi e rilancia audit prepare dopo il resolve",
+               "oppure correggi e rilancia <programma> audit prepare dopo il resolve",
 }
+PLAN_CHANGED = ("il piano o la spec sono cambiati dopo l'ultimo giro dell'avversario "
+                "({number}): riapri con /tollgate:reopen plan")
 CONFIRM_STEP = ("chiedi all'utente se procedere: con il sì rilancia <programma> audit prepare "
                 "--confirm, con il no lancia <programma> audit decline")
 ERRORS = (sqlite3.Error, git.GitError, config.ConfigError, phases.TransitionError, OSError,
@@ -323,18 +325,18 @@ def _spec_branches(ctx: _Ctx, spec: tuple, slices: int, stale, register) -> _Act
 
 
 def _spec_approval_current(ctx: _Ctx, spec_path: str, spec_blob: str) -> None:
-    """D3: l'approvazione della spec si legge a HEAD e deve essere sullo `sha` attuale."""
-    files = l2tree.spec_approvals(ctx.wt, "HEAD")
-    issue = ctx.work["issue"]
-    found = approvals.locate_spec_approval(files, issue=issue, spec_path=spec_path, spec_blob=None)
-    if found is None:
-        own = approvals.approval_paths(issue)[0]
+    """D3: l'approvazione della spec si legge a HEAD e deve essere sullo `sha` attuale (la
+    stessa ricerca di `approve plan`: `l2tree.spec_approval`)."""
+    status, _ = l2tree.spec_approval(ctx.wt, "HEAD", issue=ctx.work["issue"],
+                                     spec_path=spec_path, spec_blob=spec_blob)
+    if status == l2tree.STALE:
+        raise _Refuse("spec cambiata dopo approve spec: /tollgate:reopen spec")
+    if status == l2tree.MISSING:
+        own = approvals.approval_paths(ctx.work["issue"])[0]
         if (ctx.wt / own).exists():
             raise _Refuse(f"committa {own} prima del giro del piano")
         raise _Refuse("la spec non ha un file di approvazione nel ramo: rifai la spec con "
                       "/tollgate:reopen spec")
-    if not approvals.is_current(found[1], spec_blob):
-        raise _Refuse("spec cambiata dopo approve spec: /tollgate:reopen spec")
 
 
 def _task_rows(ctx: _Ctx, check) -> list[dict]:
@@ -390,6 +392,21 @@ def _decide_plan(ctx: _Ctx) -> _Act:
     return _Act("open", rnd, supersede=row, register_plan=register)
 
 
+def _decide_approval(ctx: _Ctx) -> _Act:
+    """In `approval` piano e spec in HEAD devono essere quelli dell'ultimo giro dell'avversario
+    del piano (come per `approve plan`); se sono cambiati l'uscita è `reopen plan`."""
+    work, cfg = ctx.work, ctx.cfg
+    plan_path, spec_path = work["plan_path"], work["spec_path"]
+    if on(cfg, PLAN_KIND) and plan_path and spec_path:
+        last = last_round(ctx.conn, work["id"], PLAN_KIND)
+        plan_blob = git.blob_at(ctx.wt, "HEAD", plan_path)
+        spec_blob = git.blob_at(ctx.wt, "HEAD", spec_path)
+        if last is not None and plan_blob is not None and spec_blob is not None \
+                and (last["sha"], last["spec_sha"]) != (plan_blob, spec_blob):
+            raise _Refuse(PLAN_CHANGED.format(number=last["number"]))
+    return _Act("approve_plan")
+
+
 def _context(state, conn, cwd: Path, confirm: bool) -> _Ctx:
     work = sessions.work_for_path(conn, cwd)
     if work is None:
@@ -404,7 +421,8 @@ def _context(state, conn, cwd: Path, confirm: bool) -> _Ctx:
                                                 if block else ""),
                       "resolve", id=block["id"] if block else "<id>")
     if work["phase"] not in ("spec_audit", "plan", "approval"):
-        raise _Refuse(f"audit prepare vale in spec_audit, plan e approval (fase {work['phase']})")
+        raise _Refuse(f"{_prog()} audit prepare vale in spec_audit, plan e approval "
+                      f"(fase {work['phase']})")
     wt = Path(work["worktree"])
     base = work_base(work, wt)
     if not base:
@@ -421,7 +439,7 @@ def _decide(ctx: _Ctx) -> _Act:
         return _decide_spec(ctx)
     if phase == "plan":
         return _decide_plan(ctx)
-    return _Act("approve_plan")
+    return _decide_approval(ctx)
 
 
 def _write_brief(ctx: _Ctx, rnd: _Round, number: int, code: str) -> Path:
@@ -526,7 +544,8 @@ def decline(state, cwd, *, now=None) -> tuple[int, list[str]]:
         ctx = _context(state, conn, Path(cwd), False)
         wid = ctx.work["id"]
         if ctx.work["phase"] != "spec_audit":
-            raise _Refuse(f"audit decline vale in spec_audit (fase {ctx.work['phase']})")
+            raise _Refuse(f"{_prog()} audit decline vale in spec_audit "
+                          f"(fase {ctx.work['phase']})")
         if not on(ctx.cfg, LENS_KIND):
             raise _Refuse("l'audit a lenti è spento: non c'è nulla da rifiutare")
         if specdoc.slices(_spec_doc(ctx)[2]) <= 1:
@@ -551,8 +570,9 @@ def peek(conn, work: sqlite3.Row) -> str:
     try:
         phase = work["phase"]
         if phase == "approval":
-            return _step_text("approve_plan")
-        if work["level"] != "L2" or phase not in ("spec_audit", "plan") or not work["worktree"]:
+            fallback = _step_text("approve_plan")
+        if work["level"] != "L2" or phase not in ("spec_audit", "plan", "approval") \
+                or not work["worktree"]:
             return fallback
         wt = Path(work["worktree"])
         if not wt.is_dir():

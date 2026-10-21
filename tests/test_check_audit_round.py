@@ -362,6 +362,29 @@ class WriteFailureTest(RoundCase):
         self.assertEqual(self.row(LENS)["stage"], "closed")
         self.assertTrue(self.vetoes()[0]["reason"].startswith("stato delle lenti non scritto"))
 
+    def test_unencodable_body_leaves_no_temporary_file(self):
+        """Riga 18: un testo che non si codifica (surrogato) non lascia un `.tmp` nella cartella
+        protetta e dà un veto, non un'eccezione."""
+        fl = self.open_adv()
+        ctx = types.SimpleNamespace(now=fl.lab.now, event=types.SimpleNamespace(session=SESSION),
+                                    cfg=lambda k: 4)
+        data = {"work": fl.work, "kind": ADV, "number": 1, "counts": dict(auditrules_zero()),
+                "body": "rotto \udcff", "extra": []}
+        apply._audit_report(fl.conn, fl.ts.state, ctx, data)
+        self.assertTrue(self.vetoes()[0]["reason"].startswith("report non scritto:"))
+        self.assertEqual(self.row()["stage"], "open")
+        folder = (fl.wt / REPORT).parent
+        self.assertEqual([p.name for p in folder.iterdir()] if folder.exists() else [], [])
+
+    def test_write_atomic_removes_temporary_on_any_error(self):
+        fl = self.open_adv()
+        target = fl.wt / "docs" / "superpowers" / "reviews" / "7" / "x.md"
+        with self.assertRaises(ValueError):
+            apply._write_atomic(target, "\udcff")
+        self.assertEqual([p.name for p in target.parent.iterdir()], [])
+        apply._write_atomic(target, "ok\n")
+        self.assertEqual([p.name for p in target.parent.iterdir()], ["x.md"])
+
     def test_audit_report_ignores_round_no_longer_open(self):
         fl = self.open_adv()
         ctx = types.SimpleNamespace(now=fl.lab.now, event=types.SimpleNamespace(session=SESSION),
