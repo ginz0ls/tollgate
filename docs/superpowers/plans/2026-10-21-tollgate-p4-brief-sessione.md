@@ -37,7 +37,8 @@ Il lavoro è finito quando:
 
 ## Punti delicati del piano
 
-- **GitHub vero solo dal controller** (decisione 25): Task 1 e Task 16, solo su `ginz0ls/tollgate-p4-protected` (pubblico, `protected`) e `ginz0ls/tollgate-p4-detect` (privato, `detect`), solo con le operazioni elencate. I repo li crea il Task 1 e li cancella l'utente.
+- **GitHub vero solo dal controller** (decisione 25): Task 1 e Task 16, solo su `ginz0ls/tollgate-p4-protected` (pubblico, `protected`) e `ginz0ls/tollgate-p4-detect` (privato, `detect`), solo con le operazioni elencate. I repo li crea il Task 1 e li cancella l'utente. Il repo pubblico riceve il codice di tollgate solo nel Task 16 e va cancellato appena chiusi i giri di correzione della revisione finale («pubblico solo per la prova», scelta dell'utente).
+- **Sicurezza dei workflow** (decisioni 5 e 17, dalla revisione del piano): nessuno stato `success` «non applicabile»; checkout del ramo predefinito con `persist-credentials: false` in ogni workflow con permessi di scrittura; artefatti e cache estratti sotto `runner.temp`.
 - **Strati** (decisione 1): `tollgate_gate` non importa mai `tollgate_core.db` né `sqlite3`, nemmeno indirettamente; `test_layers.py` lo controlla anche a runtime. Per questo il Task 2 estrae `runner`, `ghcli` e `diffcheck` senza cambiare i nomi visti dai chiamanti.
 - **Un solo calcolo** (decisione 3): `evaluate` decide le voci rosse e quelle di `attenzione` sia nel gate sia in `finish check`. Una regola nuova va lì, mai in uno solo dei due.
 - **Testo non fidato** (Global Constraints, decisione 17): nessuna `${{ }}` nelle righe `run:` dei workflow; i commenti si scrivono da file (`-F body=@file`); i nomi dei rami e i corpi delle PR non entrano mai in un argomento.

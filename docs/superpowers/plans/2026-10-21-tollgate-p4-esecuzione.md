@@ -69,7 +69,7 @@ Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincol
 - `gh api` in lettura sui due repo; `POST repos/<o>/<r>/statuses/<sha>` (prova del token personale); `PUT` e `DELETE` di `branches/main/protection` **solo** su `tollgate-p4-protected`.
 - `gh auth status` (sola lettura). Vietati: ogni altro `gh auth`, `gh api user`, cancellare i repo, cambiarne la visibilità, i segreti.
 - `claude -p` solo nel Task 16, solo da `/tmp/tollgate-p4/flow`, solo con `--plugin-dir`.
-- I repo restano alla fine: **li cancella l'utente**.
+- I repo restano alla fine: **li cancella l'utente**. Il codice di tollgate entra nel repo pubblico solo nel Task 16: avvisa l'utente quando lo installi, e chiedigli di cancellare `tollgate-p4-protected` appena chiusi i giri di correzione della revisione finale (scelta dell'utente: «pubblico solo per la prova»).
 
 **Processi, git e segreti**
 - **Mai `pkill`, `killall` o `kill` per nome o pattern**: si fermano solo processi propri, per PID, avviati in questa stessa esecuzione.
