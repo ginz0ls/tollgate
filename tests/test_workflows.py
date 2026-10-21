@@ -137,6 +137,39 @@ class WorkflowsTest(unittest.TestCase):
         self.assert_red(wf("    permissions:\n      ?\n"))
         self.assertEqual(workflows.problems(wf("    steps:\n      - run: echo ?\n")), [])
 
+    def test_yaml_tags_fail_closed(self):
+        BS = "\\"
+        red = [
+            f'on: [push, !!str "pull_request_{BS}x74arget"]\n',
+            f'on:\n  - !!str "pull_request_{BS}x74arget"\n',
+            f'permissions:\n  !!str "{BS}x73tatuses": write\n',
+            f'permissions: {{!!str "{BS}x73tatuses": write}}\n',
+            f'on: [!<tag:yaml.org,2002:str> "pull_request_{BS}x74arget"]\n',
+            'on: !!str push\n',
+            'name: !custom x\n',
+            'steps: [!t a]\n',
+            'env:\n  A: !!str 1\n',
+        ]
+        for body in red:
+            with self.subTest(body=body):
+                self.assert_red(wf("") + body, "tag")
+        for body in ("    steps:\n      - run: echo a != b\n",
+                     "    steps:\n      - run: |\n          ! grep -q x f\n          cp *.txt &x\n",
+                     "    steps:\n      - name: x # !tag\n"):
+            with self.subTest(body=body):
+                self.assertEqual(workflows.problems(wf(body)), [])
+
+    def test_tabs_after_colon_in_permissions(self):
+        for body in ("    permissions:\n      statuses:\twrite\n",
+                     "    permissions: {checks:\twrite}\n",
+                     "    permissions: {statuses :\twrite}\n",
+                     "    permissions:\n      statuses: \t write\n"):
+            with self.subTest(body=body):
+                self.assert_red(wf(body))
+        self.assertEqual(workflows.problems(wf("    permissions:\n      statuses:\tread\n")), [])
+        self.assertEqual(workflows.problems("on: push\npermissions\t: {}\n"), [])
+        self.assertEqual(workflows.problems("on: push\npermissions:\tread-all\n"), [])
+
     def test_yaml_extension(self):
         self.assertTrue(workflows.is_workflow_path(".github/workflows/ci.yml"))
         self.assertTrue(workflows.is_workflow_path(".github/workflows/ci.yaml"))

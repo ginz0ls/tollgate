@@ -11,12 +11,14 @@ SAFE_VALUES = ("read", "none")
 _PATH = re.compile(r"^\.github/workflows/[^/]+\.ya?ml$")
 _EVENT = re.compile(r"(?<![\w-])(" + "|".join(FORBIDDEN_EVENTS) + r")(?![\w-])")
 _WRITE_ALL = re.compile(r"(?<![\w-])write-all(?![\w-])")
-_SCOPE = re.compile(r"(?:^|[\s{,\[-])[\"']?(" + "|".join(GUARDED_SCOPES) + r")[\"']?[ ]*:"
-                    r"(?:[ ]+|(?=[,}\]]|$))(\"[^\"]*\"|'[^']*'|[^\s,}\]]*)")
+_SCOPE = re.compile(r"(?:^|[\s{,\[-])[\"']?(" + "|".join(GUARDED_SCOPES) + r")[\"']?[ \t]*:"
+                    r"(?:[ \t]+|(?=[,}\]]|$))(\"[^\"]*\"|'[^']*'|[^\s,}\]]*)")
 # àncora, alias o chiave di fusione: a inizio nodo (riga, `- `, dopo `chiave: `, `[`, `{` o `,`)
 _ANCHOR = re.compile(r"(?:^\s*(?:-\s+)*|:\s+|[\[{,]\s*)[&*]\S")
 _MERGE = re.compile(r"^\s*(?:-\s+)?<<\s*:")
-_TOP_PERMISSIONS = re.compile(r"^[\"']?permissions[\"']?[ ]*:")
+_TOP_PERMISSIONS = re.compile(r"^[\"']?permissions[\"']?[ \t]*:")
+# tag YAML (`!!str`, `!tag`, `!<...>`): a inizio nodo, come àncore e alias
+_TAG = re.compile(r"(?:^\s*(?:-\s+)*|:\s*|[\[{,]\s*)!")
 # chiave complessa `? `
 _COMPLEX_KEY = re.compile(r"^\s*(?:-\s+)*\?(?:\s|$)")
 _TAB_INDENT = re.compile(r"^[ ]*\t")
@@ -73,18 +75,21 @@ def _next_value(lines: list[str], index: int) -> str:
     return ""
 
 
-def _escape_lines(lines: list[str]) -> list[int]:
+def _escape_lines(lines: list[str]) -> tuple[list[int], set[int]]:
     """I numeri di riga con un `\\` dentro una stringa a doppie virgolette, in qualunque punto,
     tranne il valore di una chiave `run:`. Segue lo stato «dentro una stringa» da una riga
     all'altra; le virgolette si aprono a inizio nodo (dopo `:`, `-`, `[`, `{`, `,`, `?` o a
     inizio riga); nelle virgolette singole `\\` non è un escape; il contenuto di uno scalare a
-    blocco (`|`, `>`) è testo e non si guarda."""
+    blocco (`|`, `>`) è testo e non si guarda. Restituisce anche i numeri di riga di quei
+    contenuti."""
     found: list[int] = []
+    blocks: set[int] = set()
     in_dq = in_sq = dq_run = False
     block_base: int | None = None
     for number, line in enumerate(lines, 1):
         if block_base is not None and not in_dq and not in_sq:
             if not line.strip() or _indent(line) > block_base:
+                blocks.add(number)
                 continue
             block_base = None
         i, flagged = 0, False
@@ -114,7 +119,7 @@ def _escape_lines(lines: list[str]) -> list[int]:
             m = _BLOCK_HEADER.match(_strip_comment(line))
             if m:
                 block_base = len(m.group(1))
-    return found
+    return found, blocks
 
 
 def problems(text: str) -> list[str]:
@@ -130,6 +135,7 @@ def problems(text: str) -> list[str]:
         if _TAB_INDENT.match(line):
             return [f"il file non si legge: tabulazione nel rientro (riga {number})"]
     found: list[str] = []
+    escapes, blocks = _escape_lines(lines)
     top_permissions = False
     for number, raw in enumerate(lines, 1):
         line = _strip_comment(raw)
@@ -147,11 +153,13 @@ def problems(text: str) -> list[str]:
                 found.append(f"{m.group(1)}: {value} invece di read o none (riga {number})")
         if _COMPLEX_KEY.match(line):
             found.append(f"chiave complessa YAML `?` (riga {number}): non si controlla")
-        if _ANCHOR.search(line) or _MERGE.match(line):
+        if number not in blocks and (_ANCHOR.search(line) or _MERGE.match(line)):
             found.append(f"àncora, alias o chiave di fusione YAML (riga {number}): non si "
                          f"controlla")
+        if number not in blocks and _TAG.search(line):
+            found.append(f"tag YAML (riga {number}): non si controlla")
     found += [f"escape (\\) in una stringa tra virgolette doppie fuori da run: (riga {n}): non "
-              f"si controlla" for n in _escape_lines(lines)]
+              f"si controlla" for n in escapes]
     if not top_permissions:
         found.append("manca il blocco permissions di primo livello")
     return found
