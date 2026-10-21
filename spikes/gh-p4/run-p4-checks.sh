@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # spikes/gh-p4/run-p4-checks.sh — verifiche reali P4 (V1-V9) su due repo GitHub, decisione 25.
 # Lo esegue solo il controller. Modo `controlla`: nessuna rete, `gh` finto.
-# Uso: run-p4-checks.sh prepara | v1 | v2 | v3 | v3b | v4 | v5 | v5b | v6 | v7 | v8 | v9 | raccogli | pulisci-sonde | controlla
+# Uso: run-p4-checks.sh prepara | v1 | v2 | v3 | v3b | v4 | v4b | v5 | v5b | v6 | v7 | v8 | v9 | raccogli | pulisci-sonde | controlla
 #
 # Lezione dell'incidente di P0: nessuna cartella di uscite si cancella mai. Le uscite stanno in
 # docs/verifiche/evidenze/gh-p4/ del worktree; un file che esiste già si rinomina in <nome>.prev-<tempo>.
@@ -358,6 +358,34 @@ modo_v4() {
   gh_call v4-pr-close pr close "$PR_NUM" --repo "$PROT"
 }
 
+# V4b: dove si può scrivere una cache. probe-base (push) SALVA probe-v4b-<tag>; poi una PR: probe-run (pull_request)
+# e probe-verdict (workflow_run) la RIPRISTINANO. Il tag (data e ora) è nuovo a ogni corsa: un salvataggio su una
+# chiave esistente fallirebbe.
+modo_v4b() {
+  local ts br f
+  clone_or_update protected
+  ts="$(date +%Y%m%d-%H%M%S)"; br="p4-v4b-$ts"
+  commit_on_main .github/probe-v4b-tag "$ts"
+  git_call v4b-push-main protected push origin main
+  [ "$RC" = 0 ] || die "push su main fallito (vedi v4b-push-main.err)"
+  save_text "$OUT/v4b-push.env" "SHA=$MAIN_SHA" "TAG=$ts"
+  track_run v4b-base "$PROT" probe-base.yml "$MAIN_SHA" "" 0
+  open_pr v4b "$br" "sonde/v4b-$ts.txt"
+  save_text "$OUT/v4b-pr.env" "PR=$PR_NUM" "SHA=$PR_SHA" "BRANCH=$br"
+  track_run v4b-run "$PROT" probe-run.yml "$PR_SHA" "$br" 0
+  track_run v4b-verdict "$PROT" probe-verdict.yml "$PR_SHA" "$br" 1
+  gh_call v4b-pr-close pr close "$PR_NUM" --repo "$PROT"
+  rot "$OUT/v4b-riepilogo.txt"
+  {
+    echo "# tag $ts; v4b_save per il salvataggio (base), v4b_cache_hit e v4b_matched_key per i ripristini"
+    for f in "$OUT"/v4b-*-artifacts-*/info.json "$OUT"/v4b-*-artifacts-*/*/info.json; do
+      [ -f "$f" ] || continue
+      echo "# ${f#"$OUT"/}"
+      jq -c '{v4b_tag, v4b_save, v4b_cache_hit, v4b_matched_key, v4b_value}' "$f" 2>&1
+    done
+  } > "$OUT/v4b-riepilogo.txt"
+}
+
 get_pulls() { # <etichetta> <sha>: GET commits/<sha>/pulls, con qualche ripetizione finché non è vuota
   local i
   for i in 1 2 3 4; do
@@ -540,7 +568,7 @@ modo_pulisci_sonde() {
   for n in protected detect; do
     clone_or_update "$n"
     d="$WORK/$n"
-    files="$(ls "$d"/.github/workflows/probe-*.yml "$d"/.github/probe-tag 2>/dev/null)"
+    files="$(ls "$d"/.github/workflows/probe-*.yml "$d"/.github/probe-tag "$d"/.github/probe-v4b-tag 2>/dev/null)"
     if [ -z "$files" ]; then
       save_text "$OUT/pulisci-$n.txt" "nulla da togliere su $n"
       continue
@@ -754,7 +782,7 @@ modo_controlla() {
   [ "$(command -v gh)" = "$T/bin/gh" ] || die "il gh finto non è il primo nel PATH"
   : > "$P4_FAKE_LOG"
   echo "cartella del controllo: $T"
-  for mode in prepara v1 v2 v3 v3b v4 v5b v5 v6 v7 v8 v9 raccogli pulisci-sonde; do
+  for mode in prepara v1 v2 v3 v3b v4 v4b v5b v5 v6 v7 v8 v9 raccogli pulisci-sonde; do
     if bash "$here/run-p4-checks.sh" "$mode" >"$T/modo-$mode.log" 2>&1; then
       echo "modo $mode: ok"
     else
@@ -772,7 +800,7 @@ modo_controlla() {
   echo "--- uscite attese"
   for f in prepara-auth.out prepara-protected-esiste.rc v1-pr.env v1-target-runid.txt v1-run-runid.txt v1-verdict-runid.txt \
            v1-pr-view-comments.out v1-api-comments.out v1-login.txt v2-detect.out v2-detect.err v2-detect.rc v2-protected.rc \
-           v3-riepilogo.jsonl v3b-pr.env v3b-riepilogo.txt v5b-pr.env v5b-riepilogo.txt v4-pr.env v4-push.env v4-base-runid.txt v5-shas.txt v5-riepilogo.tsv v6-riepilogo.txt \
+           v3-riepilogo.jsonl v3b-pr.env v3b-riepilogo.txt v4b-pr.env v4b-push.env v4b-riepilogo.txt v5b-pr.env v5b-riepilogo.txt v4-pr.env v4-push.env v4-base-runid.txt v5-shas.txt v5-riepilogo.tsv v6-riepilogo.txt \
            v7-riepilogo.txt v8-find.txt v8-artefatti.out v9-protected.out v9-detect.out raccogli-runs-protected.out \
            raccogli-minuti.txt pulisci-protected.txt pulisci-detect.txt comandi.log; do
     [ -e "$T/out/$f" ] || { echo "  manca $f"; missing=1; }
@@ -786,9 +814,9 @@ modo_controlla() {
 }
 
 case "$MODE" in
-  prepara|v1|v2|v3|v3b|v4|v5|v5b|v6|v7|v8|v9|raccogli)
+  prepara|v1|v2|v3|v3b|v4|v4b|v5|v5b|v6|v7|v8|v9|raccogli)
     mkdir -p "$OUT" "$WORK"; "modo_$MODE" ;;
   pulisci-sonde) mkdir -p "$OUT" "$WORK"; modo_pulisci_sonde ;;
   controlla) modo_controlla ;;
-  *) echo "uso: $0 prepara|v1|v2|v3|v3b|v4|v5|v5b|v6|v7|v8|v9|raccogli|pulisci-sonde|controlla" >&2; exit 2 ;;
+  *) echo "uso: $0 prepara|v1|v2|v3|v3b|v4|v4b|v5|v5b|v6|v7|v8|v9|raccogli|pulisci-sonde|controlla" >&2; exit 2 ;;
 esac
