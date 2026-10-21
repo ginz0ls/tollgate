@@ -1,0 +1,68 @@
+{
+  "event_keys": [
+    "action",
+    "repository",
+    "sender",
+    "workflow",
+    "workflow_run"
+  ],
+  "workflow_run_keys": [
+    "actor",
+    "artifacts_url",
+    "cancel_url",
+    "check_suite_id",
+    "check_suite_node_id",
+    "check_suite_url",
+    "conclusion",
+    "created_at",
+    "display_title",
+    "event",
+    "head_branch",
+    "head_commit",
+    "head_repository",
+    "head_sha",
+    "html_url",
+    "id",
+    "jobs_url",
+    "logs_url",
+    "name",
+    "node_id",
+    "path",
+    "previous_attempt_url",
+    "pull_requests",
+    "referenced_workflows",
+    "repository",
+    "rerun_url",
+    "run_attempt",
+    "run_number",
+    "run_started_at",
+    "status",
+    "triggering_actor",
+    "updated_at",
+    "url",
+    "workflow_id",
+    "workflow_url"
+  ],
+  "path": ".github/workflows/probe-run.yml",
+  "event": "pull_request",
+  "head_sha": "4ce041af445cd6990d8f26391d2dec669d65f623",
+  "head_branch": "p4-v4b-20261021-182256",
+  "conclusion": "success",
+  "run_id": 39634329631,
+  "pull_requests": [
+    {
+      "number": 8,
+      "base_ref": "main",
+      "base_sha": "32fb324f2b36d609cfe7c5109941ccb3b728c234",
+      "head_ref": "p4-v4b-20261021-182256",
+      "head_sha": "4ce041af445cd6990d8f26391d2dec669d65f623",
+      "keys": [
+        "base",
+        "head",
+        "id",
+        "number",
+        "url"
+      ]
+    }
+  ]
+}

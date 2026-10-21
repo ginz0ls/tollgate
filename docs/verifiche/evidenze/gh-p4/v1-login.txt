@@ -1,0 +1,6 @@
+# gh pr view --json comments: author.login e lunghezza del corpo
+ginz0ls	31
+github-actions	54
+# GET issues/<n>/comments: user.login, user.type, lunghezza del corpo
+ginz0ls	User	31
+github-actions[bot]	Bot	54

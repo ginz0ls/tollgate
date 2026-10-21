@@ -1,0 +1,6 @@
+# PR A=2 (testa 216898cde9020848859477a0fda17ee6227dea3d), PR B=3 (testa e21bc2c1efa5348e439751d3729c795a476f1b7a, sopra A)
+# v5b-pulls-testa-a: numero, state, head.sha, base.ref
+2	open	216898cde9020848859477a0fda17ee6227dea3d	main
+3	open	e21bc2c1efa5348e439751d3729c795a476f1b7a	main
+# v5b-pulls-testa-b: numero, state, head.sha, base.ref
+3	open	e21bc2c1efa5348e439751d3729c795a476f1b7a	main

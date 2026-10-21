@@ -1,0 +1,13 @@
+{
+  "sha": "c03b433724ad7e199a913b3ffbb6c5a6526c8da6",
+  "job_id": "base",
+  "cache_hit": "",
+  "cache_matched_key": "",
+  "gh_version": "gh version 2.102.0 (2026-09-30)",
+  "gh_api_rc": 0,
+  "gh_api_full_name": "ginz0ls/tollgate-p4-protected",
+  "status_rc": 0,
+  "status_creator": "github-actions[bot]",
+  "image_os": "ubuntu24",
+  "image_version": "20261012.334.1"
+}

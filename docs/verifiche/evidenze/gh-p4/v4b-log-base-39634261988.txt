@@ -1,0 +1,216 @@
+base	Set up job	﻿2026-10-21T16:23:02.6315031Z Current runner version: '2.338.0'
+base	Set up job	2026-10-21T16:23:02.6336870Z ##[group]Runner Image Provisioner
+base	Set up job	2026-10-21T16:23:02.6337530Z Hosted Compute Agent
+base	Set up job	2026-10-21T16:23:02.6338096Z Version: 20261015.610
+base	Set up job	2026-10-21T16:23:02.6338509Z Commit: 267fdb4e8bbec4ab5ea31367f3a00d5c480c7656
+base	Set up job	2026-10-21T16:23:02.6339043Z Build Date: 2026-10-14T17:06:54Z
+base	Set up job	2026-10-21T16:23:02.6339471Z Worker ID: {b810b8f3-5068-486f-b661-ada1e5123364}
+base	Set up job	2026-10-21T16:23:02.6339907Z Region: centralus
+base	Set up job	2026-10-21T16:23:02.6340310Z Cloud: Azure
+base	Set up job	2026-10-21T16:23:02.6340667Z ##[endgroup]
+base	Set up job	2026-10-21T16:23:02.6342003Z ##[group]Operating System
+base	Set up job	2026-10-21T16:23:02.6342394Z Ubuntu
+base	Set up job	2026-10-21T16:23:02.6342732Z 24.04.5
+base	Set up job	2026-10-21T16:23:02.6343111Z LTS
+base	Set up job	2026-10-21T16:23:02.6343448Z ##[endgroup]
+base	Set up job	2026-10-21T16:23:02.6343853Z ##[group]Runner Image
+base	Set up job	2026-10-21T16:23:02.6344252Z Image: ubuntu-24.04
+base	Set up job	2026-10-21T16:23:02.6344620Z Version: 20261018.339.1
+base	Set up job	2026-10-21T16:23:02.6345311Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261018.339/images/ubuntu/Ubuntu2404-Readme.md
+base	Set up job	2026-10-21T16:23:02.6346442Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261018.339
+base	Set up job	2026-10-21T16:23:02.6347049Z ##[endgroup]
+base	Set up job	2026-10-21T16:23:02.6347827Z ##[group]GITHUB_TOKEN Permissions
+base	Set up job	2026-10-21T16:23:02.6349524Z Contents: read
+base	Set up job	2026-10-21T16:23:02.6349935Z Metadata: read
+base	Set up job	2026-10-21T16:23:02.6350376Z Statuses: write
+base	Set up job	2026-10-21T16:23:02.6350742Z ##[endgroup]
+base	Set up job	2026-10-21T16:23:02.6352448Z Secret source: Actions
+base	Set up job	2026-10-21T16:23:02.6353022Z Cache mode: write
+base	Set up job	2026-10-21T16:23:02.6353496Z Prepare workflow directory
+base	Set up job	2026-10-21T16:23:02.6658136Z Prepare all required actions
+base	Set up job	2026-10-21T16:23:02.6692070Z Getting action download info
+base	Set up job	2026-10-21T16:23:02.9413444Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+base	Set up job	2026-10-21T16:23:03.2540504Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+base	Set up job	2026-10-21T16:23:03.5108716Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+base	Set up job	2026-10-21T16:23:03.9803261Z Complete job name: base
+base	Run actions/checkout@v4	﻿2026-10-21T16:23:04.0410268Z ##[group]Run actions/checkout@v4
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0411079Z with:
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0411616Z   persist-credentials: false
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0412299Z   repository: ginz0ls/tollgate-p4-protected
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0418149Z   token: ***
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0418676Z   ssh-strict: true
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0419213Z   ssh-user: git
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0419739Z   clean: true
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0420300Z   sparse-checkout-cone-mode: true
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0420949Z   fetch-depth: 1
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0421488Z   fetch-tags: false
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0422041Z   show-progress: true
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0422604Z   lfs: false
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0423133Z   submodules: false
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0423699Z   set-safe-directory: true
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0424338Z   allow-unsafe-pr-checkout: false
+base	Run actions/checkout@v4	2026-10-21T16:23:04.0425071Z ##[endgroup]
+base	Run actions/checkout@v4	2026-10-21T16:23:04.1588994Z Syncing repository: ginz0ls/tollgate-p4-protected
+base	Run actions/checkout@v4	2026-10-21T16:23:04.1591875Z ##[group]Getting Git version info
+base	Run actions/checkout@v4	2026-10-21T16:23:04.1593504Z Working directory is '/home/runner/work/tollgate-p4-protected/tollgate-p4-protected'
+base	Run actions/checkout@v4	2026-10-21T16:23:04.1595819Z [command]/usr/bin/git version
+base	Run actions/checkout@v4	2026-10-21T16:23:04.1646277Z git version 2.55.0
+base	Run actions/checkout@v4	2026-10-21T16:23:04.1663302Z ##[endgroup]
+base	Run actions/checkout@v4	2026-10-21T16:23:04.1676205Z Temporarily overriding HOME='/home/runner/work/_temp/466d8462-aaa4-42cb-9f2d-891958fc0d33' before making global git config changes
+base	Run actions/checkout@v4	2026-10-21T16:23:04.1681203Z Adding repository directory to the temporary git global config as a safe directory
+base	Run actions/checkout@v4	2026-10-21T16:23:04.1683628Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate-p4-protected/tollgate-p4-protected
+base	Run actions/checkout@v4	2026-10-21T16:23:04.2123726Z Deleting the contents of '/home/runner/work/tollgate-p4-protected/tollgate-p4-protected'
+base	Run actions/checkout@v4	2026-10-21T16:23:04.2129324Z ##[group]Initializing the repository
+base	Run actions/checkout@v4	2026-10-21T16:23:04.2132851Z [command]/usr/bin/git init /home/runner/work/tollgate-p4-protected/tollgate-p4-protected
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3015907Z hint: Using 'master' as the name for the initial branch. This default branch name
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3018064Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3019854Z hint: to use in all of your new repositories, which will suppress this warning,
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3020883Z hint: call:
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3021372Z hint:
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3022033Z hint: 	git config --global init.defaultBranch <name>
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3022776Z hint:
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3023471Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3024721Z hint: 'development'. The just-created branch can be renamed via this command:
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3026024Z hint:
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3026579Z hint: 	git branch -m <name>
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3027171Z hint:
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3028138Z hint: Disable this message with "git config set advice.defaultBranchName false"
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3029566Z Initialized empty Git repository in /home/runner/work/tollgate-p4-protected/tollgate-p4-protected/.git/
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3032100Z [command]/usr/bin/git remote add origin https://github.com/ginz0ls/tollgate-p4-protected
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3325807Z ##[endgroup]
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3327340Z ##[group]Disabling automatic garbage collection
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3329891Z [command]/usr/bin/git config --local gc.auto 0
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3938405Z ##[endgroup]
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3939860Z ##[group]Setting up auth
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3941202Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+base	Run actions/checkout@v4	2026-10-21T16:23:04.3983274Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+base	Run actions/checkout@v4	2026-10-21T16:23:04.4306526Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+base	Run actions/checkout@v4	2026-10-21T16:23:04.4346948Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+base	Run actions/checkout@v4	2026-10-21T16:23:04.4545974Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+base	Run actions/checkout@v4	2026-10-21T16:23:04.4583994Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+base	Run actions/checkout@v4	2026-10-21T16:23:04.4782904Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+base	Run actions/checkout@v4	2026-10-21T16:23:04.5750490Z ##[endgroup]
+base	Run actions/checkout@v4	2026-10-21T16:23:04.5752525Z ##[group]Fetching the repository
+base	Run actions/checkout@v4	2026-10-21T16:23:04.5758062Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +32fb324f2b36d609cfe7c5109941ccb3b728c234:refs/remotes/origin/main
+base	Run actions/checkout@v4	2026-10-21T16:23:04.9185310Z From https://github.com/ginz0ls/tollgate-p4-protected
+base	Run actions/checkout@v4	2026-10-21T16:23:04.9185893Z  * [new ref]         32fb324f2b36d609cfe7c5109941ccb3b728c234 -> origin/main
+base	Run actions/checkout@v4	2026-10-21T16:23:04.9195316Z ##[endgroup]
+base	Run actions/checkout@v4	2026-10-21T16:23:04.9195746Z ##[group]Determining the checkout info
+base	Run actions/checkout@v4	2026-10-21T16:23:04.9196028Z ##[endgroup]
+base	Run actions/checkout@v4	2026-10-21T16:23:04.9197381Z [command]/usr/bin/git sparse-checkout disable
+base	Run actions/checkout@v4	2026-10-21T16:23:04.9746484Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+base	Run actions/checkout@v4	2026-10-21T16:23:05.0146738Z ##[group]Checking out the ref
+base	Run actions/checkout@v4	2026-10-21T16:23:05.0151202Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+base	Run actions/checkout@v4	2026-10-21T16:23:05.0745924Z Switched to a new branch 'main'
+base	Run actions/checkout@v4	2026-10-21T16:23:05.0752868Z branch 'main' set up to track 'origin/main'.
+base	Run actions/checkout@v4	2026-10-21T16:23:05.0756217Z ##[endgroup]
+base	Run actions/checkout@v4	2026-10-21T16:23:05.0806154Z [command]/usr/bin/git log -1 --format=%H
+base	Run actions/checkout@v4	2026-10-21T16:23:05.0836285Z 32fb324f2b36d609cfe7c5109941ccb3b728c234
+base	Run actions/checkout@v4	2026-10-21T16:23:05.0843684Z ##[group]Removing auth
+base	Run actions/checkout@v4	2026-10-21T16:23:05.0845981Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+base	Run actions/checkout@v4	2026-10-21T16:23:05.0878892Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+base	Run actions/checkout@v4	2026-10-21T16:23:05.1073963Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+base	Run actions/checkout@v4	2026-10-21T16:23:05.1144955Z http.https://github.com/.extraheader
+base	Run actions/checkout@v4	2026-10-21T16:23:05.1150829Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+base	Run actions/checkout@v4	2026-10-21T16:23:05.1250773Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+base	Run actions/checkout@v4	2026-10-21T16:23:05.1445711Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+base	Run actions/checkout@v4	2026-10-21T16:23:05.1480655Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+base	Run actions/checkout@v4	2026-10-21T16:23:05.1672402Z ##[endgroup]
+base	Run echo "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"	﻿2026-10-21T16:23:05.1920456Z ##[group]Run echo "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"
+base	Run echo "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"	2026-10-21T16:23:05.1920896Z [36;1mecho "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"[0m
+base	Run echo "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"	2026-10-21T16:23:05.2132403Z shell: /usr/bin/bash -e {0}
+base	Run echo "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"	2026-10-21T16:23:05.2132662Z ##[endgroup]
+base	Run echo "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"	﻿2026-10-21T16:23:05.3057497Z ##[group]Run echo "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"
+base	Run echo "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"	2026-10-21T16:23:05.3058352Z [36;1mecho "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"[0m
+base	Run echo "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"	2026-10-21T16:23:05.3101848Z shell: /usr/bin/bash -e {0}
+base	Run echo "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"	2026-10-21T16:23:05.3102032Z ##[endgroup]
+base	valore v4b	﻿2026-10-21T16:23:05.4962179Z ##[group]Run mkdir -p "$RUNNER_TEMP/probe-cache-v4b"
+base	valore v4b	2026-10-21T16:23:05.4962553Z [36;1mmkdir -p "$RUNNER_TEMP/probe-cache-v4b"[0m
+base	valore v4b	2026-10-21T16:23:05.4962824Z [36;1mecho "$GITHUB_SHA" > "$RUNNER_TEMP/probe-cache-v4b/value.txt"[0m
+base	valore v4b	2026-10-21T16:23:05.5005855Z shell: /usr/bin/bash -e {0}
+base	valore v4b	2026-10-21T16:23:05.5006034Z ##[endgroup]
+base	Run actions/cache/save@v4	﻿2026-10-21T16:23:05.5127321Z ##[group]Run actions/cache/save@v4
+base	Run actions/cache/save@v4	2026-10-21T16:23:05.5127524Z with:
+base	Run actions/cache/save@v4	2026-10-21T16:23:05.5127694Z   path: /home/runner/work/_temp/probe-cache-v4b
+base	Run actions/cache/save@v4	2026-10-21T16:23:05.5128115Z   key: probe-v4b-20261021-182256
+base	Run actions/cache/save@v4	2026-10-21T16:23:05.5128354Z   enableCrossOsArchive: false
+base	Run actions/cache/save@v4	2026-10-21T16:23:05.5128522Z ##[endgroup]
+base	Run actions/cache/save@v4	2026-10-21T16:23:05.5838249Z (node:2201) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+base	Run actions/cache/save@v4	2026-10-21T16:23:05.5838816Z (Use `node --trace-deprecation ...` to show where the warning was created)
+base	Run actions/cache/save@v4	2026-10-21T16:23:05.5955268Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/tollgate-p4-protected/tollgate-p4-protected --files-from manifest.txt --use-compress-program zstdmt
+base	Run actions/cache/save@v4	2026-10-21T16:23:05.8082203Z (node:2201) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+base	Run actions/cache/save@v4	2026-10-21T16:23:05.9917154Z Sent 289 of 289 (100.0%), 0.0 MBs/sec
+base	Run actions/cache/save@v4	2026-10-21T16:23:06.1159504Z Cache saved with key: probe-v4b-20261021-182256
+base	Run actions/cache/restore@v4	﻿2026-10-21T16:23:06.1262708Z ##[group]Run actions/cache/restore@v4
+base	Run actions/cache/restore@v4	2026-10-21T16:23:06.1262897Z with:
+base	Run actions/cache/restore@v4	2026-10-21T16:23:06.1263035Z   path: /home/runner/work/_temp/probe-cache
+base	Run actions/cache/restore@v4	2026-10-21T16:23:06.1263208Z   key: probe-v4-20261021175521
+base	Run actions/cache/restore@v4	2026-10-21T16:23:06.1263367Z   enableCrossOsArchive: false
+base	Run actions/cache/restore@v4	2026-10-21T16:23:06.1263520Z   fail-on-cache-miss: false
+base	Run actions/cache/restore@v4	2026-10-21T16:23:06.1263664Z   lookup-only: false
+base	Run actions/cache/restore@v4	2026-10-21T16:23:06.1263795Z ##[endgroup]
+base	Run actions/cache/restore@v4	2026-10-21T16:23:06.2026192Z (node:2221) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+base	Run actions/cache/restore@v4	2026-10-21T16:23:06.2026790Z (Use `node --trace-deprecation ...` to show where the warning was created)
+base	Run actions/cache/restore@v4	2026-10-21T16:23:06.3286198Z Cache not found for input keys: probe-v4-20261021175521
+base	gh, stato	﻿2026-10-21T16:23:06.3396526Z ##[group]Run set -u
+base	gh, stato	2026-10-21T16:23:06.3396743Z [36;1mset -u[0m
+base	gh, stato	2026-10-21T16:23:06.3396929Z [36;1mout="$RUNNER_TEMP/probe"; mkdir -p "$out"[0m
+base	gh, stato	2026-10-21T16:23:06.3397244Z [36;1mjq '{event_keys: keys, ref: .ref, before: .before, after: .after}' "$GITHUB_EVENT_PATH" > "$out/event-keys.json"[0m
+base	gh, stato	2026-10-21T16:23:06.3397555Z [36;1mgh_version="$(gh --version | head -1)"[0m
+base	gh, stato	2026-10-21T16:23:06.3397729Z [36;1mapi_rc=0[0m
+base	gh, stato	2026-10-21T16:23:06.3398177Z [36;1mapi_full_name="$(gh api "repos/$GITHUB_REPOSITORY" --jq .full_name 2> "$out/gh-api.err")" || api_rc=$?[0m
+base	gh, stato	2026-10-21T16:23:06.3398460Z [36;1mstatus_rc=0[0m
+base	gh, stato	2026-10-21T16:23:06.3398886Z [36;1mstatus_creator="$(gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" -f state=success -f context=probe/base -f description=sonda --jq .creator.login 2> "$out/status.err")" || status_rc=$?[0m
+base	gh, stato	2026-10-21T16:23:06.3400332Z [36;1mjq -n --arg cache_hit "$CACHE_HIT" --arg cache_key "$CACHE_KEY" --arg sha "$GITHUB_SHA" --arg gh_version "$gh_version" --arg api_rc "$api_rc" --arg api_full_name "$api_full_name" --arg status_rc "$status_rc" --arg status_creator "$status_creator" --arg job "$GITHUB_JOB" --arg image_os "${ImageOS:-}" --arg image_version "${ImageVersion:-}" '{sha: $sha, job_id: $job, cache_hit: $cache_hit, cache_matched_key: $cache_key, gh_version: $gh_version, gh_api_rc: ($api_rc|tonumber), gh_api_full_name: $api_full_name, status_rc: ($status_rc|tonumber), status_creator: $status_creator, image_os: $image_os, image_version: $image_version}' > "$out/info.json"[0m
+base	gh, stato	2026-10-21T16:23:06.3445103Z shell: /usr/bin/bash -e {0}
+base	gh, stato	2026-10-21T16:23:06.3445267Z env:
+base	gh, stato	2026-10-21T16:23:06.3446961Z   GH_TOKEN: ***
+base	gh, stato	2026-10-21T16:23:06.3447091Z   CACHE_HIT: 
+base	gh, stato	2026-10-21T16:23:06.3447221Z   CACHE_KEY: 
+base	gh, stato	2026-10-21T16:23:06.3447348Z ##[endgroup]
+base	esiti v4b	﻿2026-10-21T16:23:07.7232078Z ##[group]Run out="$RUNNER_TEMP/probe"; mkdir -p "$out"
+base	esiti v4b	2026-10-21T16:23:07.7232368Z [36;1mout="$RUNNER_TEMP/probe"; mkdir -p "$out"[0m
+base	esiti v4b	2026-10-21T16:23:07.7232616Z [36;1mbase='{}'; [ -f "$out/info.json" ] && base="$(cat "$out/info.json")"[0m
+base	esiti v4b	2026-10-21T16:23:07.7233024Z [36;1mprintf '%s' "$base" | jq --arg save "$V4B_SAVE" --arg tag "$V4B_TAG" '. + {v4b_tag: $tag, v4b_save: $save}' > "$out/info.tmp" && mv "$out/info.tmp" "$out/info.json"[0m
+base	esiti v4b	2026-10-21T16:23:07.7275935Z shell: /usr/bin/bash -e {0}
+base	esiti v4b	2026-10-21T16:23:07.7276086Z env:
+base	esiti v4b	2026-10-21T16:23:07.7276218Z   V4B_SAVE: success
+base	esiti v4b	2026-10-21T16:23:07.7276344Z   V4B_TAG: 20261021-182256
+base	esiti v4b	2026-10-21T16:23:07.7276480Z ##[endgroup]
+base	Run actions/upload-artifact@v4	﻿2026-10-21T16:23:07.7444405Z ##[group]Run actions/upload-artifact@v4
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:07.7444581Z with:
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:07.7444711Z   name: probe-base-info
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:07.7444883Z   path: /home/runner/work/_temp/probe
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:07.7445072Z   if-no-files-found: warn
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:07.7445209Z   compression-level: 6
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:07.7445337Z   overwrite: false
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:07.7445466Z   include-hidden-files: false
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:07.7445620Z ##[endgroup]
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:07.8581229Z (node:2268) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:07.8581828Z (Use `node --trace-deprecation ...` to show where the warning was created)
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:07.8627668Z With the provided path, there will be 4 files uploaded
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:07.8658426Z Artifact name is valid!
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:07.8658730Z Root directory input is valid!
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:08.1753649Z Beginning upload of artifact content to blob storage
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:08.1897663Z (node:2268) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:08.3578346Z Uploaded bytes 939
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:08.4070372Z Finished uploading artifact content to blob storage!
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:08.4071013Z SHA256 digest of uploaded artifact zip is 8f952a21d1c4dd8f47cccd5bc73637ce9bebf60bec5e40a5868dfac99f8f9748
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:08.4072403Z Finalizing artifact upload
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:08.7054586Z Artifact probe-base-info.zip successfully finalized. Artifact ID 12360267868
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:08.7055194Z Artifact probe-base-info has been successfully uploaded! Final size is 939 bytes. Artifact ID is 12360267868
+base	Run actions/upload-artifact@v4	2026-10-21T16:23:08.7059995Z Artifact download URL: https://github.com/ginz0ls/tollgate-p4-protected/actions/runs/39634261988/artifacts/12360267868
+base	Post Run actions/checkout@v4	﻿2026-10-21T16:23:08.7225082Z Post job cleanup.
+base	Post Run actions/checkout@v4	2026-10-21T16:23:08.7859608Z [command]/usr/bin/git version
+base	Post Run actions/checkout@v4	2026-10-21T16:23:08.7893666Z git version 2.55.0
+base	Post Run actions/checkout@v4	2026-10-21T16:23:08.7919914Z Temporarily overriding HOME='/home/runner/work/_temp/3f478225-dfef-4d1b-b93c-29ddce600c2a' before making global git config changes
+base	Post Run actions/checkout@v4	2026-10-21T16:23:08.7920801Z Adding repository directory to the temporary git global config as a safe directory
+base	Post Run actions/checkout@v4	2026-10-21T16:23:08.7924021Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate-p4-protected/tollgate-p4-protected
+base	Post Run actions/checkout@v4	2026-10-21T16:23:08.7961696Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+base	Post Run actions/checkout@v4	2026-10-21T16:23:08.7996227Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+base	Post Run actions/checkout@v4	2026-10-21T16:23:08.8216418Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+base	Post Run actions/checkout@v4	2026-10-21T16:23:08.8256314Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+base	Post Run actions/checkout@v4	2026-10-21T16:23:08.8510329Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+base	Post Run actions/checkout@v4	2026-10-21T16:23:08.8554956Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+base	Complete job	﻿2026-10-21T16:23:08.8946640Z Cleaning up orphan processes
+base	Complete job	2026-10-21T16:23:08.9157267Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/cache/save@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

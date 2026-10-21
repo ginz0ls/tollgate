@@ -1,0 +1,11 @@
+{
+  "pr_number": "1",
+  "comment_rc": "0",
+  "comment_user_type_id": "github-actions[bot]\tBot\t41898282",
+  "status_rc": 0,
+  "status_creator": "github-actions[bot]",
+  "download_dotdot_out": "failure",
+  "download_dotdot_in": "failure",
+  "download_symlink": "success",
+  "cache_save": "success"
+}

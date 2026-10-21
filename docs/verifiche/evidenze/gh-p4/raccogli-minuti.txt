@@ -1,0 +1,6 @@
+run sul repo protected (pubblico, minuti non fatturati): 32
+run sul repo detect (privato): 1
+{
+  "run_duration_ms_totale": 414000,
+  "run": 32
+}

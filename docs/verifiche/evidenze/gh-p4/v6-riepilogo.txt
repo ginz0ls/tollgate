@@ -1,0 +1,35 @@
+# v6-pr1-statuses.out: contesto, stato, creator.login
+probe/verdict	success	github-actions[bot]
+probe/target	success	github-actions[bot]
+# v6-v4push-statuses.out: contesto, stato, creator.login
+probe/base	success	github-actions[bot]
+# v6-v5-diretto-cea7a386-statuses.out: contesto, stato, creator.login
+probe/base	success	github-actions[bot]
+# v6-v5-merge-0fbc78db-statuses.out: contesto, stato, creator.login
+probe/verdict	success	github-actions[bot]
+probe/target	success	github-actions[bot]
+# v6-v5-merge-76d561a0-statuses.out: contesto, stato, creator.login
+probe/base	success	github-actions[bot]
+# v6-v5-rebase-5eb103d8-statuses.out: contesto, stato, creator.login
+probe/base	success	github-actions[bot]
+# v6-v5-squash-513f61b2-statuses.out: contesto, stato, creator.login
+probe/base	success	github-actions[bot]
+# v6-pr1-check-runs.out: nome, app.id, app.slug, stato, conclusione
+target	15368	github-actions	completed	success
+run	15368	github-actions	completed	success
+# v6-v4push-check-runs.out: nome, app.id, app.slug, stato, conclusione
+verdict	15368	github-actions	completed	success
+verdict	15368	github-actions	in_progress	
+verdict	15368	github-actions	completed	success
+base	15368	github-actions	completed	success
+# v6-v5-diretto-cea7a386-check-runs.out: nome, app.id, app.slug, stato, conclusione
+base	15368	github-actions	completed	success
+# v6-v5-merge-0fbc78db-check-runs.out: nome, app.id, app.slug, stato, conclusione
+target	15368	github-actions	completed	success
+run	15368	github-actions	completed	success
+# v6-v5-merge-76d561a0-check-runs.out: nome, app.id, app.slug, stato, conclusione
+base	15368	github-actions	completed	success
+# v6-v5-rebase-5eb103d8-check-runs.out: nome, app.id, app.slug, stato, conclusione
+base	15368	github-actions	completed	success
+# v6-v5-squash-513f61b2-check-runs.out: nome, app.id, app.slug, stato, conclusione
+base	15368	github-actions	completed	success

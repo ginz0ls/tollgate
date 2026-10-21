@@ -1,0 +1,293 @@
+verdict	Set up job	﻿2026-10-21T16:23:41.9413030Z Current runner version: '2.338.0'
+verdict	Set up job	2026-10-21T16:23:41.9438676Z ##[group]Runner Image Provisioner
+verdict	Set up job	2026-10-21T16:23:41.9439731Z Hosted Compute Agent
+verdict	Set up job	2026-10-21T16:23:41.9440440Z Version: 20261012.601
+verdict	Set up job	2026-10-21T16:23:41.9441090Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+verdict	Set up job	2026-10-21T16:23:41.9441813Z Build Date: 2026-10-12T17:48:21Z
+verdict	Set up job	2026-10-21T16:23:41.9442580Z Worker ID: {9b1b6cb3-2a26-4722-871c-9823c45db06c}
+verdict	Set up job	2026-10-21T16:23:41.9443789Z Region: eastus
+verdict	Set up job	2026-10-21T16:23:41.9444429Z Cloud: Azure
+verdict	Set up job	2026-10-21T16:23:41.9444978Z ##[endgroup]
+verdict	Set up job	2026-10-21T16:23:41.9446527Z ##[group]Operating System
+verdict	Set up job	2026-10-21T16:23:41.9447208Z Ubuntu
+verdict	Set up job	2026-10-21T16:23:41.9447764Z 24.04.5
+verdict	Set up job	2026-10-21T16:23:41.9448334Z LTS
+verdict	Set up job	2026-10-21T16:23:41.9448865Z ##[endgroup]
+verdict	Set up job	2026-10-21T16:23:41.9449439Z ##[group]Runner Image
+verdict	Set up job	2026-10-21T16:23:41.9450116Z Image: ubuntu-24.04
+verdict	Set up job	2026-10-21T16:23:41.9450757Z Version: 20261012.334.1
+verdict	Set up job	2026-10-21T16:23:41.9451923Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+verdict	Set up job	2026-10-21T16:23:41.9454112Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+verdict	Set up job	2026-10-21T16:23:41.9455201Z ##[endgroup]
+verdict	Set up job	2026-10-21T16:23:41.9456737Z ##[group]GITHUB_TOKEN Permissions
+verdict	Set up job	2026-10-21T16:23:41.9459072Z Actions: read
+verdict	Set up job	2026-10-21T16:23:41.9459695Z Contents: read
+verdict	Set up job	2026-10-21T16:23:41.9460370Z Issues: write
+verdict	Set up job	2026-10-21T16:23:41.9460966Z Metadata: read
+verdict	Set up job	2026-10-21T16:23:41.9461793Z PullRequests: write
+verdict	Set up job	2026-10-21T16:23:41.9462396Z Statuses: write
+verdict	Set up job	2026-10-21T16:23:41.9463275Z ##[endgroup]
+verdict	Set up job	2026-10-21T16:23:41.9465394Z Secret source: Actions
+verdict	Set up job	2026-10-21T16:23:41.9466390Z Cache mode: read
+verdict	Set up job	2026-10-21T16:23:41.9467181Z Prepare workflow directory
+verdict	Set up job	2026-10-21T16:23:41.9792607Z Prepare all required actions
+verdict	Set up job	2026-10-21T16:23:41.9841892Z Getting action download info
+verdict	Set up job	2026-10-21T16:23:42.2107134Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+verdict	Set up job	2026-10-21T16:23:42.3194305Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+verdict	Set up job	2026-10-21T16:23:42.4749356Z Download action repository 'actions/download-artifact@v4' (SHA:d3f86a106a0bac45b974a628896c90dbdf5c8093)
+verdict	Set up job	2026-10-21T16:23:42.6588893Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+verdict	Set up job	2026-10-21T16:23:42.8770539Z Complete job name: verdict
+verdict	Run actions/checkout@v4	﻿2026-10-21T16:23:42.9576792Z ##[group]Run actions/checkout@v4
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9577686Z with:
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9578152Z   ref: main
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9578596Z   persist-credentials: false
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9579153Z   repository: ginz0ls/tollgate-p4-protected
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9583471Z   token: ***
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9583924Z   ssh-strict: true
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9584372Z   ssh-user: git
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9584796Z   clean: true
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9585247Z   sparse-checkout-cone-mode: true
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9585795Z   fetch-depth: 1
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9586223Z   fetch-tags: false
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9586676Z   show-progress: true
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9587159Z   lfs: false
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9587577Z   submodules: false
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9588027Z   set-safe-directory: true
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9588541Z   allow-unsafe-pr-checkout: false
+verdict	Run actions/checkout@v4	2026-10-21T16:23:42.9654219Z ##[endgroup]
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0681978Z Syncing repository: ginz0ls/tollgate-p4-protected
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0684355Z ##[group]Getting Git version info
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0685360Z Working directory is '/home/runner/work/tollgate-p4-protected/tollgate-p4-protected'
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0686542Z [command]/usr/bin/git version
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0754810Z git version 2.55.0
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0798944Z ##[endgroup]
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0822303Z Temporarily overriding HOME='/home/runner/work/_temp/0e9a59c4-0834-41b2-9cd8-f5f6584691ae' before making global git config changes
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0824862Z Adding repository directory to the temporary git global config as a safe directory
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0826425Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate-p4-protected/tollgate-p4-protected
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0884987Z Deleting the contents of '/home/runner/work/tollgate-p4-protected/tollgate-p4-protected'
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0887838Z ##[group]Initializing the repository
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0889581Z [command]/usr/bin/git init /home/runner/work/tollgate-p4-protected/tollgate-p4-protected
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0988362Z hint: Using 'master' as the name for the initial branch. This default branch name
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0990049Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0991093Z hint: to use in all of your new repositories, which will suppress this warning,
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0991926Z hint: call:
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0992351Z hint:
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0993172Z hint: 	git config --global init.defaultBranch <name>
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0993853Z hint:
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0994482Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0995489Z hint: 'development'. The just-created branch can be renamed via this command:
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0996342Z hint:
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0996804Z hint: 	git branch -m <name>
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0997311Z hint:
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.0997985Z hint: Disable this message with "git config set advice.defaultBranchName false"
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.1004587Z Initialized empty Git repository in /home/runner/work/tollgate-p4-protected/tollgate-p4-protected/.git/
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.1016178Z [command]/usr/bin/git remote add origin https://github.com/ginz0ls/tollgate-p4-protected
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.1067632Z ##[endgroup]
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.1068982Z ##[group]Disabling automatic garbage collection
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.1073596Z [command]/usr/bin/git config --local gc.auto 0
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.1106622Z ##[endgroup]
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.1108038Z ##[group]Setting up auth
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.1115069Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.1148263Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.1567003Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.1613193Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.1841905Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.1880447Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.2105931Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.2147837Z ##[endgroup]
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.2149091Z ##[group]Fetching the repository
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.2158285Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +refs/heads/main*:refs/remotes/origin/main* +refs/tags/main*:refs/tags/main*
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7305685Z From https://github.com/ginz0ls/tollgate-p4-protected
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7306987Z  * [new branch]      main       -> origin/main
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7309901Z ##[endgroup]
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7311141Z ##[group]Determining the checkout info
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7318337Z [command]/usr/bin/git branch --list --remote origin/main
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7345567Z   origin/main
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7351435Z ##[endgroup]
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7356485Z [command]/usr/bin/git sparse-checkout disable
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7416764Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7451141Z ##[group]Checking out the ref
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7454062Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7517125Z Switched to a new branch 'main'
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7523615Z branch 'main' set up to track 'origin/main'.
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7531014Z ##[endgroup]
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7572178Z [command]/usr/bin/git log -1 --format=%H
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7599089Z 32fb324f2b36d609cfe7c5109941ccb3b728c234
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7610090Z ##[group]Removing auth
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7614682Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7649424Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7870021Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7896416Z http.https://github.com/.extraheader
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7903890Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.7944236Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.8163235Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.8196036Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+verdict	Run actions/checkout@v4	2026-10-21T16:23:43.8415127Z ##[endgroup]
+verdict	Run echo "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"	﻿2026-10-21T16:23:43.8660561Z ##[group]Run echo "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"
+verdict	Run echo "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"	2026-10-21T16:23:43.8662550Z [36;1mecho "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"[0m
+verdict	Run echo "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"	2026-10-21T16:23:43.8949406Z shell: /usr/bin/bash -e {0}
+verdict	Run echo "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"	2026-10-21T16:23:43.8950639Z ##[endgroup]
+verdict	Run echo "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"	﻿2026-10-21T16:23:43.9184013Z ##[group]Run echo "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"
+verdict	Run echo "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"	2026-10-21T16:23:43.9186582Z [36;1mecho "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"[0m
+verdict	Run echo "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"	2026-10-21T16:23:43.9248165Z shell: /usr/bin/bash -e {0}
+verdict	Run echo "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"	2026-10-21T16:23:43.9249169Z ##[endgroup]
+verdict	Run actions/cache/restore@v4	﻿2026-10-21T16:23:43.9534544Z ##[group]Run actions/cache/restore@v4
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:43.9535648Z with:
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:43.9536490Z   path: /home/runner/work/_temp/probe-cache-v4b
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:43.9537687Z   key: probe-v4b-20261021-182256
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:43.9538686Z   enableCrossOsArchive: false
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:43.9539655Z   fail-on-cache-miss: false
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:43.9540560Z   lookup-only: false
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:43.9541358Z ##[endgroup]
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:44.0639994Z (node:2439) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:44.0643250Z (Use `node --trace-deprecation ...` to show where the warning was created)
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:44.1363172Z Cache hit for: probe-v4b-20261021-182256
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:44.1479267Z (node:2439) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:44.2050656Z Received 289 of 289 (100.0%), 0.0 MBs/sec
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:44.2053017Z Cache Size: ~0 MB (289 B)
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:44.2080351Z [command]/usr/bin/tar -xf /home/runner/work/_temp/c68d8fc6-11cb-4d32-979a-9327de720f28/cache.tzst -P -C /home/runner/work/tollgate-p4-protected/tollgate-p4-protected --use-compress-program unzstd
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:44.2146624Z Cache restored successfully
+verdict	Run actions/cache/restore@v4	2026-10-21T16:23:44.2223409Z Cache restored from key: probe-v4b-20261021-182256
+verdict	Run actions/download-artifact@v4	﻿2026-10-21T16:23:44.2418906Z ##[group]Run actions/download-artifact@v4
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.2420052Z with:
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.2420813Z   name: probe-run-dotdot-out
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.2421744Z   run-id: 39634329631
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.2431835Z   github-token: ***
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.2433007Z   path: /home/runner/work/_temp/dl/dotdot-out
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.2434263Z   merge-multiple: false
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.2435448Z   repository: ginz0ls/tollgate-p4-protected
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.2436548Z ##[endgroup]
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.3931136Z Downloading single artifact
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.4007548Z (node:2457) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.4011550Z (Use `node --trace-deprecation ...` to show where the warning was created)
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.4230198Z (node:2457) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.5779109Z ##[error]Unable to download artifact(s): Artifact not found for name: probe-run-dotdot-out
+verdict	Run actions/download-artifact@v4	        Please ensure that your artifact is not expired and the artifact was uploaded using a compatible version of toolkit/upload-artifact.
+verdict	Run actions/download-artifact@v4	        For more information, visit the GitHub Artifacts FAQ: https://github.com/actions/toolkit/blob/main/packages/artifact/docs/faq.md
+verdict	Run actions/download-artifact@v4	﻿2026-10-21T16:23:44.5969296Z ##[group]Run actions/download-artifact@v4
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.5969893Z with:
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.5970327Z   name: probe-run-dotdot-in
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.5970794Z   run-id: 39634329631
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.5974324Z   github-token: ***
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.5974847Z   path: /home/runner/work/_temp/dl/dotdot-in
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.5975388Z   merge-multiple: false
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.5975880Z   repository: ginz0ls/tollgate-p4-protected
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.5976413Z ##[endgroup]
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.7441802Z Downloading single artifact
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.7515694Z (node:2469) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.7516876Z (Use `node --trace-deprecation ...` to show where the warning was created)
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.7719927Z (node:2469) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.9326070Z ##[error]Unable to download artifact(s): Artifact not found for name: probe-run-dotdot-in
+verdict	Run actions/download-artifact@v4	        Please ensure that your artifact is not expired and the artifact was uploaded using a compatible version of toolkit/upload-artifact.
+verdict	Run actions/download-artifact@v4	        For more information, visit the GitHub Artifacts FAQ: https://github.com/actions/toolkit/blob/main/packages/artifact/docs/faq.md
+verdict	Run actions/download-artifact@v4	﻿2026-10-21T16:23:44.9508134Z ##[group]Run actions/download-artifact@v4
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.9508682Z with:
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.9509077Z   name: probe-run-symlink
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.9509506Z   run-id: 39634329631
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.9512582Z   github-token: ***
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.9513230Z   path: /home/runner/work/_temp/dl/symlink
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.9513735Z   merge-multiple: false
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.9514199Z   repository: ginz0ls/tollgate-p4-protected
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:44.9514682Z ##[endgroup]
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:45.0970735Z Downloading single artifact
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:45.1045739Z (node:2481) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:45.1046853Z (Use `node --trace-deprecation ...` to show where the warning was created)
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:45.1254729Z (node:2481) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:45.2860772Z Preparing to download the following artifacts:
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:45.2862966Z - probe-run-symlink (ID: 12359299207, Size: 398, Expected Digest: sha256:64281416271a658670704007df05386497c6d376a10243c4c34821cebaa9debb)
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:45.2899267Z Downloading artifact '12359299207' from 'ginz0ls/tollgate-p4-protected'
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:45.4793148Z Redirecting to blob download url: https://productionresultssa7.blob.core.windows.net/actions-results/f8637111-3f10-8c76-ac6e-3d0afb75d49a/workflow-job-run-82a7608c-13bb-5c95-963f-ee6281f05c20/artifacts/0192ca9589f198ef50f7c702cef2e183884f9e95d104aa40ca18f54d74e5043d.zip
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:45.4795788Z Starting download of artifact to: /home/runner/work/_temp/dl/symlink
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:45.5232422Z (node:2481) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:45.5280802Z SHA256 digest of downloaded artifact is 64281416271a658670704007df05386497c6d376a10243c4c34821cebaa9debb
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:45.5282292Z Artifact download completed successfully.
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:45.5288430Z Total of 1 artifact(s) downloaded
+verdict	Run actions/download-artifact@v4	2026-10-21T16:23:45.5304198Z Download artifact has finished successfully
+verdict	cache da salvare	﻿2026-10-21T16:23:45.5423885Z ##[group]Run mkdir -p "$RUNNER_TEMP/probe-cache"
+verdict	cache da salvare	2026-10-21T16:23:45.5424570Z [36;1mmkdir -p "$RUNNER_TEMP/probe-cache"[0m
+verdict	cache da salvare	2026-10-21T16:23:45.5425482Z [36;1mjq '{head_sha: .workflow_run.head_sha, run_id: .workflow_run.id}' "$GITHUB_EVENT_PATH" > "$RUNNER_TEMP/probe-cache/value.json"[0m
+verdict	cache da salvare	2026-10-21T16:23:45.5492063Z shell: /usr/bin/bash -e {0}
+verdict	cache da salvare	2026-10-21T16:23:45.5492568Z ##[endgroup]
+verdict	Run actions/cache/save@v4	﻿2026-10-21T16:23:45.5695311Z ##[group]Run actions/cache/save@v4
+verdict	Run actions/cache/save@v4	2026-10-21T16:23:45.5695902Z with:
+verdict	Run actions/cache/save@v4	2026-10-21T16:23:45.5696358Z   path: /home/runner/work/_temp/probe-cache
+verdict	Run actions/cache/save@v4	2026-10-21T16:23:45.5696899Z   key: probe-v4-20261021175521
+verdict	Run actions/cache/save@v4	2026-10-21T16:23:45.5697389Z   enableCrossOsArchive: false
+verdict	Run actions/cache/save@v4	2026-10-21T16:23:45.5697856Z ##[endgroup]
+verdict	Run actions/cache/save@v4	2026-10-21T16:23:45.6704291Z (node:2496) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+verdict	Run actions/cache/save@v4	2026-10-21T16:23:45.6706714Z (Use `node --trace-deprecation ...` to show where the warning was created)
+verdict	Run actions/cache/save@v4	2026-10-21T16:23:45.6869969Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/tollgate-p4-protected/tollgate-p4-protected --files-from manifest.txt --use-compress-program zstdmt
+verdict	Run actions/cache/save@v4	2026-10-21T16:23:45.8102526Z ##[warning]Cache reservation failed: cache write denied: token has no writable scopes
+verdict	Run actions/cache/save@v4	2026-10-21T16:23:45.8106020Z Failed to save: Unable to reserve cache with key probe-v4-20261021175521, another job may be creating this cache.
+verdict	Run actions/cache/save@v4	2026-10-21T16:23:45.8107984Z ##[warning]Cache save failed.
+verdict	campi dell'evento, commento e stato	﻿2026-10-21T16:23:45.8219313Z ##[group]Run set -u
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8219821Z [36;1mset -u[0m
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8220287Z [36;1mout="$RUNNER_TEMP/probe"; mkdir -p "$out"[0m
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8222391Z [36;1mjq '{event_keys: keys, workflow_run_keys: (.workflow_run | keys), path: .workflow_run.path, event: .workflow_run.event, head_sha: .workflow_run.head_sha, head_branch: .workflow_run.head_branch, conclusion: .workflow_run.conclusion, run_id: .workflow_run.id, pull_requests: [.workflow_run.pull_requests[] | {number: .number, base_ref: .base.ref, base_sha: .base.sha, head_ref: .head.ref, head_sha: .head.sha, keys: keys}]}' "$GITHUB_EVENT_PATH" > "$out/event-keys.json"[0m
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8224984Z [36;1mn="$(jq -r '.workflow_run.pull_requests[0].number // empty' "$GITHUB_EVENT_PATH")"[0m
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8225751Z [36;1msha="$(jq -r .workflow_run.head_sha "$GITHUB_EVENT_PATH")"[0m
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8226343Z [36;1mcomment_rc=none; comment_user=""[0m
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8226832Z [36;1mif [ -n "$n" ]; then[0m
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8227310Z [36;1m  comment_rc=0[0m
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8228506Z [36;1m  comment_user="$(gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$n/comments" -f body='commento scritto dal workflow probe-verdict (sonda V1)' --jq '[.user.login, .user.type, (.user.id | tostring)] | @tsv' 2> "$out/comment.err")" || comment_rc=$?[0m
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8229746Z [36;1mfi[0m
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8230133Z [36;1mstatus_rc=0[0m
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8231157Z [36;1mstatus_creator="$(gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$sha" -f state=success -f context=probe/verdict -f description=sonda --jq .creator.login 2> "$out/status.err")" || status_rc=$?[0m
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8232714Z [36;1mfind "$RUNNER_TEMP" -maxdepth 6 -path "$RUNNER_TEMP/_*" -prune -o -printf '%y %p -> %l\n' > "$out/listing.txt"[0m
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8235719Z [36;1mjq -n --arg n "$n" --arg comment_rc "$comment_rc" --arg comment_user "$comment_user" --arg status_rc "$status_rc" --arg status_creator "$status_creator" --arg dotdot_out "$OUT_DOTDOT_OUT" --arg dotdot_in "$OUT_DOTDOT_IN" --arg symlink "$OUT_SYMLINK" --arg cache_save "$OUT_CACHE_SAVE" '{pr_number: $n, comment_rc: $comment_rc, comment_user_type_id: $comment_user, status_rc: ($status_rc|tonumber), status_creator: $status_creator, download_dotdot_out: $dotdot_out, download_dotdot_in: $dotdot_in, download_symlink: $symlink, cache_save: $cache_save}' > "$out/info.json"[0m
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8305651Z shell: /usr/bin/bash -e {0}
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8306111Z env:
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8309188Z   GH_TOKEN: ***
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8309612Z   OUT_DOTDOT_OUT: failure
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8310055Z   OUT_DOTDOT_IN: failure
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8310484Z   OUT_SYMLINK: success
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8310898Z   OUT_CACHE_SAVE: success
+verdict	campi dell'evento, commento e stato	2026-10-21T16:23:45.8311401Z ##[endgroup]
+verdict	esiti v4b	﻿2026-10-21T16:23:47.2317015Z ##[group]Run out="$RUNNER_TEMP/probe"; mkdir -p "$out"
+verdict	esiti v4b	2026-10-21T16:23:47.2317482Z [36;1mout="$RUNNER_TEMP/probe"; mkdir -p "$out"[0m
+verdict	esiti v4b	2026-10-21T16:23:47.2317964Z [36;1mvalue="$(cat "$RUNNER_TEMP/probe-cache-v4b/value.txt" 2>/dev/null || echo none)"[0m
+verdict	esiti v4b	2026-10-21T16:23:47.2318501Z [36;1mbase='{}'; [ -f "$out/info.json" ] && base="$(cat "$out/info.json")"[0m
+verdict	esiti v4b	2026-10-21T16:23:47.2319478Z [36;1mprintf '%s' "$base" | jq --arg hit "$V4B_HIT" --arg key "$V4B_KEY" --arg tag "$V4B_TAG" --arg value "$value" '. + {v4b_tag: $tag, v4b_cache_hit: $hit, v4b_matched_key: $key, v4b_value: $value}' > "$out/info.tmp" && mv "$out/info.tmp" "$out/info.json"[0m
+verdict	esiti v4b	2026-10-21T16:23:47.2385136Z shell: /usr/bin/bash -e {0}
+verdict	esiti v4b	2026-10-21T16:23:47.2385412Z env:
+verdict	esiti v4b	2026-10-21T16:23:47.2385598Z   V4B_HIT: true
+verdict	esiti v4b	2026-10-21T16:23:47.2385819Z   V4B_KEY: probe-v4b-20261021-182256
+verdict	esiti v4b	2026-10-21T16:23:47.2386111Z   V4B_TAG: 20261021-182256
+verdict	esiti v4b	2026-10-21T16:23:47.2386338Z ##[endgroup]
+verdict	Run actions/upload-artifact@v4	﻿2026-10-21T16:23:47.2656528Z ##[group]Run actions/upload-artifact@v4
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.2656840Z with:
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.2657055Z   name: probe-verdict-info
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.2657318Z   path: /home/runner/work/_temp/probe
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.2657592Z   if-no-files-found: warn
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.2657823Z   compression-level: 6
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.2658045Z   overwrite: false
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.2658260Z   include-hidden-files: false
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.2658502Z ##[endgroup]
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.4263412Z (node:2546) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.4264489Z (Use `node --trace-deprecation ...` to show where the warning was created)
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.4328583Z With the provided path, there will be 5 files uploaded
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.4336340Z Artifact name is valid!
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.4338050Z Root directory input is valid!
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.6815437Z Beginning upload of artifact content to blob storage
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.7069382Z (node:2546) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.7434654Z Uploaded bytes 1681
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.7586621Z Finished uploading artifact content to blob storage!
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.7587725Z SHA256 digest of uploaded artifact zip is 6923b13a89896ae8430968e85f5b57ab276d4e377c095aba8c18810ab2fdabcd
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.7589700Z Finalizing artifact upload
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.9717577Z Artifact probe-verdict-info.zip successfully finalized. Artifact ID 12361265490
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.9718726Z Artifact probe-verdict-info has been successfully uploaded! Final size is 1681 bytes. Artifact ID is 12361265490
+verdict	Run actions/upload-artifact@v4	2026-10-21T16:23:47.9725071Z Artifact download URL: https://github.com/ginz0ls/tollgate-p4-protected/actions/runs/39634363221/artifacts/12361265490
+verdict	Post Run actions/checkout@v4	﻿2026-10-21T16:23:47.9915560Z Post job cleanup.
+verdict	Post Run actions/checkout@v4	2026-10-21T16:23:48.0794947Z [command]/usr/bin/git version
+verdict	Post Run actions/checkout@v4	2026-10-21T16:23:48.0839150Z git version 2.55.0
+verdict	Post Run actions/checkout@v4	2026-10-21T16:23:48.0880347Z Temporarily overriding HOME='/home/runner/work/_temp/ca93d6a1-ccec-445c-bb5d-431ab1d7a238' before making global git config changes
+verdict	Post Run actions/checkout@v4	2026-10-21T16:23:48.0881757Z Adding repository directory to the temporary git global config as a safe directory
+verdict	Post Run actions/checkout@v4	2026-10-21T16:23:48.0885616Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate-p4-protected/tollgate-p4-protected
+verdict	Post Run actions/checkout@v4	2026-10-21T16:23:48.0926310Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+verdict	Post Run actions/checkout@v4	2026-10-21T16:23:48.0961961Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+verdict	Post Run actions/checkout@v4	2026-10-21T16:23:48.1217239Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+verdict	Post Run actions/checkout@v4	2026-10-21T16:23:48.1253716Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+verdict	Post Run actions/checkout@v4	2026-10-21T16:23:48.1510873Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+verdict	Post Run actions/checkout@v4	2026-10-21T16:23:48.1557841Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+verdict	Complete job	﻿2026-10-21T16:23:48.1996731Z Cleaning up orphan processes
+verdict	Complete job	2026-10-21T16:23:48.2254541Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/cache/save@v4, actions/checkout@v4, actions/download-artifact@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

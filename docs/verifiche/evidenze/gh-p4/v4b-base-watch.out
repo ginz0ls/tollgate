@@ -1,0 +1,52 @@
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* main probe-base · 39634261988
+Triggered via push less than a minute ago
+
+JOBS
+✓ base in 9s (ID 119340403361)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run echo "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"
+  ✓ Run echo "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"
+  ✓ valore v4b
+  ✓ Run actions/cache/save@v4
+  ✓ Run actions/cache/restore@v4
+  ✓ gh, stato
+  ✓ esiti v4b
+  ✓ Run actions/upload-artifact@v4
+  ✓ Post Run actions/checkout@v4
+  ✓ Complete job
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/cache/save@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+base: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+base: .github#1
+
+✓ main probe-base · 39634261988
+Triggered via push less than a minute ago
+
+JOBS
+✓ base in 9s (ID 119340403361)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run echo "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"
+  ✓ Run echo "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"
+  ✓ valore v4b
+  ✓ Run actions/cache/save@v4
+  ✓ Run actions/cache/restore@v4
+  ✓ gh, stato
+  ✓ esiti v4b
+  ✓ Run actions/upload-artifact@v4
+  ✓ Post Run actions/checkout@v4
+  ✓ Complete job
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/cache/save@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+base: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+base: .github#1
+

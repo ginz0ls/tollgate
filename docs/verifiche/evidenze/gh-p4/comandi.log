@@ -1,0 +1,166 @@
+2026-10-21T15:54:30Z gh auth status
+2026-10-21T15:54:32Z gh --version
+2026-10-21T15:54:32Z gh api repos/ginz0ls/tollgate-p4-protected
+2026-10-21T15:54:33Z gh repo create ginz0ls/tollgate-p4-protected --public --add-readme
+2026-10-21T15:54:56Z gh api repos/ginz0ls/tollgate-p4-protected
+2026-10-21T15:55:00Z gh repo clone ginz0ls/tollgate-p4-protected /tmp/tollgate-p4/gh/protected -- -q
+2026-10-21T15:55:03Z gh api repos/ginz0ls/tollgate-p4-detect
+2026-10-21T15:55:04Z gh repo create ginz0ls/tollgate-p4-detect --private --add-readme
+2026-10-21T15:55:19Z gh api repos/ginz0ls/tollgate-p4-detect
+2026-10-21T15:55:19Z gh repo clone ginz0ls/tollgate-p4-detect /tmp/tollgate-p4/gh/detect -- -q
+2026-10-21T15:55:21Z git -C protected push origin main
+2026-10-21T15:55:42Z git -C protected push -u origin p4-v1-20261021-175542
+2026-10-21T15:55:44Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head p4-v1-20261021-175542 --title sonda v1 --body sonda tollgate P4 (v1), da chiudere
+2026-10-21T15:55:47Z gh pr comment 1 --repo ginz0ls/tollgate-p4-protected --body commento dell'utente (sonda V1)
+2026-10-21T15:55:50Z gh run watch 39630136045 --repo ginz0ls/tollgate-p4-protected --exit-status
+2026-10-21T15:56:02Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-target.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-21T15:56:03Z gh run view 39630136045 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-21T15:56:04Z gh run download 39630136045 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v1-target-artifacts-39630136045
+2026-10-21T15:56:06Z gh run watch 39630136017 --repo ginz0ls/tollgate-p4-protected --exit-status
+2026-10-21T15:56:07Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-run.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-21T15:56:08Z gh run view 39630136017 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-21T15:56:09Z gh run download 39630136017 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v1-run-artifacts-39630136017
+2026-10-21T15:56:12Z gh run watch 39630168903 --repo ginz0ls/tollgate-p4-protected --exit-status
+2026-10-21T15:56:23Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-verdict.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-21T15:56:27Z gh run view 39630168903 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-21T15:56:29Z gh run download 39630168903 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v1-verdict-artifacts-39630168903
+2026-10-21T15:56:30Z gh pr list --repo ginz0ls/tollgate-p4-protected --state all --limit 100 --json number,headRefName,headRefOid,mergedAt,isCrossRepository,mergeStateStatus
+2026-10-21T15:56:31Z gh pr view 1 --repo ginz0ls/tollgate-p4-protected --json comments
+2026-10-21T15:56:32Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/1/comments
+2026-10-21T15:56:40Z gh api --include repos/ginz0ls/tollgate-p4-detect/branches/main/protection
+2026-10-21T15:56:45Z gh api --include repos/ginz0ls/tollgate-p4-protected/branches/main/protection
+2026-10-21T15:56:46Z gh api repos/ginz0ls/tollgate-p4-detect/branches/main/protection
+2026-10-21T15:56:47Z gh api repos/ginz0ls/tollgate-p4-protected/branches/main/protection
+2026-10-21T15:56:49Z git -C protected push -u origin p4-v5b-a-20261021-175649
+2026-10-21T15:56:51Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head p4-v5b-a-20261021-175649 --title sonda v5b-a --body sonda tollgate P4 (v5b-a), da chiudere
+2026-10-21T15:56:54Z git -C protected push -u origin p4-v5b-b-20261021-175649
+2026-10-21T15:56:55Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head p4-v5b-b-20261021-175649 --title sonda v5b-b --body sonda tollgate P4 (v5b-b), da chiudere
+2026-10-21T15:56:59Z gh api repos/ginz0ls/tollgate-p4-protected/commits/216898cde9020848859477a0fda17ee6227dea3d/pulls
+2026-10-21T15:57:01Z gh api repos/ginz0ls/tollgate-p4-protected/commits/e21bc2c1efa5348e439751d3729c795a476f1b7a/pulls
+2026-10-21T15:57:02Z gh pr close 2 --repo ginz0ls/tollgate-p4-protected
+2026-10-21T15:57:05Z gh pr close 3 --repo ginz0ls/tollgate-p4-protected
+2026-10-21T15:57:22Z git -C protected push -u origin p4-v4-20261021-175722
+2026-10-21T15:57:24Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head p4-v4-20261021-175722 --title sonda v4 --body sonda tollgate P4 (v4), da chiudere
+2026-10-21T15:57:40Z gh run watch 39630394922 --repo ginz0ls/tollgate-p4-protected --exit-status
+2026-10-21T15:57:48Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-run.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-21T15:57:49Z gh run view 39630394922 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-21T15:57:50Z gh run download 39630394922 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4-run-artifacts-39630394922
+2026-10-21T15:57:53Z git -C protected push origin main
+2026-10-21T15:58:06Z gh run watch 39630455929 --repo ginz0ls/tollgate-p4-protected --exit-status
+2026-10-21T15:58:13Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-base.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-21T15:58:14Z gh run view 39630455929 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-21T15:58:15Z gh run download 39630455929 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4-base-artifacts-39630455929
+2026-10-21T15:58:17Z gh pr close 4 --repo ginz0ls/tollgate-p4-protected
+2026-10-21T15:58:23Z git -C protected push -u origin p4-v5-merge-20261021-175823
+2026-10-21T15:58:25Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head p4-v5-merge-20261021-175823 --title sonda v5-merge --body sonda tollgate P4 (v5-merge), da chiudere
+2026-10-21T15:58:27Z git -C protected push -u origin p4-v5-squash-20261021-175823
+2026-10-21T15:58:29Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head p4-v5-squash-20261021-175823 --title sonda v5-squash --body sonda tollgate P4 (v5-squash), da chiudere
+2026-10-21T15:58:31Z git -C protected push -u origin p4-v5-rebase-20261021-175823
+2026-10-21T15:58:33Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head p4-v5-rebase-20261021-175823 --title sonda v5-rebase --body sonda tollgate P4 (v5-rebase), da chiudere
+2026-10-21T15:58:36Z gh pr merge 5 --repo ginz0ls/tollgate-p4-protected --merge
+2026-10-21T15:59:04Z gh api repos/ginz0ls/tollgate-p4-protected/commits/76d561a00e896057555503ae25a1cc17a673bfde/pulls
+2026-10-21T15:59:05Z gh api repos/ginz0ls/tollgate-p4-protected/commits/0fbc78db1261e805675ad791080bd3ffd9555e1f/pulls
+2026-10-21T15:59:07Z gh pr merge 6 --repo ginz0ls/tollgate-p4-protected --squash
+2026-10-21T15:59:17Z gh api repos/ginz0ls/tollgate-p4-protected/commits/513f61b20b772402fa73fa7911b788ded25caa62/pulls
+2026-10-21T15:59:19Z gh pr merge 7 --repo ginz0ls/tollgate-p4-protected --rebase
+2026-10-21T15:59:32Z gh api repos/ginz0ls/tollgate-p4-protected/commits/5eb103d8406906513c31699f4770f848b45674d8/pulls
+2026-10-21T15:59:33Z git -C protected push origin main
+2026-10-21T15:59:53Z gh api repos/ginz0ls/tollgate-p4-protected/commits/cea7a386e587cc1fdf4b54eb81fb2a5e383bd5c6/pulls
+2026-10-21T16:00:40Z gh api repos/ginz0ls/tollgate-p4-protected/actions/caches (controller, a mano)
+2026-10-21T16:00:57Z gh run view 39630168903 --repo ginz0ls/tollgate-p4-protected --log (controller, a mano)
+2026-10-21T16:01:05Z gh run view 39630136017 --repo ginz0ls/tollgate-p4-protected --log (controller, a mano)
+2026-10-21T16:01:07Z gh run view 39630455929 --repo ginz0ls/tollgate-p4-protected --log (controller, a mano)
+2026-10-21T16:01:25Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/47682ac330102166e869cd75ce72951040249e10/statuses
+2026-10-21T16:01:26Z gh api repos/ginz0ls/tollgate-p4-protected/commits/47682ac330102166e869cd75ce72951040249e10/check-runs
+2026-10-21T16:01:26Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/c03b433724ad7e199a913b3ffbb6c5a6526c8da6/statuses
+2026-10-21T16:01:27Z gh api repos/ginz0ls/tollgate-p4-protected/commits/c03b433724ad7e199a913b3ffbb6c5a6526c8da6/check-runs
+2026-10-21T16:01:28Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/76d561a00e896057555503ae25a1cc17a673bfde/statuses
+2026-10-21T16:01:30Z gh api repos/ginz0ls/tollgate-p4-protected/commits/76d561a00e896057555503ae25a1cc17a673bfde/check-runs
+2026-10-21T16:01:30Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/0fbc78db1261e805675ad791080bd3ffd9555e1f/statuses
+2026-10-21T16:01:31Z gh api repos/ginz0ls/tollgate-p4-protected/commits/0fbc78db1261e805675ad791080bd3ffd9555e1f/check-runs
+2026-10-21T16:01:32Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/513f61b20b772402fa73fa7911b788ded25caa62/statuses
+2026-10-21T16:01:32Z gh api repos/ginz0ls/tollgate-p4-protected/commits/513f61b20b772402fa73fa7911b788ded25caa62/check-runs
+2026-10-21T16:01:33Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/5eb103d8406906513c31699f4770f848b45674d8/statuses
+2026-10-21T16:01:33Z gh api repos/ginz0ls/tollgate-p4-protected/commits/5eb103d8406906513c31699f4770f848b45674d8/check-runs
+2026-10-21T16:01:34Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/cea7a386e587cc1fdf4b54eb81fb2a5e383bd5c6/statuses
+2026-10-21T16:01:35Z gh api repos/ginz0ls/tollgate-p4-protected/commits/cea7a386e587cc1fdf4b54eb81fb2a5e383bd5c6/check-runs
+2026-10-21T16:01:48Z git -C protected fetch origin refs/pull/1/head
+2026-10-21T16:01:59Z git -C protected rev-parse FETCH_HEAD
+2026-10-21T16:02:00Z git -C detect push origin main
+2026-10-21T16:02:02Z git -C detect push -u origin p4-v3b-20261021-180202
+2026-10-21T16:02:04Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head p4-v3b-20261021-180202 --title sonda v3b --body sonda tollgate P4 (v3b), da chiudere
+2026-10-21T16:02:19Z gh run watch 39631102348 --repo ginz0ls/tollgate-p4-detect --exit-status
+2026-10-21T16:02:26Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow probe-fetch.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-21T16:02:27Z gh run view 39631102348 --repo ginz0ls/tollgate-p4-detect --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-21T16:02:29Z gh run download 39631102348 --repo ginz0ls/tollgate-p4-detect -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v3b-fetch-artifacts-39631102348
+2026-10-21T16:02:30Z gh pr close 1 --repo ginz0ls/tollgate-p4-detect
+2026-10-21T16:02:32Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630136017/artifacts
+2026-10-21T16:02:33Z gh run download 39630136017 --repo ginz0ls/tollgate-p4-protected -n probe-run-dotdot-out -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v8-dl-probe-run-dotdot-out-39630136017
+2026-10-21T16:02:33Z gh run download 39630136017 --repo ginz0ls/tollgate-p4-protected -n probe-run-dotdot-in -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v8-dl-probe-run-dotdot-in-39630136017
+2026-10-21T16:02:34Z gh run download 39630136017 --repo ginz0ls/tollgate-p4-protected -n probe-run-symlink -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v8-dl-probe-run-symlink-39630136017
+2026-10-21T16:02:36Z gh api repos/ginz0ls/tollgate-p4-protected/actions/permissions
+2026-10-21T16:02:36Z gh api repos/ginz0ls/tollgate-p4-detect/actions/permissions
+2026-10-21T16:22:50Z gh auth status
+2026-10-21T16:22:51Z gh --version
+2026-10-21T16:22:51Z gh api repos/ginz0ls/tollgate-p4-protected
+2026-10-21T16:22:52Z gh api repos/ginz0ls/tollgate-p4-detect
+2026-10-21T16:22:53Z git -C protected push origin main
+2026-10-21T16:22:56Z git -C protected push origin main
+2026-10-21T16:23:09Z gh run watch 39634261988 --repo ginz0ls/tollgate-p4-protected --exit-status
+2026-10-21T16:23:15Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-base.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-21T16:23:16Z gh run view 39634261988 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-21T16:23:18Z gh run download 39634261988 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4b-base-artifacts-39634261988
+2026-10-21T16:23:19Z git -C protected push -u origin p4-v4b-20261021-182256
+2026-10-21T16:23:21Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head p4-v4b-20261021-182256 --title sonda v4b --body sonda tollgate P4 (v4b), da chiudere
+2026-10-21T16:23:35Z gh run watch 39634329631 --repo ginz0ls/tollgate-p4-protected --exit-status
+2026-10-21T16:23:37Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-run.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-21T16:23:38Z gh run view 39634329631 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-21T16:23:39Z gh run download 39634329631 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4b-run-artifacts-39634329631
+2026-10-21T16:23:43Z gh run watch 39634363221 --repo ginz0ls/tollgate-p4-protected --exit-status
+2026-10-21T16:23:54Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-verdict.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-21T16:23:55Z gh run view 39634363221 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-21T16:23:56Z gh run download 39634363221 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4b-verdict-artifacts-39634363221
+2026-10-21T16:23:57Z gh pr close 8 --repo ginz0ls/tollgate-p4-protected
+2026-10-21T16:24:01Z gh run view 39634261988 --repo ginz0ls/tollgate-p4-protected --log (controller, a mano)
+2026-10-21T16:24:03Z gh run view 39634329631 --repo ginz0ls/tollgate-p4-protected --log (controller, a mano)
+2026-10-21T16:24:05Z gh run view 39634363221 --repo ginz0ls/tollgate-p4-protected --log (controller, a mano)
+2026-10-21T16:24:14Z gh --version
+2026-10-21T16:24:14Z gh run list --repo ginz0ls/tollgate-p4-protected --limit 100 --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt
+2026-10-21T16:24:16Z gh run list --repo ginz0ls/tollgate-p4-detect --limit 100 --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt
+2026-10-21T16:24:17Z gh pr list --repo ginz0ls/tollgate-p4-protected --state all --limit 100 --json number,title,state,headRefName,headRefOid,baseRefName,mergedAt,isCrossRepository,mergeStateStatus
+2026-10-21T16:24:17Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39634363221/timing
+2026-10-21T16:24:18Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39634329723/timing
+2026-10-21T16:24:18Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39634329631/timing
+2026-10-21T16:24:19Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39634261988/timing
+2026-10-21T16:24:19Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39634256343/timing
+2026-10-21T16:24:20Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630705271/timing
+2026-10-21T16:24:20Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630677863/timing
+2026-10-21T16:24:21Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630643664/timing
+2026-10-21T16:24:21Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630603618/timing
+2026-10-21T16:24:22Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630594508/timing
+2026-10-21T16:24:22Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630584966/timing
+2026-10-21T16:24:23Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630583405/timing
+2026-10-21T16:24:23Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630558870/timing
+2026-10-21T16:24:24Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630558646/timing
+2026-10-21T16:24:25Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630549696/timing
+2026-10-21T16:24:25Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630549364/timing
+2026-10-21T16:24:26Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630541630/timing
+2026-10-21T16:24:26Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630541265/timing
+2026-10-21T16:24:27Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630455929/timing
+2026-10-21T16:24:27Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630439324/timing
+2026-10-21T16:24:28Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630394922/timing
+2026-10-21T16:24:28Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630393382/timing
+2026-10-21T16:24:29Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630360538/timing
+2026-10-21T16:24:29Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630344330/timing
+2026-10-21T16:24:30Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630315954/timing
+2026-10-21T16:24:30Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630315899/timing
+2026-10-21T16:24:31Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630304833/timing
+2026-10-21T16:24:31Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630304651/timing
+2026-10-21T16:24:32Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630168903/timing
+2026-10-21T16:24:32Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630136045/timing
+2026-10-21T16:24:33Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630136017/timing
+2026-10-21T16:24:34Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630086028/timing
+2026-10-21T16:24:35Z git -C protected push origin main
+2026-10-21T16:24:38Z git -C detect push origin main
+2026-10-21T16:24:54Z gh pr close 1 --repo ginz0ls/tollgate-p4-protected (controller)
+2026-10-21T16:24:54Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/39631102348/timing (controller)

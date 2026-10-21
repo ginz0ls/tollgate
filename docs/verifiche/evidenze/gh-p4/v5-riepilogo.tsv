@@ -1,0 +1,5 @@
+merge	76d561a00e896057555503ae25a1cc17a673bfde	[{"number":5,"state":"closed","merged_at":"2026-10-21T15:58:53Z","base":"main"}]
+merge	0fbc78db1261e805675ad791080bd3ffd9555e1f	[{"number":5,"state":"closed","merged_at":"2026-10-21T15:58:53Z","base":"main"}]
+squash	513f61b20b772402fa73fa7911b788ded25caa62	[{"number":6,"state":"closed","merged_at":"2026-10-21T15:59:09Z","base":"main"}]
+rebase	5eb103d8406906513c31699f4770f848b45674d8	[{"number":7,"state":"closed","merged_at":"2026-10-21T15:59:22Z","base":"main"}]
+diretto	cea7a386e587cc1fdf4b54eb81fb2a5e383bd5c6	[]

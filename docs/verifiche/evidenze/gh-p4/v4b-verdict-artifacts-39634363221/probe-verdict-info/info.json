@@ -1,0 +1,15 @@
+{
+  "pr_number": "8",
+  "comment_rc": "0",
+  "comment_user_type_id": "github-actions[bot]\tBot\t41898282",
+  "status_rc": 0,
+  "status_creator": "github-actions[bot]",
+  "download_dotdot_out": "failure",
+  "download_dotdot_in": "failure",
+  "download_symlink": "success",
+  "cache_save": "success",
+  "v4b_tag": "20261021-182256",
+  "v4b_cache_hit": "true",
+  "v4b_matched_key": "probe-v4b-20261021-182256",
+  "v4b_value": "32fb324f2b36d609cfe7c5109941ccb3b728c234"
+}

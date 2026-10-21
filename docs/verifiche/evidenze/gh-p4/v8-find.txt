@@ -1,0 +1,4 @@
+d /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v8-dl-probe-run-symlink-39630136017 -> 
+f /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v8-dl-probe-run-symlink-39630136017/link-assoluto -> 
+f /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v8-dl-probe-run-symlink-39630136017/link-relativo -> 
+f /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v8-dl-probe-run-symlink-39630136017/real.txt -> 

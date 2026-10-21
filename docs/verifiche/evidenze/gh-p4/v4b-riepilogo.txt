@@ -1,0 +1,7 @@
+# tag 20261021-182256; v4b_save per il salvataggio (base), v4b_cache_hit e v4b_matched_key per i ripristini
+# v4b-base-artifacts-39634261988/probe-base-info/info.json
+{"v4b_tag":"20261021-182256","v4b_save":"success","v4b_cache_hit":null,"v4b_matched_key":null,"v4b_value":null}
+# v4b-run-artifacts-39634329631/probe-run-info/info.json
+{"v4b_tag":"20261021-182256","v4b_save":null,"v4b_cache_hit":"true","v4b_matched_key":"probe-v4b-20261021-182256","v4b_value":"32fb324f2b36d609cfe7c5109941ccb3b728c234"}
+# v4b-verdict-artifacts-39634363221/probe-verdict-info/info.json
+{"v4b_tag":"20261021-182256","v4b_save":null,"v4b_cache_hit":"true","v4b_matched_key":"probe-v4b-20261021-182256","v4b_value":"32fb324f2b36d609cfe7c5109941ccb3b728c234"}

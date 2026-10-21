@@ -1,0 +1,4 @@
+# v1-target-artifacts-39630136045/probe-target/info.json
+{"gh_version":"gh version 2.102.0 (2026-09-30)","gh_api_rc":0,"gh_api_full_name":"ginz0ls/tollgate-p4-protected","status_rc":0,"status_creator":"github-actions[bot]","image_os":"ubuntu24","image_version":"20261018.339.1"}
+# v4-base-artifacts-39630455929/probe-base-info/info.json
+{"gh_version":"gh version 2.102.0 (2026-09-30)","gh_api_rc":0,"gh_api_full_name":"ginz0ls/tollgate-p4-protected","status_rc":0,"status_creator":"github-actions[bot]","image_os":"ubuntu24","image_version":"20261012.334.1"}

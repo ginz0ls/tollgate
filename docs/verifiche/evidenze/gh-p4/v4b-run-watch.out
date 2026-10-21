@@ -1,0 +1,35 @@
+✓ p4-v4b-20261021-182256 probe-run ginz0ls/tollgate-p4-protected#8 · 39634329631
+Triggered via pull_request less than a minute ago
+
+JOBS
+✓ run in 7s (ID 119340633045)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run echo "tag=$(cat .github/probe-tag)" >> "$GITHUB_OUTPUT"
+  ✓ Run echo "tag=$(cat .github/probe-v4b-tag 2>/dev/null || echo none)" >> "$GITHUB_OUTPUT"
+  ✓ Run actions/cache/restore@v4
+  ✓ Run actions/cache/restore@v4
+  ✓ file per gli artefatti
+  ✓ Run actions/upload-artifact@v4
+  ✓ Run actions/upload-artifact@v4
+  ✓ Run actions/upload-artifact@v4
+  ✓ Run actions/upload-artifact@v4
+  ✓ esiti
+  ✓ esiti v4b
+  ✓ Run actions/upload-artifact@v4
+  ✓ Post Run actions/checkout@v4
+  ✓ Complete job
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+run: .github#2
+
+X Invalid pattern 'sub/../keep.txt'. Relative pathing '.' and '..' is not allowed.
+run: .github#12
+
+X Invalid pattern '../probe-outside.txt'. Relative pathing '.' and '..' is not allowed.
+run: .github#12
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+run: .github#1
+

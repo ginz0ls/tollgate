@@ -1,0 +1,25 @@
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* p4-v1-20261021-175542 probe-target ginz0ls/tollgate-p4-protected#1 · 39630136045
+Triggered via pull_request_target less than a minute ago
+
+JOBS
+* target (ID 119325863666)
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* p4-v1-20261021-175542 probe-target ginz0ls/tollgate-p4-protected#1 · 39630136045
+Triggered via pull_request_target less than a minute ago
+
+JOBS
+* target (ID 119325863666)
+✓ p4-v1-20261021-175542 probe-target ginz0ls/tollgate-p4-protected#1 · 39630136045
+Triggered via pull_request_target less than a minute ago
+
+JOBS
+✓ target in 8s (ID 119325863666)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ campi dell'evento, fetch del ref della PR, gh e stato
+  ✓ Run actions/upload-artifact@v4
+  ✓ Post Run actions/checkout@v4
+  ✓ Complete job
