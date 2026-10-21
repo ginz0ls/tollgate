@@ -97,7 +97,40 @@ class WorkflowsTest(unittest.TestCase):
         # un escape in una stringa ordinaria non conta
         self.assertEqual(workflows.problems(wf('    steps:\n      - run: "echo \\"ciao\\""\n')),
                          [])
-        self.assertEqual(workflows.problems(wf('    env:\n      A: "x\\ny"\n')), [])
+
+    def test_any_escape_in_a_double_quoted_string_is_red_except_in_run(self):
+        BS = "\\"
+        red = [
+            f'on: [\n  push,\n  "pull_request_{BS}x74arget"\n]\n',
+            f'on:\n  [push, "pull_request_{BS}x74arget"]\n',
+            f'permissions: {{\n  "{BS}x73tatuses"\n  : write\n}}\n',
+            f'permissions:\n  "{BS}\n  x73tatuses": write\n',
+            f'name: "a{BS}tb"\n',
+            f'env:\n  A: "x{BS}ny"\n',
+            f'steps:\n  - name: "x{BS}u0041"\n    run: echo\n',
+            f'name: "multi\n  line {BS}x41"\n',
+        ]
+        for body in red:
+            with self.subTest(body=body):
+                self.assert_red(wf("") + body, "escape")
+        ok = [
+            f'    steps:\n      - run: "echo {BS}"ciao{BS}""\n',
+            f'    steps:\n      - name: x\n        run: "echo {BS}"a{BS}n"\n',
+            f'    steps:\n      - run: "echo {BS}"a\n          b{BS}" c"\n        name: y\n',
+            f'    steps:\n      - run: |\n          echo "a{BS}tb"\n        name: y\n',
+            f'    steps:\n      - run: >-\n          echo "a{BS}tb"\n',
+            f'    steps:\n      - name: it\'s {BS}fine\n      - run: echo "a{BS}n"\n',
+            f'    steps:\n      - name: \'a{BS}tb\'\n',
+            f'    steps:\n      - name: x # "a{BS}tb"\n',
+            f'    env:\n      A: |\n        "x{BS}ny"\n',
+        ]
+        for body in ok:
+            with self.subTest(body=body):
+                self.assertEqual(workflows.problems(wf(body)), [])
+
+    def test_block_scalar_ends_at_the_next_key(self):
+        text = wf('    steps:\n      - run: |\n          echo\n        env:\n          A: "x\\ny"\n')
+        self.assert_red(text, "escape")
 
     def test_complex_key_fails_closed(self):
         self.assert_red(wf("    permissions:\n      ? statuses\n      : write\n"), "chiave")

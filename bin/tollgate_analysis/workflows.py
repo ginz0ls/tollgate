@@ -17,14 +17,12 @@ _SCOPE = re.compile(r"(?:^|[\s{,\[-])[\"']?(" + "|".join(GUARDED_SCOPES) + r")[\
 _ANCHOR = re.compile(r"(?:^\s*(?:-\s+)*|:\s+|[\[{,]\s*)[&*]\S")
 _MERGE = re.compile(r"^\s*(?:-\s+)?<<\s*:")
 _TOP_PERMISSIONS = re.compile(r"^[\"']?permissions[\"']?[ ]*:")
-# stringa a doppie virgolette con un escape (`\x73`, `\u0073`) dove si legge un nome: chiave di
-# mappa, voce di elenco, riga `on:`; chiave complessa `? `
-_ESCAPED = r'"(?:[^"\\]|\\.)*\\(?:[^"\\]|\\.)*"'
-_ESCAPED_KEY = re.compile(r"(?:^|[\s{,\[-])" + _ESCAPED + r"\s*:")
-_ESCAPED_ITEM = re.compile(r"^\s*-\s+" + _ESCAPED + r"\s*$")
-_ESCAPED_ON = re.compile(r"^[\"']?on[\"']?\s*:.*\\")
+# chiave complessa `? `
 _COMPLEX_KEY = re.compile(r"^\s*(?:-\s+)*\?(?:\s|$)")
 _TAB_INDENT = re.compile(r"^[ ]*\t")
+_BLOCK_HEADER = re.compile(r"^(\s*(?:-\s+)*)(?:\S.*?)?[:-]\s+[|>][-+0-9]*\s*$")
+_RUN_KEY = re.compile(r"^\s*(?:-\s+)*[\"']?run[\"']?\s*:\s*$")
+_NODE_START = "-:[{,?"
 
 
 def is_workflow_path(rel: str) -> bool:
@@ -75,6 +73,50 @@ def _next_value(lines: list[str], index: int) -> str:
     return ""
 
 
+def _escape_lines(lines: list[str]) -> list[int]:
+    """I numeri di riga con un `\\` dentro una stringa a doppie virgolette, in qualunque punto,
+    tranne il valore di una chiave `run:`. Segue lo stato «dentro una stringa» da una riga
+    all'altra; le virgolette si aprono a inizio nodo (dopo `:`, `-`, `[`, `{`, `,`, `?` o a
+    inizio riga); nelle virgolette singole `\\` non è un escape; il contenuto di uno scalare a
+    blocco (`|`, `>`) è testo e non si guarda."""
+    found: list[int] = []
+    in_dq = in_sq = dq_run = False
+    block_base: int | None = None
+    for number, line in enumerate(lines, 1):
+        if block_base is not None and not in_dq and not in_sq:
+            if not line.strip() or _indent(line) > block_base:
+                continue
+            block_base = None
+        i, flagged = 0, False
+        while i < len(line):
+            c = line[i]
+            if in_dq:
+                if c == "\\":
+                    if not dq_run and not flagged:
+                        found.append(number)
+                        flagged = True
+                    i += 1
+                elif c == '"':
+                    in_dq = False
+            elif in_sq:
+                in_sq = c != "'"
+            elif c == "#" and (i == 0 or line[i - 1] in " \t"):
+                break
+            elif c in "\"'":
+                before = line[:i].rstrip()
+                if not before or before[-1] in _NODE_START:
+                    if c == '"':
+                        in_dq, dq_run = True, _RUN_KEY.match(line[:i]) is not None
+                    else:
+                        in_sq = True
+            i += 1
+        if not in_dq and not in_sq:
+            m = _BLOCK_HEADER.match(_strip_comment(line))
+            if m:
+                block_base = len(m.group(1))
+    return found
+
+
 def problems(text: str) -> list[str]:
     """Le regole che il workflow `text` viola, una frase ciascuna (`[]` se nessuna): niente
     `pull_request_target` né `workflow_run` (nemmeno in una stringa), una chiave `statuses` o
@@ -103,14 +145,13 @@ def problems(text: str) -> list[str]:
                 value = _next_value(lines, number - 1)
             if value and value not in SAFE_VALUES:
                 found.append(f"{m.group(1)}: {value} invece di read o none (riga {number})")
-        if _ESCAPED_KEY.search(line) or _ESCAPED_ITEM.match(line) or _ESCAPED_ON.match(line):
-            found.append(f"escape in una stringa tra virgolette doppie dove si legge un nome "
-                         f"(riga {number}): non si controlla")
         if _COMPLEX_KEY.match(line):
             found.append(f"chiave complessa YAML `?` (riga {number}): non si controlla")
         if _ANCHOR.search(line) or _MERGE.match(line):
             found.append(f"àncora, alias o chiave di fusione YAML (riga {number}): non si "
                          f"controlla")
+    found += [f"escape (\\) in una stringa tra virgolette doppie fuori da run: (riga {n}): non "
+              f"si controlla" for n in _escape_lines(lines)]
     if not top_permissions:
         found.append("manca il blocco permissions di primo livello")
     return found
