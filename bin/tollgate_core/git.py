@@ -350,6 +350,16 @@ def exists_at(repo, ref: str, path: str) -> bool:
     return ok(repo, "cat-file", "-e", f"{ref}:{path}")
 
 
+def object_in_history(repo, obj: str, ref: str) -> bool:
+    """`obj` (un blob) compare nella storia di `ref`: un commit che lo aggiunge o lo toglie.
+    Un oggetto presente nel database ma mai committato lungo `ref` non conta."""
+    _check_ref(obj)
+    _check_ref(ref)
+    r = _proc(repo, ["log", "-n", "1", "--format=%H", f"--find-object={obj}", ref, "--"],
+              timeout=30)
+    return r.returncode == 0 and bool(r.stdout.strip())
+
+
 def blob_sha(repo, path: str) -> str:
     return run(repo, "hash-object", "--", path).strip()
 

@@ -8,7 +8,7 @@ SPEC_ORDER = [
     "level_cap_reason", "gate_mode", "plan", "plan_sha", "spec", "spec_reviews_dir",
     "plan_reviews_dir", "spec_audit", "head_sha", "receipts", "waivers_file", "blocks", "acts",
     "dod", "verdict", "findings", "fix_rounds", "subagents", "effects", "components_off",
-    "off_periods"]
+    "off_periods", "tasks_over", "skills_absent"]
 
 
 def facts(**kw):
@@ -35,6 +35,21 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(list(prblock.FIELDS), SPEC_ORDER)
         self.assertEqual(prblock.SCHEMA_VERSION, 1)
         self.assertNotIn("extra", block)
+
+    def test_new_fields_default_to_empty_lists(self):
+        block = prblock.build(facts())
+        self.assertEqual((block["tasks_over"], block["skills_absent"]), ([], []))
+        block = prblock.build(facts(tasks_over=[{"task": 2, "lines": 300, "size_reason": "x"}],
+                                    skills_absent=[{"task": 1, "skills": ["a"]}]))
+        self.assertEqual(block["tasks_over"][0]["lines"], 300)
+        self.assertEqual(block["skills_absent"], [{"task": 1, "skills": ["a"]}])
+        self.assertEqual(prblock.parse(prblock.render(block)), block)
+
+    def test_findings_carry_blocking_field(self):
+        finding = {"id": "f-1-1", "severity": "major", "confidence": 0.9,
+                   "verification": "confirmed", "user_decision": None, "blocking": False}
+        block = prblock.build(facts(findings=[finding]))
+        self.assertEqual(prblock.parse(prblock.render(block))["findings"], [finding])
 
     def test_missing_field_is_keyerror(self):
         data = facts()

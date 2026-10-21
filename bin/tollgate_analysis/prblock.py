@@ -13,15 +13,19 @@ FIELDS = (
     "level_cap_reason", "gate_mode", "plan", "plan_sha", "spec", "spec_reviews_dir",
     "plan_reviews_dir", "spec_audit", "head_sha", "receipts", "waivers_file", "blocks", "acts",
     "dod", "verdict", "findings", "fix_rounds", "subagents", "effects", "components_off",
-    "off_periods")
+    "off_periods", "tasks_over", "skills_absent")
+# Campi nuovi (decisione 21 di P4): un blocco costruito da chi non li conosce ha elenchi vuoti.
+DEFAULTS = {"tasks_over": [], "skills_absent": []}
 _OPEN = "<!-- tollgate "
 _CLOSE = " -->"
 _ESCAPES = (("<", "\\u003c"), (">", "\\u003e"), ("&", "\\u0026"))
 
 
 def build(facts: dict) -> dict:
-    """I campi di 18.1 nell'ordine della spec; `KeyError` se ne manca uno."""
-    return {key: facts[key] for key in FIELDS}
+    """I campi di 18.1 nell'ordine della spec; `KeyError` se ne manca uno (salvo quelli di
+    `DEFAULTS`, che valgono elenchi vuoti)."""
+    return {key: facts[key] if key in facts or key not in DEFAULTS else list(DEFAULTS[key])
+            for key in FIELDS}
 
 
 def render(block: dict) -> str:

@@ -755,7 +755,7 @@ class FactsTest(OpenCase):
     def test_facts_keys_match_block_fields(self):
         fl = self.lab()
         data = self.facts(fl)
-        self.assertEqual(set(data), set(prblock.FIELDS))
+        self.assertEqual(set(data) | set(prblock.DEFAULTS), set(prblock.FIELDS))
         self.assertEqual((data["head_sha"], data["tollgate_version"]), (head(fl), VERSION))
         self.assertEqual((data["verdict"]["outcome"], data["verdict"]["cycles"]), ("ok", 1))
         self.assertEqual(self.facts(fl, cycle=None)["verdict"]["outcome"], None)

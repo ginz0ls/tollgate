@@ -250,6 +250,8 @@ class GitTest(unittest.TestCase):
             "patch_id head": lambda r: git.patch_id(self.repo, "HEAD", r),
             "resolve_ref": lambda r: git.resolve_ref(self.repo, r),
             "fetch_ref": lambda r: git.fetch_ref(self.repo, r),
+            "object_in_history obj": lambda r: git.object_in_history(self.repo, r, "HEAD"),
+            "object_in_history ref": lambda r: git.object_in_history(self.repo, self.base, r),
         }
         for name, call in calls.items():
             with self.subTest(name), patch("tollgate_core.git.subprocess.run") as run:
@@ -257,6 +259,21 @@ class GitTest(unittest.TestCase):
                     call("--output=/tmp/x")
                 run.assert_not_called()
         self.assertEqual(git.text_at(self.repo, "HEAD", "src/a.py"), "uno\ndue\n")
+
+    def test_object_in_history(self):
+        blob = g(self.repo, "rev-parse", "HEAD:src/a.py")
+        self.assertTrue(git.object_in_history(self.repo, blob, "HEAD"))
+        (self.repo / "src" / "a.py").write_text("tre\n")
+        g(self.repo, "add", "-A")
+        g(self.repo, "commit", "-qm", "cambia")
+        self.assertTrue(git.object_in_history(self.repo, blob, "HEAD"))   # tolto in un commit
+        loose = subprocess.run(["git", "-C", str(self.repo), "hash-object", "-w", "--stdin"],
+                               input=b"mai committato\n", capture_output=True,
+                               check=True).stdout.decode().strip()
+        self.assertEqual(git.blob_text(self.repo, loose), "mai committato\n")
+        self.assertFalse(git.object_in_history(self.repo, loose, "HEAD"))
+        self.assertFalse(git.object_in_history(self.repo, "0" * 40, "HEAD"))
+        self.assertFalse(git.object_in_history(self.repo, blob, "refs/heads/inesistente"))
 
     def test_fetch_ref_passes_token_only_in_environment(self):
         token = "ghs_segretissimo"
