@@ -286,6 +286,34 @@ class CheckL2Test(unittest.TestCase):
         self.assertTrue(any("piano" in p for p in check(full(), plan_path=None, plan_blob=None)))
 
 
+class JudgeSpecTest(unittest.TestCase):
+    where = {"issue": 7, "spec_path": SPEC_PATH}
+
+    def judge(self, files, blob=BLOB):
+        return approvals.judge_spec(files, spec_blob=blob, **self.where)
+
+    def test_statuses(self):
+        self.assertEqual(self.judge({}).status, approvals.MISSING)
+        cur = self.judge(dict([approval(3)]))
+        self.assertEqual((cur.status, cur.found[0]), (approvals.CURRENT, f"{REV}/3/spec-approval.md"))
+        own = self.judge(dict([approval(7, sha="old")]))
+        self.assertEqual((own.status, own.found[0]), (approvals.STALE, f"{REV}/7/spec-approval.md"))
+
+    def test_only_another_issue_stale(self):
+        j = self.judge(dict([approval(3, sha="old")]))
+        self.assertEqual((j.status, j.found), (approvals.STALE, None))
+        self.assertEqual(j.approval[0], f"{REV}/3/spec-approval.md")
+
+    def test_check_l2_detail_agrees_on_another_issue_stale(self):
+        files = full(issue=9, spec_issue=3)
+        files.update([approval(3, sha="old"), plan_approval(9, spec_sha="old")])
+        problems = detail(files, issue=9)
+        self.assertEqual(kinds(problems), ["stale"])
+        self.assertIn(f"{REV}/3/spec-approval.md", problems[0].text)
+        self.assertEqual(approvals.judge_spec(files, issue=9, spec_path=SPEC_PATH,
+                                              spec_blob=BLOB).status, approvals.STALE)
+
+
 class CheckL2DetailTest(unittest.TestCase):
     def test_clean(self):
         self.assertEqual(detail(full()), [])

@@ -28,26 +28,21 @@ def locate(repo, ref: str, *, issue: int, spec_path: str, spec_blob: str | None
                                           spec_path=spec_path, spec_blob=spec_blob)
 
 
-CURRENT, STALE, MISSING = "current", "stale", "missing"
+CURRENT, STALE, MISSING = approvals.CURRENT, approvals.STALE, approvals.MISSING
 
 
 def spec_approval(repo, ref: str, *, issue: int, spec_path: str, spec_blob: str
                   ) -> tuple[str, tuple[str, dict] | None]:
     """Lo stato dell'approvazione della spec nell'albero di `ref`, per chi deve rifiutare con il
-    messaggio giusto (`audit prepare`, `approve plan`): `(stato, trovata)`.
-
-    Si cerca prima con lo `sha` attuale della spec (la propria approvazione, o quella di
-    un'altra issue per una fetta successiva): `CURRENT` se è sullo `sha` attuale. Solo se manca
-    si cerca senza `sha`, per distinguere `STALE` (esiste, ma su una spec cambiata) da
-    `MISSING`. Con la propria approvazione superata e un'altra corrente vince quella corrente,
-    come in `locate_spec_approval`: l'approvazione è legata al contenuto."""
-    files = spec_approvals(repo, ref)
-    where = {"issue": issue, "spec_path": spec_path}
-    found = approvals.locate_spec_approval(files, spec_blob=spec_blob, **where)
-    if found is None:
-        anyone = approvals.locate_spec_approval(files, spec_blob=None, **where)
-        return (STALE if anyone is not None else MISSING), None
-    return (CURRENT if approvals.is_current(found[1], spec_blob) else STALE), found
+    messaggio giusto (`audit prepare`, `approve plan`): `(stato, trovata)`. Il giudizio è
+    `approvals.judge_spec`, lo stesso di `check_l2_detail`: `CURRENT` se un'approvazione (la
+    propria, o quella di un'altra issue per una fetta successiva) è sullo `sha` attuale, `STALE`
+    se esiste ma su una spec cambiata (`trovata` è `None` se è solo di un'altra issue),
+    `MISSING` altrimenti. Con la propria superata e un'altra corrente vince quella corrente:
+    l'approvazione è legata al contenuto."""
+    j = approvals.judge_spec(spec_approvals(repo, ref), issue=issue, spec_path=spec_path,
+                             spec_blob=spec_blob)
+    return j.status, j.found
 
 
 def collect(repo, ref: str, *, issue: int, spec_path: str | None, spec_blob: str | None

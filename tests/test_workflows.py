@@ -87,6 +87,23 @@ class WorkflowsTest(unittest.TestCase):
         self.assertEqual(workflows.problems(wf("    steps:\n      - run: a && b\n")), [])
         self.assertEqual(workflows.problems(wf("    env:\n      CRON: '* * * * *'\n")), [])
 
+    def test_escapes_in_double_quoted_keys_and_events_fail_closed(self):
+        self.assert_red(wf('    permissions:\n      "\\x73tatuses": write\n'), "escape")
+        self.assert_red(wf("", on='on: "pull_request_\\x74arget"\n'), "escape")
+        self.assert_red(wf("", on='on: ["pull_request_\\x74arget"]\n'))
+        self.assert_red(wf("", on='on:\n  - "pull_request_\\x74arget"\n'))
+        self.assert_red(wf("", on='on:\n  "pull_request_\\x74arget":\n'))
+        self.assert_red(wf("    permissions: {\"\\x73tatuses\": write}\n"))
+        # un escape in una stringa ordinaria non conta
+        self.assertEqual(workflows.problems(wf('    steps:\n      - run: "echo \\"ciao\\""\n')),
+                         [])
+        self.assertEqual(workflows.problems(wf('    env:\n      A: "x\\ny"\n')), [])
+
+    def test_complex_key_fails_closed(self):
+        self.assert_red(wf("    permissions:\n      ? statuses\n      : write\n"), "chiave")
+        self.assert_red(wf("    permissions:\n      ?\n"))
+        self.assertEqual(workflows.problems(wf("    steps:\n      - run: echo ?\n")), [])
+
     def test_yaml_extension(self):
         self.assertTrue(workflows.is_workflow_path(".github/workflows/ci.yml"))
         self.assertTrue(workflows.is_workflow_path(".github/workflows/ci.yaml"))

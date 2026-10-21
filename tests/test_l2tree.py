@@ -64,6 +64,15 @@ class L2TreeTest(unittest.TestCase):
         self.approve(3, OLD)
         self.assertEqual(self.state(), (l2tree.STALE, None))
 
+    def test_agrees_with_check_l2_detail_on_only_another_issue_stale(self):
+        self.approve(3, OLD)
+        status, found = self.state()
+        problems = approvals.check_l2_detail(
+            l2tree.spec_approvals(self.repo, "HEAD"), issue=7, spec_path=SPEC,
+            spec_blob=self.blob, plan_path=None, plan_blob=None)
+        self.assertEqual((status, found), (l2tree.STALE, None))
+        self.assertEqual(problems[0].kind, status)
+
     def test_none_is_missing(self):
         self.assertEqual(self.state(), (l2tree.MISSING, None))
 

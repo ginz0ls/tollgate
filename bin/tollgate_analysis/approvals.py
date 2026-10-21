@@ -193,7 +193,7 @@ def _valid_reports(files: Mapping[str, str], folder: str, kinds) -> list[dict]:
     return out
 
 
-MISSING, STALE = "missing", "stale"
+CURRENT, MISSING, STALE = "current", "missing", "stale"
 
 
 class L2Problem(NamedTuple):
@@ -201,6 +201,29 @@ class L2Problem(NamedTuple):
     assenti o non validi) oppure `stale` (l'`sha` approvato non è più quello del documento)."""
     kind: str
     text: str
+
+
+class SpecJudgement(NamedTuple):
+    """Il giudizio sull'approvazione della spec: `status` (`CURRENT`, `STALE`, `MISSING`),
+    `found` (come `locate_spec_approval` con `spec_blob`, `None` se nessuna) e `approval`
+    (`found`, o con `STALE` l'approvazione trovata senza `sha`, anche di un'altra issue)."""
+    status: str
+    found: tuple[str, dict] | None
+    approval: tuple[str, dict] | None
+
+
+def judge_spec(files: Mapping[str, str], *, issue: int, spec_path: str,
+               spec_blob: str) -> SpecJudgement:
+    """Il solo giudizio sull'approvazione della spec, per `check_l2_detail` e per
+    `tollgate_gate.l2tree.spec_approval`: si cerca con lo `sha` attuale; se non ce n'è una
+    corrente (né la propria superata) si cerca senza `sha`, per distinguere `STALE` (esiste,
+    ma su una spec cambiata) da `MISSING`."""
+    where = {"issue": issue, "spec_path": spec_path}
+    found = locate_spec_approval(files, spec_blob=spec_blob, **where)
+    if found is None:
+        anyone = locate_spec_approval(files, spec_blob=None, **where)
+        return SpecJudgement(MISSING if anyone is None else STALE, None, anyone)
+    return SpecJudgement(CURRENT if is_current(found[1], spec_blob) else STALE, found, found)
 
 
 def _header_off(header: dict, key: str, component: str, components: Mapping[str, bool] | None,
@@ -229,18 +252,19 @@ def check_l2_detail(files: Mapping[str, str], *, issue: int, spec_path: str | No
         problems.append(L2Problem(MISSING, "spec non registrata o assente dall'albero: manca "
                                            "l'approvazione della spec (spec-approval.md)"))
     else:
-        found = locate_spec_approval(files, issue=issue, spec_path=spec_path, spec_blob=spec_blob)
-        if found is None:
+        judged = judge_spec(files, issue=issue, spec_path=spec_path, spec_blob=spec_blob)
+        if judged.status == MISSING:
             problems.append(L2Problem(
                 MISSING, f"manca il file di approvazione della spec {spec_path} con lo sha "
                          f"attuale ({approval_paths(issue)[0]})"))
-        elif not is_current(found[1], spec_blob):
-            approved_spec = found[1]["sha"]
+        elif judged.status == STALE:
+            path, header = judged.approval
+            approved_spec = header["sha"]
             problems.append(L2Problem(
-                STALE, f"{found[0]}: la spec {spec_path} è cambiata dopo l'approvazione "
+                STALE, f"{path}: la spec {spec_path} è cambiata dopo l'approvazione "
                        f"(rifai approve spec)"))
         else:
-            problems += _spec_reports(files, *found, components)
+            problems += _spec_reports(files, *judged.found, components)
     plan_approval = approval_paths(issue)[1]
     if not plan_path or plan_blob is None:
         problems.append(L2Problem(MISSING, f"piano non registrato o assente dall'albero: manca "

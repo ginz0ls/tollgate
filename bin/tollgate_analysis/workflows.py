@@ -17,6 +17,13 @@ _SCOPE = re.compile(r"(?:^|[\s{,\[-])[\"']?(" + "|".join(GUARDED_SCOPES) + r")[\
 _ANCHOR = re.compile(r"(?:^\s*(?:-\s+)*|:\s+|[\[{,]\s*)[&*]\S")
 _MERGE = re.compile(r"^\s*(?:-\s+)?<<\s*:")
 _TOP_PERMISSIONS = re.compile(r"^[\"']?permissions[\"']?[ ]*:")
+# stringa a doppie virgolette con un escape (`\x73`, `\u0073`) dove si legge un nome: chiave di
+# mappa, voce di elenco, riga `on:`; chiave complessa `? `
+_ESCAPED = r'"(?:[^"\\]|\\.)*\\(?:[^"\\]|\\.)*"'
+_ESCAPED_KEY = re.compile(r"(?:^|[\s{,\[-])" + _ESCAPED + r"\s*:")
+_ESCAPED_ITEM = re.compile(r"^\s*-\s+" + _ESCAPED + r"\s*$")
+_ESCAPED_ON = re.compile(r"^[\"']?on[\"']?\s*:.*\\")
+_COMPLEX_KEY = re.compile(r"^\s*(?:-\s+)*\?(?:\s|$)")
 _TAB_INDENT = re.compile(r"^[ ]*\t")
 
 
@@ -96,6 +103,11 @@ def problems(text: str) -> list[str]:
                 value = _next_value(lines, number - 1)
             if value and value not in SAFE_VALUES:
                 found.append(f"{m.group(1)}: {value} invece di read o none (riga {number})")
+        if _ESCAPED_KEY.search(line) or _ESCAPED_ITEM.match(line) or _ESCAPED_ON.match(line):
+            found.append(f"escape in una stringa tra virgolette doppie dove si legge un nome "
+                         f"(riga {number}): non si controlla")
+        if _COMPLEX_KEY.match(line):
+            found.append(f"chiave complessa YAML `?` (riga {number}): non si controlla")
         if _ANCHOR.search(line) or _MERGE.match(line):
             found.append(f"àncora, alias o chiave di fusione YAML (riga {number}): non si "
                          f"controlla")
