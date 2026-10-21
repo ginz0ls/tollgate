@@ -135,13 +135,25 @@ class CommandsTest(LabCase):
         self.assertEqual(keys(ev.red, "commands"), ["command_red"])   # report assente
 
     def test_setup_red_is_a_red_command(self):
+        lab = GateLab(toml=PROFILE_TOML)
+        self.addCleanup(lab.close)
         for name in ("setup", "profile:web:setup"):
+            with self.subTest(name):
+                commands = lab.inputs().commands + [CommandResult(name, "red", 1, None, None)]
+                ev = evaluate(lab.inputs(commands=commands))
+                self.assertEqual(keys(ev.red, "commands"), ["command_red"])
+                self.assertIn(name, ev.red[0].text)
+
+    def test_artifact_names_never_reach_item_text(self):
+        hostile = "profile:inventato:setup"
+        for name in (hostile, "evil:setup", "`@x` setup"):
             with self.subTest(name):
                 commands = self.lab.inputs().commands + [CommandResult(name, "red", 1, None,
                                                                        None)]
                 ev = self.run_gate(commands=commands)
-                self.assertEqual(keys(ev.red, "commands"), ["command_red"])
-                self.assertIn(name, ev.red[0].text)
+                for item in ev.red + ev.attention:
+                    self.assertNotIn(name, item.text)
+                self.assertNotIn(name, " ".join(i.text for i in ev.red))
 
     def test_missing_result_is_red(self):
         ev = self.run_gate(commands=[])
@@ -295,6 +307,15 @@ class DiffTest(LabCase):
         self.assertIn("+- Create: `src/extra.py`", diff)
         self.assertTrue(diff.startswith("--- registrato\n+++ testa"))
         self.assertEqual(ev.attention_state, "failure")
+
+    def test_plan_changed_is_scope_violation_in_local(self):
+        changed = plan_text(task2="- Create: `docs/uso.md`\n- Create: `src/extra.py`")
+        self.lab.commit(PLAN, changed, "piano cambiato")
+        self.lab.commit("src/extra.py", "x = 1\n", "il file in più")
+        ev = self.run_gate(where="local", pr=None, base_ids=None)
+        self.assertEqual(sorted(i.data for i in ev.red if i.family == "diff"),
+                         [PLAN, "src/extra.py"])
+        self.assertNotIn("plan_changed", keys(ev.attention))
 
     def test_plan_diff_is_capped(self):
         many = plan_text() + "".join(f"riga {n}\n" for n in range(500))

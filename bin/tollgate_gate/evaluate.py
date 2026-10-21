@@ -181,8 +181,12 @@ def commands(ctx: Context, ev: Evaluation) -> None:
             ev.errors.append("risultati dei comandi del gate assenti")
         return
     allow = bool(ctx.cfg.get("project.allow_no_tests"))
-    for name, r in ctx.results.items():
-        if (name == "setup" or name.endswith(":setup")) and r.state == "red":
+    # i nomi del `results.json` li scrive codice della PR: solo quelli della configurazione
+    # arrivano nel testo di una voce
+    setups = ["setup"] + [f"profile:{p}:setup" for p in ctx.cfg.profiles]
+    for name in setups:
+        r = ctx.results.get(name)
+        if r is not None and r.state == "red":
             _red(ev, "command_red", "commands", f"il comando «{name}» è rosso")
     counted = False
     for spec in ctx.required:
@@ -334,7 +338,8 @@ def _scope(ctx: Context, ev: Evaluation) -> tuple[set[str] | None, set[str], tup
 
 
 def _plan_changed(ctx: Context, ev: Evaluation, registered: tuple | None) -> None:
-    """Il piano in testa è diverso da quello registrato (criterio 36): `attenzione` con il diff.
+    """Il piano in testa è diverso da quello registrato (criterio 36): `attenzione` con il diff,
+    solo nel gate (in locale è una violazione di scope, più severa).
     I file che il piano nuovo aggiunge sono fuori scope, perché lo scope resta quello registrato."""
     if registered is None or ctx.registered_plan is None:
         return
@@ -381,11 +386,12 @@ def diff(ctx: Context, ev: Evaluation) -> None:
         ctx.cfg, repo=i.repo, issue=ctx.issue_no or 0, level=ctx.level, base_ref=i.base_sha,
         head_ref=i.head_sha, changes=ctx.changes, scope=scope, locked=locked,
         registered_plan=registered, approved_spec=approved, waiver_file=ctx.waiver_file,
-        components=ctx.components, plan_change_is_attention=True)
+        components=ctx.components, plan_change_is_attention=ctx.is_github)
     for v in check.violations:
         _red(ev, v.kind, "diff", f"{v.detail} ({v.waiver_type})", v.path)
     ev.watch = list(check.watched)
-    _plan_changed(ctx, ev, registered)
+    if ctx.is_github:
+        _plan_changed(ctx, ev, registered)
     _waiver_items(ctx, ev)
 
 
