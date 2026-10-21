@@ -308,6 +308,7 @@ def text_at(repo, ref: str, path: str) -> str | None:
 
 def blob_text(repo, sha: str) -> str | None:
     """Testo di un blob dal suo SHA; None se manca dal database degli oggetti o è binario."""
+    _check_ref(sha)
     r = _proc(repo, ["cat-file", "blob", sha])
     return _text(r.stdout) if r.returncode == 0 else None
 
@@ -426,12 +427,12 @@ def fetch_ref(repo, ref: str, *, token: str | None = None) -> None:
     come intestazione HTTP nelle variabili d'ambiente del processo figlio: mai negli argomenti né
     in `.git/config`."""
     _check_ref(ref)
-    env = None
+    env = {"GIT_TERMINAL_PROMPT": "0"}     # senza credenziali non si attende mai un prompt
     if token:
         auth = base64.b64encode(f"x-access-token:{token}".encode()).decode("ascii")
-        env = {"GIT_CONFIG_COUNT": "1",
-               "GIT_CONFIG_KEY_0": "http.https://github.com/.extraheader",
-               "GIT_CONFIG_VALUE_0": f"AUTHORIZATION: basic {auth}"}
+        env |= {"GIT_CONFIG_COUNT": "1",
+                "GIT_CONFIG_KEY_0": "http.https://github.com/.extraheader",
+                "GIT_CONFIG_VALUE_0": f"AUTHORIZATION: basic {auth}"}
     r = _proc(repo, ["fetch", "--no-tags", "origin", ref], timeout=FETCH_TIMEOUT_S,
               extra_env=env)
     if r.returncode != 0:

@@ -236,6 +236,7 @@ class GitTest(unittest.TestCase):
         calls = {
             "ls_files_at": lambda r: git.ls_files_at(self.repo, r, "src/"),
             "text_at": lambda r: git.text_at(self.repo, r, "src/a.py"),
+            "blob_text": lambda r: git.blob_text(self.repo, r),
             "show": lambda r: git.show(self.repo, r, "src/a.py"),
             "blob_at": lambda r: git.blob_at(self.repo, r, "src/a.py"),
             "exists_at": lambda r: git.exists_at(self.repo, r, "src/a.py"),
@@ -263,6 +264,7 @@ class GitTest(unittest.TestCase):
         with patch("tollgate_core.git.subprocess.run", return_value=done) as run:
             git.fetch_ref(self.repo, "refs/pull/5/head", token=token)
         cmd, env = run.call_args.args[0], run.call_args.kwargs["env"]
+        self.assertEqual(env["GIT_TERMINAL_PROMPT"], "0")
         self.assertEqual(cmd[-2:], ["origin", "refs/pull/5/head"])
         self.assertFalse([a for a in cmd if token in a or "AUTHORIZATION" in a])
         self.assertFalse([a for a in cmd if "extraheader" in a])
@@ -281,8 +283,9 @@ class GitTest(unittest.TestCase):
         g(self.repo, "push", "-q", "origin", "HEAD:refs/heads/main")
         with patch("tollgate_core.git.subprocess.run", wraps=subprocess.run) as run:
             git.fetch_ref(self.repo, "refs/heads/main")
-        self.assertNotIn("GIT_CONFIG_COUNT", {k for k in run.call_args.kwargs["env"]
-                                              if k not in os.environ})
+        env = run.call_args.kwargs["env"]
+        self.assertEqual(env["GIT_TERMINAL_PROMPT"], "0")
+        self.assertNotIn("GIT_CONFIG_COUNT", {k for k in env if k not in os.environ})
         self.assertEqual(git.resolve_ref(self.repo, "FETCH_HEAD"), self.base)
         with self.assertRaises(git.GitError):
             git.fetch_ref(self.repo, "refs/heads/assente")
