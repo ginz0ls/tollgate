@@ -120,12 +120,11 @@ def _check(state, conn, cwd: Path, now, environ) -> CheckResult:
     comps = cfg.get("components")
     details: dict[str, str] = {}
 
-    approved_spec = _approved_spec_blob(wt, work) if level == "L2" else None
-    spec_blob = git.blob_at(wt, "HEAD", work["spec_path"]) if approved_spec else None
-    found = [v for v in violations.diff_violations(cfg, conn, work, wt, base, sha,
-                                                   git.changes(wt, base, head=sha),
-                                                   components=comps)
-             if not _own_document(work, v, approved_spec, spec_blob)]
+    spec_sha = _approved_spec_blob(wt, work) if level == "L2" else None
+    approved_spec = (work["spec_path"], spec_sha) if spec_sha else None
+    found = violations.diff_violations(cfg, conn, work, wt, base, sha,
+                                       git.changes(wt, base, head=sha), components=comps,
+                                       approved_spec=approved_spec)
     external = {"guard_scope": not found}
     if found:
         shown = [f"{v.kind} {v.path}" for v in found[:MAX_LISTED]]
@@ -192,14 +191,6 @@ def _approved_spec_blob(wt: Path, work) -> str | None:
     blob = git.blob_at(wt, "HEAD", spec_path)
     found = l2tree.locate(wt, "HEAD", issue=work["issue"], spec_path=spec_path, spec_blob=blob)
     return found[1]["sha"] if found is not None else None
-
-
-def _own_document(work, v, approved_spec: str | None, spec_blob: str | None) -> bool:
-    """Esente dallo scope in un lavoro L2: la spec approvata, cioè con il blob in HEAD uguale allo
-    `sha` dell'approvazione trovata. Il piano lo è solo se è il blob registrato
-    (`is_registered_plan`, dentro `diff_violations`)."""
-    return (v.kind == "out_of_scope" and bool(work["spec_path"]) and v.path == work["spec_path"]
-            and approved_spec is not None and approved_spec == spec_blob)
 
 
 def _saved(work, sha: str) -> CheckResult:

@@ -2,16 +2,17 @@
 (commit) e per `finish check`. Nessuna dipendenza da `Ctx`."""
 from __future__ import annotations
 
-import posixpath
 from collections.abc import Mapping
 from pathlib import Path
 
-from tollgate_analysis import approvals, globs, profiles as prof, testguard, waivers
+from tollgate_analysis import approvals, profiles as prof, waivers
 from tollgate_analysis.approvals import REVIEWS_DIR
-from tollgate_analysis.testguard import DEFAULT_TEST_GLOBS, GuardConfig, Violation
+from tollgate_analysis.testguard import Violation
 
-from . import git, scope as scope_mod
-from .config import Config, output_excludes
+from . import diffcheck, git, scope as scope_mod
+from .config import Config
+# `guard_config` e `is_docs_md` stanno in `diffcheck`; da qui li importano hook e contesto.
+from .diffcheck import guard_config, is_docs_md, scope_exempt_rel  # noqa: F401
 
 # Ordine delle fasi di un lavoro (phases.SEQUENCES): la spec si scrive in spec_audit e il
 # piano in plan. Oltre quelle fasi la spec e il piano sono bloccati (6.2).
@@ -20,26 +21,6 @@ _ORDER = ("spec_audit", "plan", "approval", "execution", "review", "pr_open", "c
 
 def _rank(phase: str | None) -> int:
     return _ORDER.index(phase) if phase in _ORDER else len(_ORDER)
-
-
-def guard_config(cfg: Config, files) -> GuardConfig:
-    tg = cfg.get("test_guard")
-    profs = cfg.profiles
-    active = prof.active_profiles(files, profs, cfg.get("profiles.active"))
-    extra = lambda k: [x for n in active for x in profs[n].get(k, [])]  # noqa: E731
-    commands = " ".join(str(v) for v in cfg.get("commands").values())
-    return GuardConfig(
-        test_globs=list(DEFAULT_TEST_GLOBS) + tg["test_globs"] + extra("test_globs"),
-        fixture_globs=tg["fixture_globs"], ci_globs=tg["ci_globs"],
-        verification_globs=tg["verification_globs"],
-        verification_watch=tg["verification_watch"],
-        skip_markers=tg["skip_markers"] + extra("skip_markers"),
-        assert_markers=tg["assert_markers"] + extra("assert_markers"),
-        js_form="jest" if "jest" in commands else "vitest")
-
-
-def is_docs_md(rel: str | None) -> bool:
-    return bool(rel) and rel.startswith("docs/superpowers/") and rel.endswith(".md")
 
 
 def _approval_files(wt: Path) -> dict[str, str]:
@@ -95,26 +76,10 @@ def active_profile_names(cfg: Config, wt: Path, work, *, head: str | None = None
 
 def scope_exempt(cfg: Config, work, rel: str, scope: set[str], *,
                  locked: set[str] | None = None) -> bool:
-    """Esenzioni dallo scope (7.4); quella di `docs/superpowers/reviews/<N>/` (report e
-    approvazioni del lavoro) vale a ogni livello, non solo in L2. I percorsi di `scope` sono nomi letterali (possono
-    contenere `[ ]`): si confrontano per uguaglianza, mai come pattern. Solo `[scope] always`
-    è fatto di pattern. `locked` sono i documenti bloccati (`locked_docs`): chi esamina molti
-    file lo calcola una volta sola e lo passa."""
-    if rel.startswith(".superpowers/") or rel == f".tollgate/waivers/{work['issue']}.toml":
-        return True
-    # I report e le approvazioni del lavoro li scrivono solo la CLI e gli hook e il
-    # coordinatore li committa con spec e piano (decisione 26).
-    if rel.startswith(f"{REVIEWS_DIR}/{work['issue']}/"):
-        return True
-    if git.excluded(rel, output_excludes(cfg)):
-        return True
-    if is_docs_md(rel) and not rel.startswith(f"{REVIEWS_DIR}/") \
-            and rel not in (locked_docs(work) if locked is None else locked):
-        return True
-    if globs.match_any(cfg.get("scope.always"), rel):
-        return True
-    manifest = cfg.get("scope.lockfiles").get(posixpath.basename(rel))
-    return bool(manifest and posixpath.join(posixpath.dirname(rel), manifest) in scope)
+    """`diffcheck.scope_exempt_rel` per un lavoro. `locked` sono i documenti bloccati
+    (`locked_docs`): chi esamina molti file lo calcola una volta sola e lo passa."""
+    return scope_exempt_rel(cfg, issue=work["issue"], rel=rel, scope=scope,
+                            locked=locked_docs(work) if locked is None else locked)
 
 
 def is_registered_plan(work, wt: Path, path: str, head_ref: str | None) -> bool:
@@ -141,33 +106,19 @@ def waiver_file(work) -> waivers.WaiverFile | None:
 
 
 def diff_violations(cfg: Config, conn, work, wt: Path, base_ref: str, head_ref: str | None,
-                    changes, *, components: Mapping[str, bool]) -> list[Violation]:
+                    changes, *, components: Mapping[str, bool],
+                    approved_spec: tuple[str, str] | None = None) -> list[Violation]:
     """Violazioni di test-guard e scope su `changes` (da `base_ref` a `head_ref`; `None` è il
-    working tree), senza le cartelle di output e `.tollgate-run/`. Restano solo quelle non
-    coperte da una deroga, anche in attesa (decisione 9). Un componente assente è acceso."""
-    skip = output_excludes(cfg)
-    changes = [c for c in changes if not git.excluded(c.path, skip)]
-    out: list[Violation] = []
-    if components.get("test_guard", True):
-        tg = []
-        for c in changes:
-            base_text = None if c.status == "A" else git.text_at(wt, base_ref,
-                                                                 c.old_path or c.path)
-            if c.status == "D":
-                head_text = None
-            elif head_ref is None:
-                head_text = git.worktree_text(wt, c.path)
-            else:
-                head_text = git.text_at(wt, head_ref, c.path)
-            tg.append(testguard.Change(c.status, c.path, c.old_path, base_text, head_text,
-                                       c.binary))
-        out += testguard.check(tg, guard_config(cfg, [c.path for c in changes])).violations
-    if components.get("scope_check", True) and work["level"] != "L0" and work["plan_sha"]:
-        scope = scope_mod.paths(conn, work["id"])
-        locked = locked_docs(work)
-        for c in changes:
-            if c.path not in scope and not scope_exempt(cfg, work, c.path, scope, locked=locked) \
-                    and not is_registered_plan(work, wt, c.path, head_ref):
-                out.append(Violation("out_of_scope", c.path, "file fuori dallo scope del piano",
-                                     "scope"))
-    return waivers.unresolved(out, waiver_file(work))
+    working tree): `diffcheck.diff_findings` con i dati del lavoro. Lo scope viene dal DB (nessun
+    controllo in L0 o senza `plan_sha`). `approved_spec` (percorso, sha dell'approvazione) lo
+    calcola chi sa leggere l'albero (`finish check`); gli hook passano `None`."""
+    scope = (scope_mod.paths(conn, work["id"])
+             if work["level"] != "L0" and work["plan_sha"] else None)
+    plan_path = work["plan_path"]
+    registered = (plan_path, work["plan_sha"]) if (
+        plan_path and work["plan_sha"] and not (wt / plan_path).is_symlink()) else None
+    return diffcheck.diff_findings(
+        cfg, repo=wt, issue=work["issue"], level=work["level"], base_ref=base_ref,
+        head_ref=head_ref, changes=changes, scope=scope,
+        locked=locked_docs(work) if scope is not None else set(), registered_plan=registered,
+        approved_spec=approved_spec, waiver_file=waiver_file(work), components=components)

@@ -1,3 +1,4 @@
+import base64
 import os
 import shutil
 import subprocess
@@ -230,6 +231,61 @@ class GitTest(unittest.TestCase):
         git.is_clean(self.repo, [])
         git.changes(self.repo, self.base)
         self.assertFalse(sentinel.exists())
+
+    def test_refs_starting_with_dash_refused(self):
+        calls = {
+            "ls_files_at": lambda r: git.ls_files_at(self.repo, r, "src/"),
+            "text_at": lambda r: git.text_at(self.repo, r, "src/a.py"),
+            "show": lambda r: git.show(self.repo, r, "src/a.py"),
+            "blob_at": lambda r: git.blob_at(self.repo, r, "src/a.py"),
+            "exists_at": lambda r: git.exists_at(self.repo, r, "src/a.py"),
+            "rev_list base": lambda r: git.rev_list(self.repo, r, "HEAD"),
+            "rev_list head": lambda r: git.rev_list(self.repo, "HEAD", r),
+            "changes base": lambda r: git.changes(self.repo, r, head="HEAD"),
+            "changes head": lambda r: git.changes(self.repo, "HEAD", head=r),
+            "diff_size base": lambda r: git.diff_size(self.repo, r, head="HEAD"),
+            "diff_size head": lambda r: git.diff_size(self.repo, "HEAD", head=r),
+            "patch_id base": lambda r: git.patch_id(self.repo, r, "HEAD"),
+            "patch_id head": lambda r: git.patch_id(self.repo, "HEAD", r),
+            "resolve_ref": lambda r: git.resolve_ref(self.repo, r),
+            "fetch_ref": lambda r: git.fetch_ref(self.repo, r),
+        }
+        for name, call in calls.items():
+            with self.subTest(name), patch("tollgate_core.git.subprocess.run") as run:
+                with self.assertRaises(git.GitError):
+                    call("--output=/tmp/x")
+                run.assert_not_called()
+        self.assertEqual(git.text_at(self.repo, "HEAD", "src/a.py"), "uno\ndue\n")
+
+    def test_fetch_ref_passes_token_only_in_environment(self):
+        token = "ghs_segretissimo"
+        done = subprocess.CompletedProcess([], 0, b"", b"")
+        with patch("tollgate_core.git.subprocess.run", return_value=done) as run:
+            git.fetch_ref(self.repo, "refs/pull/5/head", token=token)
+        cmd, env = run.call_args.args[0], run.call_args.kwargs["env"]
+        self.assertEqual(cmd[-2:], ["origin", "refs/pull/5/head"])
+        self.assertFalse([a for a in cmd if token in a or "AUTHORIZATION" in a])
+        self.assertFalse([a for a in cmd if "extraheader" in a])
+        auth = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+        self.assertEqual((env["GIT_CONFIG_COUNT"], env["GIT_CONFIG_KEY_0"],
+                          env["GIT_CONFIG_VALUE_0"]),
+                         ("1", "http.https://github.com/.extraheader",
+                          f"AUTHORIZATION: basic {auth}"))
+        self.assertNotIn(token, (self.repo / ".git" / "config").read_text())
+
+    def test_fetch_ref_without_token_sets_no_header_and_fetches(self):
+        origin = self.tmp / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True,
+                       capture_output=True)
+        g(self.repo, "remote", "add", "origin", str(origin))
+        g(self.repo, "push", "-q", "origin", "HEAD:refs/heads/main")
+        with patch("tollgate_core.git.subprocess.run", wraps=subprocess.run) as run:
+            git.fetch_ref(self.repo, "refs/heads/main")
+        self.assertNotIn("GIT_CONFIG_COUNT", {k for k in run.call_args.kwargs["env"]
+                                              if k not in os.environ})
+        self.assertEqual(git.resolve_ref(self.repo, "FETCH_HEAD"), self.base)
+        with self.assertRaises(git.GitError):
+            git.fetch_ref(self.repo, "refs/heads/assente")
 
 
 class LsFilesAtTest(unittest.TestCase):

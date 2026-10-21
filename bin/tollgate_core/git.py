@@ -1,6 +1,7 @@
-"""Git in sola lettura per hook e CLI (spec 3.2): diff dalla base, file, impronte."""
+"""Git per hook e CLI (spec 3.2): diff dalla base, file, impronte. Sola lettura, tranne `fetch_ref`."""
 from __future__ import annotations
 
+import base64
 import hashlib
 import os
 import shutil
@@ -12,6 +13,7 @@ from pathlib import Path
 
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 GIT_TIMEOUT_S = 10
+FETCH_TIMEOUT_S = 120
 _HEAD_BYTES = 8000  # byte letti per riconoscere un file binario (come per i blob)
 _BLOCK = 1 << 16  # blocco di lettura per contare le righe
 
@@ -28,6 +30,13 @@ class Change:
     added: int
     removed: int
     binary: bool
+
+
+def _check_ref(ref: str) -> None:
+    """Un riferimento che comincia con `-` sarebbe un'opzione di git: rifiutato prima di lanciare
+    alcun processo."""
+    if ref.startswith("-"):
+        raise GitError(f"riferimento non valido: {ref!r}")
 
 
 def _proc(repo, args, input_=None, timeout=GIT_TIMEOUT_S, extra_env=None):
@@ -125,6 +134,7 @@ def local_branches(repo) -> set[str]:
 
 
 def resolve_ref(repo, ref: str) -> str | None:
+    _check_ref(ref)
     out = run(repo, "rev-parse", "--verify", "-q", f"{ref}^{{commit}}", check=False).strip()
     return out or None
 
@@ -232,6 +242,9 @@ def _pathspecs(exclude) -> list[str]:
 
 def changes(repo, base: str, *, head: str | None = None, exclude=()) -> list[Change]:
     """Differenze dalla base. `exclude`: cartelle o file (output_dirs) da lasciar fuori."""
+    _check_ref(base)
+    if head is not None:
+        _check_ref(head)
     refs = [base] if head is None else [base, head]
     specs = _pathspecs(exclude)
     with nullcontext({}) if head is not None else _private_index(repo) as env:
@@ -256,6 +269,9 @@ def commit_changes(repo, sha: str) -> list[Change]:
 
 
 def diff_size(repo, base: str, *, head: str | None = None, exclude=()) -> int:
+    _check_ref(base)
+    if head is not None:
+        _check_ref(head)
     refs = [base] if head is None else [base, head]
     with nullcontext({}) if head is not None else _private_index(repo) as env:
         size = len(run(repo, "diff", "--no-color", "--no-ext-diff", "--no-textconv", *refs,
@@ -271,6 +287,7 @@ def diff_size(repo, base: str, *, head: str | None = None, exclude=()) -> int:
 
 
 def show(repo, ref: str, path: str) -> bytes | None:
+    _check_ref(ref)
     r = _proc(repo, ["show", f"{ref}:{path}"])
     return r.stdout if r.returncode == 0 else None
 
@@ -305,6 +322,7 @@ def worktree_text(repo, path: str) -> str | None:
 def ls_files_at(repo, ref: str, prefix: str) -> list[str]:
     """I file sotto `prefix` nell'albero di `ref`, ricorsivi; `[]` se il riferimento non c'è.
     Divide su NUL: i nomi non vengono citati né spezzati da spazi o accenti."""
+    _check_ref(ref)
     r = _proc(repo, ["ls-tree", "-r", "-z", "--name-only", ref, "--", prefix])
     if r.returncode != 0:
         return []
@@ -314,6 +332,7 @@ def ls_files_at(repo, ref: str, prefix: str) -> list[str]:
 def blob_at(repo, ref: str, path: str) -> str | None:
     """SHA del blob di `path` nell'albero di `ref`; `None` se manca, se è una cartella o se manca
     il riferimento."""
+    _check_ref(ref)
     r = _proc(repo, ["ls-tree", "-z", ref, "--", path])
     if r.returncode != 0:
         return None
@@ -326,6 +345,7 @@ def blob_at(repo, ref: str, path: str) -> str | None:
 
 
 def exists_at(repo, ref: str, path: str) -> bool:
+    _check_ref(ref)
     return ok(repo, "cat-file", "-e", f"{ref}:{path}")
 
 
@@ -334,6 +354,8 @@ def blob_sha(repo, path: str) -> str:
 
 
 def rev_list(repo, base: str, head: str) -> list[str]:
+    _check_ref(base)
+    _check_ref(head)
     return [s for s in run(repo, "rev-list", "--reverse", f"{base}..{head}").split() if s]
 
 
@@ -383,6 +405,8 @@ def patch_id(repo, base: str, head: str) -> str | None:
     """Identità del contenuto di `base..head` (`git patch-id --stable`): non cambia con un
     rebase senza conflitti su una base avanzata. `None` con il diff vuoto. Niente driver di
     diff né textconv del repo (M2)."""
+    _check_ref(base)
+    _check_ref(head)
     diff = _proc(repo, ["diff", "--binary", "--no-ext-diff", "--no-textconv", base, head],
                  timeout=30)
     if diff.returncode != 0:
@@ -394,3 +418,21 @@ def patch_id(repo, base: str, head: str) -> str | None:
         raise GitError(f"git patch-id: {out.stderr.decode('utf-8', 'replace').strip()}")
     first = out.stdout.decode("ascii", "replace").split()
     return first[0] if first else None
+
+
+def fetch_ref(repo, ref: str, *, token: str | None = None) -> None:
+    """`git fetch origin <ref>` (nel gate: `refs/pull/<n>/head`, che un checkout con
+    `persist-credentials: false` non può leggere su un repo privato). Il token, se c'è, passa
+    come intestazione HTTP nelle variabili d'ambiente del processo figlio: mai negli argomenti né
+    in `.git/config`."""
+    _check_ref(ref)
+    env = None
+    if token:
+        auth = base64.b64encode(f"x-access-token:{token}".encode()).decode("ascii")
+        env = {"GIT_CONFIG_COUNT": "1",
+               "GIT_CONFIG_KEY_0": "http.https://github.com/.extraheader",
+               "GIT_CONFIG_VALUE_0": f"AUTHORIZATION: basic {auth}"}
+    r = _proc(repo, ["fetch", "--no-tags", "origin", ref], timeout=FETCH_TIMEOUT_S,
+              extra_env=env)
+    if r.returncode != 0:
+        raise GitError(f"git fetch origin {ref}: {r.stderr.decode('utf-8', 'replace').strip()}")

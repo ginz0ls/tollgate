@@ -1,1 +1,1 @@
-"""Flusso del coordinatore: importa solo tollgate_core e tollgate_analysis (spec 3.2)."""
+"""Flusso del coordinatore: importa tollgate_core, tollgate_analysis e tollgate_gate (spec 3.2)."""

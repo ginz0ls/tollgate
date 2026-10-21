@@ -9,7 +9,17 @@ Dati (JSON):
    "prs": [{"number": 3, "headRefName": "tg/7-x", "state": "OPEN", "url": "...",
             "headRefOid": "<sha>", "mergedAt": null, "body": "", "comments": []}],
    "fail": ["pr create"],
-   "statuses": {"<sha>": {"statuses": [{"context": "tollgate/guard", "state": "success"}]}}}
+   "statuses": {"<sha>": {"statuses": [{"context": "tollgate/guard", "state": "success"}]}},
+   "api_status": {"repos/o/r/branches/main/protection": {"status": 403, "message": "...",
+                                                          "body": {"message": "..."}}}}
+
+`api_status` risponde a `gh api --include <percorso>` come `gh` vero (V2): su stdout la riga di
+stato `HTTP/2.0 403 Forbidden` terminata da `\n`, le intestazioni terminate da `\r\n`, una riga
+vuota `\r\n`, il corpo JSON senza a capo finale; con codice >= 400 esce con 1 e su stderr
+`gh: <message> (HTTP <codice>)`. Senza `--include` il corpo è il solo stdout.
+`prs[].comments` si leggono con `pr view --json comments` come li dà GraphQL
+(`author.login = "github-actions"`) e con `api repos/o/r/issues/<n>/comments` come li dà REST
+(`user.login = "github-actions[bot]"`, `user.type = "Bot"`); il `--jq` non si valuta.
 
 Le PR stanno in `prs`: `pr create` ne aggiunge una (numero successivo al più alto, stato OPEN) e
 `pr edit` riscrive `body`; entrambi riscrivono il file dei dati. `fail` elenca i comandi (le prime
@@ -26,6 +36,7 @@ import sys
 
 _COMMITS_STATUS = re.compile(r"^repos/[^/]+/[^/]+/commits/([^/]+)/status$")
 _ISSUE_REST = re.compile(r"^repos/[^/]+/[^/]+/issues/(\d+)$")
+_PR_COMMENTS = re.compile(r"^repos/[^/]+/[^/]+/issues/(\d+)/comments(\?.*)?$")
 _PULLS = re.compile(r"^repos/[^/]+/[^/]+/pulls(\?.*)?$")
 PR_FIELDS = frozenset({"number", "state", "url", "headRefName", "headRefOid", "mergedAt",
                        "title", "body", "comments", "isCrossRepository"})
@@ -86,6 +97,34 @@ def _remote_oid(branch):
     r = subprocess.run(["git", "ls-remote", "--heads", "origin", f"refs/heads/{branch}"],
                        capture_output=True, text=True)
     return r.stdout.split()[0] if r.returncode == 0 and r.stdout.split() else None
+
+
+_REASONS = {200: "OK", 403: "Forbidden", 404: "Not Found"}
+
+
+def _api_status(entry, include):
+    """Risposta di `gh api` per un percorso di `api_status`, nella forma osservata in V2."""
+    status = int(entry["status"])
+    body = json.dumps(entry.get("body")) if "body" in entry else ""
+    if include:
+        sys.stdout.write(f"HTTP/2.0 {status} {_REASONS.get(status, '')}\n"
+                         "Content-Type: application/json; charset=utf-8\r\n"
+                         "X-Github-Request-Id: ABCD:1234\r\n\r\n" + body)
+    else:
+        sys.stdout.write(body)
+    if status >= 400:
+        sys.stderr.write(f"gh: {entry.get('message', '')} (HTTP {status})\n")
+        return 1
+    return 0
+
+
+def _rest_comment(comment):
+    """Un commento di `pr view` (GraphQL) come lo darebbe l'API REST."""
+    login = (comment.get("author") or {}).get("login", "")
+    bot = login == "github-actions"
+    return {"id": comment.get("id"), "body": comment.get("body", ""),
+            "user": {"login": "github-actions[bot]" if bot else login,
+                     "type": "Bot" if bot else "User"}}
 
 
 def _fail(msg):
@@ -182,6 +221,18 @@ def main(argv):
             print(json.dumps(out, separators=(",", ":")))
         return 0
     if argv[:1] == ["api"] and len(argv) > 1:
+        entry = next((e for a in argv[1:] if (e := (data.get("api_status") or {}).get(a))), None)
+        if entry is not None:
+            return _api_status(entry, "--include" in argv)
+        m = _PR_COMMENTS.match(argv[-1])
+        if m:
+            pr = next((p for p in data.get("prs") or [] if str(p.get("number")) == m.group(1)),
+                      None)
+            if pr is None:
+                _fail(f"pull request {m.group(1)} assente dai dati")
+            for c in pr.get("comments") or []:
+                print(json.dumps(_rest_comment(c), separators=(",", ":")))
+            return 0
         m = _COMMITS_STATUS.match(argv[1])
         if m:
             status = (data.get("statuses") or {}).get(m.group(1))

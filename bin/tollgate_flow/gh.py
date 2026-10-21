@@ -4,22 +4,11 @@ Nessun testo dell'issue entra mai in un argomento: si passano solo numeri, SHA e
 costruiti da numeri."""
 from __future__ import annotations
 
-import json
-import os
-import subprocess
 from dataclasses import dataclass
-from pathlib import Path
 
-from tollgate_core import paths
-
-GH_ENV = "TOLLGATE_GH"
-GH_TIMEOUT_S = 60
-REQUIRED_CONTEXTS = ("tollgate/guard", "tollgate/verdict")
-SENTINEL_TITLE = "tollgate: merge non verificato"
-
-
-class GhError(Exception):
-    pass
+from tollgate_core.ghcli import (GH_ENV, GH_TIMEOUT_S, REQUIRED_CONTEXTS, SENTINEL_TITLE,  # noqa: F401
+                                 GhError, decode_json_values, gh_cmd, run as _run, run_json,
+                                 run_json_lines)
 
 
 @dataclass(frozen=True)
@@ -30,62 +19,6 @@ class Issue:
     state: str
     labels: tuple[str, ...]
     author_association: str
-
-
-def gh_cmd(state: paths.State) -> list[str]:
-    override = paths.test_env(state, GH_ENV)
-    return [override] if override else ["gh"]
-
-
-def _run(state, repo, args) -> subprocess.CompletedProcess:
-    env = {**os.environ, "GH_PROMPT_DISABLED": "1", "NO_COLOR": "1"}
-    try:
-        return subprocess.run([*gh_cmd(state), *args], cwd=str(repo), capture_output=True,
-                              text=True, timeout=GH_TIMEOUT_S, env=env,
-                              stdin=subprocess.DEVNULL)
-    except FileNotFoundError as e:
-        raise GhError("gh non è installato") from e
-    except subprocess.TimeoutExpired as e:
-        raise GhError(f"gh {' '.join(args[:2])}: timeout dopo {GH_TIMEOUT_S} s") from e
-
-
-def run_json(state, repo, args):
-    r = _run(state, repo, args)
-    if r.returncode != 0:
-        raise GhError(f"gh {' '.join(args[:2])}: {r.stderr.strip() or 'uscita ' + str(r.returncode)}")
-    try:
-        return json.loads(r.stdout)
-    except ValueError as e:
-        raise GhError(f"gh {' '.join(args[:2])}: risposta non JSON") from e
-
-
-def decode_json_values(text: str) -> list[dict]:
-    """I valori JSON dell'uscita in sequenza (G5: niente `--slurp`), uno per riga o su più righe,
-    separati da spazi. Un testo non JSON o un valore che non è un oggetto è un errore."""
-    decoder, values, i = json.JSONDecoder(), [], 0
-    while True:
-        while i < len(text) and text[i].isspace():
-            i += 1
-        if i >= len(text):
-            return values
-        try:
-            value, i = decoder.raw_decode(text, i)
-        except ValueError as e:
-            raise GhError("risposta non JSON") from e
-        if not isinstance(value, dict):
-            raise GhError("risposta inattesa: un valore JSON che non è un oggetto")
-        values.append(value)
-
-
-def run_json_lines(state, repo, args) -> list[dict]:
-    """Per `--paginate --jq`: un oggetto JSON per elemento. Uscita non zero → `GhError`."""
-    r = _run(state, repo, args)
-    if r.returncode != 0:
-        raise GhError(f"gh {' '.join(args[:2])}: {r.stderr.strip() or 'uscita ' + str(r.returncode)}")
-    try:
-        return decode_json_values(r.stdout)
-    except GhError as e:
-        raise GhError(f"gh {' '.join(args[:2])}: {e}") from e
 
 
 def _run_checked(state, repo, args) -> None:

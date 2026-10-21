@@ -3,7 +3,8 @@ import unittest
 
 from tests.helpers import BIN
 
-FORBIDDEN = ("tollgate_core", "tollgate_flow", "tollgate_hooks", "tollgate_checks")
+FORBIDDEN = ("tollgate_core", "tollgate_flow", "tollgate_gate", "tollgate_hooks",
+             "tollgate_checks")
 
 
 def _forbidden(name: str) -> bool:
@@ -44,6 +45,9 @@ class IsolationTest(unittest.TestCase):
                          ["tollgate_core"])
         self.assertEqual(violations('__import__("tollgate_checks.x")'), ["tollgate_checks.x"])
         self.assertEqual(violations('x = "tollgate_hooks.runner"'), ["tollgate_hooks.runner"])
+        self.assertEqual(violations("from tollgate_gate import l2tree"), ["tollgate_gate"])
+        self.assertEqual(violations('importlib.import_module("tollgate_gate.cli")'),
+                         ["tollgate_gate.cli"])
         self.assertEqual(violations("import json\nfrom . import globs"), [])
 
 
