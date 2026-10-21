@@ -593,12 +593,12 @@ class SpecApprovalOfLaterSliceTest(AuditCase):
         status, found = self.state("1" * 40)
         self.assertEqual((status, found), (l2tree.STALE, None))
 
-    def test_helper_own_stale_approval(self):
+    def test_helper_own_stale_approval_other_current(self):
         fl, blob = self.two_approvals()
         fields = {"kind": "spec-approval", "path": SPEC, "sha": "0" * 40, "slices": 1}
         fl.commit(approvals.approval_paths(7)[0], approvals.render_approval(fields), "propria")
         status, found = self.state(blob)
-        self.assertEqual((status, found[0]), (l2tree.STALE, approvals.approval_paths(7)[0]))
+        self.assertEqual((status, found[0]), (l2tree.CURRENT, approvals.approval_paths(9)[0]))
 
     def test_helper_none(self):
         fl = self.lab("plan")

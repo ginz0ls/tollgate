@@ -235,9 +235,13 @@ class FlowLab:
         """Committa il report `<kind>-<number>.md` con intestazione valida in
         `reviews/<issue>/` (default: il lavoro); `issue` diverso riproduce i report della
         prima fetta, che stanno nella cartella di un'altra issue."""
-        issue = issue or phases.get_work(self.conn, self.work)["issue"]
+        work = phases.get_work(self.conn, self.work)
+        issue = issue or work["issue"]
         fields = {"kind": kind, "number": number,
+                  "spec_sha": self._blob(work["spec_path"] or SPEC),
                   "counts": {**ZERO_COUNTS, **(counts or {})}, "outcome": "empty"}
+        if kind == "plan-adversarial":
+            fields["plan_sha"] = self._blob(PLAN)
         self.commit(f"{approvals.REVIEWS_DIR}/{issue}/{kind}-{number}.md",
                     approvals.render_report(fields, "Nessun rilievo.\n"), f"report {kind}")
 

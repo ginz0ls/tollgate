@@ -8,11 +8,11 @@ mai se ha modifiche; il ramo solo se punta ancora allo SHA letto in quel momento
 del checkout principale."""
 from __future__ import annotations
 
-import re
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
+from tollgate_analysis import prref
 from tollgate_core import acts, clock, db, git, phases, sessions
 from tollgate_core.paths import State, program_command, repo_key
 
@@ -21,7 +21,6 @@ from . import gh, gitw, start as flow_start
 OK, REFUSED, NEEDS_CONFIRM = 0, 1, 3
 ERRORS = (sqlite3.Error, phases.TransitionError, gh.GhError, git.GitError, gitw.GitWriteError,
           OSError, db.DbError)
-_TG = re.compile(r"^tg/(\d+)-")
 
 
 @dataclass(frozen=True)
@@ -142,8 +141,8 @@ def collect(conn, main: Path, key: str, *, orphans: bool, cwd: Path,
     found = [it for b, n in closed.items() if (it := item("closed", n, b))]
     orphan_items = []
     for b in sorted(local):
-        m = _TG.match(b)
-        if m and b not in known and (it := item("orphan", int(m.group(1)), b)):
+        n = prref.issue_from_branch(b)
+        if n is not None and b not in known and (it := item("orphan", n, b)):
             orphan_items.append(it)
     return (found + orphan_items, []) if orphans else (found, orphan_items)
 

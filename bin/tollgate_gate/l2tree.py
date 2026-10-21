@@ -39,8 +39,8 @@ def spec_approval(repo, ref: str, *, issue: int, spec_path: str, spec_blob: str
     Si cerca prima con lo `sha` attuale della spec (la propria approvazione, o quella di
     un'altra issue per una fetta successiva): `CURRENT` se è sullo `sha` attuale. Solo se manca
     si cerca senza `sha`, per distinguere `STALE` (esiste, ma su una spec cambiata) da
-    `MISSING`. Con la propria approvazione superata e un'altra corrente vince la propria, come
-    in `locate_spec_approval`."""
+    `MISSING`. Con la propria approvazione superata e un'altra corrente vince quella corrente,
+    come in `locate_spec_approval`: l'approvazione è legata al contenuto."""
     files = spec_approvals(repo, ref)
     where = {"issue": issue, "spec_path": spec_path}
     found = approvals.locate_spec_approval(files, spec_blob=spec_blob, **where)

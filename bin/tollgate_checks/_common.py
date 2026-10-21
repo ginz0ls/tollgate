@@ -3,17 +3,14 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from pathlib import Path
 
-from tollgate_analysis import level as lv, profiles as prof
+from tollgate_analysis import level as lv, prref, profiles as prof
 from tollgate_analysis.protected import is_protected
 from tollgate_core import audits, config, git, reviews, subagents, violations
 from tollgate_core.paths import program_command, repo_key
 from tollgate_hooks.adapter import edit_path
 from tollgate_hooks.model import inject, record
-
-_TG = re.compile(r"^tg/(\d+)-")
 
 
 def _inside(p, root) -> bool:
@@ -155,15 +152,15 @@ def orphan_tg(ctx, repo) -> int | None:
     """Ramo tg/<N>-* senza lavoro attivo per (repo, N): DB perso, serve adopt (12.4)."""
     if repo is None:
         return None
-    m = _TG.match(git.branch(repo) or "")
-    if not m:
+    issue = prref.issue_from_branch(git.branch(repo) or "")
+    if issue is None:
         return None
     key = repo_key_of(repo)
     if key is None:
         return None
     row = ctx.db.execute("SELECT 1 FROM work_items WHERE repo_key = ? AND issue = ? "
-                         "AND phase <> 'closed'", (key, int(m.group(1)))).fetchone()
-    return None if row else int(m.group(1))
+                         "AND phase <> 'closed'", (key, issue)).fetchone()
+    return None if row else issue
 
 
 def closed_tg(ctx, repo) -> int | None:
@@ -172,14 +169,14 @@ def closed_tg(ctx, repo) -> int | None:
     if repo is None:
         return None
     branch = git.branch(repo) or ""
-    m = _TG.match(branch)
+    issue = prref.issue_from_branch(branch)
     key = repo_key_of(repo)
-    if not m or key is None:
+    if issue is None or key is None:
         return None
     phases_ = [r[0] for r in ctx.db.execute(
         "SELECT phase FROM work_items WHERE repo_key = ? AND branch = ?", (key, branch))]
     if phases_ and all(p == "closed" for p in phases_):
-        return int(m.group(1))
+        return issue
     return None
 
 

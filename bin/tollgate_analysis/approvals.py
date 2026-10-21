@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections.abc import Mapping
+from typing import NamedTuple
 
 KINDS = ("spec-approval", "plan-approval")
 REQUIRED = ("kind", "path", "sha")
@@ -147,86 +148,174 @@ def report_listing(paths, folders) -> list[str]:
 def locate_spec_approval(files: Mapping[str, str], *, issue: int, spec_path: str,
                          spec_blob: str | None) -> tuple[str, dict] | None:
     """L'approvazione della spec `spec_path`, come (percorso, intestazione), oppure `None`.
-    Prima quella del lavoro (`reviews/<issue>/`) se ha `path == spec_path`, qualunque `sha`
-    (chi chiama controlla `is_current`); poi, per una fetta successiva, quella di un'altra
-    issue con `path == spec_path` e `sha == spec_blob` (con `spec_blob = None` basta il
-    `path`); con più candidati vince il numero di issue più basso.
+    Con `spec_blob` vince l'approvazione corrente (`sha == spec_blob`, la propria prima, poi la
+    issue col numero più basso: l'approvazione è legata al contenuto); se nessuna è corrente,
+    la propria con `path == spec_path`, qualunque `sha` (chi chiama controlla `is_current`).
+    Con `spec_blob = None` basta il `path`: la propria, poi la issue più bassa.
 
     Pura: `files` (percorso -> testo) lo sceglie il chiamante, cioè HEAD, la punta del ramo
     predefinito o il disco; qui non si legge nulla."""
     own = approval_paths(issue)[0]
     candidates = [own] + sorted((p for p in approval_listing(files) if p != own),
                                 key=lambda p: int(_APPROVAL_PATH.match(p).group(1)))
+    found = []
     for path in candidates:
         if path not in files:
             continue
         header = parse_approval(files[path])
         if header is None or header["kind"] != "spec-approval" or header["path"] != spec_path:
             continue
-        if path == own or spec_blob is None or header["sha"] == spec_blob:
+        found.append((path, header))
+    if spec_blob is None:
+        return found[0] if found else None
+    for path, header in found:
+        if header["sha"] == spec_blob:
             return path, header
-    return None
+    return next(((p, h) for p, h in found if p == own), None)
 
 
 def _reports(files: Mapping[str, str], folder: str, kind: str) -> int:
     """Quanti report di `kind` con intestazione valida ci sono in `folder`."""
-    n = 0
+    return len(_valid_reports(files, folder, kind))
+
+
+def _valid_reports(files: Mapping[str, str], folder: str, kinds) -> list[dict]:
+    """Le intestazioni valide dei report dei `kinds` (un tipo o un elenco) direttamente in `folder`."""
+    kinds = (kinds,) if isinstance(kinds, str) else tuple(kinds)
+    out = []
     for path, text in files.items():
         head, _, name = path.rpartition("/")
         m = _REPORT_NAME.match(name)
-        if head == folder and m and m.group(1) == kind:
+        if head == folder and m and m.group(1) in kinds:
             header = parse_report_header(text)
-            n += header is not None and header["kind"] == kind
-    return n
+            if header is not None and header["kind"] == m.group(1):
+                out.append(header)
+    return out
+
+
+MISSING, STALE = "missing", "stale"
+
+
+class L2Problem(NamedTuple):
+    """Un problema della voce `approvals`: `missing` (file, report o intestazione richiesti
+    assenti o non validi) oppure `stale` (l'`sha` approvato non è più quello del documento)."""
+    kind: str
+    text: str
+
+
+def _header_off(header: dict, key: str, component: str, components: Mapping[str, bool] | None,
+                where: str) -> L2Problem | None:
+    """`key: off` nell'intestazione con il componente acceso sul ramo predefinito: l'intestazione
+    è scritta nel ramo ed esente dallo scope, la configurazione del predefinito no."""
+    if header.get(key) == "off" and components is not None and components.get(component):
+        return L2Problem(MISSING, f"{where}: intestazione {key}: off ma il componente "
+                                  f"{component} è acceso sul ramo predefinito")
+    return None
+
+
+def check_l2_detail(files: Mapping[str, str], *, issue: int, spec_path: str | None,
+                    spec_blob: str | None, plan_path: str | None, plan_blob: str | None,
+                    components: Mapping[str, bool] | None = None) -> list[L2Problem]:
+    """La voce `approvals` in L2 (spec 8.7), problema per problema. `files` è `{percorso: testo}`
+    di tutti i file sotto `docs/superpowers/reviews/` dell'albero scelto dal chiamante.
+    `components` (`spec_adversary`, `spec_audit`, `plan_adversary`) è la configurazione del ramo
+    predefinito: con il componente acceso un'intestazione `off` è `missing`; `None` la ignora.
+    Con l'avversario o le lenti accesi serve un report della spec con `spec_sha` uguale allo
+    `sha` approvato, con quello del piano un `plan-adversarial` con `plan_sha` uguale allo `sha`
+    di `plan-approval.md`. Con un documento superato non si cercano i suoi report."""
+    problems: list[L2Problem] = []
+    approved_spec = spec_blob
+    if not spec_path or spec_blob is None:
+        problems.append(L2Problem(MISSING, "spec non registrata o assente dall'albero: manca "
+                                           "l'approvazione della spec (spec-approval.md)"))
+    else:
+        found = locate_spec_approval(files, issue=issue, spec_path=spec_path, spec_blob=spec_blob)
+        if found is None:
+            problems.append(L2Problem(
+                MISSING, f"manca il file di approvazione della spec {spec_path} con lo sha "
+                         f"attuale ({approval_paths(issue)[0]})"))
+        elif not is_current(found[1], spec_blob):
+            approved_spec = found[1]["sha"]
+            problems.append(L2Problem(
+                STALE, f"{found[0]}: la spec {spec_path} è cambiata dopo l'approvazione "
+                       f"(rifai approve spec)"))
+        else:
+            problems += _spec_reports(files, *found, components)
+    plan_approval = approval_paths(issue)[1]
+    if not plan_path or plan_blob is None:
+        problems.append(L2Problem(MISSING, f"piano non registrato o assente dall'albero: manca "
+                                           f"l'approvazione del piano ({plan_approval})"))
+        return problems
+    header = parse_approval(files.get(plan_approval, ""))
+    if header is None or header["kind"] != "plan-approval":
+        problems.append(L2Problem(MISSING, f"manca il file di approvazione del piano "
+                                           f"{plan_approval}"))
+        return problems
+    if header["path"] != plan_path:
+        problems.append(L2Problem(MISSING, f"{plan_approval}: approva {header['path']}, non il "
+                                           f"piano registrato {plan_path}"))
+        return problems
+    if not is_current(header, plan_blob):
+        problems.append(L2Problem(STALE, f"{plan_approval}: il piano {plan_path} è cambiato dopo "
+                                         f"l'approvazione (rifai approve plan)"))
+        return problems
+    if approved_spec is not None and header.get("spec_sha") != approved_spec:
+        problems.append(L2Problem(MISSING, f"{plan_approval}: approvato su una spec diversa da "
+                                           f"quella approvata (rifai approve plan)"))
+    folder = plan_approval.rpartition("/")[0]
+    off = _header_off(header, "adversarial", "plan_adversary", components, plan_approval)
+    if off is not None:
+        problems.append(off)
+    elif header.get("adversarial") != "off":
+        reports = _valid_reports(files, folder, "plan-adversarial")
+        if not reports:
+            problems.append(L2Problem(MISSING, f"manca il report plan-adversarial-<n>.md valido "
+                                               f"in {folder}/"))
+        elif not any(r.get("plan_sha") == header["sha"] for r in reports):
+            problems.append(L2Problem(MISSING, f"nessun report del piano sullo sha approvato "
+                                               f"in {folder}/ (plan-adversarial con plan_sha "
+                                               f"{header['sha']})"))
+    return problems
+
+
+def _spec_reports(files, path: str, header: dict,
+                  components: Mapping[str, bool] | None) -> list[L2Problem]:
+    """I problemi dei report della spec nella cartella dell'approvazione trovata `path`."""
+    folder = path.rpartition("/")[0]
+    problems = []
+    adversary_off = _header_off(header, "adversarial", "spec_adversary", components, path)
+    lens_off = _header_off(header, "lens", "spec_audit", components, path)
+    problems += [p for p in (adversary_off, lens_off) if p is not None]
+    slices = header.get("slices")
+    adversary = header.get("adversarial") != "off"
+    lens = isinstance(slices, int) and slices > 1 and header.get("lens") == "closed"
+    complete = True
+    if adversary and not _reports(files, folder, "spec-adversarial"):
+        problems.append(L2Problem(MISSING, f"manca il report spec-adversarial-<n>.md valido "
+                                           f"in {folder}/"))
+        complete = False
+    if lens and not _reports(files, folder, "spec-lens"):
+        problems.append(L2Problem(MISSING, f"manca il report spec-lens-<n>.md valido in "
+                                           f"{folder}/"))
+        complete = False
+    if not isinstance(slices, int):
+        problems.append(L2Problem(MISSING, f"{path}: slices non è un intero"))
+    if complete and (adversary or lens) and not any(
+            r.get("spec_sha") == header["sha"]
+            for r in _valid_reports(files, folder, ("spec-adversarial", "spec-lens"))):
+        problems.append(L2Problem(MISSING, f"nessun report della spec sullo sha approvato in "
+                                           f"{folder}/ (spec_sha {header['sha']})"))
+    return problems
 
 
 def check_l2(files: Mapping[str, str], *, issue: int, spec_path: str | None,
              spec_blob: str | None, plan_path: str | None, plan_blob: str | None) -> list[str]:
-    """La voce `approvals` della DoD in L2 (spec 8.7): i problemi, o `[]` se spec e piano sono
-    approvati e i report richiesti ci sono. `files` è `{percorso: testo}` di tutti i file sotto
-    `docs/superpowers/reviews/` dell'albero scelto dal chiamante. Ogni messaggio nomina il file
-    o il report che manca."""
-    problems: list[str] = []
-    if not spec_path or spec_blob is None:
-        problems.append("spec non registrata o assente dall'albero: manca l'approvazione della "
-                        "spec (spec-approval.md)")
-    else:
-        found = locate_spec_approval(files, issue=issue, spec_path=spec_path, spec_blob=spec_blob)
-        if found is None:
-            problems.append(f"manca il file di approvazione della spec {spec_path} con lo sha "
-                            f"attuale ({approval_paths(issue)[0]})")
-        elif not is_current(found[1], spec_blob):
-            problems.append(f"{found[0]}: la spec {spec_path} è cambiata dopo l'approvazione "
-                            f"(rifai approve spec)")
-        else:
-            path, header = found
-            folder = path.rpartition("/")[0]
-            if header.get("adversarial") != "off" \
-                    and not _reports(files, folder, "spec-adversarial"):
-                problems.append(f"manca il report spec-adversarial-<n>.md valido in {folder}/")
-            slices = header.get("slices")
-            if isinstance(slices, int) and slices > 1 and header.get("lens") == "closed" \
-                    and not _reports(files, folder, "spec-lens"):
-                problems.append(f"manca il report spec-lens-<n>.md valido in {folder}/")
-    plan_approval = approval_paths(issue)[1]
-    if not plan_path or plan_blob is None:
-        problems.append(f"piano non registrato o assente dall'albero: manca l'approvazione del "
-                        f"piano ({plan_approval})")
-        return problems
-    header = parse_approval(files.get(plan_approval, ""))
-    if header is None or header["kind"] != "plan-approval":
-        problems.append(f"manca il file di approvazione del piano {plan_approval}")
-        return problems
-    if not is_current(header, plan_blob):
-        problems.append(f"{plan_approval}: il piano {plan_path} è cambiato dopo l'approvazione "
-                        f"(rifai approve plan)")
-    if spec_blob is not None and header.get("spec_sha") != spec_blob:
-        problems.append(f"{plan_approval}: approvato su una spec diversa da quella attuale "
-                        f"(rifai approve plan)")
-    folder = plan_approval.rpartition("/")[0]
-    if header.get("adversarial") != "off" and not _reports(files, folder, "plan-adversarial"):
-        problems.append(f"manca il report plan-adversarial-<n>.md valido in {folder}/")
-    return problems
+    """La voce `approvals` della DoD in L2 (spec 8.7): i testi di `check_l2_detail` senza la
+    configurazione dei componenti, o `[]` se spec e piano sono approvati e i report richiesti ci
+    sono. Ogni messaggio nomina il file o il report che manca."""
+    return [p.text for p in check_l2_detail(files, issue=issue, spec_path=spec_path,
+                                            spec_blob=spec_blob, plan_path=plan_path,
+                                            plan_blob=plan_blob)]
 
 
 def is_current(header: dict, blob_sha: str | None) -> bool:

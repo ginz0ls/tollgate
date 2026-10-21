@@ -33,7 +33,8 @@ def first_slice_files() -> dict:
         "approved_at": "2026-10-19T10:00:00Z"})}
     for kind in ("spec-adversarial", "spec-lens"):
         files[f"{folder}/{kind}-1.md"] = approvals.render_report(
-            {"kind": kind, "number": 1, "counts": ZERO, "outcome": "empty"}, "Nessun rilievo.\n")
+            {"kind": kind, "number": 1, "spec_sha": blob(text), "counts": ZERO,
+             "outcome": "empty"}, "Nessun rilievo.\n")
     return files
 
 
