@@ -15,6 +15,7 @@ PROT="$OWNER/tollgate-p4-protected"   # pubblico, modalità protected
 DET="$OWNER/tollgate-p4-detect"       # privato, GitHub Free, modalità detect
 OUT="${P4_OUT:-$root/docs/verifiche/evidenze/gh-p4}"
 WORK="${P4_WORK:-/tmp/tollgate-p4/gh}"   # cloni di lavoro, non sono uscite
+export P4_OUT="$OUT" P4_WORK="$WORK"   # ghguard.py li legge: -D e i cloni devono stare qui sotto
 WAIT_MAX="${P4_WAIT_MAX:-600}"           # tetto di attesa per ogni run, in secondi
 POLL="${P4_POLL:-10}"
 RETRY_SLEEP="${P4_RETRY_SLEEP:-5}"
@@ -27,7 +28,7 @@ die() { echo "errore: $*" >&2; exit 1; }
 # Prima di ogni gh: lista degli ammessi della decisione 25, unica fonte in ghguard.py (la usa anche check_gh_log).
 guard_args() {
   local msg
-  msg="$(python3 -I "$here/ghguard.py" check -- "$@" 2>&1)" || die "gh $*: $msg"
+  msg="$(python3 -B -I "$here/ghguard.py" check -- "$@" 2>&1)" || die "gh $*: $msg"
 }
 
 # Un remoto git diverso dal repo atteso ferma lo script prima di ogni git che parla con la rete.
@@ -647,7 +648,7 @@ FAKE
 
 # Controlla il registro dei comandi del gh finto con la stessa lista degli ammessi di guard_args
 check_gh_log() { # <registro>
-  python3 -I "$here/ghguard.py" log "$1"
+  python3 -B -I "$here/ghguard.py" log "$1"
 }
 
 # Prova negativa: ogni comando vietato deve fermare guard_args e dare una violazione in check_gh_log
@@ -666,6 +667,22 @@ check_negativi() { # <cartella>
     "repo create $PROT --private --add-readme --visibility public" "repo create $PROT" "repo delete $PROT"
     "repo edit $PROT --visibility public" "repo fork $PROT" "auth login" "auth refresh" "auth status --show-token"
     "secret set X" "ssh-key add" "extension install x" "--version --help"
+    "pr view https://github.com/altro/x/pull/1 --repo $PROT" "pr view altro/x#1 --repo $PROT" "pr view 1 --repo $PROT --web"
+    "pr list --repo $PROT -Raltro/x" "pr list --repo $PROT --repo $DET" "pr list --repo=altro/x" "pr list --repo $PROT -R $DET"
+    "pr comment 1 --repo $PROT --body-file /etc/passwd" "pr comment 1 2 --repo $PROT --body x" "pr merge 1 --repo $PROT"
+    "pr merge 1 --repo $PROT --merge --squash" "pr merge 1 --repo $PROT --merge --delete-branch" "pr create --repo $PROT --fill"
+    "run download 1 --repo $PROT -D /etc" "run download 1 --repo $PROT -D $P4_OUT/../x" "run download 1 --repo $PROT -D$P4_OUT/../x"
+    "run download 1 --repo $PROT -D relativa" "run download 1 --repo $PROT -n ../x" "run view abc --repo $PROT"
+    "run view 1 --repo $PROT --exit-status" "run watch 1 --repo $PROT --json id"
+    "api repos/$PROT/issues?x=1/../../" "api repos/$PROT/issues?x=%2e%2e" "api repos/$PROT/issues?x=a//b" "api repos/$PROT/./issues"
+    "repo clone $PROT /etc/clone"
+  )
+  local -a allowed=(
+    "pr view 1 --repo=$PROT --json comments" "pr view p4-v1-x/y --repo $PROT --json comments,number"
+    "pr list --repo $DET --state all --limit 100 --json number,title" "pr merge 3 --repo $PROT --squash"
+    "run download 5 --repo $DET -D $P4_OUT/a -n probe-fetch" "run list --repo $PROT --workflow probe-run.yml --limit 30 --json databaseId"
+    "run view 5 --repo $PROT --log" "api --paginate repos/$PROT/issues/1/comments" "api repos/$DET/actions/caches?per_page=100"
+    "repo clone $PROT $P4_WORK/protected -- -q"
   )
   : > "$T/negativi.log"
   for cmd in "${forbidden[@]}"; do
@@ -681,12 +698,18 @@ check_negativi() { # <cartella>
   done
   viol="$(check_gh_log "$T/negativi.log" | grep -c '^VIOLAZIONE')"
   echo "  guard_args: $stopped fermati su $n; check_gh_log: $viol violazioni su $n"
-  [ "$stopped" = "$n" ] && [ "$viol" -ge "$n" ]
+  local ok=0
+  for cmd in "${allowed[@]}"; do
+    # shellcheck disable=SC2086
+    if ( guard_args $cmd ) >/dev/null 2>&1; then ok=$((ok + 1)); else echo "  AMMESSO MA RIFIUTATO: $cmd"; fi
+  done
+  echo "  comandi legittimi ammessi: $ok su ${#allowed[@]}"
+  [ "$stopped" = "$n" ] && [ "$viol" -ge "$n" ] && [ "$ok" = "${#allowed[@]}" ]
 }
 
 # Nessuna ${{ }} dentro le righe run: dei workflow sonda (decisione 17); il YAML deve leggersi
 check_workflows() {
-  python3 -I - "$here"/workflows/probe-*.yml <<'PY'
+  python3 -B -I - "$here"/workflows/probe-*.yml <<'PY'
 import re, sys
 bad = 0
 for path in sys.argv[1:]:
@@ -738,6 +761,13 @@ modo_controlla() {
   check_gh_log "$P4_FAKE_LOG" || rc=1
   echo "--- prova negativa della guardia"
   check_negativi "$T" || { echo "PROVA NEGATIVA FALLITA"; rc=1; }
+  echo "--- comandi veri del controller (comandi.log delle evidenze)"
+  if [ -f "$root/docs/verifiche/evidenze/gh-p4/comandi.log" ]; then
+    env -u P4_OUT -u P4_WORK python3 -B -I "$here/ghguard.py" comandi "$root/docs/verifiche/evidenze/gh-p4/comandi.log" | grep -v "^ *[0-9]* *gh " || true
+    env -u P4_OUT -u P4_WORK python3 -B -I "$here/ghguard.py" comandi "$root/docs/verifiche/evidenze/gh-p4/comandi.log" >/dev/null || { echo "COMANDI VERI RIFIUTATI"; rc=1; }
+  else
+    echo "  comandi.log assente: salto"
+  fi
   echo "--- remoti dei cloni"
   for f in protected detect; do
     url="$(git -C "$T/work/$f" remote get-url --push origin 2>&1)"

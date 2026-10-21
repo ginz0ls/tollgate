@@ -2,12 +2,19 @@
 """Lista degli ammessi per i comandi gh di run-p4-checks.sh (decisione 25): unica fonte.
 
   ghguard.py check -- <argomenti di gh...>   exit 0 se ammesso, 1 con il motivo su stderr
-  ghguard.py log <registro>                  controlla un registro del gh finto (argomenti separati da tab)
+  ghguard.py log <registro>                  registro del gh finto (argomenti separati da tab)
+  ghguard.py comandi <comandi.log>           registro delle uscite (`<ora> gh <argomenti>`), righe «(controller...)» escluse
 
 Un comando è ammesso solo se la coppia (comando, sottocomando) è nella tabella, ogni opzione è nell'elenco
-di quel comando e ogni repo nominato è uno dei due. `gh api` è solo in lettura: ogni opzione che non sia
-nell'elenco (qualunque forma di -X, --method, -f, -F, --field, --raw-field, --input) è rifiutata.
+di quella coppia con un valore del tipo previsto, i posizionali sono numeri (PR, issue, run) o nomi di ramo
+semplici, esattamente un --repo/-R vale uno dei due repo. `-D` e la cartella di `repo clone` devono stare
+sotto le cartelle dell'ambiente (P4_OUT: uscite; P4_WORK: cloni). `gh api` è solo in lettura.
+
+Le scritture `gh api` della decisione 25 (POST statuses, PUT|DELETE branches/main/protection su protected)
+non servono a questo script e restano vietate qui: se serviranno, vanno aggiunte come coppie esplicite
+con endpoint fisso, mai come apertura di -X/-f/-F.
 """
+import os
 import re
 import sys
 
@@ -16,50 +23,153 @@ PROT = OWNER + "/tollgate-p4-protected"
 DET = OWNER + "/tollgate-p4-detect"
 REPOS = (PROT, DET)
 
-PR_SUBS = {"create", "edit", "close", "merge", "view", "list", "comment"}
-ISSUE_SUBS = {"create", "close", "comment", "view", "list"}
-RUN_SUBS = {"list", "view", "download", "watch"}
 REPO_CREATE_OPTS = {"--public", "--private", "--add-readme"}
 API_FLAGS = {"--include", "--paginate", "--silent"}
 API_VALUED = {"--jq", "-q"}
-FORBIDDEN_PR_FLAGS = {"merge": {"--admin", "--auto"}}
+
+BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
+FIELDS_RE = re.compile(r"^[A-Za-z][A-Za-z,]*$")
+NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+STATES = {"open", "closed", "merged", "all"}
 
 
-def _repo_flag(args):
-    """Il repo di --repo/-R (anche --repo=R), None se assente, ValueError se doppio o senza valore."""
-    found = []
+def _ok_branch(v):
+    return bool(BRANCH_RE.match(v)) and not v.startswith("-") and ".." not in v
+
+
+def _under(var, v):
+    base = os.environ.get(var, "")
+    if not base or not os.path.isabs(v):
+        return False
+    base = os.path.normpath(base)
+    return os.path.normpath(v) == v and v.startswith(base + os.sep)
+
+
+# tipo di valore -> funzione di controllo
+KINDS = {
+    "repo": lambda v: v in REPOS,
+    "int": lambda v: v.isdigit(),
+    "branch": _ok_branch,
+    "text": lambda v: True,
+    "fields": lambda v: bool(FIELDS_RE.match(v)),
+    "state": lambda v: v in STATES,
+    "name": lambda v: bool(NAME_RE.match(v)) and ".." not in v,
+    "outdir": lambda v: _under("P4_OUT", v),
+}
+LENIENT_KINDS = {"text", "outdir"}   # nel formato di comandi.log gli spazi dei valori sono andati persi
+
+REPO_OPTS = {"--repo": "repo", "-R": "repo"}
+
+
+def _spec(valued, flags=(), pos=None, exactly_one_of=()):
+    return {"valued": dict(REPO_OPTS, **valued), "flags": set(flags), "pos": pos, "one_of": set(exactly_one_of)}
+
+
+SPECS = {
+    ("pr", "create"): _spec({"--base": "branch", "--head": "branch", "--title": "text", "--body": "text"}),
+    ("pr", "edit"): _spec({"--base": "branch", "--title": "text", "--body": "text"}, pos="ref"),
+    ("pr", "close"): _spec({}, pos="ref"),
+    ("pr", "merge"): _spec({}, flags=("--merge", "--squash", "--rebase"), pos="ref",
+                           exactly_one_of=("--merge", "--squash", "--rebase")),
+    ("pr", "view"): _spec({"--json": "fields"}, pos="ref"),
+    ("pr", "list"): _spec({"--state": "state", "--limit": "int", "--json": "fields"}),
+    ("pr", "comment"): _spec({"--body": "text"}, pos="ref"),
+    ("issue", "create"): _spec({"--title": "text", "--body": "text"}),
+    ("issue", "close"): _spec({}, pos="int"),
+    ("issue", "comment"): _spec({"--body": "text"}, pos="int"),
+    ("issue", "view"): _spec({"--json": "fields"}, pos="int"),
+    ("issue", "list"): _spec({"--state": "state", "--limit": "int", "--json": "fields"}),
+    ("run", "list"): _spec({"--workflow": "name", "--limit": "int", "--json": "fields"}),
+    ("run", "view"): _spec({"--json": "fields"}, flags=("--log", "--log-failed"), pos="int"),
+    ("run", "watch"): _spec({}, flags=("--exit-status",), pos="int"),
+    ("run", "download"): _spec({"-D": "outdir", "--dir": "outdir", "-n": "name", "--name": "name"}, pos="int"),
+}
+
+
+def _parse(cmd, args, lenient):
+    """Controlla opzioni e posizionali di (comando, sottocomando); ValueError con il motivo."""
+    spec = SPECS[cmd]
+    valued, flags = spec["valued"], spec["flags"]
+    repos, positionals, seen_flags = [], [], []
     i = 0
     while i < len(args):
         a = args[i]
-        if a in ("--repo", "-R"):
-            if i + 1 >= len(args):
-                raise ValueError("--repo senza valore")
-            found.append(args[i + 1])
-            i += 2
+        if a.startswith("--"):
+            name, eq, val = a.partition("=")
+            if name in flags:
+                if eq:
+                    raise ValueError("%s non vuole un valore" % name)
+                seen_flags.append(name)
+                i += 1
+                continue
+            if name not in valued:
+                raise ValueError("opzione non ammessa: %s" % name)
+            if eq:
+                value, i = val, i + 1
+            else:
+                if i + 1 >= len(args):
+                    raise ValueError("%s senza valore" % name)
+                value, i = args[i + 1], i + 2
+                if lenient and valued[name] in LENIENT_KINDS:
+                    while i < len(args) and not args[i].startswith("-"):
+                        value, i = value + " " + args[i], i + 1
+        elif a.startswith("-") and len(a) > 1:
+            name = a[:2]
+            if name in valued:
+                if len(a) > 2:
+                    value, i = a[2:], i + 1   # valore attaccato: -Rvalore, -Dcartella
+                else:
+                    if i + 1 >= len(args):
+                        raise ValueError("%s senza valore" % name)
+                    value, i = args[i + 1], i + 2
+                    if lenient and valued[name] in LENIENT_KINDS:
+                        while i < len(args) and not args[i].startswith("-"):
+                            value, i = value + " " + args[i], i + 1
+            else:
+                raise ValueError("opzione non ammessa: %s" % a)
+        else:
+            positionals.append(a)
+            i += 1
             continue
-        if a.startswith("--repo="):
-            found.append(a[len("--repo="):])
-        i += 1
-    if len(found) > 1:
-        raise ValueError("più di un --repo")
-    return found[0] if found else None
+        if not KINDS[valued[name]](value):
+            raise ValueError("valore non ammesso per %s: %s" % (name, value))
+        if valued[name] == "repo":
+            repos.append(value)
+    if len(repos) != 1:
+        raise ValueError("serve esattamente un --repo/-R (trovati %d)" % len(repos))
+    want = spec["pos"]
+    if want is None and positionals:
+        raise ValueError("argomenti posizionali non ammessi: %s" % " ".join(positionals))
+    if want is not None:
+        if len(positionals) != 1:
+            raise ValueError("serve un solo argomento posizionale (trovati %d)" % len(positionals))
+        p = positionals[0]
+        if want == "int" and not p.isdigit():
+            raise ValueError("serve un numero: %s" % p)
+        if want == "ref" and not (p.isdigit() or _ok_branch(p)):
+            raise ValueError("serve un numero o un nome di ramo semplice: %s" % p)
+    if spec["one_of"] and len([f for f in seen_flags if f in spec["one_of"]]) != 1:
+        raise ValueError("serve esattamente una tra %s" % ", ".join(sorted(spec["one_of"])))
+    if len(seen_flags) != len(set(seen_flags)):
+        raise ValueError("opzione ripetuta")
 
 
 def _check_endpoint(ep):
     m = re.match(r"^repos/([^/?]+)/([^/?]+)", ep)
     if not m or "%s/%s" % (m[1], m[2]) not in REPOS:
         raise ValueError("endpoint non ammesso: %s" % ep)
-    path = ep.split("?", 1)[0]
-    if re.search(r"%2e|%2f|%5c|\\", ep, re.IGNORECASE):
-        raise ValueError("endpoint con codifiche sospette: %s" % ep)
-    if any(seg in ("", ".", "..") for seg in path.split("/")):
-        raise ValueError("endpoint con segmento vuoto o '..': %s" % ep)
+    if not re.match(r"^[A-Za-z0-9._~/?&=%:,@+-]+$", ep):
+        raise ValueError("endpoint con caratteri non ammessi: %s" % ep)
+    if re.search(r"%2e|%2f|%5c|%00", ep, re.IGNORECASE) or ".." in ep or "//" in ep:
+        raise ValueError("endpoint con '..', '//' o codifiche sospette: %s" % ep)
+    if any(seg == "." for seg in re.split(r"[/?&=]", ep)):
+        raise ValueError("endpoint con segmento '.': %s" % ep)
     rest = ep[len("repos/%s/%s" % (m[1], m[2])):]
     if rest and rest[0] not in "/?":
         raise ValueError("endpoint non ammesso: %s" % ep)
 
 
-def violation(args):
+def violation(args, lenient=False):
     """None se il comando è ammesso, altrimenti il motivo."""
     if not args:
         return "comando vuoto"
@@ -84,6 +194,8 @@ def violation(args):
                     return "repo clone: repo non ammesso"
                 rest = args[3:]
                 if rest and not rest[0].startswith("-"):
+                    if not _under("P4_WORK", rest[0]):
+                        return "repo clone: la cartella deve stare sotto P4_WORK"
                     rest = rest[1:]
                 if rest not in ([], ["--", "-q"]):
                     return "repo clone: argomenti non ammessi"
@@ -91,16 +203,8 @@ def violation(args):
             if second == "view":
                 return None if len(args) == 3 and args[2] in REPOS else "repo view: solo `repo view <repo>`"
             return "gh repo %s non ammesso" % second
-        if first in ("pr", "issue", "run"):
-            subs = {"pr": PR_SUBS, "issue": ISSUE_SUBS, "run": RUN_SUBS}[first]
-            if second not in subs:
-                return "gh %s %s non ammesso" % (first, second)
-            repo = _repo_flag(args[2:])
-            if repo not in REPOS:
-                return "gh %s %s: --repo mancante o non ammesso (%s)" % (first, second, repo)
-            bad = FORBIDDEN_PR_FLAGS.get(second, set()) if first == "pr" else set()
-            if bad & set(args):
-                return "gh pr %s: opzione non ammessa" % second
+        if (first, second) in SPECS:
+            _parse((first, second), args[2:], lenient)
             return None
         if first == "api":
             ep = None
@@ -124,9 +228,24 @@ def violation(args):
                 return "gh api senza endpoint"
             _check_endpoint(ep)
             return None
+        if first in ("pr", "issue", "run"):
+            return "gh %s %s non ammesso" % (first, second)
         return "gh %s non ammesso" % first
     except ValueError as exc:
         return str(exc)
+
+
+def _report(n, subs, bad, extra=""):
+    print("comandi gh controllati: %d%s" % (n, extra))
+    for k in sorted(subs):
+        print("  %4d  gh %s" % (subs[k], k))
+    for why, cmd in bad:
+        print("VIOLAZIONE (%s): %s" % (why, cmd))
+    return 1 if bad else 0
+
+
+def _key(args):
+    return " ".join(args[:2]) if args[0] in ("repo", "auth", "pr", "run", "issue") else args[0]
 
 
 def check_log(path):
@@ -138,8 +257,7 @@ def check_log(path):
         if not args:
             continue
         n += 1
-        key = " ".join(args[:2]) if args[0] in ("repo", "auth", "pr", "run", "issue") else args[0]
-        subs[key] = subs.get(key, 0) + 1
+        subs[_key(args)] = subs.get(_key(args), 0) + 1
         why = violation(args)
         if why:
             bad.append((why, " ".join(args)))
@@ -148,12 +266,32 @@ def check_log(path):
                 bad.append(("repo non ammesso", " ".join(args)))
     if n == 0:
         bad.append(("registro vuoto", ""))
-    print("comandi gh registrati: %d" % n)
-    for k in sorted(subs):
-        print("  %4d  gh %s" % (subs[k], k))
-    for why, cmd in bad:
-        print("VIOLAZIONE (%s): %s" % (why, cmd))
-    return 1 if bad else 0
+    return _report(n, subs, bad)
+
+
+def check_comandi(path):
+    """comandi.log: `<ora> gh <argomenti separati da spazi>`; le righe git e quelle annotate «(controller...)»
+    (comandi a mano del controller, con annotazione nel testo) non sono comandi dello script e si escludono."""
+    n, excluded, subs, bad = 0, 0, {}, []
+    if "P4_OUT" not in os.environ:
+        os.environ["P4_OUT"] = os.path.dirname(os.path.abspath(path))
+    os.environ.setdefault("P4_WORK", "/tmp/tollgate-p4/gh")
+    for line in open(path):
+        m = re.match(r"^\S+ gh (.*)$", line.rstrip("\n"))
+        if not m:
+            continue
+        if "(controller" in m.group(1):
+            excluded += 1
+            continue
+        args = m.group(1).split(" ")
+        n += 1
+        subs[_key(args)] = subs.get(_key(args), 0) + 1
+        why = violation(args, lenient=True)
+        if why:
+            bad.append((why, m.group(1)))
+    if n == 0:
+        bad.append(("nessun comando gh nel registro", ""))
+    return _report(n, subs, bad, " (escluse %d righe annotate «(controller...)»)" % excluded)
 
 
 def main(argv):
@@ -165,6 +303,8 @@ def main(argv):
         return 0
     if len(argv) == 3 and argv[1] == "log":
         return check_log(argv[2])
+    if len(argv) == 3 and argv[1] == "comandi":
+        return check_comandi(argv[2])
     print(__doc__, file=sys.stderr)
     return 2
 
