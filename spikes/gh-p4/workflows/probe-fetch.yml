@@ -1,0 +1,39 @@
+name: probe-fetch
+# V3b (solo sul repo privato): git fetch di refs/pull/<n>/head dentro pull_request_target, senza e con credenziali
+on: pull_request_target
+permissions:
+  contents: read
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: fetch senza e con credenziali
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          out="$RUNNER_TEMP/probe"; mkdir -p "$out"
+          n="$(jq -r .number "$GITHUB_EVENT_PATH")"
+          head="$(jq -r .pull_request.head.sha "$GITHUB_EVENT_PATH")"
+          has() { if git cat-file -e "$head^{commit}" 2>/dev/null; then echo yes; else echo no; fi; }
+          present_before="$(has)"
+          anon_rc=0
+          git fetch --no-tags origin "refs/pull/$n/head" > "$out/fetch-anon.log" 2>&1 || anon_rc=$?
+          present_anon="$(has)"
+          b64="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          echo "::add-mask::$b64"
+          auth_rc=0
+          GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $b64" \
+            git fetch --no-tags origin "refs/pull/$n/head" > "$out/fetch-auth.log" 2>&1 || auth_rc=$?
+          present_auth="$(has)"
+          jq -n --arg head "$head" --arg before "$present_before" --arg anon_rc "$anon_rc" --arg anon "$present_anon" --arg auth_rc "$auth_rc" --arg auth "$present_auth" '{head_sha: $head, head_present_before_fetch: $before, fetch_anon_rc: ($anon_rc|tonumber), head_present_after_anon: $anon, fetch_auth_rc: ($auth_rc|tonumber), head_present_after_auth: $auth}' > "$out/info.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: probe-fetch
+          path: ${{ runner.temp }}/probe

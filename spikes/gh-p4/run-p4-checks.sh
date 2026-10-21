@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # spikes/gh-p4/run-p4-checks.sh — verifiche reali P4 (V1-V9) su due repo GitHub, decisione 25.
 # Lo esegue solo il controller. Modo `controlla`: nessuna rete, `gh` finto.
-# Uso: run-p4-checks.sh prepara | v1 | v2 | v3 | v4 | v5 | v6 | v7 | v8 | v9 | raccogli | pulisci-sonde | controlla
+# Uso: run-p4-checks.sh prepara | v1 | v2 | v3 | v3b | v4 | v5 | v5b | v6 | v7 | v8 | v9 | raccogli | pulisci-sonde | controlla
 #
 # Lezione dell'incidente di P0: nessuna cartella di uscite si cancella mai. Le uscite stanno in
 # docs/verifiche/evidenze/gh-p4/ del worktree; un file che esiste già si rinomina in <nome>.prev-<tempo>.
@@ -157,18 +157,20 @@ clone_or_update() { # protected | detect
   fi
 }
 
-# open_pr <etichetta> <ramo> <file>: ramo da main con un file nuovo, push, PR verso main. Imposta PR_NUM e PR_SHA.
+# open_pr <etichetta> <ramo> <file> [protected|detect] [da]: ramo da main (o dal ramo locale <da>) con un file nuovo,
+# push, PR verso main. Imposta PR_NUM e PR_SHA.
 open_pr() {
-  local label="$1" br="$2" file="$3" d="$WORK/protected" url
+  local label="$1" br="$2" file="$3" n="${4:-protected}" from="${5:-main}" d repo url
+  d="$WORK/$n"; repo="$(repo_of "$n")"
   git -C "$d" switch -q main && git -C "$d" merge -q --ff-only origin/main || die "main locale non allineato"
-  git -C "$d" switch -q -c "$br" || die "ramo $br non creato"
+  git -C "$d" switch -q -c "$br" "$from" || die "ramo $br non creato"
   mkdir -p "$(dirname "$d/$file")"
   printf 'sonda %s %s\n' "$label" "$br" > "$d/$file"
   git -C "$d" add "$file" && git -C "$d" commit -qm "sonda $label" || die "commit della sonda fallito"
   PR_SHA="$(git -C "$d" rev-parse HEAD)"
-  git_call "$label-push" protected push -u origin "$br"
+  git_call "$label-push" "$n" push -u origin "$br"
   [ "$RC" = 0 ] || die "push di $br fallito (vedi $label-push.err)"
-  gh_call "$label-pr-create" pr create --repo "$PROT" --base main --head "$br" --title "sonda $label" --body "sonda tollgate P4 ($label), da chiudere"
+  gh_call "$label-pr-create" pr create --repo "$repo" --base main --head "$br" --title "sonda $label" --body "sonda tollgate P4 ($label), da chiudere"
   [ "$RC" = 0 ] || die "creazione della PR fallita (vedi $label-pr-create.err)"
   url="$(tail -n 1 "$OUT/$label-pr-create.out")"
   PR_NUM="${url##*/}"
@@ -254,10 +256,10 @@ modo_prepara() {
     fi
     clone_or_update "$n"
   done
-  # sonde solo nel pubblico; il privato resta con il solo README
+  # sonde nel pubblico; sul privato solo probe-fetch, installata da v3b
   local d="$WORK/protected"
   mkdir -p "$d/.github/workflows"
-  cp "$here"/workflows/probe-*.yml "$d/.github/workflows/"
+  cp "$here"/workflows/probe-{target,run,verdict,base}.yml "$d/.github/workflows/"
   [ -e "$d/.github/probe-tag" ] || date +%Y%m%d%H%M%S > "$d/.github/probe-tag"
   if [ -n "$(git -C "$d" status --porcelain)" ]; then
     git -C "$d" add .github && git -C "$d" commit -qm "sonde tollgate P4: workflow delle verifiche" || die "commit delle sonde fallito"
@@ -315,6 +317,28 @@ modo_v3() {
   clone_or_update protected
   git_call v3-fetch-pull protected fetch origin "refs/pull/$PR/head"
   git_call v3-fetch-pull-sha protected rev-parse FETCH_HEAD
+}
+
+# V3b: git fetch di refs/pull/<n>/head dentro pull_request_target sul PRIVATO, senza e con credenziali.
+# Unica sonda sul privato: la installa questo modo (commit e push su detect), poi apre e chiude una PR.
+modo_v3b() {
+  local ts br d="$WORK/detect"
+  clone_or_update detect
+  mkdir -p "$d/.github/workflows"
+  cp "$here/workflows/probe-fetch.yml" "$d/.github/workflows/"
+  if [ -n "$(git -C "$d" status --porcelain)" ]; then
+    git -C "$d" add .github && git -C "$d" commit -qm "sonda tollgate P4: probe-fetch" || die "commit della sonda fallito"
+    git_call v3b-push-sonda detect push origin main
+    [ "$RC" = 0 ] || die "push della sonda su detect fallito (vedi v3b-push-sonda.err)"
+  fi
+  ts="$(date +%Y%m%d-%H%M%S)"; br="p4-v3b-$ts"
+  open_pr v3b "$br" "sonde/v3b-$ts.txt" detect
+  save_text "$OUT/v3b-pr.env" "PR=$PR_NUM" "SHA=$PR_SHA" "BRANCH=$br"
+  track_run v3b-fetch "$DET" probe-fetch.yml "$PR_SHA" "$br" 1
+  gh_call v3b-pr-close pr close "$PR_NUM" --repo "$DET"
+  rot "$OUT/v3b-riepilogo.txt"
+  find "$OUT"/v3b-fetch-artifacts-* -name info.json -exec jq -c . {} \; > "$OUT/v3b-riepilogo.txt" 2>&1
+  [ -s "$OUT/v3b-riepilogo.txt" ] || echo "non determinato: nessun info.json (run non completato?)" > "$OUT/v3b-riepilogo.txt"
 }
 
 # V4: la cache salvata da probe-verdict (v1) si ripristina in un job pull_request (PR2) e in un job push (main)
@@ -386,6 +410,30 @@ modo_v5() {
   get_pulls "v5-diretto-${MAIN_SHA:0:8}" "$MAIN_SHA"
   printf 'diretto %s\n' "$MAIN_SHA" >> "$OUT/v5-shas.txt"
   printf '%s\t%s\t%s\n' diretto "$MAIN_SHA" "$(jq -c '[.[] | {number, state, merged_at, base: .base.ref}]' "$OUT/v5-diretto-${MAIN_SHA:0:8}.out" 2>&1)" >> "$OUT/v5-riepilogo.tsv"
+}
+
+# V5b: due PR aperte insieme, B costruita sopra la testa di A; commits/<testa>/pulls per entrambe (prima di unire A)
+modo_v5b() {
+  local ts br_a br_b pr_a pr_b sha_a sha_b
+  clone_or_update protected
+  ts="$(date +%Y%m%d-%H%M%S)"; br_a="p4-v5b-a-$ts"; br_b="p4-v5b-b-$ts"
+  open_pr v5b-a "$br_a" "sonde/v5b-a-$ts.txt"
+  pr_a="$PR_NUM"; sha_a="$PR_SHA"
+  open_pr v5b-b "$br_b" "sonde/v5b-b-$ts.txt" protected "$br_a"
+  pr_b="$PR_NUM"; sha_b="$PR_SHA"
+  save_text "$OUT/v5b-pr.env" "PR_A=$pr_a" "SHA_A=$sha_a" "PR_B=$pr_b" "SHA_B=$sha_b"
+  get_pulls v5b-pulls-testa-a "$sha_a"
+  get_pulls v5b-pulls-testa-b "$sha_b"
+  rot "$OUT/v5b-riepilogo.txt"
+  {
+    echo "# PR A=$pr_a (testa $sha_a), PR B=$pr_b (testa $sha_b, sopra A)"
+    for f in v5b-pulls-testa-a v5b-pulls-testa-b; do
+      echo "# $f: numero, state, head.sha, base.ref"
+      jq -r '.[] | [(.number | tostring), .state, .head.sha, .base.ref] | @tsv' "$OUT/$f.out" 2>&1
+    done
+  } > "$OUT/v5b-riepilogo.txt"
+  gh_call v5b-pr-close-a pr close "$pr_a" --repo "$PROT"
+  gh_call v5b-pr-close-b pr close "$pr_b" --repo "$PROT"
 }
 
 # V6: stati e check-run di un job pull_request_target/workflow_run (PR1) e dei job push
@@ -706,7 +754,7 @@ modo_controlla() {
   [ "$(command -v gh)" = "$T/bin/gh" ] || die "il gh finto non è il primo nel PATH"
   : > "$P4_FAKE_LOG"
   echo "cartella del controllo: $T"
-  for mode in prepara v1 v2 v3 v4 v5 v6 v7 v8 v9 raccogli pulisci-sonde; do
+  for mode in prepara v1 v2 v3 v3b v4 v5b v5 v6 v7 v8 v9 raccogli pulisci-sonde; do
     if bash "$here/run-p4-checks.sh" "$mode" >"$T/modo-$mode.log" 2>&1; then
       echo "modo $mode: ok"
     else
@@ -724,7 +772,7 @@ modo_controlla() {
   echo "--- uscite attese"
   for f in prepara-auth.out prepara-protected-esiste.rc v1-pr.env v1-target-runid.txt v1-run-runid.txt v1-verdict-runid.txt \
            v1-pr-view-comments.out v1-api-comments.out v1-login.txt v2-detect.out v2-detect.err v2-detect.rc v2-protected.rc \
-           v3-riepilogo.jsonl v4-pr.env v4-push.env v4-base-runid.txt v5-shas.txt v5-riepilogo.tsv v6-riepilogo.txt \
+           v3-riepilogo.jsonl v3b-pr.env v3b-riepilogo.txt v5b-pr.env v5b-riepilogo.txt v4-pr.env v4-push.env v4-base-runid.txt v5-shas.txt v5-riepilogo.tsv v6-riepilogo.txt \
            v7-riepilogo.txt v8-find.txt v8-artefatti.out v9-protected.out v9-detect.out raccogli-runs-protected.out \
            raccogli-minuti.txt pulisci-protected.txt pulisci-detect.txt comandi.log; do
     [ -e "$T/out/$f" ] || { echo "  manca $f"; missing=1; }
@@ -738,9 +786,9 @@ modo_controlla() {
 }
 
 case "$MODE" in
-  prepara|v1|v2|v3|v4|v5|v6|v7|v8|v9|raccogli)
+  prepara|v1|v2|v3|v3b|v4|v5|v5b|v6|v7|v8|v9|raccogli)
     mkdir -p "$OUT" "$WORK"; "modo_$MODE" ;;
   pulisci-sonde) mkdir -p "$OUT" "$WORK"; modo_pulisci_sonde ;;
   controlla) modo_controlla ;;
-  *) echo "uso: $0 prepara|v1|v2|v3|v4|v5|v6|v7|v8|v9|raccogli|pulisci-sonde|controlla" >&2; exit 2 ;;
+  *) echo "uso: $0 prepara|v1|v2|v3|v3b|v4|v5|v5b|v6|v7|v8|v9|raccogli|pulisci-sonde|controlla" >&2; exit 2 ;;
 esac
