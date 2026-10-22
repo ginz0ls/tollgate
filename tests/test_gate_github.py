@@ -619,6 +619,22 @@ class BoundaryTest(VerdictBase):
         self.assertIn("HTTP 502", err.getvalue())
         self.assertNotIn("commit_statuses", self.gh_data())
 
+    def test_exception_text_cannot_start_a_workflow_command(self):
+        # M-8: il motivo su stderr passa da `json.dumps`, come le voci di `_print`
+        for publish, fail_write in ((False, False), (True, True)):
+            with self.subTest(publish=publish):
+                err = io.StringIO()
+                write = mock.patch.object(github, "set_status",
+                                          side_effect=ghcli.GhError("403\n::error::w")) \
+                    if fail_write else contextlib.nullcontext()
+                with mock.patch.object(github, "shared_sha_prs",
+                                       side_effect=ghcli.GhError("x\n::error::x")), \
+                        write, contextlib.redirect_stderr(err):
+                    self.assertEqual(self.run_verdict(publish=publish), 1)
+                self.assertIn("::error::x", err.getvalue())
+                self.assertFalse(any(line.startswith("::")
+                                     for line in err.getvalue().splitlines()))
+
     def test_not_applicable_and_superseded_still_write_no_error(self):
         self.set_gh(pull=self.rest_pull(base={"ref": "other"}))
         self.run_verdict()

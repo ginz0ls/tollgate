@@ -414,9 +414,9 @@ class BasePublishBase(SentinelBase):
                 "ids": {f"c{i}": [] for i, _ in enumerate(states)},
                 "commands": {f"c{i}": s for i, s in enumerate(states)}}
 
-    def publish(self, result):
-        baseids.publish(self.lab.repo, config_sha=self.lab.base, sha=self.lab.base,
-                        result=result, environ=os.environ)
+    def publish(self, result) -> int:
+        return baseids.publish(self.lab.repo, config_sha=self.lab.base, sha=self.lab.base,
+                               result=result, environ=os.environ)
 
     def base_statuses(self) -> list[dict]:
         rows = self.gh_data().get("commit_statuses", {}).get(self.lab.base, [])
@@ -462,10 +462,24 @@ class BaseDetectTest(BasePublishBase):
         self.assertEqual([r["state"] for r in self.base_statuses()], ["success"])
         self.assertEqual(self.issues(), [])
 
+    def test_red_suite_exits_1_after_status_and_issue(self):
+        # I-1: il job `tollgate-base` è rosso se la suite della base è rossa
+        self.assertEqual(self.publish(self.result("green", "red")), 1)
+        self.assertEqual([r["state"] for r in self.base_statuses()], ["failure"])
+        self.assertEqual(len(self.issues()), 1)
+
+    def test_green_suite_exits_0(self):
+        self.assertEqual(self.publish(self.result("green", "unverified")), 0)
+
 
 class BaseProtectedTest(BasePublishBase):
     def test_protected_mode_publishes_nothing(self):
-        self.publish(self.result("red"))
+        # I-1: in `protected` non c'è uno stato, il segnale è il job rosso
+        self.assertEqual(self.publish(self.result("red")), 1)
+        self.assertEqual(self.calls(), [])
+
+    def test_protected_green_exits_0_without_writing(self):
+        self.assertEqual(self.publish(self.result("green", "unverified")), 0)
         self.assertEqual(self.calls(), [])
 
 
@@ -502,8 +516,9 @@ class BasePublishFromTest(BasePublishBase):
         self.assertEqual(self.issues(), [])
 
     def test_valid_data_publishes_the_status_even_from_a_cache_hit(self):
-        # su un cache hit `sha` è quello del commit che ha riempito la cache: conta l'albero
-        self.assertEqual(self.publish_from(self.ids_dir(commands={"verify": "red"})), 0)
+        # su un cache hit `sha` è quello del commit che ha riempito la cache: conta l'albero;
+        # la suite rossa rende rosso anche il job (I-1)
+        self.assertEqual(self.publish_from(self.ids_dir(commands={"verify": "red"})), 1)
         [row] = self.base_statuses()
         self.assertEqual(row["state"], "failure")
         self.assertIn("`verify`", self.issues()[0]["body"])
@@ -514,6 +529,8 @@ class BasePublishFromTest(BasePublishBase):
 
     def test_without_publish_nothing_is_written(self):
         self.assertEqual(self.publish_from(self.ids_dir(), publish=False), 0)
+        self.assertEqual(self.publish_from(self.ids_dir(commands={"verify": "red"}),
+                                           publish=False), 1)
         self.assertEqual(self.calls(), [])
 
     def test_missing_artifact_is_error(self):
@@ -558,6 +575,20 @@ class BasePublishProtectedErrorTest(BasePublishBase):
             self.lab.repo, config_sha=self.lab.base, sha=self.lab.base, ids_dir=tmp,
             environ=os.environ, publish=True), 1)
         self.assertEqual(self.calls(), [])
+
+    def test_protected_red_suite_fails_without_writing(self):
+        d = self.tmp / "ids"
+        d.mkdir()
+        tree = git(self.lab.repo, "rev-parse", f"{self.lab.base}^{{tree}}")
+        for states, code in (({"verify": "red"}, 1), ({"verify": "green"}, 0)):
+            with self.subTest(states=states):
+                (d / "ids.json").write_text(json.dumps({
+                    "v": 1, "tree": tree, "sha": self.lab.base, "ids": {"verify": []},
+                    "commands": states}))
+                self.assertEqual(baseids.publish_from(
+                    self.lab.repo, config_sha=self.lab.base, sha=self.lab.base, ids_dir=d,
+                    environ=os.environ, publish=True), code)
+                self.assertEqual(self.calls(), [])
 
 
 if __name__ == "__main__":

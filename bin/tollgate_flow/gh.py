@@ -6,9 +6,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tollgate_core.ghcli import (GH_ENV, GH_TIMEOUT_S, REQUIRED_CONTEXTS, SENTINEL_TITLE,  # noqa: F401
-                                 GhError, decode_json_values, gh_cmd, run as _run, run_json,
-                                 run_json_lines)
+from tollgate_core.ghcli import (  # noqa: F401
+    GH_ENV, GH_TIMEOUT_S, REQUIRED_CONTEXTS, SENTINEL_TITLE, GhError, decode_json_values, gh_cmd,
+    run as _run, run_json, run_json_lines)
 from tollgate_gate import github
 
 
@@ -25,7 +25,8 @@ class Issue:
 def _run_checked(state, repo, args) -> None:
     r = _run(state, repo, args)
     if r.returncode != 0:
-        raise GhError(f"gh {' '.join(args[:2])}: {r.stderr.strip() or 'uscita ' + str(r.returncode)}")
+        why = r.stderr.strip() or f"uscita {r.returncode}"
+        raise GhError(f"gh {' '.join(args[:2])}: {why}")
 
 
 def auth_ok(state, repo) -> bool:
@@ -105,9 +106,11 @@ def pr_create(state, repo, *, branch: str, base: str, title: str, body_file) -> 
 
 
 def pr_edit(state, repo, number: int, *, body_file) -> None:
-    """Aggiorna il corpo con la REST: `gh pr edit` con gh 2.46 esce con 1 per la deprecazione dei Projects (classic)
-    (`repository.pullRequest.projectCards`). `{owner}/{repo}` lo risolve gh; il testo viene dal file, mai da un argomento."""
-    _run_checked(state, repo, ["api", "--method", "PATCH", f"repos/{{owner}}/{{repo}}/pulls/{int(number)}",
+    """Aggiorna il corpo con la REST: `gh pr edit` con gh 2.46 esce con 1 per la deprecazione
+    dei Projects (classic) (`repository.pullRequest.projectCards`). `{owner}/{repo}` lo risolve
+    gh; il testo viene dal file, mai da un argomento."""
+    _run_checked(state, repo, ["api", "--method", "PATCH",
+                               f"repos/{{owner}}/{{repo}}/pulls/{int(number)}",
                                "-F", f"body=@{body_file}"])
 
 

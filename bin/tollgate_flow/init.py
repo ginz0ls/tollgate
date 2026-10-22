@@ -174,6 +174,7 @@ def _protect_script(branch: str) -> str:
           f'.app.slug == "{protection.BASE_APP_SLUG}") | '
           '[.status, (.conclusion // ""), (.app.id | tostring)] | @tsv')
     contexts = ", ".join(protection.REQUIRED_CONTEXTS)
+    runs_path = "repos/{owner}/{repo}/commits/$SHA/check-runs?per_page=100"
     return f"""#!/usr/bin/env bash
 # Attiva la protezione del ramo {branch} per tollgate (spec 9.3).
 # Lo lanci tu, dalla radice del repo e con le tue credenziali di gh, dopo aver unito sul ramo
@@ -195,7 +196,7 @@ if ! [[ $SHA =~ ^[0-9a-f]{{40}}$ ]]; then
   exit 2
 fi
 
-runs=$(gh api --paginate --jq {_quote(jq)} "repos/{{owner}}/{{repo}}/commits/$SHA/check-runs?per_page=100")
+runs=$(gh api --paginate --jq {_quote(jq)} "{runs_path}")
 if [ -z "$runs" ]; then
   echo "check-run di $JOB non trovato sul commit $SHA: unisci prima i workflow sul ramo $BRANCH" >&2
   exit 1
@@ -416,7 +417,8 @@ def propose(state: State, cwd: Path, *, update: bool, merges_per_month: int,
     proposal = _Proposal(
         mode=mode, kind=read.kind, missing=read.missing, files=tree, removed=removed,
         violations=_existing_violations(main, ref), jest=jest, jest_junit=jest_junit,
-        from_template=current is None, seconds=_gate_seconds(state, repo_key(url), _gate_commands(toml)))
+        from_template=current is None,
+        seconds=_gate_seconds(state, repo_key(url), _gate_commands(toml)))
     protect = (_protect_script(default), protection.body_template()) \
         if mode == "protected" and (read.kind == protection.PROTECTED_UNSET or read.missing) \
         else None

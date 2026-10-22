@@ -28,6 +28,8 @@ gate = ["test"]
 [profiles.web.commands]
 test = "true"
 """
+# `unverified` lo scrive il CLI solo per un comando non configurato (`run.py`, `verify.py`)
+UNCONFIGURED_TOML = GATE_TOML.replace('verify = "true"', 'verify = ""')
 SOMMA, ZERO = DEFAULT_IDS
 # Le chiavi di `attenzione` che ogni caso di `evaluate` produce, raccolte per
 # `CoverageTest.test_every_group_key_is_produced`.
@@ -83,14 +85,16 @@ class CommandsTest(LabCase):
         self.assertEqual(ev.attention, [])
 
     def test_red_empty_uncounted_unverified(self):
+        unconfigured = GateLab(toml=UNCONFIGURED_TOML)
+        self.addCleanup(unconfigured.close)
         cases = {
-            "command_red": self.verify("red", 1, self.lab.junit(DEFAULT_IDS)),
-            "command_empty": self.verify("empty", 0, self.lab.junit([])),
-            "command_unverified": self.verify("unverified", None),
+            "command_red": (self.lab, self.verify("red", 1, self.lab.junit(DEFAULT_IDS))),
+            "command_empty": (self.lab, self.verify("empty", 0, self.lab.junit([]))),
+            "command_unverified": (unconfigured, self.verify("unverified", None)),
         }
-        for want, commands in cases.items():
+        for want, (lab, commands) in cases.items():
             with self.subTest(want):
-                ev = self.run_gate(commands=commands)
+                ev = evaluate(lab.inputs(commands=commands))
                 self.assertIn(want, keys(ev.red, "commands"))
                 self.assertEqual(ev.verdict_state, "failure")
 
@@ -127,20 +131,38 @@ class CommandsTest(LabCase):
         ev = evaluate(lab.inputs(commands=self.verify("empty", 1, lab.junit([]))))
         self.assertEqual(keys(ev.red, "commands"), ["command_red"])
 
+    def unconfigured_lab(self):
+        lab = GateLab(toml=UNCONFIGURED_TOML)
+        self.addCleanup(lab.close)
+        return lab
+
     def test_unverified_green_with_declared_act_and_attention(self):
-        block = self.lab.block(acts=[{"act_id": "a-1", "type": "approve",
-                                      "object": "unverified-tests", "target": None,
-                                      "at": "2026-10-21T10:00:00Z", "state": "consumed"}])
-        ev = self.run_gate(block=block, commands=self.verify("unverified", None))
+        lab = self.unconfigured_lab()
+        block = lab.block(acts=[{"act_id": "a-1", "type": "approve",
+                                 "object": "unverified-tests", "target": None,
+                                 "at": "2026-10-21T10:00:00Z", "state": "consumed"}])
+        ev = evaluate(lab.inputs(block=block, commands=self.verify("unverified", None)))
         self.assertEqual(keys(ev.red, "commands"), [])
         self.assertIn("unverified_tests", keys(ev.attention))
         self.assertEqual(ev.attention_state, "failure")
 
     def test_other_act_does_not_approve_unverified(self):
-        block = self.lab.block(acts=[{"act_id": "a-1", "type": "approve", "object": "waiver",
-                                      "target": "w-7-1", "at": "x"}])
-        ev = self.run_gate(block=block, commands=self.verify("unverified", None))
+        lab = self.unconfigured_lab()
+        block = lab.block(acts=[{"act_id": "a-1", "type": "approve", "object": "waiver",
+                                 "target": "w-7-1", "at": "x"}])
+        ev = evaluate(lab.inputs(block=block, commands=self.verify("unverified", None)))
         self.assertEqual(keys(ev.red, "commands"), ["command_unverified"])
+
+    def test_unverified_for_a_configured_command_is_red(self):
+        # M-6: un `results.json` che dice `unverified` per un comando configurato è incoerente
+        block = self.lab.block(acts=[{"act_id": "a-1", "type": "approve",
+                                      "object": "unverified-tests", "target": None,
+                                      "at": "2026-10-21T10:00:00Z", "state": "consumed"}])
+        for b in (block, None):
+            with self.subTest(approved=b is not None):
+                ev = self.run_gate(block=b, commands=self.verify("unverified", None))
+                self.assertEqual(keys(ev.red, "commands"), ["command_red"])
+                self.assertNotIn("unverified_tests", keys(ev.attention))
 
     def test_or_true_with_failure_is_red(self):
         failed = self.lab.junit(DEFAULT_IDS, ids_failed=[SOMMA])

@@ -158,5 +158,6 @@ def main(args: list[str]) -> int:
     try:
         return HANDLERS[ns.gate_cmd](ns)
     except (GhError, GitError, ConfigError, OSError, ValueError) as e:
-        sys.stderr.write(f"gate {ns.gate_cmd}: {e}\n")
+        # una riga sola: un `::` a inizio riga sarebbe un comando del runner
+        sys.stderr.write(f"gate {ns.gate_cmd}: {json.dumps(str(e), ensure_ascii=False)}\n")
         return 1

@@ -216,9 +216,10 @@ def components_off(ctx: Context, ev: Evaluation) -> None:
 
 def _command_state(spec: runner.CommandSpec, r: CommandResult, allow_no_tests: bool) -> str:
     """Lo stato dichiarato e quello ricalcolato da uscita e JUnit: vale il peggiore (un `|| true`
-    con un fallito nel report è rosso, 8.1)."""
+    con un fallito nel report è rosso, 8.1). `unverified` lo scrive il CLI solo per un comando
+    vuoto: per uno configurato il risultato è incoerente e vale rosso."""
     if r.state == "unverified":
-        return "unverified"
+        return "red" if spec.command else "unverified"
     recomputed = runner.receipt_state(
         exit_code=-1 if r.exit is None else r.exit, report_configured=bool(spec.report),
         junit=r.junit, allow_no_tests=allow_no_tests)
@@ -443,7 +444,8 @@ def diff(ctx: Context, ev: Evaluation) -> None:
         # la parte dopo «: » del dettaglio è letta dal codice della PR (identificativi di test,
         # soglie): va in `data`, nel testo resta la frase di tollgate
         said, _, read = v.detail.partition(": ")
-        _red(ev, v.kind, "diff", f"{said} ({v.waiver_type})", f"{v.path}\n{read}" if read else v.path)
+        _red(ev, v.kind, "diff", f"{said} ({v.waiver_type})",
+             f"{v.path}\n{read}" if read else v.path)
     ev.watch = list(check.watched)
     if ctx.is_github:
         _plan_changed(ctx, ev, registered)

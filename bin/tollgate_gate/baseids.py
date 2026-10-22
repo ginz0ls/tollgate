@@ -23,18 +23,21 @@ def compute(repo: Path, *, config_sha: str, sha: str, out: Path, environ: Mappin
             cfg_repo: Path | None = None) -> dict:
     """Esegue in `repo` (il checkout di `sha`) i comandi di `runner.ids_commands`, con la
     configurazione di `config_sha` letta in `cfg_repo` (di norma `repo`), e scrive
-    `out/ids.json`. Un `setup` fallito lascia i comandi `red` e senza identificativi."""
+    `out/ids.json`. Un `setup` fallito lascia i comandi `red` e senza identificativi. Con il
+    componente `base_test_ids` spento (decisione 12) non esegue nulla e scrive un `ids.json`
+    valido senza comandi: `base-publish` lo accetta e `verdict` non trova identificativi."""
     cfg = load_config_at(cfg_repo or repo, config_sha)
     tree = git.run(repo, "rev-parse", f"{sha}^{{tree}}").strip()
-    specs = runner.ids_commands(cfg)
-    setups = gate_run.setup_commands(cfg, list(cfg.profiles))
-    entries = gate_run.run_commands(repo, cfg, setups, specs, files=[], environ=environ,
-                                    out=out, tag=f"base-{sha[:7]}")
     ids, commands = {}, {}
-    for spec, entry in zip(specs, entries[len(setups):]):
-        junit = entry.get("_junit")
-        ids[spec.name] = sorted(runner.executed_ids(junit)) if junit is not None else []
-        commands[spec.name] = entry["state"]
+    if cfg.get("components.base_test_ids"):
+        specs = runner.ids_commands(cfg)
+        setups = gate_run.setup_commands(cfg, list(cfg.profiles))
+        entries = gate_run.run_commands(repo, cfg, setups, specs, files=[], environ=environ,
+                                        out=out, tag=f"base-{sha[:7]}")
+        for spec, entry in zip(specs, entries[len(setups):]):
+            junit = entry.get("_junit")
+            ids[spec.name] = sorted(runner.executed_ids(junit)) if junit is not None else []
+            commands[spec.name] = entry["state"]
     result = {"v": IDS_VERSION, "tree": tree, "sha": sha, "ids": ids, "commands": commands}
     out.mkdir(parents=True, exist_ok=True)
     (out / "ids.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -67,24 +70,30 @@ def _load(path: Path, tree: str) -> dict[str, set[str]] | None:
 
 
 def publish(repo: Path, *, config_sha: str, sha: str, result: dict,
-            environ: Mapping[str, str]) -> None:
+            environ: Mapping[str, str]) -> int:
     """In `detect` pubblica `tollgate/base` sul commit `sha` (spec 9.1): `failure` se qualche
     comando della suite della base è `red`, e allora commenta anche l'issue di sentinel (la crea
-    se manca). In `protected` non scrive nulla: il segnale è il job."""
-    _publish(repo, load_config_at(repo, config_sha), sha=sha, result=result, environ=environ)
+    se manca). In `protected` non scrive nulla. In entrambe le modalità risponde 1 se la suite è
+    rossa, così il job `tollgate-base` è rosso, e 0 se è verde."""
+    return _publish(repo, load_config_at(repo, config_sha), sha=sha, result=result,
+                    environ=environ)
 
 
-def _publish(repo: Path, cfg, *, sha: str, result: dict, environ: Mapping[str, str]) -> None:
+def _red(result: dict) -> list[str]:
+    return sorted(name for name, st in result["commands"].items() if st == "red")
+
+
+def _publish(repo: Path, cfg, *, sha: str, result: dict, environ: Mapping[str, str]) -> int:
+    red = _red(result)
     if cfg.get("gate.mode") != "detect":
-        return
+        return 1 if red else 0
     state, slug = paths.resolve_state(environ), github.repo_slug(environ)
-    red = sorted(name for name, st in result["commands"].items() if st == "red")
     open_ = sorted(name for name, st in result["commands"].items() if st == "unverified")
     extra = f"; non verificati: {', '.join(open_)}" if open_ else ""
     if not red:
         github.set_status(state, repo, slug, sha, context="tollgate/base", status="success",
                           description=f"suite della base verde{extra}")
-        return
+        return 0
     github.set_status(state, repo, slug, sha, context="tollgate/base", status="failure",
                       description=f"suite della base rossa: {len(red)} comandi{extra}")
     with tempfile.TemporaryDirectory(prefix="tollgate-base-") as tmp:
@@ -94,6 +103,7 @@ def _publish(repo: Path, cfg, *, sha: str, result: dict, environ: Mapping[str, s
             f"`{sha}`. Comandi rossi: {', '.join(f'`{n}`' for n in red)}.\n\n"
             "Chiudi l'issue su GitHub dopo averla letta.\n", encoding="utf-8")
         github.report_sentinel(state, repo, slug, body_file=body)
+    return 1
 
 
 def read_result(path: Path, *, tree: str, names: set[str]) -> dict | None:
@@ -123,7 +133,8 @@ def publish_from(repo: Path, *, config_sha: str, sha: str, ids_dir: Path,
     """Pubblica da `ids_dir/ids.json` (l'artefatto di `ids`, dati non fidati) come `publish`.
     Il file deve essere dell'albero di `sha` (su un cache hit il suo `sha` è un altro commit con
     lo stesso albero). Se non è valido: in `detect` stato `error` con il motivo, e codice 1 in
-    ogni modalità, così il job è rosso. Senza `publish` legge e basta."""
+    ogni modalità, così il job è rosso; lo stesso codice 1 se la suite della base è rossa. Senza
+    `publish` legge e basta."""
     cfg = load_config_at(repo, config_sha)
     tree = git.run(repo, "rev-parse", f"{sha}^{{tree}}").strip()
     names = {spec.name for spec in runner.ids_commands(cfg)}
@@ -136,5 +147,5 @@ def publish_from(repo: Path, *, config_sha: str, sha: str, ids_dir: Path,
                               description="identificativi della base assenti o non validi")
         return 1
     if publish:
-        _publish(repo, cfg, sha=sha, result=result, environ=environ)
-    return 0
+        return _publish(repo, cfg, sha=sha, result=result, environ=environ)
+    return 1 if _red(result) else 0

@@ -31,8 +31,9 @@ valuta **solo** il filtro di `protect.sh` (`.name == "<job>"`, e `.app.slug == "
 stampa per riga `status<TAB>conclusion<TAB>app.id`. Poi `commits/<sha>/statuses` (da
 `commit_statuses`, vuoto se manca), `commits/<sha>/pulls` (da `commit_pulls`, vuoto se manca),
 `pulls/<n>` (da `pulls[<n>]`, come la REST: `body`, `head.sha|ref|repo.full_name`, `base.ref`,
-`state`; 404 se manca) e `issues?state=open` (da `open_issues`, senza le righe con `pull_request`, che il filtro scarta), un valore per riga; il
-`--jq` non si valuta: i dati hanno già la forma che il filtro produce.
+`state`; 404 se manca) e `issues?state=open` (da `open_issues`, senza le righe con
+`pull_request`, che il filtro scarta), un valore per riga; il `--jq` non si valuta: i dati hanno
+già la forma che il filtro produce.
 `api_flaky` simula i 5xx transitori di GitHub (prova P4): `{"<percorso senza ?query>": ["<stderr>",
 ...]}`; ogni `gh api` su quel percorso consuma il primo messaggio (riscrive il file dei dati), lo
 scrive su stderr ed esce con 1 senza stdout; finita la lista risponde normalmente. La chiave

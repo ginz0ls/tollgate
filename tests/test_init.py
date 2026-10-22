@@ -241,7 +241,8 @@ class ServicesTest(InitCase):
         self.make(UNSET)
         for service in ("DB=x", "a b=x", "d:b=x", "-db=x", "db=x y", "db=x\ny", "db=",
                         "db=postgres:16,0", "db=postgres:16,70000", "db=postgres:16,54x2",
-                        "db=postgres:16,", "db", "=x", "db=x;rm", "db=$(x)", "db\n=x", "db=x\n", "d_b=x"):
+                        "db=postgres:16,", "db", "=x", "db=x;rm", "db=$(x)", "db\n=x", "db=x\n",
+                        "d_b=x"):
             r = self.run_init("--propose", "--service", service)
             self.assertNotEqual(r.returncode, 0, service)
             self.assertFalse(self.folder.exists(), service)

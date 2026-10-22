@@ -294,6 +294,25 @@ class BaseIdsTest(GateRunBase):
                 self.assertEqual(r.returncode, 2)
 
 
+class BaseIdsComponentOffTest(GateRunBase):
+    """M-2, decisione 12: con `base_test_ids = false` la suite della base non gira."""
+    toml = TOML + "[components]\nbase_test_ids = false\n"
+
+    def test_nothing_runs_and_ids_json_is_valid_and_empty(self):
+        r = self.tollgate("gate", "base-ids", "--sha", self.lab.base, "--out", str(self.out),
+                          "--event", str(self.event()))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertFalse((self.lab.repo / "ran.txt").exists())
+        tree = git(self.lab.repo, "rev-parse", f"{self.lab.base}^{{tree}}")
+        self.assertEqual(json.loads((self.out / "ids.json").read_text()),
+                         {"v": 1, "tree": tree, "sha": self.lab.base, "ids": {},
+                          "commands": {}})
+        self.assertEqual(baseids.load(self.out / "ids.json", tree=tree), {})
+        self.assertEqual(baseids.publish_from(self.lab.repo, config_sha=self.lab.base,
+                                              sha=self.lab.base, ids_dir=self.out,
+                                              environ=os.environ, publish=True), 0)
+
+
 class MainErrorsTest(unittest.TestCase):
     def failing(self, exc):
         buf = io.StringIO()
@@ -319,6 +338,17 @@ class MainErrorsTest(unittest.TestCase):
 
     def test_value_error(self):
         self.failing(ValueError("boom"))
+
+    def test_message_cannot_start_a_workflow_command(self):
+        # M-8: il testo dell'eccezione passa da `json.dumps`, una riga sola
+        buf = io.StringIO()
+        exc = ValueError("boom\n::error::x")
+        with mock.patch.dict(cli.HANDLERS, {"run": mock.Mock(side_effect=exc)}), \
+                redirect_stderr(buf):
+            self.assertEqual(cli.main(["run", "--event", "e.json", "--out", "o"]), 1)
+        self.assertEqual(buf.getvalue().count("\n"), 1)
+        self.assertIn("::error::x", buf.getvalue())
+        self.assertFalse(any(line.startswith("::") for line in buf.getvalue().splitlines()))
 
     def test_bad_event_file_is_a_message(self):
         with tempfile.TemporaryDirectory() as tmp:

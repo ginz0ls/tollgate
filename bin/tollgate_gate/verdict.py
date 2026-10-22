@@ -197,13 +197,14 @@ def main(event_path: Path, *, artifacts: Path, base_ids_cache: Path | None,
                       publish=publish, environ=environ)
     except Exception as e:      # confine: dopo questo punto ogni esito è uno stato esplicito
         reason = f"{type(e).__name__}: {e}"
-        sys.stderr.write(f"gate evaluate: {reason}\n")
+        sys.stderr.write(f"gate evaluate: {json.dumps(reason, ensure_ascii=False)}\n")
         if not publish:
             return 1
         try:
             _statuses(state, repo, slug, sha, _error(reason))
         except Exception as write_error:
-            sys.stderr.write(f"gate evaluate: stato non scritto: {write_error}\n")
+            sys.stderr.write("gate evaluate: stato non scritto: "
+                             f"{json.dumps(str(write_error), ensure_ascii=False)}\n")
             return 1
         return 0
 
