@@ -8,6 +8,9 @@ from __future__ import annotations
 from . import brief, prblock
 
 MAX_TEXT = 2000
+# Tetto del corpo intero (GitHub accetta 65536 caratteri): il commento del gate lo importa da qui.
+MAX_BODY = 60000
+_CAPS = (MAX_TEXT, 1000, 500, 250, 120, 60, 30)
 TRUNCATED = "… (troncato)"
 ZWSP = "\u200b"
 
@@ -17,17 +20,21 @@ def _cap(text, max_len: int = MAX_TEXT) -> str:
     return text[:max_len].rstrip() + TRUNCATED if len(text) > max_len else text
 
 
-def neutralize(text: str, max_len: int = MAX_TEXT) -> str:
-    text = _cap(text, max_len)
-    text = (text.replace("@", "@" + ZWSP).replace("<!--", "<!" + ZWSP + "--")
+def defuse(text: str) -> str:
+    """Menzioni spente e nessun marcatore di commento HTML."""
+    return (text.replace("@", "@" + ZWSP).replace("<!--", "<!" + ZWSP + "--")
             .replace("-->", "--" + ZWSP + ">"))
+
+
+def neutralize(text: str, max_len: int = MAX_TEXT) -> str:
+    text = defuse(_cap(text, max_len))
     fence = brief.fence(text)
     return f"{fence}\n{text}\n{fence}"
 
 
-def _section(title: str, lines: list[str]) -> list[str]:
+def _section(title: str, lines: list[str], cap: int = MAX_TEXT) -> list[str]:
     """Il tetto vale per ogni voce, non per la sezione: una voce lunga non nasconde le altre."""
-    joined = "\n".join(_cap(x) for x in lines)
+    joined = "\n".join(_cap(x, cap) for x in lines)
     return [f"## {title}", neutralize(joined, len(joined)), ""]
 
 
@@ -42,18 +49,39 @@ def _unverified(n: dict) -> str:
     return _note(n) + (f" [non verificato: {why}]" if why else " [non verificato]")
 
 
+def _render(issue, level, sections, block) -> str:
+    out = [f"Closes #{int(issue)}", "", f"Livello: {level}", ""]
+    for title, lines, cap in sections:
+        out += _section(title, lines, cap)
+    out.append(prblock.render(block))
+    return "\n".join(out) + "\n"
+
+
 def render(*, issue: int, level: str, dod_lines: list[str], notes: list[dict],
            waivers: list[str], warnings: list[str], block: dict,
            unverified: list[dict] = ()) -> str:
-    out = [f"Closes #{int(issue)}", "", f"Livello: {level}", ""]
-    out += _section("Definition of Done", dod_lines)
+    """Il corpo sta entro `MAX_BODY`: se lo supera, le voci si accorciano (tetto per voce sempre
+    più basso) e, in ultima istanza, si tolgono dalla coda con una nota. Il blocco JSON di 18.1
+    resta intero e ultimo."""
+    parts = [("Definition of Done", list(dod_lines))]
     if notes:
-        out += _section("Note della revisione (non bloccanti)", [_note(n) for n in notes])
+        parts.append(("Note della revisione (non bloccanti)", [_note(n) for n in notes]))
     if unverified:
-        out += _section("Rilievi non verificati", [_unverified(n) for n in unverified])
+        parts.append(("Rilievi non verificati", [_unverified(n) for n in unverified]))
     if waivers:
-        out += _section("Deroghe", waivers)
+        parts.append(("Deroghe", list(waivers)))
     if warnings:
-        out += _section("Avvisi", warnings)
-    out.append(prblock.render(block))
-    return "\n".join(out) + "\n"
+        parts.append(("Avvisi", list(warnings)))
+    for cap in _CAPS:
+        body = _render(issue, level, [(t, ls, cap) for t, ls in parts], block)
+        if len(body) <= MAX_BODY:
+            return body
+    keep = max(len(ls) for _, ls in parts)
+    while keep > 1:
+        keep //= 2
+        cut = [(t, ls[:keep] + ([f"… (troncato: altre {len(ls) - keep} voci omesse)"]
+                                 if len(ls) > keep else []), 60) for t, ls in parts]
+        body = _render(issue, level, cut, block)
+        if len(body) <= MAX_BODY:
+            return body
+    return body

@@ -104,6 +104,24 @@ class RenderTest(unittest.TestCase):
         self.assertIsNone(fence)
         self.assertEqual(opened, 4)
 
+    def test_total_cap_keeps_block(self):
+        notes = [{"severity": "minor", "file": f"f{i}.py", "line": i, "rule": "R-1",
+                  "text": f"nota{i} " + "x" * 2000} for i in range(200)]
+        body = render(notes=notes)
+        self.assertLessEqual(len(body), prbody.MAX_BODY)
+        self.assertEqual(prblock.parse(body), BLOCK)
+        self.assertTrue(body.rstrip().endswith("-->"))
+        self.assertIn("nota199 ", body)
+        self.assertIn("troncato", body)
+
+    def test_total_cap_drops_entries_as_last_resort(self):
+        notes = [{"severity": "minor", "file": f"f{i}.py", "line": i, "rule": "R-1",
+                  "text": "x" * 100} for i in range(5000)]
+        body = render(notes=notes)
+        self.assertLessEqual(len(body), prbody.MAX_BODY)
+        self.assertEqual(prblock.parse(body), BLOCK)
+        self.assertIn("voci omesse", body)
+
 
 if __name__ == "__main__":
     unittest.main()
