@@ -40,9 +40,13 @@ def load(path: Path, *, tree: str) -> dict[str, set[str]] | None:
     """Gli identificativi per comando, `None` se il file è illeggibile, malformato o di un altro
     albero."""
     try:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, ValueError, RecursionError):
+        return _load(path, tree)
+    except Exception:   # confine fail-closed su dati non fidati: illeggibile = assente
         return None
+
+
+def _load(path: Path, tree: str) -> dict[str, set[str]] | None:
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(data, dict) or data.get("v") != IDS_VERSION or data.get("tree") != tree:
         return None
     ids = data.get("ids")

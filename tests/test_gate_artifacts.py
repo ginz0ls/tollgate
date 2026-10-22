@@ -105,6 +105,34 @@ class ArtifactsTest(unittest.TestCase):
             self.assertEqual(artifacts.read_results(self.root)[2], [])
         self.assertEqual(len(reads), 1)
 
+    def test_bogus_xml_encoding_is_a_problem(self):
+        (self.root / "junit" / "0.xml").write_text(
+            '<?xml version="1.0" encoding="bogus"?><testsuite/>')
+        self.assertTrue(any("junit/0.xml" in p for p in artifacts.validate(self.root)))
+        results, applicable, problems = artifacts.read_results(self.root)
+        self.assertEqual((results, applicable), (None, False))
+        self.assertTrue(problems)
+
+    def test_any_exception_at_the_boundary_is_a_problem(self):
+        with mock.patch.object(artifacts, "parse_junit", side_effect=RuntimeError("boom")):
+            problems = artifacts.validate(self.root)
+            self.assertTrue(any("RuntimeError" in p and "boom" in p for p in problems), problems)
+            results, applicable, found = artifacts.read_results(self.root)
+        self.assertEqual((results, applicable), (None, False))
+        self.assertTrue(found)
+        with mock.patch.object(artifacts.os, "walk", side_effect=KeyError("boom")):
+            self.assertTrue(any("KeyError" in p for p in artifacts.validate(self.root)))
+            self.assertIsNone(artifacts.read_results(self.root)[0])
+        with mock.patch.object(artifacts, "_check", return_value=([], {"applicable": True,
+                                                                     "commands": [object()]})):
+            self.assertIsNone(artifacts.read_results(self.root)[0])
+
+    def test_stat_failure_after_is_file_is_a_problem(self):
+        with mock.patch.object(Path, "is_file", return_value=True), \
+                mock.patch.object(Path, "stat", side_effect=OSError("gone")):
+            problems = artifacts.validate(self.root)
+        self.assertTrue(problems)
+
     def test_size_limits(self):
         (self.root / "big.log").write_bytes(b"x" * 100)
         self.assertEqual(artifacts.validate(self.root, max_file=1000), [])

@@ -22,6 +22,13 @@ NEVER = re.compile(rb"(?!x)x")
 
 
 class JunitTest(unittest.TestCase):
+    def test_unknown_or_bad_encoding_is_junit_error(self):
+        for head in (b'<?xml version="1.0" encoding="bogus"?>',
+                     b'<?xml version="1.0" encoding="utf-8"?>\xff'):
+            with self.subTest(head=head):
+                with self.assertRaises(JunitError):
+                    parse_junit(head + b"<testsuite/>")
+
     def test_counts_and_ids(self):
         j = parse_junit(XML)
         self.assertEqual((j.total, j.skipped, j.failed), (4, 1, 2))

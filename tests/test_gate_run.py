@@ -209,6 +209,12 @@ class BaseIdsTest(GateRunBase):
         path.write_text("[" * 100000)
         self.assertIsNone(baseids.load(path, tree="t"))
 
+    def test_load_returns_none_on_any_exception(self):
+        path = self.out.parent / "ids.json"
+        path.write_text("{}")
+        with mock.patch.object(Path, "read_text", side_effect=RuntimeError("boom")):
+            self.assertIsNone(baseids.load(path, tree="t"))
+
     def test_load_rejects_unreadable_and_malformed(self):
         path = self.out.parent / "ids.json"
         self.assertIsNone(baseids.load(path, tree="t"))

@@ -52,6 +52,13 @@ def validate(root: Path, *, max_file: int = MAX_FILE, max_total: int = MAX_TOTAL
 
 def _check(root: Path, max_file: int, max_total: int) -> tuple[list[str], dict | None]:
     """I problemi di `validate` e il contenuto di `results.json`, letto una volta sola."""
+    try:
+        return _check_tree(root, max_file, max_total)
+    except Exception as e:  # confine fail-closed su dati non fidati: nessuna eccezione sfugge
+        return [f"{type(e).__name__}: {e}"], None
+
+
+def _check_tree(root: Path, max_file: int, max_total: int) -> tuple[list[str], dict | None]:
     problems: list[str] = []
     total = 0
     for dirpath, dirnames, filenames in os.walk(root):
@@ -62,7 +69,11 @@ def _check(root: Path, max_file: int, max_total: int) -> tuple[list[str], dict |
             if p.is_symlink():
                 problems.append(f"{rel}: collegamento simbolico")
             elif p.is_file():
-                size = p.stat().st_size
+                try:
+                    size = p.stat().st_size
+                except OSError as e:
+                    problems.append(f"{rel}: {e.strerror or e}")
+                    continue
                 total += size
                 if size > max_file:
                     problems.append(f"{rel}: oltre {max_file} byte")
@@ -82,9 +93,9 @@ def _check(root: Path, max_file: int, max_total: int) -> tuple[list[str], dict |
     junit_dir = root / "junit"
     if junit_dir.is_dir() and not junit_dir.is_symlink():
         for p in sorted(junit_dir.rglob("*.xml")):
-            if p.is_symlink() or not p.is_file() or p.stat().st_size > max_file:
-                continue    # già segnalato sopra
             try:
+                if p.is_symlink() or not p.is_file() or p.stat().st_size > max_file:
+                    continue    # già segnalato sopra
                 parse_junit(p.read_bytes())
             except (OSError, ValueError, RecursionError) as e:     # JunitError è un ValueError
                 problems.append(f"{p.relative_to(root).as_posix()}: {e}")
@@ -98,7 +109,13 @@ def _int_or_none(value) -> bool:
 def read_results(root: Path) -> tuple[list[CommandResult] | None, bool, list[str]]:
     """(risultati, `applicable`, problemi). Con problemi i risultati sono `None`; con
     `applicable` falso sono una lista vuota."""
-    root = Path(root)
+    try:
+        return _read_results(Path(root))
+    except Exception as e:  # confine fail-closed su dati non fidati: nessuna eccezione sfugge
+        return None, False, [f"{type(e).__name__}: {e}"]
+
+
+def _read_results(root: Path) -> tuple[list[CommandResult] | None, bool, list[str]]:
     problems, data = _check(root, MAX_FILE, MAX_TOTAL)
     if problems or data is None:
         return None, False, problems or ["results.json assente o illeggibile"]

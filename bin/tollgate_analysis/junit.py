@@ -91,6 +91,8 @@ def parse_junit(data: bytes, *, max_bytes: int = MAX_BYTES) -> Junit:
     parser.EndElementHandler = collect.end
     try:
         parser.Parse(data, True)
-    except expat.ExpatError as e:
+    except JunitError:
+        raise
+    except (expat.ExpatError, LookupError, UnicodeError) as e:    # codifica sconosciuta o rotta
         raise JunitError(f"XML non valido: {e}") from e
     return collect.j

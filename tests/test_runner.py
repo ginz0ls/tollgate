@@ -79,6 +79,20 @@ class RunOneTest(unittest.TestCase):
             self.assertTrue(log.is_file())
             self.assertGreaterEqual(duration, 0)
 
+    def test_bogus_report_encoding_is_a_red_run_not_an_exception(self):
+        with tempfile.TemporaryDirectory(prefix="tollgate runner ") as tmp:
+            root, logs = Path(tmp) / "repo", Path(tmp) / "logs"
+            root.mkdir()
+            logs.mkdir()
+            spec = runner.CommandSpec(
+                "verify", "echo '<?xml version=\"1.0\" encoding=\"bogus\"?><testsuite/>' > j.xml",
+                "junit:j.xml")
+            _resolved, _code, junit, _dur, state, _log = runner.run_one(
+                spec, root=root, files=[], env={"PATH": "/usr/bin:/bin"}, timeout_s=20,
+                allow_no_tests=False, log_dir=logs, tag="t")
+            self.assertIsNone(junit)
+            self.assertEqual(state, "red")
+
     def test_report_path_refuses_escape(self):
         from tollgate_core.config import ConfigError
         with self.assertRaises(ConfigError):
