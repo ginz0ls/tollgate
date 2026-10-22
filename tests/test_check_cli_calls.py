@@ -102,6 +102,7 @@ class CliCallsTest(unittest.TestCase):
         for cmd in (f"'{PROGRAM}' gate base-ids --sha x --out o --publish",
                     f'python3 "{PROGRAM}" gate base-ids --publish --sha x --out o',
                     f"python3 -B '{PROGRAM}' gate evaluate --event e --publish",
+                    f"'{PROGRAM}' gate base-publish --ids d --event e --publish",
                     f"cd /tmp && '{PROGRAM}' gate sentinel --publish=1",
                     f'p="{PROGRAM}"; python3 "$p" gate guard --publish'):
             for agent in (None, "ag-1"):

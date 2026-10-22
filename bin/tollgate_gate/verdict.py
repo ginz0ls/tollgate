@@ -32,7 +32,7 @@ DESC_ERROR = "errore nel calcolo del gate"
 DESC_OK = "nessuna voce rossa"
 DESC_ATTENTION_OK = "nessuna voce da leggere"
 DESC_ATTENTION_ERROR = "non calcolato: vedi tollgate/verdict"
-MAX_IDS_FILE = 50 * 2**20
+MAX_IDS_FILE = baseids.MAX_IDS_FILE
 
 
 def _event_problem(event: dict) -> str | None:

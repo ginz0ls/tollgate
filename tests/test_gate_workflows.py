@@ -1,4 +1,5 @@
 import re
+import shlex
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,7 +8,7 @@ from tests.helpers import ROOT
 from tollgate_analysis import workflows
 from tollgate_core import VERSION
 from tollgate_flow import prereq
-from tollgate_gate import install
+from tollgate_gate import cli, install, protection
 
 NAMES = ("guard", "run", "verdict", "base", "sentinel")
 EXPR = "${{"
@@ -92,6 +93,27 @@ def field(step: list[str], key: str) -> str | None:
     return None
 
 
+def jobs(text: str) -> dict[str, list[str]]:
+    """Le righe di ogni job (chiavi a rientro 2 sotto `jobs:`)."""
+    out: dict[str, list[str]] = {}
+    for line in section(text, "jobs"):
+        m = re.match(r"^ {2}([\w-]+):\s*$", line)
+        if m:
+            out[m.group(1)] = []
+        elif out and (not line.strip() or indent(line) > 2):
+            out[list(out)[-1]].append(line)
+    return out
+
+
+def effective_permissions(text: str, job: list[str]) -> dict[str, str]:
+    own = section("\n".join(job), "permissions", 4)
+    return mapping(own, 6) if own else mapping(section(text, "permissions"), 2)
+
+
+def runs_project_commands(job: list[str]) -> bool:
+    return any(re.search(r"tollgate gate (run|base-ids)\b", line) for line in run_lines("\n".join(job)))
+
+
 def run_lines(text: str) -> list[str]:
     """Il testo dei valori di `run:`, di una riga o a blocco."""
     out, lines = [], text.splitlines()
@@ -145,7 +167,7 @@ class WorkflowFilesTest(unittest.TestCase):
                 self.assertEqual(got, types, name)
             if name in ("base", "sentinel"):
                 self.assertEqual([l.strip() for l in section(on, "branches", 4)],
-                                 ["- __DEFAULT_BRANCH__"], name)
+                                 ["- '__DEFAULT_BRANCH__'"], name)
 
     def test_no_expression_in_run(self):
         for name in NAMES:
@@ -164,11 +186,92 @@ class WorkflowFilesTest(unittest.TestCase):
                 self.assertEqual(field(step, "persist-credentials"), "false", name)
         for name in ("guard", "verdict", "sentinel"):
             self.assertEqual([field(s, "ref") for s in checkouts(read(name))], [DEFAULT_REF], name)
-        # in `tollgate-base` il secondo checkout è il commit del push, già nel predefinito, in una
-        # sottocartella di dati: la CLI viene dal predefinito (`trusted`)
+        # `tollgate-base`: il job `ids` esegue la suite sul commit del push, senza permessi di
+        # scrittura; il job di pubblicazione fa solo il checkout del predefinito (C-1)
         base = checkouts(read("base"))
-        self.assertEqual([field(s, "ref") for s in base], [DEFAULT_REF, "${{ github.sha }}"])
-        self.assertEqual([field(s, "path") for s in base], ["trusted", "base"])
+        self.assertEqual([field(s, "ref") for s in base], ["${{ github.sha }}", DEFAULT_REF])
+        job = jobs(read("base"))
+        self.assertEqual([field(s, "ref") for s in checkouts("\n".join(job["ids"]))],
+                         ["${{ github.sha }}"])
+        self.assertEqual([field(s, "ref") for s in checkouts("\n".join(job["tollgate-base"]))],
+                         [DEFAULT_REF])
+
+    def test_no_job_runs_project_commands_with_write_or_token(self):
+        seen = 0
+        for name in NAMES:
+            text = read(name)
+            for key, job in jobs(text).items():
+                if not runs_project_commands(job):
+                    continue
+                seen += 1
+                perms = effective_permissions(text, job)
+                self.assertNotIn("write", perms.values(), (name, key))
+                self.assertNotIn("GH_TOKEN", "\n".join(job), (name, key))
+                self.assertNotIn("github.token", "\n".join(job), (name, key))
+        self.assertEqual(seen, 3)       # head e base di `tollgate-run`, ids di `tollgate-base`
+
+    def test_base_ids_job_is_read_only_and_publish_job_runs_no_project_code(self):
+        job = jobs(read("base"))
+        self.assertEqual(sorted(job), ["ids", "tollgate-base"])
+        self.assertEqual(effective_permissions(read("base"), job["ids"]), {"contents": "read"})
+        self.assertEqual(effective_permissions(read("base"), job["tollgate-base"]),
+                         {"contents": "read", "statuses": "write", "issues": "write"})
+        publish = "\n".join(job["tollgate-base"])
+        self.assertIn("needs: ids", publish)
+        self.assertEqual(field(job["tollgate-base"], "if"), "always()")
+        runs = run_lines(publish)
+        self.assertEqual(len(runs), 1)
+        self.assertIn("tollgate gate base-publish", runs[0])
+        self.assertIn("--publish", runs[0])
+        self.assertNotIn("base-ids", publish)
+        ids_runs = "\n".join(run_lines("\n".join(job["ids"])))
+        self.assertIn("gate base-ids", ids_runs)
+        self.assertNotIn("--publish", ids_runs)
+
+    def test_publish_job_name_is_the_one_protection_reads(self):
+        job = jobs(read("base"))
+        self.assertIn(protection.BASE_JOB, job)
+        self.assertEqual(
+            [k for k, lines in job.items() if "statuses" in "\n".join(
+                effective_permissions(read("base"), lines)) and
+             "write" in effective_permissions(read("base"), lines).values()],
+            [protection.BASE_JOB])
+        self.assertNotIn(protection.BASE_JOB, [field(l, "name") for l in job.values()])
+
+    def test_verdict_has_no_condition_on_conclusion(self):
+        text = read("verdict")
+        for line in text.splitlines():
+            if re.match(r"^\s*(?:- )?if:", line):
+                self.assertNotIn("conclusion", line)
+        for lines in jobs(text).values():
+            self.assertIsNone(
+                next((l for l in lines if re.match(r"^ {4}if:", l)), None))
+        self.assertNotIn("conclusion", text)
+
+    def test_expressions_only_in_allowed_places(self):
+        for name in NAMES:
+            lines = read(name).splitlines()
+            for i, line in enumerate(lines):
+                if EXPR not in line or line.lstrip().startswith("#"):
+                    continue
+                if re.match(r"^\s*(?:- )?if:", line):
+                    continue
+                parent = next((l.strip() for l in reversed(lines[:i])
+                               if l.strip() and indent(l) < indent(line)), "")
+                self.assertIn(parent, ("with:", "env:", "concurrency:"), (name, line))
+
+    def test_run_lines_pass_the_cli_parser(self):
+        seen = 0
+        for name in NAMES:
+            for line in run_lines(read(name)):
+                if "tollgate gate " not in line:
+                    continue
+                words = shlex.split(re.sub(r"\$\{?[A-Z_]+\}?", "x", line))
+                args = words[words.index("gate") + 1:]
+                with self.subTest(name=name, args=args):
+                    cli.build_parser().parse_args(args)
+                seen += 1
+        self.assertEqual(seen, 7)
 
     def test_downloads_under_runner_temp(self):
         seen = 0
@@ -181,7 +284,7 @@ class WorkflowFilesTest(unittest.TestCase):
                     continue
                 seen += 1
                 self.assertTrue(field(step, "path").startswith("${{ runner.temp }}/"), name)
-        self.assertEqual(seen, 5)
+        self.assertEqual(seen, 6)
 
     def test_verdict_never_writes_cache(self):
         text = read("verdict")
@@ -198,7 +301,15 @@ class WorkflowFilesTest(unittest.TestCase):
                     if (field(s, "uses") or "").startswith("actions/cache/save@"))
         self.assertEqual(field(save, "if"), "steps.cache.outputs.cache-hit != 'true'")
         self.assertEqual(field(save, "key"), "tollgate-ids-${{ steps.key.outputs.tree }}")
-        self.assertIn("--publish", "\n".join(run_lines(read("base"))))
+        ids = jobs(read("base"))["ids"]
+        self.assertIn(save[0], "\n".join(ids))
+        # su un cache hit `ids` non ricalcola e carica comunque l'ids.json ripristinato
+        compute = next(s for s in steps(read("base")) if "base-ids" in "".join(s))
+        self.assertEqual(field(compute, "if"), "steps.cache.outputs.cache-hit != 'true'")
+        upload = next(s for s in steps(read("base"))
+                      if (field(s, "uses") or "").startswith("actions/upload-artifact@"))
+        self.assertEqual(field(upload, "if"), "always()")
+        self.assertEqual(field(upload, "path"), "${{ runner.temp }}/tollgate-ids/ids.json")
 
     def test_default_branch_placeholder_replaced(self):
         out = install.files(ROOT, default_branch="trunk", services={})
@@ -207,11 +318,17 @@ class WorkflowFilesTest(unittest.TestCase):
             self.assertNotIn("__DEFAULT_BRANCH__", text)
             self.assertEqual([l.strip() for l in section(text, "branches", 4)
                               or section("\n".join(section(text, "on")), "branches", 4)],
-                             ["- trunk"])
+                             ["- 'trunk'"])
             self.assertEqual(workflows_unexpected(text), [], name)
-        for bad in ("a b", "x\ny", "-x", "x: y", "'x'"):
+        for bad in ("a b", "x\ny", "-x", "x: y", "'x'", "main\n"):
             with self.assertRaises(ValueError):
                 install.files(ROOT, default_branch=bad, services={})
+
+    def test_default_branch_looking_like_a_yaml_scalar_is_a_string(self):
+        for branch in ("true", "123", "null", "on"):
+            out = install.files(ROOT, default_branch=branch, services={})
+            text = out[".github/workflows/tollgate-sentinel.yml"].decode()
+            self.assertIn(f"      - '{branch}'", text.splitlines())
 
     def test_pr_code_only_in_run_workflow(self):
         for name in NAMES:
@@ -244,8 +361,10 @@ class WorkflowFilesTest(unittest.TestCase):
         for name in NAMES:
             text = read(name)
             for i, line in enumerate(text.splitlines()):
+                self.assertNotIn("secrets.GITHUB_TOKEN", line, name)
                 if "github.token" in line and "download-artifact" not in line:
-                    self.assertRegex(line.strip(), r"^(GH_TOKEN|github-token): \$\{\{ github.token \}\}$")
+                            self.assertRegex(line.strip(),
+                                     r"^(GH_TOKEN|github-token): \$\{\{ github.token \}\}$")
 
     def test_run_job_base_uses_trusted_cli_and_subfolder(self):
         text = read("run")
@@ -293,26 +412,42 @@ class InstallTest(unittest.TestCase):
             self.assertEqual(workflows_unexpected(
                 out[f".github/workflows/tollgate-{name}.yml"].decode()), [], name)
 
-    def test_services_go_in_head_job_only(self):
+    def test_services_go_in_every_job_that_runs_the_suite(self):
         out = install.files(ROOT, default_branch="main",
-                            services={"db": "postgres:16", "cache": "redis:7"})
-        text = out[".github/workflows/tollgate-run.yml"].decode()
-        head = "\n".join(section(text, "head", 2))
-        self.assertEqual(section(head, "services", 4)[:1], ["      db:"])
-        self.assertIn("        image: postgres:16", head)
-        self.assertIn("        image: redis:7", head)
-        self.assertNotIn("services", "\n".join(section(text, "base", 2)))
-        self.assertNotIn("__SERVICES__", text)
-        self.assertEqual(workflows_unexpected(text), [])
-        self.assertEqual(workflows.problems(text), [])
-        empty = install.files(ROOT, default_branch="main", services={})
-        plain = empty[".github/workflows/tollgate-run.yml"].decode()
-        self.assertNotIn("services", plain)
-        self.assertNotIn("__SERVICES__", plain)
+                            services={"db": "postgres:16", "cache": "redis:7"},
+                            ports={"db": 5432})
+        blocks = []
+        for name, key in (("run", "head"), ("run", "base"), ("base", "ids")):
+            text = out[f".github/workflows/tollgate-{name}.yml"].decode()
+            job = jobs(text)[key]
+            block = section("\n".join(job), "services", 4)
+            self.assertEqual(block[:1], ["      'db':"], (name, key))
+            self.assertIn("        image: 'postgres:16'", block)
+            self.assertIn("        image: 'redis:7'", block)
+            self.assertIn('          - "5432:5432"', block)
+            blocks.append(block)
+            self.assertNotIn("__SERVICES__", text)
+            self.assertEqual(workflows_unexpected(text), [], name)
+            self.assertEqual([k for k, lines in jobs(text).items()
+                              if section("\n".join(lines), "services", 4)],
+                             ["head", "base"] if name == "run" else ["ids"])
+        self.assertEqual(blocks[0], blocks[1])
+        self.assertEqual(blocks[0], blocks[2])
+        self.assertEqual(workflows.problems(
+            out[".github/workflows/tollgate-run.yml"].decode()), [])
+        for name in NAMES:
+            plain = install.files(ROOT, default_branch="main", services={})[
+                f".github/workflows/tollgate-{name}.yml"].decode()
+            self.assertNotIn("services", plain)
+            self.assertNotIn("__SERVICES__", plain)
+
+    def test_services_are_strings_in_yaml(self):
+        out = install.files(ROOT, default_branch="main", services={"true": "postgres:16"})
+        self.assertIn("      'true':", out[".github/workflows/tollgate-run.yml"].decode())
 
     def test_invalid_service_is_rejected(self):
         for name, image in (("a b", "x"), ("db", "x\n  evil: 1"), ("db", "x y"), ("db", ""),
-                            ("d: b", "x")):
+                            ("d: b", "x"), ("db", "postgres:"), ("db", "x\n"), ("db\n", "x")):
             with self.assertRaises(ValueError, msg=(name, image)):
                 install.files(ROOT, default_branch="main", services={name: image})
 

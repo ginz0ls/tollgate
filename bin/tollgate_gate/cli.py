@@ -38,7 +38,11 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--root", metavar="DIR",
                    help="checkout da cui calcolare l'albero (predefinito: la cartella corrente)")
     b.add_argument("--event", metavar="FILE", help="evento da cui leggere il ramo predefinito")
-    b.add_argument("--publish", action="store_true", help="solo dentro GitHub Actions")
+    q = sub.add_parser("base-publish", allow_abbrev=False,
+                       help="pubblica tollgate/base dai dati di base-ids, senza eseguire codice")
+    q.add_argument("--ids", required=True, metavar="DIR", help="cartella con ids.json")
+    q.add_argument("--event", required=True, metavar="FILE", help="evento push (JSON)")
+    q.add_argument("--publish", action="store_true", help="solo dentro GitHub Actions")
     g = sub.add_parser("guard", allow_abbrev=False,
                        help="controlla i file di tollgate e i workflow del progetto di una PR")
     g.add_argument("--event", required=True, metavar="FILE", help="evento della PR (JSON)")
@@ -101,7 +105,6 @@ def cmd_run(args) -> int:
 
 
 def cmd_base_ids(args) -> int:
-    _require_actions(args)
     cwd = Path.cwd()
     root = Path(args.root) if args.root else cwd
     default = (_field(_read_event(args.event), "repository", "default_branch") if args.event
@@ -115,9 +118,16 @@ def cmd_base_ids(args) -> int:
     result = baseids.compute(root, config_sha=tip, sha=sha, out=Path(args.out),
                              environ=os.environ, cfg_repo=cwd)
     print(f"base-ids: albero {result['tree']}, {len(result['ids'])} comandi")
-    if args.publish:
-        baseids.publish(cwd, config_sha=tip, sha=sha, result=result, environ=os.environ)
     return 0
+
+
+def cmd_base_publish(args) -> int:
+    _require_actions(args)
+    cwd = Path.cwd()
+    event = _read_event(args.event)
+    tip = _default_tip(cwd, _field(event, "repository", "default_branch"))
+    return baseids.publish_from(cwd, config_sha=tip, sha=_field(event, "after"),
+                                ids_dir=Path(args.ids), environ=os.environ, publish=args.publish)
 
 
 def cmd_guard(args) -> int:
@@ -139,8 +149,8 @@ def cmd_sentinel(args) -> int:
     return sentinel.run(Path(args.event), publish=args.publish, environ=os.environ)
 
 
-HANDLERS = {"run": cmd_run, "base-ids": cmd_base_ids, "guard": cmd_guard,
-            "evaluate": cmd_evaluate, "sentinel": cmd_sentinel}
+HANDLERS = {"run": cmd_run, "base-ids": cmd_base_ids, "base-publish": cmd_base_publish,
+            "guard": cmd_guard, "evaluate": cmd_evaluate, "sentinel": cmd_sentinel}
 
 
 def main(args: list[str]) -> int:

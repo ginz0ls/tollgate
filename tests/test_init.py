@@ -200,7 +200,7 @@ class FilesTest(InitCase):
         self.make(UNSET)
         self.proposal()
         base = (self.folder / "files/.github/workflows/tollgate-base.yml").read_text()
-        self.assertIn("- main", base)
+        self.assertIn("- 'main'", base)
         self.assertNotIn(install.BRANCH_PLACEHOLDER, base)
 
     def test_rerun_replaces_the_previous_proposal(self):
@@ -229,9 +229,12 @@ class ServicesTest(InitCase):
         self.make(UNSET)
         self.proposal("--service", "db=postgres:16", "--service", "cache=redis:7,6379")
         run = (self.folder / "files/.github/workflows/tollgate-run.yml").read_text()
-        self.assertIn("        image: postgres:16", run)
-        self.assertIn("        image: redis:7\n        ports:\n          - \"6379:6379\"", run)
-        self.assertEqual(run.count("ports:"), 1)        # db non ha porta: nessuna se non richiesta
+        self.assertIn("        image: 'postgres:16'", run)
+        self.assertIn("        image: 'redis:7'\n        ports:\n          - \"6379:6379\"", run)
+        # db non ha porta: nessuna se non richiesta; i job `head` e `base` hanno gli stessi servizi
+        self.assertEqual(run.count("ports:"), 2)
+        base = (self.folder / "files/.github/workflows/tollgate-base.yml").read_text()
+        self.assertIn("        image: 'redis:7'", base)
         self.assertIn("db", self.readme())
 
     def test_untrusted_names(self):

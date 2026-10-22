@@ -14,10 +14,13 @@ INSTALL_DIR = ".github/tollgate"
 BRANCH_PLACEHOLDER = "__DEFAULT_BRANCH__"
 SERVICES_MARKER = "# __SERVICES__"
 
-# valori che finiscono in YAML senza virgolette: solo caratteri che YAML legge come testo semplice
-_BRANCH = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._/-]*$")
-_SERVICE_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_-]*$")
-_IMAGE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/:@-]*$")
+# i valori finiscono nello YAML tra virgolette singole (così `true` o `123` restano stringhe): le
+# regex escludono `'` e ogni carattere di controllo
+_BRANCH = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._/-]*")
+_SERVICE_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_-]*")
+_IMAGE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/:@-]*")
+# workflow con un segnaposto dei servizi per ogni job che esegue la suite del progetto (I-1)
+SERVICES_WORKFLOWS = {"run": 2, "base": 1}
 
 
 def _sources(bin_root: Path) -> list[Path]:
@@ -43,11 +46,11 @@ def _services_block(services: dict[str, str], ports: dict[str, int]) -> str:
         raise ValueError(f"porta per un servizio non dichiarato: {unknown[0]!r}")
     lines = ["    services:"]
     for name, image in services.items():
-        if not _SERVICE_NAME.match(name):
+        if not _SERVICE_NAME.fullmatch(name):
             raise ValueError(f"nome di servizio non valido: {name!r}")
-        if not _IMAGE.match(image):
+        if not _IMAGE.fullmatch(image) or image.endswith(":"):
             raise ValueError(f"immagine del servizio {name!r} non valida: {image!r}")
-        lines += [f"      {name}:", f"        image: {image}"]
+        lines += [f"      '{name}':", f"        image: '{image}'"]
         if name in ports:
             port = ports[name]
             if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
@@ -60,22 +63,21 @@ def _services_block(services: dict[str, str], ports: dict[str, int]) -> str:
 def _render(name: str, text: str, default_branch: str, services: dict[str, str],
             ports: dict[str, int]) -> str:
     text = text.replace(BRANCH_PLACEHOLDER, default_branch)
-    if name != "run":
-        return text
-    marker = "    " + SERVICES_MARKER
-    if marker not in text:
-        raise ValueError("tollgate-run.yml senza il segnaposto dei servizi")
-    block = _services_block(services, ports) + "\n" if services else ""
-    return text.replace(marker + "\n", block)
+    expected = SERVICES_WORKFLOWS.get(name, 0)
+    marker = "    " + SERVICES_MARKER + "\n"
+    if text.count(marker) != expected:
+        raise ValueError(f"tollgate-{name}.yml: segnaposto dei servizi attesi {expected}, "
+                         f"trovati {text.count(marker)}")
+    return text.replace(marker, _services_block(services, ports) + "\n" if services else "")
 
 
 def files(plugin_root: Path, *, default_branch: str, services: dict[str, str],
           ports: dict[str, int] | None = None) -> dict[str, bytes]:
     """Percorso nel repo del progetto → contenuto. Il ramo predefinito sostituisce
-    `__DEFAULT_BRANCH__` nei workflow dei `push`; i servizi entrano nel job `head` di
-    `tollgate-run`, e `ports` (nome del servizio → porta) li rende raggiungibili dal job
-    con `ports: ["P:P"]` (9.6)."""
-    if not _BRANCH.match(default_branch):
+    `__DEFAULT_BRANCH__` nei workflow dei `push`. I servizi entrano in ogni job che esegue la
+    suite del progetto (`head` e `base` di `tollgate-run`, `ids` di `tollgate-base`); `ports`
+    (nome del servizio → porta) li rende raggiungibili dal job con `ports: ["P:P"]` (9.6)."""
+    if not _BRANCH.fullmatch(default_branch):
         raise ValueError(f"nome del ramo predefinito non valido: {default_branch!r}")
     root = Path(plugin_root)
     out: dict[str, bytes] = {}

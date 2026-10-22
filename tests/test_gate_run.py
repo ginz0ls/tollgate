@@ -256,9 +256,13 @@ class BaseIdsTest(GateRunBase):
             with self.subTest(env=env):
                 r = self.tollgate("gate", "base-ids", "--sha", self.lab.base, "--out",
                                   str(self.out), "--event", str(self.event()), "--publish", **env)
+                self.assertEqual(r.returncode, 2)       # `base-ids` non pubblica più (C-1)
+        for env in ({}, {"GITHUB_ACTIONS": "false"}, {"GITHUB_ACTIONS": "1"}):
+            with self.subTest(publish_env=env):
+                r = self.tollgate("gate", "base-publish", "--ids", str(self.out), "--event",
+                                  str(self.event()), "--publish", **env)
                 self.assertNotEqual(r.returncode, 0)
                 self.assertIn("GitHub Actions", r.stderr)
-                self.assertFalse((self.out / "ids.json").exists())
 
     def test_abbreviated_option_is_an_argument_error(self):
         for opt in ("--publ", "--pub", "--pu"):
@@ -282,11 +286,12 @@ class BaseIdsTest(GateRunBase):
         self.assertEqual(before, after)
         self.assertEqual(list(self.home.iterdir()), [])
 
-    def test_publish_accepted_in_actions(self):
-        r = self.tollgate("gate", "base-ids", "--sha", self.lab.base, "--out", str(self.out),
-                          "--event", str(self.event()), "--publish", GITHUB_ACTIONS="true")
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertTrue((self.out / "ids.json").is_file())
+    def test_base_publish_abbreviations_are_argument_errors(self):
+        for opt in ("--publ", "--pub", "--pu"):
+            with self.subTest(opt=opt):
+                r = self.tollgate("gate", "base-publish", "--ids", str(self.out), "--event",
+                                  str(self.event()), opt, GITHUB_ACTIONS="true")
+                self.assertEqual(r.returncode, 2)
 
 
 class MainErrorsTest(unittest.TestCase):

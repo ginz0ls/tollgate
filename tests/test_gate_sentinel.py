@@ -469,5 +469,96 @@ class BaseProtectedTest(BasePublishBase):
         self.assertEqual(self.calls(), [])
 
 
+class BasePublishFromTest(BasePublishBase):
+    """`gate base-publish` (C-1): pubblica dai dati dell'artefatto di `ids`, che non si fidano."""
+    toml = GATE_TOML.replace("protected", "detect")
+
+    def ids_dir(self, content=None, *, tree=None, commands=None, symlink=False) -> Path:
+        d = self.tmp / "ids"
+        d.mkdir(exist_ok=True)
+        if content is None:
+            content = json.dumps({
+                "v": 1, "tree": tree or git(self.lab.repo, "rev-parse",
+                                            f"{self.lab.base}^{{tree}}"),
+                "sha": "f" * 40, "ids": {"verify": []},
+                "commands": commands or {"verify": "green"}})
+        if symlink:
+            (d / "real.json").write_text(content)
+            (d / "ids.json").symlink_to(d / "real.json")
+        elif content is not False:
+            (d / "ids.json").write_text(content)
+        return d
+
+    def publish_from(self, d, *, publish=True) -> int:
+        return baseids.publish_from(self.lab.repo, config_sha=self.lab.base, sha=self.lab.base,
+                                    ids_dir=d, environ=os.environ, publish=publish)
+
+    def assert_error(self, d):
+        self.data.write_text(json.dumps({"commit_pulls": {}, "commit_statuses": {},
+                                         "open_issues": []}))
+        self.assertEqual(self.publish_from(d), 1)
+        [row] = self.base_statuses()
+        self.assertEqual(row["state"], "error")
+        self.assertEqual(self.issues(), [])
+
+    def test_valid_data_publishes_the_status_even_from_a_cache_hit(self):
+        # su un cache hit `sha` è quello del commit che ha riempito la cache: conta l'albero
+        self.assertEqual(self.publish_from(self.ids_dir(commands={"verify": "red"})), 0)
+        [row] = self.base_statuses()
+        self.assertEqual(row["state"], "failure")
+        self.assertIn("`verify`", self.issues()[0]["body"])
+
+    def test_green_data_is_success(self):
+        self.assertEqual(self.publish_from(self.ids_dir()), 0)
+        self.assertEqual([r["state"] for r in self.base_statuses()], ["success"])
+
+    def test_without_publish_nothing_is_written(self):
+        self.assertEqual(self.publish_from(self.ids_dir(), publish=False), 0)
+        self.assertEqual(self.calls(), [])
+
+    def test_missing_artifact_is_error(self):
+        self.assert_error(self.ids_dir(False))
+        self.assert_error(self.tmp / "nessuna")
+
+    def test_other_tree_is_error(self):
+        self.assert_error(self.ids_dir(tree="0" * 40))
+
+    def test_hostile_json_is_error(self):
+        tree = git(self.lab.repo, "rev-parse", f"{self.lab.base}^{{tree}}")
+        for text in ("{", "[" * 100000, "[]", json.dumps({"v": 2, "tree": tree}),
+                     json.dumps({"v": 1, "tree": tree, "commands": []}),
+                     json.dumps({"v": 1, "tree": tree, "commands": {"verify": "verde"}}),
+                     json.dumps({"v": 1, "tree": tree, "commands": {"verify": 1}}),
+                     json.dumps({"v": 1, "tree": tree, "commands": {"x`\n# evil": "red"}})):
+            with self.subTest(text=text[:40]):
+                self.assert_error(self.ids_dir(text))
+                self.data.write_text(json.dumps({"commit_pulls": {}, "commit_statuses": {},
+                                                 "open_issues": []}))
+
+    def test_symlink_and_oversize_are_error(self):
+        self.assert_error(self.ids_dir(symlink=True, content="{}"))
+        self.data.write_text(json.dumps({"commit_pulls": {}, "commit_statuses": {},
+                                         "open_issues": []}))
+        self.assert_error(self.ids_dir(" " * (baseids.MAX_IDS_FILE + 1)))
+
+    def test_cli_handler_reads_the_push_event(self):
+        event = self.event(self.start, self.lab.base)
+        ns = cli.build_parser().parse_args(["base-publish", "--ids", str(self.ids_dir()),
+                                            "--event", str(event), "--publish"])
+        with mock.patch.object(Path, "cwd", return_value=self.lab.repo):
+            self.assertEqual(cli.HANDLERS["base-publish"](ns), 0)
+        self.assertEqual([r["state"] for r in self.base_statuses()], ["success"])
+
+
+class BasePublishProtectedErrorTest(BasePublishBase):
+    def test_protected_mode_writes_no_status_but_fails(self):
+        tmp = self.tmp / "ids"
+        tmp.mkdir()
+        self.assertEqual(baseids.publish_from(
+            self.lab.repo, config_sha=self.lab.base, sha=self.lab.base, ids_dir=tmp,
+            environ=os.environ, publish=True), 1)
+        self.assertEqual(self.calls(), [])
+
+
 if __name__ == "__main__":
     unittest.main()
