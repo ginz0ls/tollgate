@@ -19,12 +19,12 @@ vuota `\r\n`, il corpo JSON senza a capo finale; con codice >= 400 esce con 1 e 
 `gh: <message> (HTTP <codice>)`. Senza `--include` il corpo è il solo stdout.
 Scritture (REST, `--method POST|PATCH`): `repos/o/r/statuses/<sha>` (corpo da `--input`) si
 accoda in testa a `commit_statuses[<sha>]` con `creator.login = "github-actions[bot]"`; i commenti
-(`-F body=@<file>`) si accodano a `comments` della PR o dell'issue (`POST issues/<n>/comments`) o
-si riscrivono (`PATCH issues/comments/<id>`); `POST repos/o/r/issues` accoda a `open_issues`.
+(`-F body=@<file>`) si accodano a `comments` della PR o dell'issue, anche di `open_issues` (`POST issues/<n>/comments`) o
+si riscrivono (`PATCH issues/comments/<id>`); `POST repos/o/r/issues` accoda a `open_issues` (con `body`).
 Letture: `commits/<sha>/statuses` (da `commit_statuses`, vuoto se manca), `commits/<sha>/pulls`
 (da `commit_pulls`, vuoto se manca), `pulls/<n>` (da `pulls[<n>]`, come la REST: `body`,
-`head.sha|ref|repo.full_name`, `base.ref`, `state`; 404 se manca) e `issues?state=open` (da `open_issues`), un valore per riga; il `--jq` non
-si valuta: i dati hanno già la forma che il filtro produce.
+`head.sha|ref|repo.full_name`, `base.ref`, `state`; 404 se manca) e `issues?state=open` (da `open_issues`, senza le righe con `pull_request`, che il filtro
+scarta), un valore per riga; il `--jq` non si valuta: i dati hanno già la forma che il filtro produce.
 `prs[].comments` si leggono con `pr view --json comments` come li dà GraphQL
 (`author.login = "github-actions"`) e con `api repos/o/r/issues/<n>/comments` come li dà REST
 (`user.login = "github-actions[bot]"`, `user.type = "Bot"`); il `--jq` non si valuta.
@@ -164,7 +164,7 @@ def _file_field(argv, name):
 
 def _commented(data, number):
     """La PR o l'issue `number` dei dati, con la lista dei commenti."""
-    for group in (data.get("prs") or [], list((data.get("issues") or {}).values())):
+    for group in _groups(data):
         for item in group:
             if str(item.get("number")) == str(number):
                 item.setdefault("comments", [])
@@ -172,8 +172,14 @@ def _commented(data, number):
     _fail(f"PR o issue {number} assente dai dati")
 
 
+def _groups(data):
+    """PR, issue e issue aperte dei dati: dove stanno i commenti."""
+    return (data.get("prs") or [], list((data.get("issues") or {}).values()),
+            data.get("open_issues") or [])
+
+
 def _all_comments(data):
-    for group in (data.get("prs") or [], list((data.get("issues") or {}).values())):
+    for group in _groups(data):
         for item in group:
             yield from item.get("comments") or []
 
@@ -207,7 +213,8 @@ def _api_write(data, path_data, argv):
         issues = data.setdefault("open_issues", [])
         number = max([i["number"] for i in issues] + [100]) + 1
         issues.append({"number": number, "title": _flag(argv, "-f").split("=", 1)[1],
-                       "url": f"https://github.com/prova/flow/issues/{number}"})
+                       "url": f"https://github.com/prova/flow/issues/{number}",
+                       "body": _file_field(argv, "body")})
         _save(path_data, data)
         return _ok(argv, {"number": number, "html_url": issues[-1]["url"]})
     return None
@@ -223,7 +230,7 @@ def _api_list(data, argv):
     elif _ISSUES_OPEN.match(path):
         if "open_issues" not in data:
             _fail("open_issues assente dai dati")
-        rows = data["open_issues"]
+        rows = [r for r in data["open_issues"] if r.get("pull_request") is None]  # come il jq
     else:
         return None
     for row in rows:

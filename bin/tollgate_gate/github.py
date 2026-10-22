@@ -77,6 +77,11 @@ def event_repo(event: dict) -> tuple[str, str]:
     return _text(event, "repository", "full_name"), _text(event, "repository", "default_branch")
 
 
+def push_from_event(event: dict) -> tuple[str, str, str]:
+    """`(ref, before, after)` di un evento `push`; `before` è tutto zeri per un ramo nuovo."""
+    return (_text(event, "ref"), _sha(_text(event, "before")), _sha(_text(event, "after")))
+
+
 def pr_from_event(event: dict) -> PrFacts | None:
     """Le informazioni della PR in un evento `pull_request_target`; `None` se l'evento non ha
     una PR. Un campo che manca o non ha la forma attesa è un `ValueError`. Una testa senza
@@ -223,3 +228,16 @@ def open_sentinel_issues(state, cwd, slug: str) -> list[dict]:
     rows = ghcli.api(state, cwd, f"repos/{slug}/issues?state=open&{_PER_PAGE}", paginate=True,
                      jq=jq).data
     return [r for r in rows if r.get("title") == ghcli.SENTINEL_TITLE]
+
+
+def report_sentinel(state, cwd, slug: str, *, body_file: Path) -> dict:
+    """Segnala sull'**unica** issue aperta «tollgate: merge non verificato» (decisione 16): se ce
+    n'è una la commenta (la più vecchia, se per errore fossero più d'una), se no la crea. Il testo
+    viene dal file. Ritorna `{"number", "created"}`."""
+    found = open_sentinel_issues(state, cwd, slug)
+    if found:
+        number = min(_number(i.get("number")) for i in found)
+        comment_issue(state, cwd, slug, number, body_file=body_file)
+        return {"number": number, "created": False}
+    made = create_issue(state, cwd, slug, title=ghcli.SENTINEL_TITLE, body_file=body_file)
+    return {"number": made["number"], "created": True}

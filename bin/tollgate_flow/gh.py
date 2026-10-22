@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from tollgate_core.ghcli import (GH_ENV, GH_TIMEOUT_S, REQUIRED_CONTEXTS, SENTINEL_TITLE,  # noqa: F401
                                  GhError, decode_json_values, gh_cmd, run as _run, run_json,
                                  run_json_lines)
+from tollgate_gate import github
 
 
 @dataclass(frozen=True)
@@ -135,8 +136,5 @@ def commit_state(state, repo, sha: str) -> dict[str, str]:
 
 
 def sentinel_issues(state, repo) -> list[dict]:
-    data = run_json(state, repo, ["issue", "list", "--state", "open", "--limit", "100",
-                                  "--json", "number,title,url"])
-    if not isinstance(data, list):
-        raise GhError("issue list: risposta inattesa")
-    return [i for i in data if isinstance(i, dict) and i.get("title") == SENTINEL_TITLE]
+    """Le issue aperte di sentinel, paginate (decisione 16): `{owner}/{repo}` lo risolve `gh`."""
+    return github.open_sentinel_issues(state, repo, "{owner}/{repo}")

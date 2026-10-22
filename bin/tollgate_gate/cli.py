@@ -13,7 +13,7 @@ from tollgate_core.config import ConfigError
 from tollgate_core.ghcli import GhError
 from tollgate_core.git import GitError
 
-from . import baseids, guard, verdict
+from . import baseids, guard, sentinel, verdict
 from . import run as gate_run
 
 ACTIONS_ENV = "GITHUB_ACTIONS"
@@ -50,6 +50,10 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--base-ids-cache", metavar="FILE", help="ids.json ripristinato dalla cache")
     e.add_argument("--base-ids-artifact", metavar="DIR", help="artefatto tollgate-base-ids")
     e.add_argument("--publish", action="store_true", help="solo dentro GitHub Actions")
+    n = sub.add_parser("sentinel", allow_abbrev=False,
+                       help="dopo un push sul predefinito: ogni commit viene da una PR verificata?")
+    n.add_argument("--event", required=True, metavar="FILE", help="evento push (JSON)")
+    n.add_argument("--publish", action="store_true", help="solo dentro GitHub Actions")
     return p
 
 
@@ -111,6 +115,8 @@ def cmd_base_ids(args) -> int:
     result = baseids.compute(root, config_sha=tip, sha=sha, out=Path(args.out),
                              environ=os.environ, cfg_repo=cwd)
     print(f"base-ids: albero {result['tree']}, {len(result['ids'])} comandi")
+    if args.publish:
+        baseids.publish(cwd, config_sha=tip, sha=sha, result=result, environ=os.environ)
     return 0
 
 
@@ -128,8 +134,13 @@ def cmd_evaluate(args) -> int:
         publish=args.publish, environ=os.environ)
 
 
+def cmd_sentinel(args) -> int:
+    _require_actions(args)
+    return sentinel.run(Path(args.event), publish=args.publish, environ=os.environ)
+
+
 HANDLERS = {"run": cmd_run, "base-ids": cmd_base_ids, "guard": cmd_guard,
-            "evaluate": cmd_evaluate}
+            "evaluate": cmd_evaluate, "sentinel": cmd_sentinel}
 
 
 def main(args: list[str]) -> int:

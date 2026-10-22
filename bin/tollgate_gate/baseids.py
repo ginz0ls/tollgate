@@ -3,12 +3,14 @@ della base e scrive `ids.json`; `load` lo rilegge, solo se è dello stesso alber
 from __future__ import annotations
 
 import json
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 
-from tollgate_core import git, runner
+from tollgate_core import git, paths, runner
 from tollgate_core.config import load_config_at
 
+from . import github
 from . import run as gate_run
 
 IDS_VERSION = 1
@@ -59,3 +61,27 @@ def _load(path: Path, tree: str) -> dict[str, set[str]] | None:
             return None
         out[name] = set(values)
     return out
+
+
+def publish(repo: Path, *, config_sha: str, sha: str, result: dict,
+            environ: Mapping[str, str]) -> None:
+    """In `detect` pubblica `tollgate/base` sul commit `sha` (spec 9.1): `failure` se qualche
+    comando della suite della base è `red`, e allora commenta anche l'issue di sentinel (la crea
+    se manca). In `protected` non scrive nulla: il segnale è il job."""
+    if load_config_at(repo, config_sha).get("gate.mode") != "detect":
+        return
+    state, slug = paths.resolve_state(environ), github.repo_slug(environ)
+    red = sorted(name for name, st in result["commands"].items() if st == "red")
+    if not red:
+        github.set_status(state, repo, slug, sha, context="tollgate/base", status="success",
+                          description="suite della base verde")
+        return
+    with tempfile.TemporaryDirectory(prefix="tollgate-base-") as tmp:
+        body = Path(tmp) / "body.md"
+        body.write_text(
+            "## tollgate: merge non verificato\n\nLa suite della base è rossa sul commit "
+            f"`{sha}`. Comandi rossi: {', '.join(f'`{n}`' for n in red)}.\n\n"
+            "Chiudi l'issue su GitHub dopo averla letta.\n", encoding="utf-8")
+        github.report_sentinel(state, repo, slug, body_file=body)
+    github.set_status(state, repo, slug, sha, context="tollgate/base", status="failure",
+                      description=f"suite della base rossa: {len(red)} comandi")

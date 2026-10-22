@@ -297,8 +297,9 @@ class StartNewTest(StartCase):
 
     def test_detect_mode_warning(self):
         fl = self.make(toml=DEFAULT_TOML.replace("protected", "detect"))
-        self.gh(fl, issue_list=[{"number": 3, "title": SENTINEL_TITLE},
-                                {"number": 4, "title": "Altra issue qualunque"}])
+        self.gh(fl, open_issues=[{"number": 3, "title": SENTINEL_TITLE, "url": "https://x/3"},
+                                 {"number": 4, "title": "Altra issue qualunque"},
+                                 {"number": 5, "title": SENTINEL_TITLE, "pull_request": {}}])
         r = fl.cli("start", "7")
         self.assertEqual(r.returncode, 0, out(r))
         self.assertIn("modalità rilevazione: il merge non è impedito", out(r))

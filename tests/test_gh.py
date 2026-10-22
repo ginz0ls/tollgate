@@ -171,5 +171,22 @@ class PrWriteTest(FakeGhCase):
             gh.pr_edit(self.state, self.tmp, 4, body_file=body)
 
 
+class SentinelIssuesTest(FakeGhCase):
+    def test_sentinel_issues_paginated(self):
+        rows = [{"number": n, "title": f"issue {n}", "url": f"https://x/{n}"}
+                for n in range(1, 111)]
+        rows[104] = {"number": 105, "title": gh.SENTINEL_TITLE, "url": "https://x/105"}
+        rows[10] = {"number": 11, "title": gh.SENTINEL_TITLE, "url": "https://x/11",
+                    "pull_request": {}}
+        self.set(open_issues=rows)
+        self.assertEqual(gh.sentinel_issues(self.state, self.tmp),
+                         [{"number": 105, "title": gh.SENTINEL_TITLE, "url": "https://x/105"}])
+        [argv] = self.calls()
+        self.assertEqual(argv[0], "api")
+        self.assertIn("--paginate", argv)
+        self.assertNotIn("--limit", argv)
+        self.assertTrue(argv[-1].startswith("repos/{owner}/{repo}/issues?state=open"), argv)
+
+
 if __name__ == "__main__":
     unittest.main()
