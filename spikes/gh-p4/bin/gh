@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# gh con guardia (decisione 25): ogni chiamata passa da ghguard.py prima di arrivare al gh vero.
+# Va in testa al PATH dei programmi che chiamano gh per conto dello script (tollgate init, protect.sh, claude -p).
+exec python3 -B -I "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../ghwrap.py" "$@"

@@ -10,9 +10,12 @@ di quella coppia con un valore del tipo previsto, i posizionali sono numeri (PR,
 semplici, esattamente un --repo/-R vale uno dei due repo. `-D` e la cartella di `repo clone` devono stare
 sotto le cartelle dell'ambiente (P4_OUT: uscite; P4_WORK: cloni). `gh api` è solo in lettura.
 
-Le scritture `gh api` della decisione 25 (POST statuses, PUT|DELETE branches/main/protection su protected)
-non servono a questo script e restano vietate qui: se serviranno, vanno aggiunte come coppie esplicite
-con endpoint fisso, mai come apertura di -X/-f/-F.
+Le scritture `gh api` della decisione 25 sono tre forme esatte, con endpoint fisso, mai un'apertura di
+-X/-f/-F (vedi `_check_api_write`): POST statuses di `tollgate/verdict` (prova del token personale),
+PUT e DELETE di branches/main/protection solo su protected.
+
+Il profilo `flow` (P4_PROFILE=flow, gh del `claude -p` di run-p4-flow.sh) è lo stesso elenco meno
+`issue create`, `pr merge`, `pr close`, `run download` e ogni scrittura `gh api`.
 """
 import os
 import re
@@ -31,6 +34,13 @@ BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
 FIELDS_RE = re.compile(r"^[A-Za-z][A-Za-z,]*$")
 NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 STATES = {"open", "closed", "merged", "all"}
+PROFILES = ("script", "flow")
+FLOW_FORBIDDEN = {("issue", "create"), ("pr", "merge"), ("pr", "close"), ("run", "download")}
+# scritture `gh api` ammesse (decisione 25): descrizione senza spazi, che `comandi.log` non conserva
+STATUS_DESCRIPTION = "prova-token-personale-p4"
+STATUS_CONTEXT = "tollgate/verdict"
+STATUS_STATES = {"success", "failure", "error", "pending"}
+PROTECTION_ENDPOINT = "repos/%s/branches/main/protection"
 
 
 def _ok_branch(v):
@@ -45,6 +55,23 @@ def _under(var, v):
     return os.path.normpath(v) == v and v.startswith(base + os.sep)
 
 
+def _temp_roots():
+    """Cartelle dei file temporanei dei programmi che chiamano gh (mktemp di protect.sh, file del corpo di
+    tollgate): /tmp e $TMPDIR, mai altrove."""
+    roots = {"/tmp"}
+    if os.environ.get("TMPDIR"):
+        roots.add(os.path.normpath(os.environ["TMPDIR"]))
+    return roots
+
+
+def _infile(v):
+    """File di ingresso letto da gh (--body-file, --input): percorso assoluto normalizzato sotto le cartelle
+    dell'ambiente (P4_OUT, P4_WORK, P4_TMP) o sotto i file temporanei."""
+    if _under("P4_OUT", v) or _under("P4_WORK", v) or _under("P4_TMP", v):
+        return True
+    return os.path.isabs(v) and os.path.normpath(v) == v and any(v.startswith(r + os.sep) for r in _temp_roots())
+
+
 # tipo di valore -> funzione di controllo
 KINDS = {
     "repo": lambda v: v in REPOS,
@@ -55,8 +82,9 @@ KINDS = {
     "state": lambda v: v in STATES,
     "name": lambda v: bool(NAME_RE.match(v)) and ".." not in v,
     "outdir": lambda v: _under("P4_OUT", v),
+    "infile": _infile,
 }
-LENIENT_KINDS = {"text", "outdir"}   # nel formato di comandi.log gli spazi dei valori sono andati persi
+LENIENT_KINDS = {"text", "outdir", "infile"}   # nel formato di comandi.log gli spazi dei valori sono andati persi
 
 REPO_OPTS = {"--repo": "repo", "-R": "repo"}
 
@@ -66,17 +94,19 @@ def _spec(valued, flags=(), pos=None, exactly_one_of=()):
 
 
 SPECS = {
-    ("pr", "create"): _spec({"--base": "branch", "--head": "branch", "--title": "text", "--body": "text"}),
-    ("pr", "edit"): _spec({"--base": "branch", "--title": "text", "--body": "text"}, pos="ref"),
+    ("pr", "create"): _spec({"--base": "branch", "--head": "branch", "--title": "text", "--body": "text",
+                             "--body-file": "infile"}),
+    ("pr", "edit"): _spec({"--base": "branch", "--title": "text", "--body": "text", "--body-file": "infile"},
+                          pos="ref"),
     ("pr", "close"): _spec({}, pos="ref"),
     ("pr", "merge"): _spec({}, flags=("--merge", "--squash", "--rebase"), pos="ref",
                            exactly_one_of=("--merge", "--squash", "--rebase")),
     ("pr", "view"): _spec({"--json": "fields"}, pos="ref"),
-    ("pr", "list"): _spec({"--state": "state", "--limit": "int", "--json": "fields"}),
-    ("pr", "comment"): _spec({"--body": "text"}, pos="ref"),
-    ("issue", "create"): _spec({"--title": "text", "--body": "text"}),
+    ("pr", "list"): _spec({"--state": "state", "--limit": "int", "--json": "fields", "--head": "branch"}),
+    ("pr", "comment"): _spec({"--body": "text", "--body-file": "infile"}, pos="ref"),
+    ("issue", "create"): _spec({"--title": "text", "--body": "text", "--body-file": "infile"}),
     ("issue", "close"): _spec({}, pos="int"),
-    ("issue", "comment"): _spec({"--body": "text"}, pos="int"),
+    ("issue", "comment"): _spec({"--body": "text", "--body-file": "infile"}, pos="int"),
     ("issue", "view"): _spec({"--json": "fields"}, pos="int"),
     ("issue", "list"): _spec({"--state": "state", "--limit": "int", "--json": "fields"}),
     ("run", "list"): _spec({"--workflow": "name", "--limit": "int", "--json": "fields"}),
@@ -169,11 +199,85 @@ def _check_endpoint(ep):
         raise ValueError("endpoint non ammesso: %s" % ep)
 
 
-def violation(args, lenient=False):
-    """None se il comando è ammesso, altrimenti il motivo."""
+def _repo_of_endpoint(ep):
+    m = re.match(r"^repos/([^/?]+/[^/?]+)/", ep)
+    return m.group(1) if m else None
+
+
+def _check_api_write(args):
+    """Scrittura `gh api` (argomenti dopo `api`): solo le tre forme esatte della decisione 25, ValueError
+    altrimenti. Nessuna opzione fuori da `--method|-X`, `-f` (una per chiave) e `--input`."""
+    method = endpoint = infile = None
+    fields = {}
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a in ("--method", "-X", "-f", "--input"):
+            if i + 1 >= len(args):
+                raise ValueError("gh api: %s senza valore" % a)
+            v = args[i + 1]
+            i += 2
+            if a in ("--method", "-X"):
+                if method is not None:
+                    raise ValueError("gh api: metodo ripetuto")
+                method = v
+            elif a == "-f":
+                key, eq, val = v.partition("=")
+                if not eq or key in fields:
+                    raise ValueError("gh api: campo -f non valido o ripetuto")
+                fields[key] = val
+            else:
+                if infile is not None:
+                    raise ValueError("gh api: --input ripetuto")
+                infile = v
+        elif a.startswith("-"):
+            raise ValueError("gh api: opzione di scrittura non ammessa (%s)" % a)
+        else:
+            if endpoint is not None:
+                raise ValueError("gh api: più di un endpoint")
+            endpoint = a
+            i += 1
+    if endpoint is None:
+        raise ValueError("gh api senza endpoint")
+    _check_endpoint(endpoint)
+    repo = _repo_of_endpoint(endpoint)
+    if method == "POST" and infile is None:
+        ok = (re.match(r"^repos/[^/]+/[^/]+/statuses/[0-9a-f]{40}$", endpoint)
+              and set(fields) == {"state", "context", "description"}
+              and fields["state"] in STATUS_STATES and fields["context"] == STATUS_CONTEXT
+              and fields["description"] == STATUS_DESCRIPTION)
+        if ok:
+            return
+        raise ValueError("gh api POST: solo statuses/<sha> con state, context=%s e la descrizione di prova"
+                         % STATUS_CONTEXT)
+    if method == "PUT" and not fields and infile is not None:
+        if repo == PROT and endpoint == PROTECTION_ENDPOINT % PROT and _infile(infile):
+            return
+        raise ValueError("gh api PUT: solo branches/main/protection su protected, con --input da un file temporaneo")
+    if method == "DELETE" and not fields and infile is None:
+        if repo == PROT and endpoint == PROTECTION_ENDPOINT % PROT:
+            return
+        raise ValueError("gh api DELETE: solo branches/main/protection su protected")
+    raise ValueError("gh api: scrittura non ammessa")
+
+
+_WRITE_OPTS = ("--method", "-X", "-f", "-F", "--input", "--field", "--raw-field")
+
+
+def _is_write(arg):
+    return arg.startswith("-") and arg.split("=", 1)[0] in _WRITE_OPTS or arg[:2] in ("-X", "-f", "-F")
+
+
+def violation(args, lenient=False, profile="script"):
+    """None se il comando è ammesso, altrimenti il motivo. `profile` è `script` (gli script di prova) o
+    `flow` (il `claude -p` del flusso: niente creazione di issue, merge, chiusure, scritture `gh api`)."""
     if not args:
         return "comando vuoto"
+    if profile not in PROFILES:
+        return "profilo sconosciuto: %s" % profile
     first, second = args[0], (args[1] if len(args) > 1 else "")
+    if profile == "flow" and (first == "repo" or (first, second) in FLOW_FORBIDDEN):
+        return "gh %s %s non ammesso nel flusso" % (first, second)
     try:
         if first == "--version":
             return None if len(args) == 1 else "--version con altro"
@@ -207,6 +311,11 @@ def violation(args, lenient=False):
             _parse((first, second), args[2:], lenient)
             return None
         if first == "api":
+            if any(_is_write(a) for a in args[1:]):
+                if profile == "flow":
+                    return "gh api in scrittura non ammesso nel flusso"
+                _check_api_write(args[1:])
+                return None
             ep = None
             i = 1
             while i < len(args):
@@ -217,6 +326,9 @@ def violation(args, lenient=False):
                     if i + 1 >= len(args):
                         return "gh api: %s senza valore" % a
                     i += 2
+                    if lenient:     # nel registro gli spazi del filtro jq sono andati persi
+                        while i < len(args) and not args[i].startswith(("-", "repos/")):
+                            i += 1
                 elif a.startswith("-"):
                     return "gh api: opzione non ammessa (%s): solo lettura" % a
                 else:
@@ -296,7 +408,7 @@ def check_comandi(path):
 
 def main(argv):
     if len(argv) >= 3 and argv[1] == "check" and argv[2] == "--":
-        why = violation(argv[3:])
+        why = violation(argv[3:], profile=os.environ.get("P4_PROFILE", "script"))
         if why:
             print(why, file=sys.stderr)
             return 1
