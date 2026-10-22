@@ -109,8 +109,18 @@ class CliCallsTest(unittest.TestCase):
                     r = self.lab.bash(cmd, agent_id=agent)
                     self.assertEqual(r.exit, 2)
                     self.assertIn("GitHub Actions", r.stderr)
-        self.assertEqual(self.lab.bash(f"python3 '{PROGRAM}' gate base-ids \"unchiuso --publish",
+        self.assertEqual(self.lab.bash(f"python3 '{PROGRAM}' gate base-ids \"unchiuso --pub",
                                        ).exit, 2)
+
+    def test_gate_publish_abbreviations_denied(self):
+        for opt in ("--pu", "--pub", "--publi", "--pub=1", "--publish=x"):
+            for agent in (None, "ag-1"):
+                with self.subTest(opt=opt, agent=agent):
+                    r = self.lab.bash(f"'{PROGRAM}' gate base-ids --sha x {opt}", agent_id=agent)
+                    self.assertEqual(r.exit, 2)
+        for opt in ("--p", "--pull", "--publisher", "--out=--pub"):
+            with self.subTest(opt=opt):
+                self.assertEqual(self.lab.bash(f"'{PROGRAM}' gate base-ids {opt}").exit, 0)
 
     def test_gate_without_publish_is_not_denied(self):
         for cmd in (f"'{PROGRAM}' gate run --event e --out o",

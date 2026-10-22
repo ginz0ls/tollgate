@@ -249,6 +249,28 @@ class BaseIdsTest(GateRunBase):
                 self.assertIn("GitHub Actions", r.stderr)
                 self.assertFalse((self.out / "ids.json").exists())
 
+    def test_abbreviated_option_is_an_argument_error(self):
+        for opt in ("--publ", "--pub", "--pu"):
+            with self.subTest(opt=opt):
+                r = self.tollgate("gate", "base-ids", "--sha", self.lab.base, "--out",
+                                  str(self.out), "--event", str(self.event()), opt,
+                                  GITHUB_ACTIONS="true")
+                self.assertEqual(r.returncode, 2)
+                self.assertFalse((self.out / "ids.json").exists())
+
+    def test_base_ids_no_state_created(self):
+        before = sorted(p.relative_to(self.ts.dir).as_posix() for p in self.ts.dir.rglob("*"))
+        r = self.tollgate("gate", "base-ids", "--sha", self.lab.base, "--out", str(self.out),
+                          "--event", str(self.event()), PYTHONVERBOSE="1")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        loaded = re.findall(r"^import '([\w.]+)'", r.stderr, re.M)
+        self.assertIn("tollgate_gate.cli", loaded)
+        for module in ("tollgate_core.db", "tollgate_core.cli", "sqlite3"):
+            self.assertNotIn(module, loaded)
+        after = sorted(p.relative_to(self.ts.dir).as_posix() for p in self.ts.dir.rglob("*"))
+        self.assertEqual(before, after)
+        self.assertEqual(list(self.home.iterdir()), [])
+
     def test_publish_accepted_in_actions(self):
         r = self.tollgate("gate", "base-ids", "--sha", self.lab.base, "--out", str(self.out),
                           "--event", str(self.event()), "--publish", GITHUB_ACTIONS="true")

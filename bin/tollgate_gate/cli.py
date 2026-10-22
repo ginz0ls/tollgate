@@ -24,12 +24,15 @@ class GateUsageError(ValueError):
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="gate", description="Il gate di tollgate su GitHub")
+    p = argparse.ArgumentParser(prog="gate", description="Il gate di tollgate su GitHub",
+                                allow_abbrev=False)
     sub = p.add_subparsers(dest="gate_cmd", required=True)
-    r = sub.add_parser("run", help="esegue i comandi del gate sulla testa e scrive gli artefatti")
+    r = sub.add_parser("run", allow_abbrev=False,
+                      help="esegue i comandi del gate sulla testa e scrive gli artefatti")
     r.add_argument("--event", required=True, metavar="FILE", help="evento della PR (JSON)")
     r.add_argument("--out", required=True, metavar="DIR", help="cartella degli artefatti")
-    b = sub.add_parser("base-ids", help="esegue la suite della base e scrive ids.json")
+    b = sub.add_parser("base-ids", allow_abbrev=False,
+                      help="esegue la suite della base e scrive ids.json")
     b.add_argument("--sha", required=True, metavar="SHA", help="commit della base")
     b.add_argument("--out", required=True, metavar="DIR")
     b.add_argument("--root", metavar="DIR",

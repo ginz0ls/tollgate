@@ -52,8 +52,14 @@ def _coordinator_only(sub: str | None, args: list[str]) -> bool:
     return sub in _COORDINATOR_ONLY or (sub == "status" and "--checkpoint" in args)
 
 
+def _is_publish(token: str) -> bool:
+    """`--publish` o un suo prefisso di almeno `--pu`, con o senza `=valore`."""
+    name = token.split("=", 1)[0]
+    return len(name) >= 4 and "--publish".startswith(name)
+
+
 def _publishes(sub: str | None, args: list[str]) -> bool:
-    return sub == "gate" and any(x == "--publish" or x.startswith("--publish=") for x in args)
+    return sub == "gate" and any(_is_publish(x) for x in args)
 
 
 def _deny_publish():
@@ -80,7 +86,7 @@ def decide(event, ctx):
         # Fail-closed per un subagente: non si capisce il comando, ma se nomina il programma con
         # un sottocomando del coordinatore non passa.
         words = set(re.findall(r"[\w-]+", raw))
-        if "tollgate" in raw and {"gate", "--publish"} <= words:
+        if "tollgate" in raw and "gate" in words and any(_is_publish(w) for w in words):
             return [_deny_publish()]
         if event.agent_id and "tollgate" in raw and (words & {*_COORDINATOR_ONLY, "--checkpoint"}):
             return [deny("comando non analizzabile che nomina tollgate con un sottocomando del "

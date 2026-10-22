@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 
-from tollgate_analysis.junit import JunitError, parse_junit
+from tollgate_analysis.junit import parse_junit
 
 from .model import CommandResult
 from .run import RESULTS_VERSION, STATES
@@ -18,6 +18,8 @@ MAX_TOTAL = 200 * 2**20
 def _report_problem(report) -> str | None:
     if not isinstance(report, str):
         return f"report {report!r} non è un percorso"
+    if any(ord(c) < 32 or ord(c) == 127 for c in report):
+        return f"report {report!r}: caratteri di controllo"
     path = PurePosixPath(report)
     if path.is_absolute() or ".." in path.parts:
         return f"report {report!r}: percorso assoluto o con '..'"
@@ -26,9 +28,11 @@ def _report_problem(report) -> str | None:
     return None
 
 
-def _load_results(root: Path) -> tuple[dict | None, list[str]]:
+def _load_results(root: Path, max_file: int = MAX_FILE) -> tuple[dict | None, list[str]]:
     path = root / "results.json"
     try:
+        if path.stat().st_size > max_file:
+            return None, ["results.json troppo grande"]
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None, ["results.json assente o illeggibile"]
@@ -64,7 +68,7 @@ def validate(root: Path, *, max_file: int = MAX_FILE, max_total: int = MAX_TOTAL
         dirnames[:] = [d for d in dirnames if not (base / d).is_symlink()]
     if total > max_total:
         problems.append(f"totale degli artefatti oltre {max_total} byte")
-    data, found = _load_results(root)
+    data, found = _load_results(root, max_file)
     problems += found
     if data is not None:
         for cmd in data["commands"]:
@@ -78,7 +82,7 @@ def validate(root: Path, *, max_file: int = MAX_FILE, max_total: int = MAX_TOTAL
                 continue    # già segnalato sopra
             try:
                 parse_junit(p.read_bytes())
-            except JunitError as e:
+            except (OSError, ValueError) as e:     # JunitError è un ValueError
                 problems.append(f"{p.relative_to(root).as_posix()}: {e}")
     return problems
 
@@ -108,7 +112,7 @@ def read_results(root: Path) -> tuple[list[CommandResult] | None, bool, list[str
         if cmd.get("report") is not None:
             try:
                 junit = parse_junit((root / cmd["report"]).read_bytes())
-            except (OSError, JunitError) as e:
+            except (OSError, ValueError) as e:
                 problems.append(f"results.json: report di {cmd['name']}: {e}")
                 continue
         results.append(CommandResult(cmd["name"], cmd["state"], cmd.get("exit"),

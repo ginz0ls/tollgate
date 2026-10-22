@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tollgate_gate import artifacts
 
@@ -59,6 +60,31 @@ class ArtifactsTest(unittest.TestCase):
                 problems = artifacts.validate(self.root)
                 self.assertTrue(any("report" in p for p in problems), problems)
                 self.assertEqual(artifacts.read_results(self.root)[0], None)
+
+    def test_control_characters_in_report_rejected(self):
+        for report in ("junit/a\u0000.xml", "junit/a\n.xml", "junit/a\x1b.xml"):
+            with self.subTest(report=repr(report)):
+                self.write_results([{**COMMAND, "report": report}])
+                self.assertTrue(any("report" in p for p in artifacts.validate(self.root)))
+                results, applicable, problems = artifacts.read_results(self.root)
+                self.assertEqual((results, applicable), (None, False))
+                self.assertTrue(problems)
+
+    def test_read_failures_are_problems_not_exceptions(self):
+        with mock.patch.object(Path, "read_bytes", side_effect=OSError("boom")):
+            results, applicable, problems = artifacts.read_results(self.root)
+        self.assertEqual((results, applicable), (None, False))
+        self.assertTrue(problems)
+        with mock.patch.object(artifacts, "parse_junit", side_effect=ValueError("boom")):
+            results, _, problems = artifacts.read_results(self.root)
+        self.assertIsNone(results)
+        self.assertTrue(problems)
+
+    def test_results_json_size_checked_before_reading(self):
+        (self.root / "results.json").write_text(" " * 200)
+        with mock.patch.object(Path, "read_text", side_effect=AssertionError("letto")):
+            problems = artifacts.validate(self.root, max_file=100)
+        self.assertTrue(any("results.json" in p for p in problems), problems)
 
     def test_size_limits(self):
         (self.root / "big.log").write_bytes(b"x" * 100)
