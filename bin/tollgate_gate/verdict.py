@@ -6,11 +6,12 @@ lettura: `verdict` non salva mai nulla in cache."""
 from __future__ import annotations
 
 import json
+import sys
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 
-from tollgate_analysis import prblock, prref
+from tollgate_analysis import prblock
 from tollgate_core import git, paths
 from tollgate_core.config import ConfigError, load_config_at
 from tollgate_core.ghcli import GhError
@@ -27,7 +28,7 @@ ARTIFACT_PREFIX = "artefatti del run: "
 VERDICT = "tollgate/verdict"
 ATTENTION = "tollgate/attention"
 DESC_ARTIFACTS = "artefatti del run mancanti o non validi: vedi il commento"
-DESC_ERROR = "errore nel calcolo del gate: vedi il commento"
+DESC_ERROR = "errore nel calcolo del gate"
 DESC_OK = "nessuna voce rossa"
 DESC_ATTENTION_OK = "nessuna voce da leggere"
 DESC_ATTENTION_ERROR = "non calcolato: vedi tollgate/verdict"
@@ -75,17 +76,14 @@ def _base_ids(repo: Path, base_sha: str, cache: Path | None, artifact: Path | No
             return ids, BASE_FROM_CACHE
     if artifact is not None:
         path = Path(artifact) / "ids.json"
-        if path.is_file() and not path.is_symlink() and path.stat().st_size <= MAX_IDS_FILE:
-            if (ids := baseids.load(path, tree=tree)) is not None:
-                return ids, BASE_FROM_RUN
+        try:
+            usable = path.is_file() and not path.is_symlink() \
+                and path.stat().st_size <= MAX_IDS_FILE
+        except OSError:
+            usable = False
+        if usable and (ids := baseids.load(path, tree=tree)) is not None:
+            return ids, BASE_FROM_RUN
     return None, None
-
-
-def _issue_number(pr) -> int | None:
-    """L'issue della PR come la legge `evaluate` (decisione 8): il ramo `tg/<N>-*` (non da fork),
-    altrimenti «Closes #N»."""
-    branch = None if pr.cross_repo else prref.issue_from_branch(pr.head_ref)
-    return branch or prref.closes_issue(pr.body)
 
 
 def inputs_from_github(repo: Path, event: dict, pr: dict, *, artifacts: Path,
@@ -109,7 +107,7 @@ def inputs_from_github(repo: Path, event: dict, pr: dict, *, artifacts: Path,
             return None, ["la testa della PR non è quella giudicata: la PR è cambiata"]
         base_sha = git.run(repo, "merge-base", tip, head).strip()
         base_ids, source = _base_ids(repo, base_sha, base_ids_cache, base_ids_artifact)
-        n = _issue_number(facts)
+        n = evaluate.pr_issue_number(facts)
         waiver_text = git.text_at(repo, head, f".tollgate/waivers/{n}.toml") if n else None
     except (git.GitError, ConfigError) as e:
         return None, [str(e)]
@@ -139,7 +137,8 @@ def inputs_from_github(repo: Path, event: dict, pr: dict, *, artifacts: Path,
 
 def _error_description(errors: list[str]) -> str:
     first = errors[0]
-    return DESC_ARTIFACTS if first.startswith(ARTIFACT_PREFIX) else f"errore: {first}"
+    return (DESC_ARTIFACTS if first.startswith(ARTIFACT_PREFIX)
+            else f"{DESC_ERROR}: {first}")
 
 
 def _descriptions(ev: Evaluation) -> tuple[str, str]:
@@ -184,13 +183,41 @@ def main(event_path: Path, *, artifacts: Path, base_ids_cache: Path | None,
     `tollgate/attention` e il commento e risponde 0: il segnale sono gli stati. Una PR verso un
     altro ramo non riceve nessuno stato, solo il commento «non applicabile». Subito prima di
     scrivere ricontrolla che lo SHA sia ancora la testa della PR (decisione 14): se non lo è non
-    scrive nulla di quello SHA."""
+    scrive nulla di quello SHA. Noto lo SHA, ogni altro guasto (GitHub, forma della PR, calcolo)
+    è un `error` esplicito sullo SHA (decisione 5): l'uscita è 1 solo se nemmeno questo si
+    scrive."""
     repo = Path.cwd() if repo is None else repo
     event = github.read_event(event_path)
     state = paths.resolve_state(environ)
     slug = github.repo_slug(environ)
-    run = event.get("workflow_run")
     sha = github.run_sha(event)
+    try:
+        return _judge(event, repo, state, slug, sha, artifacts=artifacts,
+                      base_ids_cache=base_ids_cache, base_ids_artifact=base_ids_artifact,
+                      publish=publish, environ=environ)
+    except Exception as e:      # confine: dopo questo punto ogni esito è uno stato esplicito
+        reason = f"{type(e).__name__}: {e}"
+        sys.stderr.write(f"gate evaluate: {reason}\n")
+        if not publish:
+            return 1
+        try:
+            _statuses(state, repo, slug, sha, _error(reason))
+        except Exception as write_error:
+            sys.stderr.write(f"gate evaluate: stato non scritto: {write_error}\n")
+            return 1
+        return 0
+
+
+def _head_is(state, repo, slug, number: int, sha: str) -> bool:
+    """Lo SHA è ancora la testa della PR (`GET pulls/<n>`); una risposta malformata vale no."""
+    head = github.pull(state, repo, slug, number).get("head")
+    return isinstance(head, dict) and head.get("sha") == sha
+
+
+def _judge(event: dict, repo: Path, state, slug: str, sha: str, *, artifacts: Path,
+           base_ids_cache: Path | None, base_ids_artifact: Path | None, publish: bool,
+           environ: Mapping[str, str]) -> int:
+    run = event.get("workflow_run")
     default = github.event_repo(event)[1]
 
     def finish(ev: Evaluation, number: int | None = None) -> int:
@@ -198,7 +225,7 @@ def main(event_path: Path, *, artifacts: Path, base_ids_cache: Path | None,
         if not publish:
             return _print(ev)
         if number is not None:
-            if github.pull(state, repo, slug, number)["head"]["sha"] != sha:
+            if not _head_is(state, repo, slug, number, sha):
                 print("verdict: la PR è avanzata dopo l'evento, nessuna scrittura (la "
                       "rigiudica l'evento nuovo)")
                 return 0
@@ -217,15 +244,17 @@ def main(event_path: Path, *, artifacts: Path, base_ids_cache: Path | None,
     if not numbers:
         numbers = [p["number"] for p in github.prs_for_commit(state, repo, slug, sha)
                    if p.get("state") == "open" and (p.get("head") or {}).get("sha") == sha]
-    pulls = [github.pull(state, repo, slug, n) for n in dict.fromkeys(numbers)]
+    pulls = [p for p in (github.pull(state, repo, slug, n) for n in dict.fromkeys(numbers))
+             if p.get("state", "open") == "open"]
     here = [p for p in pulls if (p.get("base") or {}).get("ref") == default]
     for other in pulls:
-        if other not in here:       # nessuno stato: sono per SHA e vincerebbe l'ultimo scritto
+        if other not in here and (other.get("head") or {}).get("sha") == sha:
+            # nessuno stato: sono per SHA e vincerebbe l'ultimo scritto
             _not_applicable(state, repo, slug, other["number"], sha, publish)
     if not here:
         return 0 if pulls else finish(_error(prechecks(event, None, default_branch=default,
                                                        open_prs_for_sha=shared)[1]))
-    pr = next((p for p in here if p["head"]["sha"] == sha), here[0])
+    pr = next((p for p in here if (p.get("head") or {}).get("sha") == sha), here[0])
     outcome, reason = prechecks(event, pr, default_branch=default, open_prs_for_sha=shared)
     if outcome == "error":
         return finish(_error(reason))
@@ -239,6 +268,8 @@ def main(event_path: Path, *, artifacts: Path, base_ids_cache: Path | None,
 def _not_applicable(state, repo, slug, number: int, sha: str, publish: bool) -> None:
     if not publish:
         print(f"verdict: PR #{number}: {NOT_APPLICABLE}")
+        return
+    if not _head_is(state, repo, slug, number, sha):
         return
     with tempfile.TemporaryDirectory(prefix="tollgate-verdict-") as tmp:
         body = _write(tmp, "comment.md", _na_body(sha))

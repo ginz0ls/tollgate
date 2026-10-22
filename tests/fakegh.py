@@ -18,13 +18,15 @@ stato `HTTP/2.0 403 Forbidden` terminata da `\n`, le intestazioni terminate da `
 vuota `\r\n`, il corpo JSON senza a capo finale; con codice >= 400 esce con 1 e su stderr
 `gh: <message> (HTTP <codice>)`. Senza `--include` il corpo è il solo stdout.
 Scritture (REST, `--method POST|PATCH`): `repos/o/r/statuses/<sha>` (corpo da `--input`) si
-accoda in testa a `commit_statuses[<sha>]` con `creator.login = "github-actions[bot]"`; i commenti
-(`-F body=@<file>`) si accodano a `comments` della PR o dell'issue, anche di `open_issues` (`POST issues/<n>/comments`) o
-si riscrivono (`PATCH issues/comments/<id>`); `POST repos/o/r/issues` accoda a `open_issues` (con `body`).
+accoda in testa a `commit_statuses[<sha>]` con `creator.login = "github-actions[bot]"`; i
+commenti (`-F body=@<file>`) si accodano a `comments` della PR o dell'issue, anche di
+`open_issues` (`POST issues/<n>/comments`), o si riscrivono (`PATCH issues/comments/<id>`);
+`POST repos/o/r/issues` accoda a `open_issues` (con `body`).
 Letture: `commits/<sha>/statuses` (da `commit_statuses`, vuoto se manca), `commits/<sha>/pulls`
 (da `commit_pulls`, vuoto se manca), `pulls/<n>` (da `pulls[<n>]`, come la REST: `body`,
-`head.sha|ref|repo.full_name`, `base.ref`, `state`; 404 se manca) e `issues?state=open` (da `open_issues`, senza le righe con `pull_request`, che il filtro
-scarta), un valore per riga; il `--jq` non si valuta: i dati hanno già la forma che il filtro produce.
+`head.sha|ref|repo.full_name`, `base.ref`, `state`; 404 se manca) e `issues?state=open` (da
+`open_issues`, senza le righe con `pull_request`, che il filtro scarta), un valore per riga; il
+`--jq` non si valuta: i dati hanno già la forma che il filtro produce.
 `prs[].comments` si leggono con `pr view --json comments` come li dà GraphQL
 (`author.login = "github-actions"`) e con `api repos/o/r/issues/<n>/comments` come li dà REST
 (`user.login = "github-actions[bot]"`, `user.type = "Bot"`); il `--jq` non si valuta.

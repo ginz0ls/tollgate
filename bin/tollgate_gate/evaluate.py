@@ -35,6 +35,13 @@ _WAIVER_KEYS = {"test": "waiver_test", "ci": "waiver_ci", "threshold": "waiver_t
                 "command": "waiver_command"}
 
 
+def pr_issue_number(pr) -> int | None:
+    """L'issue di una PR (decisione 8), l'unica regola: dal ramo `tg/<N>-*` (non da un fork),
+    altrimenti da «Closes #N»."""
+    branch = None if pr.cross_repo else prref.issue_from_branch(pr.head_ref)
+    return branch or prref.closes_issue(pr.body)
+
+
 class Context:
     """I fatti che più famiglie leggono, calcolati una sola volta."""
 
@@ -62,8 +69,7 @@ class Context:
         locale, senza PR, dal blocco o dall'issue letta."""
         i = self.inputs
         if i.pr is not None:
-            branch = None if i.pr.cross_repo else prref.issue_from_branch(i.pr.head_ref)
-            return branch or prref.closes_issue(i.pr.body)
+            return pr_issue_number(i.pr)
         if i.block and isinstance(i.block.get("issue"), int):
             return i.block["issue"]
         return i.issue.number if i.issue else None

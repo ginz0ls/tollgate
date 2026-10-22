@@ -534,11 +534,28 @@ class CliTest(VerdictBase):
         self.assertEqual(code, 0)
         self.assertEqual(self.statuses()["tollgate/verdict"]["state"], "success")
 
-    def test_gh_failure_is_a_clean_refusal(self):
-        self.data.write_text(json.dumps({"api_status": {}}))      # niente PR: gh esce con 1
+    def chdir_repo(self):
         cwd = os.getcwd()
         os.chdir(self.lab.repo)
         self.addCleanup(os.chdir, cwd)
+
+    def test_read_failure_writes_explicit_error_through_cli(self):
+        """`pulls/<n>` assente: gh esce con 1, ma gli stati si possono scrivere."""
+        self.set_gh(pulls={})
+        self.chdir_repo()
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            code = cli.main(["evaluate", "--event", str(self.event()), "--artifacts",
+                             str(self.art), "--publish"])
+        self.assertEqual(code, 0)
+        self.assert_error(verdict.DESC_ERROR)
+        self.assertNotIn("Traceback", err.getvalue())
+
+    def test_status_write_failure_is_a_clean_refusal(self):
+        """Se nemmeno lo stato si scrive l'uscita è 1, senza traceback."""
+        self.set_gh(pulls={}, api_status={f"repos/{SLUG}/statuses/{self.sha}": {
+            "status": 403, "message": "Forbidden", "body": {"message": "Forbidden"}}})
+        self.chdir_repo()
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
             code = cli.main(["evaluate", "--event", str(self.event()), "--artifacts",
@@ -546,6 +563,156 @@ class CliTest(VerdictBase):
         self.assertEqual(code, 1)
         self.assertIn("gate evaluate:", err.getvalue())
         self.assertNotIn("Traceback", err.getvalue())
+        self.assertNotIn("commit_statuses", self.gh_data())
+
+
+class BoundaryTest(VerdictBase):
+    """Con `--publish`, noto lo SHA, ogni esito scrive `error` espliciti (decisione 5)."""
+
+    def assert_explicit_error(self):
+        got = self.assert_error(verdict.DESC_ERROR)
+        self.assertLessEqual(len(got["tollgate/verdict"]["description"]), 140)
+
+    def test_unexpected_failures_write_explicit_error(self):
+        real_pull = github.pull
+        calls = []
+
+        def pull_fails_on_recheck(state, cwd, slug, n):
+            calls.append(n)
+            if len(calls) > 1:
+                raise ghcli.GhError("rate limit")
+            return real_pull(state, cwd, slug, n)
+
+        bad_head = self.rest_pull(head={"sha": self.sha, "repo": {"full_name": SLUG}})
+        cases = {
+            "shared": lambda: mock.patch.object(github, "shared_sha_prs",
+                                                side_effect=ghcli.GhError("HTTP 502")),
+            "pull": lambda: mock.patch.object(github, "pull",
+                                              side_effect=ghcli.GhError("HTTP 500")),
+            "recheck": lambda: mock.patch.object(github, "pull", pull_fails_on_recheck),
+            "pr_from_rest": lambda: _set(self, pull=bad_head),
+            "evaluate": lambda: mock.patch.object(verdict.evaluate, "evaluate",
+                                                  side_effect=RuntimeError("boom")),
+        }
+        for name, setup in cases.items():
+            with self.subTest(name):
+                self.set_gh()
+                calls.clear()
+                with setup(), contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(self.run_verdict(), 0)
+                self.assert_explicit_error()
+                self.assertEqual(self.comments(), [])
+
+    def test_unwritable_status_exits_1(self):
+        err = io.StringIO()
+        with mock.patch.object(github, "shared_sha_prs", side_effect=ghcli.GhError("x")), \
+                mock.patch.object(github, "set_status", side_effect=ghcli.GhError("403")), \
+                contextlib.redirect_stderr(err):
+            self.assertEqual(self.run_verdict(), 1)
+        self.assertIn("403", err.getvalue())
+
+    def test_no_publish_prints_reason_and_exits_nonzero(self):
+        err = io.StringIO()
+        with mock.patch.object(github, "shared_sha_prs", side_effect=ghcli.GhError("HTTP 502")), \
+                contextlib.redirect_stderr(err):
+            self.assertNotEqual(self.run_verdict(publish=False), 0)
+        self.assertIn("HTTP 502", err.getvalue())
+        self.assertNotIn("commit_statuses", self.gh_data())
+
+    def test_not_applicable_and_superseded_still_write_no_error(self):
+        self.set_gh(pull=self.rest_pull(base={"ref": "other"}))
+        self.run_verdict()
+        self.assertNotIn("commit_statuses", self.gh_data())
+
+
+@contextlib.contextmanager
+def _set(case, **kw):
+    case.set_gh(**kw)
+    yield
+
+
+class MinorsTest(VerdictBase):
+    def test_not_applicable_comment_skips_pr_with_another_head(self):
+        other = self.rest_pull(number=2, base={"ref": "other"},
+                               head={"sha": "b" * 40, "ref": "x", "repo": {"full_name": SLUG}})
+        self.set_gh(pulls={"1": self.rest_pull(), "2": other},
+                    prs=[{"number": 1, "comments": []}, {"number": 2, "comments": []}])
+        self.run_verdict(self.event(pull_requests=[{"number": 1}, {"number": 2}]))
+        prs = {p["number"]: p["comments"] for p in self.gh_data()["prs"]}
+        self.assertEqual(prs[2], [])
+        self.assertEqual(len(prs[1]), 1)
+
+    def test_not_applicable_comment_rechecks_head(self):
+        real, calls = github.pull, []
+
+        def advancing(state, cwd, slug, n):
+            calls.append(n)
+            pull = real(state, cwd, slug, n)
+            if len(calls) > 1:
+                pull["head"]["sha"] = "c" * 40
+            return pull
+
+        self.set_gh(pull=self.rest_pull(base={"ref": "other"}))
+        with mock.patch.object(github, "pull", advancing):
+            self.run_verdict()
+        self.assertEqual(self.comments(), [])
+
+    def test_closed_pr_from_payload_is_ignored(self):
+        self.set_gh(pull=self.rest_pull(state="closed"))
+        self.run_verdict()
+        self.assert_error("nessuna PR")
+
+    def test_closed_pr_with_same_head_is_not_chosen(self):
+        self.set_gh(pulls={"1": self.rest_pull(state="closed"), "2": self.rest_pull(number=2)},
+                    prs=[{"number": 1, "comments": []}, {"number": 2, "comments": []}])
+        self.run_verdict(self.event(pull_requests=[{"number": 1}, {"number": 2}]))
+        prs = {p["number"]: p["comments"] for p in self.gh_data()["prs"]}
+        self.assertEqual((len(prs[1]), len(prs[2])), (0, 1))
+
+    def test_malformed_recheck_response_writes_nothing(self):
+        real, calls = github.pull, []
+
+        def malformed(state, cwd, slug, n):
+            calls.append(n)
+            pull = real(state, cwd, slug, n)
+            if len(calls) > 1:
+                pull.pop("head")
+            return pull
+
+        with mock.patch.object(github, "pull", malformed), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(self.run_verdict(), 0)
+        self.assertNotIn("commit_statuses", self.gh_data())
+
+    def test_fork_pr_with_closed_issue_is_red(self):
+        pull = self.rest_pull(body=f"Closes #{ISSUE}\n",
+                              head={"sha": self.sha, "ref": BRANCH,
+                                    "repo": {"full_name": "altro/r"}})
+        self.set_gh(pull=pull, issue={"number": ISSUE, "state": "CLOSED", "labels": []})
+        self.run_verdict()
+        self.assertEqual(self.statuses()["tollgate/verdict"]["state"], "failure")
+        self.assertIn("non è aperta", self.comments()[0]["body"])
+
+
+class IssueRuleTest(unittest.TestCase):
+    """La regola «issue della PR» sta in `evaluate.pr_issue_number`, usata anche da `verdict`."""
+
+    def pr(self, ref, body="", cross=False):
+        from tollgate_gate.model import PrFacts
+        return PrFacts(1, "a" * 40, ref, "main", "main", body, cross)
+
+    def test_rule(self):
+        from tollgate_gate import evaluate
+        cases = [(self.pr("tg/7-x", "Closes #9"), 7), (self.pr("tg/7-x"), 7),
+                 (self.pr("tg/7-x", "Closes #9", cross=True), 9),
+                 (self.pr("tg/7-x", cross=True), None), (self.pr("fix/x", "Fixes #4"), 4),
+                 (self.pr("fix/x"), None)]
+        for pr, want in cases:
+            with self.subTest(pr=pr):
+                self.assertEqual(evaluate.pr_issue_number(pr), want)
+
+    def test_verdict_has_no_copy(self):
+        self.assertFalse(hasattr(verdict, "_issue_number"))
 
 
 class SharedShaPrsTest(VerdictBase):
