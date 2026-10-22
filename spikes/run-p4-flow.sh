@@ -15,6 +15,15 @@
 #   passo4    solo se verdict è rosso: /tollgate:start #N e `task start --from-gate`, un solo giro
 #   registra  versione di claude, sessioni, eventi, token (`tollgate stats`), PATH del tool Bash, comandi gh del modello
 #
+# Modello di minaccia. Il modello è cooperativo: esegue le skill di tollgate. `--disallowedTools` e il gh con guardia sono un
+# primo argine; l'audit dei comandi (flowcheck.py) copre i vettori che elenca (gh per percorso o dietro un prefisso, git push,
+# eval, python -c, manomissioni dei file della guardia) ed è un segnale. La GARANZIA è la verifica dello stato prima e dopo ogni
+# passo (flowstate.py): hash di wrapper, guardia e script, registro gh-wrap.log copiato e solo crescente, `git ls-remote` con main
+# invariato e soli refs/heads/tg/* avanzati senza forzature, PR, issue e protezione di main invariate. Non impedisce un effetto:
+# lo rileva, qualunque sia il comando che lo ha prodotto, e rende il caso «non riuscito» (uscita 3, riga esplicita in
+# <id>-stato.txt). Il wrapper scarta GH_TOKEN e GH_CONFIG_DIR dell'ambiente: l'autenticazione di gh deve stare nella sua
+# configurazione, non in una variabile d'ambiente del controller (altrimenti il passo fallisce, in modo visibile).
+#
 # Cautele: `claude -p` solo qui, solo da /tmp/tollgate-p4/flow e sempre con --plugin-dir (lo script lo controlla).
 # Prima di ogni passo `git remote get-url --push origin` deve essere protected; TOLLGATE_GH non impostata. Il gh del
 # modello è il wrapper con guardia (profilo flow: niente creazione di issue, merge, chiusure, scritture api); in più
@@ -91,6 +100,35 @@ worktree_lavoro() { # il worktree del ramo tg/<N>-*, sempre sotto $FLOW
 
 # ---------------------------------------------------------------- un passo con claude -p
 
+# state_snapshot <id> <prima|dopo>: l'istantanea dello stato (hash, registro, ls-remote, PR, issue, protezione) in <id>-stato-<quando>/.
+# Le letture di GitHub passano dal gh con guardia del controller (profilo script), non dal wrapper del flusso.
+state_snapshot() {
+  local id="$1" when="$2" d="$LOGS/$id-stato-$2" l="$id-stato-$2"
+  check_remote protected || die "git remote get-url --push origin non è protected: mi fermo"
+  rot "$d"
+  gh_call "$l-pr" pr list --repo "$PROT" --state all --limit 100 --json number,state,headRefName,baseRefName,mergedAt
+  gh_call "$l-issue" issue list --repo "$PROT" --state all --limit 100 --json number,state
+  gh_call "$l-protezione" api "repos/$PROT/branches/main/protection"
+  { cat "$OUT/$l-protezione.out"; echo "rc=$(cat "$OUT/$l-protezione.rc")"; } > "$OUT/$l-protezione.txt"
+  python3 -B -I "$GH4/flowstate.py" snapshot "$d" --repo "$REPO" --log "$LOGS/gh-wrap.log" --pr "$OUT/$l-pr.out" \
+    --issue "$OUT/$l-issue.out" --protection "$OUT/$l-protezione.txt" \
+    --tool "$GHBIN/gh" --tool "$GH4/ghwrap.py" --tool "$GH4/ghguard.py" --tool "$GH4/flowcheck.py" \
+    --tool "$GH4/flowstate.py" --tool "$GH4/common.sh" --tool "$here/run-p4-flow.sh" || die "istantanea dello stato non riuscita"
+}
+
+# state_compare <id>: stato prima e dopo il passo; una differenza ferma lo script (uscita 3)
+state_compare() {
+  local id="$1"
+  rot "$LOGS/$id-stato.txt"
+  if python3 -B -I "$GH4/flowstate.py" compare "$LOGS/$id-stato-prima" "$LOGS/$id-stato-dopo" --repo "$REPO" > "$LOGS/$id-stato.txt" 2>&1; then
+    tail -n 1 "$LOGS/$id-stato.txt"
+  else
+    cat "$LOGS/$id-stato.txt" >&2
+    echo "STOP dopo $id: lo stato è cambiato fuori dagli effetti attesi: il passo è NON RIUSCITO (vedi $LOGS/$id-stato.txt)" >&2
+    return 3
+  fi
+}
+
 # claude_step <id> <cartella> <cartella dei gh> <strumenti> <prompt>
 claude_step() {
   local id="$1" dir="$2" bindir="$3" tools="$4" prompt="$5" rc=0 cmd
@@ -104,6 +142,7 @@ claude_step() {
   case " ${cmd[*]} " in *" --plugin-dir "*) ;; *) die "claude -p senza --plugin-dir" ;; esac
   { printf 'cwd: %s\nPATH in testa: %s\n' "$dir" "$bindir"; printf '%q ' "${cmd[@]}"; printf '\n'; } > "$LOGS/$id.argv"
   log_cmd "claude -p $id (cwd $dir, PATH $bindir)"
+  state_snapshot "$id" prima
   if [ "$CHECK" = 1 ]; then
     check_canned "$id" "$dir" "$bindir"
   else
@@ -115,6 +154,8 @@ claude_step() {
   fi
   echo "$id: uscita $rc (cwd $dir)" | tee -a "$LOGS/exit-codes.txt"
   verifica_push
+  state_snapshot "$id" dopo
+  state_compare "$id" || return 3
   return "$rc"
 }
 
@@ -303,6 +344,13 @@ check_canned() {
   esac
   [ "$id" = shim ] || printf '%s gh pr list --head %s --state all --limit 100 --json number,state,url,headRefOid,mergedAt,isCrossRepository --repo %s\n' \
     "$(date -u +%FT%TZ)" "$branch" "$PROT" >> "$LOGS/gh-wrap.log"
+  case "${P4_CHECK_TAMPER:-}" in      # solo nel banco di prova: un effetto fuori elenco che la verifica dello stato deve vedere
+    hash) chmod u+w "$GHBIN/gh"; echo "# manomesso" >> "$GHBIN/gh"; chmod 555 "$GHBIN/gh" ;;
+    log) : > "$LOGS/gh-wrap.log" ;;
+    main) git -C "$REPO" -c user.name=fake -c user.email=fake@example.invalid commit -q --allow-empty -m manomissione \
+            && git -C "$REPO" push -q origin HEAD:main ;;
+    ref) git -C "$REPO" push -q origin HEAD:refs/heads/altro ;;
+  esac
   python3 -B - "$LOGS/$id.jsonl" "$id" "$dir" "$tool_use" "$result" <<'PY'
 import json, sys
 path, sid, cwd, command, result = sys.argv[1:6]
@@ -390,6 +438,14 @@ PY
   else echo "modo registra (transcript ostile): ok (audit non riuscito, come atteso)"; fi
   grep -q 'git push --for' "$LOGS_CHECK/audit.txt" && grep -q 'audit: non riuscito' "$LOGS_CHECK/audit.txt" || { echo "  l'audit non ha segnalato il transcript ostile"; rc=1; }
   mv "$LOGS_CHECK/passo9.jsonl" "$LOGS_CHECK/passo9.ostile.txt"
+  echo "--- la verifica dello stato rileva ogni manomissione (uscita 3, riga esplicita)"
+  for f in hash log main ref; do
+    if P4_CHECK_TAMPER="$f" bash "$here/run-p4-flow.sh" shim >"$T/modo-shim-$f.log" 2>&1; then
+      echo "  manomissione $f: NON rilevata"; rc=1
+    elif grep -q "NON RIUSCITO" "$T/modo-shim-$f.log" && grep -q "STATO CAMBIATO" "$T/modo-shim-$f.log"; then
+      echo "  manomissione $f: rilevata"
+    else echo "  manomissione $f: uscita non zero ma senza la riga attesa"; rc=1; fi
+  done
   echo "--- attese andate a tetto nei modi (nel banco di prova non devono esserci)"
   if grep -l "non completi\|non comparso\|non comparsi\|non completato" "$T"/modo-*.log 2>/dev/null; then rc=1; else echo "  nessuna"; fi
   echo "--- i comandi claude che verrebbero lanciati"

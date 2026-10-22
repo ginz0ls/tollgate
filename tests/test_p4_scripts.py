@@ -72,6 +72,22 @@ class GiroUnoTest(unittest.TestCase):
         self.assertNotIn('P4_REPO="$PROT" P4_PROFILE', text)     # profilo e repo non passano dall'ambiente del passo
 
 
+class StateVerificationTest(unittest.TestCase):
+    def test_every_claude_step_is_wrapped_by_the_state_verification(self):
+        text = (SPIKES / "run-p4-flow.sh").read_text()
+        step = text.split("claude_step() {")[1].split("\n}\n")[0]
+        self.assertLess(step.index('state_snapshot "$id" prima'), step.index("timeout "))
+        self.assertLess(step.index("timeout "), step.index('state_snapshot "$id" dopo'))
+        self.assertIn('state_compare "$id" || return 3', step)
+        self.assertEqual(text.count("P4_CHECK_TAMPER"), 2)          # letta solo in check_canned, usata da controlla
+
+    def test_tamper_switch_exists_only_inside_check_canned(self):
+        text = (SPIKES / "run-p4-flow.sh").read_text()
+        body = text.split("check_canned() {")[1].split("\nwrite_fake_gh")[0]
+        self.assertIn('${P4_CHECK_TAMPER:-}', body)
+        self.assertNotIn("P4_CHECK_TAMPER", text.split("check_canned() {")[0])
+
+
 class ControllaTest(unittest.TestCase):
     def run_controlla(self, script: Path, **env) -> str:
         tmp = Path(tempfile.mkdtemp(prefix="tollgate-p4-controlla-"))
@@ -108,6 +124,8 @@ class ControllaTest(unittest.TestCase):
         self.assertIn("uguali: sì", out)
         self.assertIn("esito: riuscito", out)
         self.assertIn("vietato\tgh issue create", out)
+        for kind in ("hash", "log", "main", "ref"):
+            self.assertIn(f"manomissione {kind}: rilevata", out)
 
 
 if __name__ == "__main__":

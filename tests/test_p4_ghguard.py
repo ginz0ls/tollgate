@@ -309,11 +309,32 @@ class GeneratedWrapperTest(unittest.TestCase):
 
     def test_hostile_environment_changes_nothing(self):
         for env in ({"P4_PROFILE": "script"}, {"P4_REPO": DET}, {"P4_REAL_GH": "/bin/true"}, {"P4_LOG": "/dev/null"},
-                    {"P4_OUT": str(self.tmp), "P4_WORK": str(self.tmp), "P4_TMP": "/"}, {"GH_REPO": DET}):
+                    {"P4_OUT": str(self.tmp), "P4_WORK": str(self.tmp), "P4_TMP": "/"}, {"GH_REPO": DET},
+                    {"GH_HOST": "altro.example"}, {"GH_CONFIG_DIR": str(self.tmp)}, {"BASH_ENV": str(self.tmp / "evil.sh")},
+                    {"ENV": str(self.tmp / "evil.sh")}):
             r, ran = self.call("pr", "merge", "5", "--squash", **env)
             self.assertEqual(r.returncode, 126, env)
             self.assertFalse(ran, env)
         self.assertIn("RIFIUTATO", self.log.read_text())
+
+    def test_credentials_and_host_variables_are_dropped_without_reading_them(self):
+        probe = self.tmp / "gh-sonda"
+        probe.write_text(f'#!/bin/sh\nenv | cut -d= -f1 | sort > "{self.tmp}/nomi.txt"\n')
+        probe.chmod(0o755)
+        dest = self.tmp / "ghbin" / "gh2"
+        subprocess.run([sys.executable, "-B", "-I", str(GH4 / "ghwrap.py"), "make-wrapper", str(dest), "--real", str(probe),
+                        "--repo", PROT, "--profile", "flow", "--log", str(self.log), "--tmp", str(self.tmp / "flow")],
+                       check=True)
+        env = {"PATH": os.environ["PATH"]}
+        dropped = ("GH_HOST", "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN",
+                   "GH_CONFIG_DIR", "BASH_ENV", "ENV", "GH_REPO", "TMPDIR")
+        env.update({name: "valore-finto" for name in dropped})
+        r = subprocess.run([str(dest), "pr", "list", "--head", "tg/7-x", "--state", "all", "--limit", "100", "--json",
+                            "number"], capture_output=True, text=True, env=env, cwd=self.tmp)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        names = (self.tmp / "nomi.txt").read_text().split()
+        for name in dropped:
+            self.assertNotIn(name, names)
 
     def test_body_file_roots_are_not_taken_from_the_environment(self):
         r, ran = self.call("pr", "create", "--base", "main", "--head", "tg/7-x", "--title", "t", "--body-file",
@@ -385,7 +406,7 @@ class FlowCheckTest(unittest.TestCase):
         for command in bad:
             with self.subTest(command):
                 self.assertTrue(flowcheck.risky(command), command)
-        for command in ("git push origin tg/7-x", "git status", 'echo "main"', "git push -u origin tg/7-x"):
+        for command in ("git status", 'echo "main"', "git log --oneline"):
             with self.subTest(command):
                 self.assertEqual(flowcheck.risky(command), [], command)
 
@@ -396,7 +417,7 @@ class FlowCheckTest(unittest.TestCase):
             return quiet(flowcheck.cmd_audit, self.tmp, log)
 
     def test_audit_passes_a_clean_run(self):
-        ok = self.audit(["gh pr view 3 --json state", "git push origin tg/7-x"],
+        ok = self.audit(["gh pr view 3 --json state", "git status"],
                         [f"2026-10-22T00:00:00Z gh pr view 3 --json state --repo {PROT}\n",
                          f"2026-10-22T00:00:01Z gh api repos/{PROT}/issues/7\n"])
         self.assertEqual(ok, 0)

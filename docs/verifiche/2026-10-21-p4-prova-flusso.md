@@ -8,6 +8,10 @@ controlli in `spikes/gh-p4/flowcheck.py`. Uscite grezze in `docs/verifiche/evide
 
 **Esito: [da compilare: riuscito / composito / non riuscito].**
 
+## Modello di minaccia e garanzia
+
+Il modello è cooperativo: esegue le skill di tollgate. `--disallowedTools` e il gh con guardia (wrapper generato, valori fissati nel file) sono un primo argine; l'audit dei comandi (`flowcheck.py audit`) copre i vettori che elenca (gh per percorso o dietro un prefisso, `git push` ovunque nella stringa, `eval`, `python -c`, manomissioni dei file della guardia e del registro) ed è un segnale. La **garanzia** è la verifica dello stato prima e dopo ogni passo (`flowstate.py`, `<passo>-stato.txt`): hash di wrapper, guardia e script, registro `gh-wrap.log` copiato e solo crescente, `git ls-remote` con `main` invariato e soli `refs/heads/tg/*` avanzati senza forzature, PR, issue e protezione di `main` invariate. Non impedisce un effetto: lo rileva, qualunque comando lo abbia prodotto, e rende il passo «non riuscito» (uscita 3). Per il rapporto: [da compilare: esito della verifica per ogni passo].
+
 ## Impianto
 
 - Cartella `/tmp/tollgate-p4/flow`: clone di `ginz0ls/tollgate-p4-protected` in `protected/`, stato `state/` con la sentinella `.tollgate-test`, `shim/gh` (gh finto, solo per il passo `shim`),

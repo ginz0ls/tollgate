@@ -73,8 +73,8 @@ def main(argv, env):
 
 def make_wrapper(argv):
     """`make-wrapper <file> --real GH --repo SLUG --profile P --log FILE --tmp DIR`: scrive un `gh` che fissa profilo, repo,
-    gh vero, registro e cartella dei file di ingresso al momento della generazione e scarta le variabili P4_*, TMPDIR e GH_REPO
-    dell'ambiente: ciò che il modello imposta nella sua shell non cambia niente. Il file è di sola lettura."""
+    gh vero, registro e cartella dei file di ingresso al momento della generazione e scarta le variabili P4_*, TMPDIR, GH_REPO, GH_HOST, i token (GH_TOKEN, GITHUB_TOKEN e gli enterprise), GH_CONFIG_DIR, BASH_ENV e ENV
+    dell'ambiente (valori mai letti): ciò che il modello imposta nella sua shell non cambia niente. Il file è di sola lettura."""
     import argparse
     import shlex
     ap = argparse.ArgumentParser(prog="ghwrap.py make-wrapper")
@@ -89,7 +89,7 @@ def make_wrapper(argv):
     text = (
         "#!/usr/bin/env bash\n"
         "# gh con guardia generato da ghwrap.py make-wrapper: valori fissati alla generazione (non letti dall'ambiente)\n"
-        "unset P4_PROFILE P4_REPO P4_REAL_GH P4_LOG P4_OUT P4_WORK P4_TMP TMPDIR GH_REPO\n"
+        "unset P4_PROFILE P4_REPO P4_REAL_GH P4_LOG P4_OUT P4_WORK P4_TMP TMPDIR GH_REPO GH_HOST GH_TOKEN GITHUB_TOKEN \\\n          GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN GH_CONFIG_DIR BASH_ENV ENV\n"
         "export P4_PROFILE=%s P4_REPO=%s P4_REAL_GH=%s P4_LOG=%s P4_TMP=%s\n"
         "exec python3 -B -I %s \"$@\"\n" % (
             shlex.quote(a.profile), shlex.quote(a.repo), shlex.quote(a.real), shlex.quote(a.log), shlex.quote(a.tmp),

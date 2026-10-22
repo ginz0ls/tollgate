@@ -10,6 +10,7 @@
   flowcheck.py sessions <cartella dei log>          id e cartella di ogni sessione (`system`/`init`)
   flowcheck.py shapes                               i gh che il flusso di tollgate fa davvero, ognuno passato da ghguard
 """
+import collections
 import json
 import os
 import re
@@ -176,12 +177,28 @@ def gh_invocations(command):
     return [args for args, _how in gh_calls(command)]
 
 
+PROTECTED_NAMES = re.compile(r"ghbin|gh-p4|gh-wrap|ghwrap|ghguard|flowcheck|flowstate|run-p4")
+TOUCHING = re.compile(r"\b(chmod|chown|rm|mv|ln|cp|tee|truncate|dd|install)\b|\bsed\s+-\S*i|>")
+
+
 def risky(command):
     """I motivi per cui il comando Bash esce dal flusso: nomina `P4_*`, lancia `gh` per percorso o dietro un prefisso, fa
     `git push` forzato, con `+refspec`, `--mirror`, `--delete` o verso main/master."""
     out = []
     if "P4_" in command:
         out.append("nomina P4_*")
+    # segnali sulla stringa grezza (anche dentro `bash -c`, heredoc, alias): non la garanzia, che è la verifica dello stato
+    if re.search(r"\bgit\b[^\n;&|]*\bpush\b", command):
+        out.append("git push nella stringa del comando")
+    if re.search(r"\bgit\b[^\n;&|]*\bconfig\b[^\n;&|]*\b(alias|remote|url)\.", command) \
+            or re.search(r"\bgit\b[^\n;&|]*\bremote\s+(set-url|add|rename|remove|rm)\b", command):
+        out.append("git cambia alias, remoti o url")
+    if re.search(r"(^|[\s;&|(])eval\b", command):
+        out.append("eval")
+    if re.search(r"\bpython[0-9.]*\s+(?:-\S+\s+)*-c\b", command):
+        out.append("python -c")
+    if PROTECTED_NAMES.search(command) and TOUCHING.search(command):
+        out.append("tocca il wrapper, la guardia o il registro")
     for args, how in gh_calls(command):
         if how in ("path", "prefix"):
             out.append("gh lanciato per %s: gh %s" % ("percorso" if how == "path" else "dietro un prefisso", " ".join(args)[:80]))
@@ -210,7 +227,7 @@ def risky(command):
                 out.append("git push verso main: %s" % ref)
         if positional[1:] == [] and positional[:1] in (["main"], ["master"]):
             out.append("git push verso main: %s" % positional[0])
-    return out
+    return list(dict.fromkeys(out))
 
 
 def foreign_repo(args):
@@ -286,10 +303,6 @@ def cmd_events(path, expected):
 WRAP_LINE = re.compile(r"^\S+ (RIFIUTATO )?gh (.*)$")
 
 
-def _key(args):
-    return ("api",) if args and args[0] == "api" else tuple(args[:2])
-
-
 def cmd_audit(folder, wrap_log):
     """L'audit a valle del flusso: ogni chiamata passata dal wrapper (`gh-wrap.log`) è nelle forme ammesse dal profilo flow;
     ogni gh del transcript di ogni passo è ammesso, passato dal wrapper (e non lanciato per percorso o dietro un prefisso),
@@ -318,8 +331,9 @@ def cmd_audit(folder, wrap_log):
                     if why:
                         findings.append("%s: gh %s: %s" % (f.stem, " ".join(args)[:100], why))
                     elif how not in ("path", "prefix"):
-                        seen.append((f.stem, _key(args), " ".join(args)))
-    logged = set()
+                        seen.append((f.stem, " ".join(ghwrap.expand(args, ghguard.PROT)
+                                                      if args and args[0] in ("api", "pr", "issue", "run") else args)))
+    logged = collections.Counter()
     for line in (Path(wrap_log).read_text(errors="replace").splitlines() if Path(wrap_log).is_file() else []):
         m = WRAP_LINE.match(line)
         if not m:
@@ -331,10 +345,12 @@ def cmd_audit(folder, wrap_log):
         why = ghguard.violation(args, lenient=True, profile="flow")
         if why:
             findings.append("wrapper: gh %s: %s" % (m.group(2)[:100], why))
-        logged.add(_key(args))
-    for step, key, text in seen:
-        if key not in logged:
-            findings.append("%s: gh %s visto nel transcript ma non nel registro del wrapper" % (step, text[:100]))
+        logged[" ".join(args)] += 1
+    for step, line in seen:          # riga di comando intera (con --repo e segnaposto espansi), una voce di registro per chiamata
+        if logged[line] > 0:
+            logged[line] -= 1
+        else:
+            findings.append("%s: gh %s visto nel transcript ma non nel registro del wrapper" % (step, line[:100]))
     for f in findings:
         print("FUORI ELENCO\t" + f)
     print("audit: %s (%d voci fuori elenco)" % ("riuscito" if not findings else "non riuscito", len(findings)))
