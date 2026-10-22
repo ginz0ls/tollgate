@@ -47,7 +47,7 @@ class GuardBase(unittest.TestCase):
         (self.tmp / "out").mkdir()
         (self.tmp / "work").mkdir()
         patcher = mock.patch.dict(os.environ, {"P4_OUT": str(self.tmp / "out"), "P4_WORK": str(self.tmp / "work"),
-                                               "TMPDIR": ""})
+                                               "P4_TMP": str(self.tmp / "flow"), "TMPDIR": ""})
         patcher.start()
         os.environ.pop("TMPDIR")
         self.addCleanup(patcher.stop)
@@ -150,7 +150,7 @@ class ReadFormsTest(GuardBase):
 
     def test_flow_profile_forbids_what_the_flow_never_does(self):
         self.ok("pr", "create", "--repo", PROT, "--base", "main", "--head", "tg/7-x", "--title", "t",
-                "--body-file", "/tmp/b.md", profile="flow")
+                "--body-file", f"{self.tmp}/flow/wt/.tollgate-run/7/pr-body.md", profile="flow")
         for args in (["issue", "create", "--repo", PROT, "--title", "x"], ["pr", "merge", "1", "--repo", PROT, "--squash"],
                      ["pr", "close", "1", "--repo", PROT], ["repo", "clone", PROT], ["run", "download", "1", "--repo", PROT]):
             self.no(*args, profile="flow")
@@ -178,6 +178,46 @@ class ReadFormsTest(GuardBase):
         r = subprocess.run([sys.executable, "-B", "-I", str(GH4 / "ghguard.py"), "comandi", str(log)], capture_output=True,
                            text=True, env={**os.environ, "P4_OUT": str(self.tmp / "out"), "P4_WORK": str(self.tmp / "work")})
         self.assertEqual(r.returncode, 1)
+
+
+class TighteningTest(GuardBase):
+    """Giro 1: M-2 (repo create e segreti), M-4 (profilo flow solo le forme del flusso), file di ingresso del flusso."""
+
+    def test_repo_create_visibility_matches_the_repo(self):
+        self.ok("repo", "create", PROT, "--public", "--add-readme")
+        self.ok("repo", "create", DET, "--private", "--add-readme")
+        self.no("repo", "create", DET, "--public", "--add-readme")
+        self.no("repo", "create", PROT, "--private")
+
+    def test_secrets_endpoints_are_refused(self):
+        self.no("api", f"repos/{PROT}/actions/secrets")
+        self.no("api", f"repos/{DET}/actions/secrets/NOME")
+        self.no("api", "--paginate", f"repos/{DET}/dependabot/secrets?per_page=100")
+        self.ok("api", f"repos/{PROT}/actions/permissions")
+
+    def test_flow_profile_has_only_the_flow_forms(self):
+        body = f"{self.tmp}/flow/wt/.tollgate-run/7/pr-body.md"
+        self.ok("pr", "edit", "3", "--repo", PROT, "--body-file", body, profile="flow")
+        for args in (["issue", "close", "5", "--repo", PROT], ["issue", "comment", "5", "--repo", PROT, "--body", "x"],
+                     ["pr", "comment", "3", "--repo", PROT, "--body", "x"],
+                     ["pr", "edit", "3", "--repo", PROT, "--base", "dev"],
+                     ["pr", "edit", "3", "--repo", PROT, "--title", "x"],
+                     ["pr", "edit", "3", "--repo", PROT, "--body", "x"]):
+            self.no(*args, profile="flow")
+            if args[:2] in (["issue", "close"], ["pr", "comment"]):
+                self.ok(*args)          # lo script del gate li usa
+
+    def test_flow_body_files_only_under_the_flow_folder(self):
+        for path in ("/tmp/x.md", "/etc/passwd", f"{self.tmp}/out/x.md", f"{self.tmp}/flow/../x.md"):
+            self.no("pr", "create", "--repo", PROT, "--base", "main", "--head", "tg/7-x", "--title", "t",
+                    "--body-file", path, profile="flow")
+        self.ok("pr", "create", "--repo", PROT, "--base", "main", "--head", "tg/7-x", "--title", "t",
+                "--body-file", f"{self.tmp}/flow/a/b.md", profile="flow")
+
+    def test_tmpdir_of_the_environment_does_not_widen_the_flow_profile(self):
+        with mock.patch.dict(os.environ, {"TMPDIR": "/etc"}):
+            self.no("pr", "create", "--repo", PROT, "--base", "main", "--head", "tg/7-x", "--title", "t",
+                    "--body-file", "/etc/passwd", profile="flow")
 
 
 class WrapperTest(unittest.TestCase):
@@ -244,6 +284,54 @@ class WrapperTest(unittest.TestCase):
         self.assertEqual(r.returncode, 126)
 
 
+class GeneratedWrapperTest(unittest.TestCase):
+    """Il gh del flusso fissa profilo, repo, gh vero e registro al momento della generazione: l'ambiente del modello non li cambia."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="tollgate p4 gen "))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.real = self.tmp / "gh-vero"
+        self.real.write_text(f'#!/bin/sh\nprintf "%s\\n" "$@" > "{self.tmp}/argv.txt"\n')
+        self.real.chmod(0o755)
+        self.dest = self.tmp / "ghbin" / "gh"
+        self.dest.parent.mkdir()
+        self.log = self.tmp / "gh-wrap.log"
+        r = subprocess.run([sys.executable, "-B", "-I", str(GH4 / "ghwrap.py"), "make-wrapper", str(self.dest),
+                            "--real", str(self.real), "--repo", PROT, "--profile", "flow", "--log", str(self.log),
+                            "--tmp", str(self.tmp / "flow")], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def call(self, *args, **env):
+        (self.tmp / "argv.txt").unlink(missing_ok=True)
+        e = {"PATH": os.environ["PATH"], **env}
+        r = subprocess.run([str(self.dest), *args], capture_output=True, text=True, env=e, cwd=self.tmp)
+        return r, (self.tmp / "argv.txt").exists()
+
+    def test_hostile_environment_changes_nothing(self):
+        for env in ({"P4_PROFILE": "script"}, {"P4_REPO": DET}, {"P4_REAL_GH": "/bin/true"}, {"P4_LOG": "/dev/null"},
+                    {"P4_OUT": str(self.tmp), "P4_WORK": str(self.tmp), "P4_TMP": "/"}, {"GH_REPO": DET}):
+            r, ran = self.call("pr", "merge", "5", "--squash", **env)
+            self.assertEqual(r.returncode, 126, env)
+            self.assertFalse(ran, env)
+        self.assertIn("RIFIUTATO", self.log.read_text())
+
+    def test_body_file_roots_are_not_taken_from_the_environment(self):
+        r, ran = self.call("pr", "create", "--base", "main", "--head", "tg/7-x", "--title", "t", "--body-file",
+                           "/etc/passwd", TMPDIR="/etc", P4_TMP="/etc")
+        self.assertEqual((r.returncode, ran), (126, False))
+
+    def test_allowed_call_goes_to_the_pinned_real_gh_and_the_pinned_repo(self):
+        r, ran = self.call("pr", "list", "--head", "tg/7-x", "--state", "all", "--limit", "100", "--json", "number",
+                           P4_REPO=DET, P4_REAL_GH="/bin/false", GH_REPO=DET)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(ran)
+        self.assertEqual((self.tmp / "argv.txt").read_text().split("\n")[-3:-1], ["--repo", PROT])
+        self.assertIn(f"gh pr list", self.log.read_text())
+
+    def test_the_generated_file_is_not_writable(self):
+        self.assertFalse(os.access(self.dest, os.W_OK) and (self.dest.stat().st_mode & 0o222))
+
+
 def stream(*blocks):
     """Un'uscita stream-json di esempio: `system/init` e, per ogni `(comando, uscita)`, un uso di Bash con il suo risultato."""
     lines = [{"type": "system", "subtype": "init", "session_id": "s-1", "cwd": "/tmp/tollgate-p4/flow/protected"}]
@@ -269,6 +357,72 @@ class FlowCheckTest(unittest.TestCase):
         found = flowcheck.gh_invocations('cd x && GH_PROMPT_DISABLED=1 gh pr list --head tg/7-a | cat; echo "gh issue create"')
         self.assertEqual(found, [["pr", "list", "--head", "tg/7-a"]])
         self.assertEqual(flowcheck.gh_invocations("echo gh; ls"), [])
+
+    def test_gh_invocations_through_prefixes_paths_and_substitutions(self):
+        cases = {
+            "P4_PROFILE=script gh pr merge 5 --squash": [["pr", "merge", "5", "--squash"]],
+            "/usr/bin/gh pr merge 5": [["pr", "merge", "5"]],
+            "command gh pr merge 5": [["pr", "merge", "5"]],
+            "env gh pr merge 5": [["pr", "merge", "5"]],
+            "env -i FOO=1 /opt/bin/gh pr merge 5": [["pr", "merge", "5"]],
+            "exec gh pr merge 5": [["pr", "merge", "5"]],
+            "echo 5 | xargs gh pr merge": [["pr", "merge"]],
+            "bash -c 'gh pr merge 5 && echo ok'": [["pr", "merge", "5"]],
+            'sh -c "cd x; gh issue create --title a"': [["issue", "create", "--title", "a"]],
+            "echo $(gh pr merge 5)": [["pr", "merge", "5"]],
+            "echo `gh pr merge 5`": [["pr", "merge", "5"]],
+            "cd /tmp && gh pr view 3 | cat": [["pr", "view", "3"]],
+        }
+        for command, want in cases.items():
+            with self.subTest(command):
+                self.assertEqual(flowcheck.gh_invocations(command), want)
+
+    def test_dangerous_commands_are_listed(self):
+        bad = ["git push --force origin main", "git push -f origin tg/7-x", "git push origin +HEAD:tg/7-x",
+               "git push origin HEAD:main", "git push origin main", "git -C x push --force-with-lease",
+               "git push origin tg/7-x:refs/heads/main", "P4_PROFILE=script true", "export P4_REAL_GH=/usr/bin/gh",
+               "git push --mirror", "git push origin --delete tg/7-x"]
+        for command in bad:
+            with self.subTest(command):
+                self.assertTrue(flowcheck.risky(command), command)
+        for command in ("git push origin tg/7-x", "git status", 'echo "main"', "git push -u origin tg/7-x"):
+            with self.subTest(command):
+                self.assertEqual(flowcheck.risky(command), [], command)
+
+    def audit(self, transcript_commands, wrap_lines=()):
+        self.write("passo1.jsonl", stream(*[(c, "") for c in transcript_commands]))
+        log = self.write("gh-wrap.log", "".join(wrap_lines))
+        with mock.patch.dict(os.environ, {"P4_TMP": "/tmp/tollgate-p4/flow"}):
+            return quiet(flowcheck.cmd_audit, self.tmp, log)
+
+    def test_audit_passes_a_clean_run(self):
+        ok = self.audit(["gh pr view 3 --json state", "git push origin tg/7-x"],
+                        [f"2026-10-22T00:00:00Z gh pr view 3 --json state --repo {PROT}\n",
+                         f"2026-10-22T00:00:01Z gh api repos/{PROT}/issues/7\n"])
+        self.assertEqual(ok, 0)
+
+    def test_audit_catches_each_bypass_in_the_transcript(self):
+        for command in ("P4_PROFILE=script gh pr merge 5 --squash", "/usr/bin/gh pr merge 5", "command gh pr merge 5",
+                        "env gh pr merge 5", "bash -c 'gh pr merge 5'", "echo $(gh pr merge 5)",
+                        "git push --force origin main", "git push origin HEAD:main", "git push origin +tg/7-x"):
+            with self.subTest(command):
+                self.assertEqual(self.audit([command]), 1)
+
+    def test_audit_catches_a_transcript_gh_that_never_went_through_the_wrapper(self):
+        self.assertEqual(self.audit(["gh pr view 3 --json state"], []), 1)
+
+    def test_audit_catches_out_of_list_and_refused_wrapper_calls(self):
+        self.assertEqual(self.audit([], [f"2026-10-22T00:00:00Z gh pr merge 5 --squash --repo {PROT}\n"]), 1)
+        self.assertEqual(self.audit([], ["2026-10-22T00:00:00Z RIFIUTATO gh issue create --title x\n"]), 1)
+        self.assertEqual(self.audit([], [f"2026-10-22T00:00:00Z gh api repos/{PROT}/issues/7\n"]), 0)
+
+    def test_audit_catches_writes_to_the_wrapper(self):
+        path = self.write("passo2.jsonl", json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "w", "name": "Write", "input": {"file_path": "/tmp/tollgate-p4/flow/ghbin/gh"}}]}}) + "\n")
+        log = self.write("gh-wrap.log", "")
+        with mock.patch.dict(os.environ, {"P4_TMP": "/tmp/tollgate-p4/flow"}):
+            self.assertEqual(quiet(flowcheck.cmd_audit, self.tmp, log), 1)
+        path.unlink()
 
     def test_judge_gh(self):
         self.assertIsNone(flowcheck.judge_gh(["pr", "view", "3", "--json", "comments"]))
@@ -301,8 +455,10 @@ class FlowCheckTest(unittest.TestCase):
         self.assertEqual(quiet(flowcheck.cmd_events, path, "nessuno"), 1)
 
     def test_shapes_all_pass_and_the_forbidden_ones_do_not(self):
-        with mock.patch.dict(os.environ, {"P4_TMP": "/tmp"}):
+        with mock.patch.dict(os.environ, {"P4_TMP": "/tmp/tollgate-p4/flow"}):
             self.assertEqual(quiet(flowcheck.cmd_shapes), 0)
+            body = [a for shape in flowcheck.SHAPES for a in shape if a.endswith("pr-body.md")]
+            self.assertTrue(body and all(".tollgate-run/" in b and b.startswith("/tmp/tollgate-p4/flow/") for b in body))
 
     def test_sessions_are_listed(self):
         self.write("passo1.jsonl", stream(("ls", "x")))

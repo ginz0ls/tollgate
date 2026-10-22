@@ -6,6 +6,7 @@
                                                     uscita 1 se uno è rifiutato o rivolto a un repo non ammesso
   flowcheck.py shim <passo.jsonl> <percorso shim>   l'uscita del tool per `command -v gh` e il confronto con lo shim
   flowcheck.py events <events.jsonl> <atteso>       veti ed effetti degli eventi, contro l'atteso (nessuno|open-pr)
+  flowcheck.py audit <cartella dei log> <gh-wrap.log>   audit a valle: wrapper e transcript contro le forme ammesse, git push, P4_*
   flowcheck.py sessions <cartella dei log>          id e cartella di ogni sessione (`system`/`init`)
   flowcheck.py shapes                               i gh che il flusso di tollgate fa davvero, ognuno passato da ghguard
 """
@@ -23,6 +24,9 @@ import ghwrap  # noqa: E402
 SPLIT = re.compile(r"\|\||&&|[;|\n]")
 ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
+# il corpo della PR, dove lo scrive bin/tollgate_flow/openpr.py: <worktree>/.tollgate-run/<N>/pr-body.md, sotto la cartella di lavoro
+FLOW_DIR = os.environ.get("P4_TMP", "/tmp/tollgate-p4/flow")
+BODY = FLOW_DIR + "/protected/.claude/worktrees/tg-7-prova/.tollgate-run/7/pr-body.md"
 # I gh del flusso di tollgate (bin/tollgate_flow/gh.py, tollgate_gate/github.py): con `{owner}/{repo}` come li scrive la CLI.
 SHAPES = [
     ["auth", "status"],
@@ -34,8 +38,8 @@ SHAPES = [
     ["pr", "view", "3", "--json", "number,state,url,mergedAt"],
     ["pr", "view", "3", "--json", "body"],
     ["pr", "view", "3", "--json", "comments"],
-    ["pr", "create", "--head", "tg/7-prova", "--base", "main", "--title", "prova", "--body-file", "/tmp/tollgate-body/body.md"],
-    ["pr", "edit", "3", "--body-file", "/tmp/tollgate-body/body.md"],
+    ["pr", "create", "--head", "tg/7-prova", "--base", "main", "--title", "prova", "--body-file", BODY],
+    ["pr", "edit", "3", "--body-file", BODY],
     ["api", "repos/{owner}/{repo}/commits/" + "a" * 40 + "/status"],
     ["api", "--include", "repos/{owner}/{repo}/branches/main/protection"],
     ["api", "repos/{owner}/{repo}/actions/permissions"],
@@ -92,20 +96,121 @@ def tool_results(path):
     return out
 
 
-def gh_invocations(command):
-    """Gli argomenti di ogni `gh` che il comando Bash lancia (un `gh` all'inizio di un segmento, dopo eventuali
-    assegnazioni di variabili). Un segmento che non si legge con shlex si salta."""
+OPERATORS = {"&&", "||", ";", "|", "&", "(", ")", "{", "}"}
+PREFIXES = {"command", "exec", "builtin", "nohup", "time", "sudo", "xargs", "nice", "stdbuf"}
+SHELLS = {"bash", "sh", "zsh", "dash"}
+
+
+def _tokens(command):
+    """Le parole del comando con gli operatori della shell come parole a sé, rispettando le virgolette. Un a capo e un
+    backtick valgono come separatore. Un testo che shlex non legge si divide per spazi (peggio: più allarmi, mai meno)."""
+    text = command.replace("`", " ; ").replace("\n", " ; ")
+    lexer = shlex.shlex(text, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    try:
+        return list(lexer)
+    except ValueError:
+        return text.split()
+
+
+def _segments(command):
+    out, cur = [], []
+    for word in _tokens(command):
+        if word in OPERATORS or (word and set(word) <= set("&|;(){}")):
+            if cur:
+                out.append(cur)
+            cur = []
+        else:
+            cur.append(word)
+    if cur:
+        out.append(cur)
+    return out
+
+
+def gh_calls(command, _depth=0):
+    """`[(argomenti, come)]` di ogni `gh` che il comando Bash lancia. `come`: `plain` (gh a inizio comando, anche dopo
+    assegnazioni o dentro `$(...)`), `path` (percorso assoluto o relativo), `prefix` (dietro command, env, exec, xargs...)
+    o `shell` (dentro `bash -c`). Le assegnazioni a P4_* le segnala `risky`."""
     found = []
-    for segment in SPLIT.split(command):
-        try:
-            words = shlex.split(segment, comments=True)
-        except ValueError:
+    if _depth > 4:
+        return found
+    for words in _segments(command):
+        for w in words:             # sostituzioni di comando dentro una parola tra virgolette
+            for m in re.finditer(r"\$\(([^()]*)\)", w):
+                found += gh_calls(m.group(1), _depth + 1)
+        how = "plain"
+        i = 0
+        while i < len(words):
+            w = words[i]
+            if ENV_ASSIGN.match(w):
+                i += 1
+            elif w == "env":
+                how = "prefix"
+                i += 1
+                while i < len(words) and (words[i].startswith("-") or ENV_ASSIGN.match(words[i])):
+                    i += 2 if words[i] in ("-u", "-C", "-S", "--unset", "--chdir") else 1
+            elif w in PREFIXES:
+                how = "prefix"
+                i += 1
+                while w == "xargs" and i < len(words) and words[i].startswith("-"):
+                    i += 1
+            else:
+                break
+        if i >= len(words):
             continue
-        while words and ENV_ASSIGN.match(words[0]):
-            words = words[1:]
-        if words and words[0] == "gh":
-            found.append(words[1:])
+        head = words[i]
+        if os.path.basename(head) == "gh":
+            found.append((words[i + 1:], how if how != "plain" else ("plain" if head == "gh" else "path")))
+            if how != "plain" and head != "gh":
+                found[-1] = (words[i + 1:], "path")
+        elif os.path.basename(head) in SHELLS and "-c" in words[i + 1:]:
+            j = words.index("-c", i + 1)
+            if j + 1 < len(words):
+                found += [(args, "shell") for args, _ in gh_calls(words[j + 1], _depth + 1)]
     return found
+
+
+def gh_invocations(command):
+    """Gli argomenti di ogni `gh` del comando (vedi `gh_calls`)."""
+    return [args for args, _how in gh_calls(command)]
+
+
+def risky(command):
+    """I motivi per cui il comando Bash esce dal flusso: nomina `P4_*`, lancia `gh` per percorso o dietro un prefisso, fa
+    `git push` forzato, con `+refspec`, `--mirror`, `--delete` o verso main/master."""
+    out = []
+    if "P4_" in command:
+        out.append("nomina P4_*")
+    for args, how in gh_calls(command):
+        if how in ("path", "prefix"):
+            out.append("gh lanciato per %s: gh %s" % ("percorso" if how == "path" else "dietro un prefisso", " ".join(args)[:80]))
+    for words in _segments(command):
+        i = 0
+        while i < len(words) and (ENV_ASSIGN.match(words[i]) or words[i] in PREFIXES or words[i] == "env"):
+            i += 1
+        if i >= len(words) or os.path.basename(words[i]) != "git":
+            continue
+        rest = words[i + 1:]
+        j = 0
+        while j < len(rest) and rest[j].startswith("-"):
+            j += 2 if rest[j] in ("-C", "-c", "--git-dir", "--work-tree") else 1
+        if j >= len(rest) or rest[j] != "push":
+            continue
+        args = rest[j + 1:]
+        positional = [a for a in args if not a.startswith("-")]
+        for a in args:
+            if a in ("-f", "--force", "--mirror", "--delete", "-d", "--prune") or a.startswith("--force"):
+                out.append("git push %s" % a)
+        for ref in positional[1:]:
+            if ref.startswith("+"):
+                out.append("git push con +refspec: %s" % ref)
+            dest = ref.lstrip("+").rpartition(":")[2]
+            if dest.removeprefix("refs/heads/") in ("main", "master"):
+                out.append("git push verso main: %s" % ref)
+        if positional[1:] == [] and positional[:1] in (["main"], ["master"]):
+            out.append("git push verso main: %s" % positional[0])
+    return out
 
 
 def foreign_repo(args):
@@ -135,8 +240,8 @@ def judge_gh(args, slug=ghguard.PROT):
 def cmd_gh(path):
     rc = 0
     for _id, command in bash_uses(path):
-        for args in gh_invocations(command):
-            why = judge_gh(args)
+        for args, how in gh_calls(command):
+            why = judge_gh(args) or ("gh lanciato per %s" % how if how in ("path", "prefix") else None)
             print("%s\tgh %s%s" % ("ok" if why is None else "RIFIUTATO", " ".join(args), "" if why is None else "\t# " + why))
             if why:
                 rc = 1
@@ -178,6 +283,64 @@ def cmd_events(path, expected):
     return rc
 
 
+WRAP_LINE = re.compile(r"^\S+ (RIFIUTATO )?gh (.*)$")
+
+
+def _key(args):
+    return ("api",) if args and args[0] == "api" else tuple(args[:2])
+
+
+def cmd_audit(folder, wrap_log):
+    """L'audit a valle del flusso: ogni chiamata passata dal wrapper (`gh-wrap.log`) è nelle forme ammesse dal profilo flow;
+    ogni gh del transcript di ogni passo è ammesso, passato dal wrapper (e non lanciato per percorso o dietro un prefisso),
+    senza `git push` forzato o verso main né riferimenti a P4_*, e nessuno scrive il wrapper. Uscita 1 con le righe `FUORI ELENCO`."""
+    findings = []
+    seen = []
+    for f in sorted(Path(folder).glob("*.jsonl")):
+        if f.name.startswith("events"):
+            continue
+        for ev in events(f):
+            for b in _blocks(ev):
+                if not (isinstance(b, dict) and b.get("type") == "tool_use"):
+                    continue
+                inp = b.get("input") or {}
+                if b.get("name") in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
+                    path = str(inp.get("file_path") or inp.get("notebook_path") or "")
+                    if "/ghbin/" in path or "/gh-p4/" in path or path.endswith("/gh"):
+                        findings.append("%s: scrive il wrapper o la guardia: %s" % (f.stem, path))
+                if b.get("name") != "Bash" or not isinstance(inp.get("command"), str):
+                    continue
+                command = inp["command"]
+                for why in risky(command):
+                    findings.append("%s: %s (comando: %s)" % (f.stem, why, command.replace("\n", " ")[:120]))
+                for args, how in gh_calls(command):
+                    why = judge_gh(args)
+                    if why:
+                        findings.append("%s: gh %s: %s" % (f.stem, " ".join(args)[:100], why))
+                    elif how not in ("path", "prefix"):
+                        seen.append((f.stem, _key(args), " ".join(args)))
+    logged = set()
+    for line in (Path(wrap_log).read_text(errors="replace").splitlines() if Path(wrap_log).is_file() else []):
+        m = WRAP_LINE.match(line)
+        if not m:
+            continue
+        args = m.group(2).split(" ")
+        if m.group(1):
+            findings.append("wrapper: chiamata rifiutata: gh %s" % m.group(2)[:120])
+            continue
+        why = ghguard.violation(args, lenient=True, profile="flow")
+        if why:
+            findings.append("wrapper: gh %s: %s" % (m.group(2)[:100], why))
+        logged.add(_key(args))
+    for step, key, text in seen:
+        if key not in logged:
+            findings.append("%s: gh %s visto nel transcript ma non nel registro del wrapper" % (step, text[:100]))
+    for f in findings:
+        print("FUORI ELENCO\t" + f)
+    print("audit: %s (%d voci fuori elenco)" % ("riuscito" if not findings else "non riuscito", len(findings)))
+    return 1 if findings else 0
+
+
 def cmd_sessions(folder):
     for f in sorted(Path(folder).glob("*.jsonl")):
         if f.name.startswith("events"):
@@ -215,10 +378,11 @@ def main(argv):
         return cmd_shim(argv[2], argv[3])
     if len(argv) == 4 and argv[1] == "events" and argv[3] in ("nessuno", "open-pr"):
         return cmd_events(argv[2], argv[3])
+    if len(argv) == 4 and argv[1] == "audit":
+        return cmd_audit(argv[2], argv[3])
     if len(argv) == 3 and argv[1] == "sessions":
         return cmd_sessions(argv[2])
     if len(argv) == 2 and argv[1] == "shapes":
-        os.environ.setdefault("P4_TMP", "/tmp")
         return cmd_shapes()
     print(__doc__, file=sys.stderr)
     return 2

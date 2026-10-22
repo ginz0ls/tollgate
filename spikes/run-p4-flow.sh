@@ -39,14 +39,22 @@ REPO="$FLOW/protected"
 STATE="$FLOW/state"
 SHIM="$FLOW/shim"                                   # in testa al PATH del solo passo `shim`: gh finto
 GHBIN="$FLOW/ghbin"                                 # in testa al PATH degli altri passi: gh con guardia
-export P4_OUT="$OUT" P4_WORK="$WORK"
+export P4_OUT="$OUT" P4_WORK="$WORK" P4_TMP="$FLOW"     # P4_TMP: i file di ingresso di gh del flusso stanno solo qui sotto
 WAIT_MAX="${P4_WAIT_MAX:-900}"
 POLL="${P4_POLL:-10}"
 RETRY_SLEEP="${P4_RETRY_SLEEP:-5}"
 STEP_TIMEOUT="${P4_STEP_TIMEOUT:-1800}"
 MODEL="${P4_MODEL:-sonnet}"
 TOOLS="Bash,Agent,Skill,EnterWorktree,SendMessage,Read,Write,Edit,Grep,Glob"
-DISALLOWED="Bash(gh repo:*),Bash(gh api:*),Bash(gh auth:*),Bash(gh secret:*),Bash(gh issue create:*)"
+# Divieti per Claude Code (prefissi `Bash(<comando>:*)`): gh pericolosi, git push forzato o verso main, gh per percorso o dietro un
+# prefisso, impostazione inline di P4_*. Il formato non permette un jolly a metà comando né di vietare per regola ogni forma
+# (`git push origin tg/7-x:main`, `bash -c '…'`): ciò che sfugge lo prende l'audit di `registra` (flowcheck.py audit) sul
+# transcript e su gh-wrap.log, che rende la prova «non riuscita».
+DISALLOWED="Bash(gh repo:*),Bash(gh api:*),Bash(gh auth:*),Bash(gh secret:*),Bash(gh issue create:*),\
+Bash(git push --force:*),Bash(git push -f:*),Bash(git push --force-with-lease:*),Bash(git push --mirror:*),Bash(git push --delete:*),\
+Bash(git push origin main:*),Bash(git push origin master:*),Bash(git push origin +:*),Bash(git push -u origin main:*),\
+Bash(*/gh:*),Bash(command gh:*),Bash(env:*),Bash(exec:*),Bash(xargs:*),\
+Bash(P4_PROFILE=:*),Bash(P4_REPO=:*),Bash(P4_REAL_GH=:*),Bash(P4_LOG=:*),Bash(P4_TMP=:*),Bash(export P4_:*)"
 if [ "${PLUGIN_LINK:-0}" = 1 ]; then PLUGIN="$FLOW/plugin"; else PLUGIN="$root"; fi
 REAL_GH="$(command -v gh 2>/dev/null || true)"
 TG=(python3 -B "$PLUGIN/bin/tollgate")
@@ -99,8 +107,9 @@ claude_step() {
   if [ "$CHECK" = 1 ]; then
     check_canned "$id" "$dir" "$bindir"
   else
-    ( cd "$dir" && env -u TOLLGATE_GH -u TOLLGATE_TEST_CONFIG PATH="$bindir:$PATH" TOLLGATE_STATE="$STATE" \
-        P4_REAL_GH="$REAL_GH" P4_REPO="$PROT" P4_PROFILE=flow P4_LOG="$LOGS/gh-wrap.log" \
+    # profilo, repo, gh vero e registro non passano dall'ambiente: li fissa il wrapper generato da prepara
+    ( cd "$dir" && env -u TOLLGATE_GH -u TOLLGATE_TEST_CONFIG -u P4_PROFILE -u P4_REPO -u P4_REAL_GH -u P4_LOG \
+        PATH="$bindir:$PATH" TOLLGATE_STATE="$STATE" \
         timeout "$STEP_TIMEOUT" "${cmd[@]}" < /dev/null ) > "$LOGS/$id.jsonl" 2> "$LOGS/$id.err"
     rc=$?
   fi
@@ -112,12 +121,14 @@ claude_step() {
 # post_passo <id> <atteso degli effetti: nessuno|open-pr>: eventi del DB, comandi Bash e gh del modello; si ferma su un gh rivolto ad altro
 post_passo() {
   local id="$1" expected="$2" rc=0
-  rot "$LOGS/events-$id.jsonl" "$LOGS/$id-eventi.txt" "$LOGS/$id-gh-modello.txt" "$LOGS/$id-comandi-bash.txt"
+  rot "$LOGS/events-$id.jsonl" "$LOGS/events-$id.err" "$LOGS/$id-eventi.txt" "$LOGS/$id-gh-modello.txt" "$LOGS/$id-comandi-bash.txt"
   ( cd "$REPO" && env -u TOLLGATE_GH TOLLGATE_STATE="$STATE" "${TG[@]}" events ) > "$LOGS/events-$id.jsonl" 2> "$LOGS/events-$id.err"
   python3 -B -I "$GH4/flowcheck.py" commands "$LOGS/$id.jsonl" > "$LOGS/$id-comandi-bash.txt" 2>&1
   python3 -B -I "$GH4/flowcheck.py" events "$LOGS/events-$id.jsonl" "$expected" > "$LOGS/$id-eventi.txt" 2>&1 || rc=1
   python3 -B -I "$GH4/flowcheck.py" gh "$LOGS/$id.jsonl" > "$LOGS/$id-gh-modello.txt" 2>&1 || rc=1
-  [ "$rc" = 0 ] || { echo "STOP dopo $id: un gh del modello non è ammesso o gli eventi non sono quelli attesi (vedi $LOGS/$id-gh-modello.txt e $id-eventi.txt)" >&2; return 1; }
+  rot "$LOGS/$id-audit.txt"
+  python3 -B -I "$GH4/flowcheck.py" audit "$LOGS" "$LOGS/gh-wrap.log" > "$LOGS/$id-audit.txt" 2>&1 || rc=1
+  [ "$rc" = 0 ] || { echo "STOP dopo $id: un gh del modello non è ammesso o gli eventi non sono quelli attesi (vedi $LOGS/$id-gh-modello.txt, $id-audit.txt e $id-eventi.txt)" >&2; return 1; }
   return 0
 }
 
@@ -149,7 +160,10 @@ modo_prepara() {
   clone_or_update protected
   check_remote protected || die "il remoto del clone non è quello atteso: mi fermo"
   printf '#!/bin/sh\nexec python3 "%s" "$@"\n' "$root/tests/fakegh.py" > "$SHIM/gh" && chmod +x "$SHIM/gh" || die "shim non scritto"
-  ln -sfn "$GH4/bin/gh" "$GHBIN/gh" || die "gh con guardia non collegato"
+  [ -n "$REAL_GH" ] || die "gh non trovato nel PATH"
+  # il gh del flusso fissa profilo, repo, gh vero e registro nel file stesso (sola lettura): l'ambiente del modello non li cambia
+  python3 -B -I "$GH4/ghwrap.py" make-wrapper "$GHBIN/gh" --real "$REAL_GH" --repo "$PROT" --profile flow \
+    --log "$LOGS/gh-wrap.log" --tmp "$FLOW" || die "gh con guardia non generato"
   [ "$PLUGIN" = "$root" ] || ln -sfn "$root" "$PLUGIN"
   git -C "$REPO" cat-file -e origin/main:.github/workflows/tollgate-guard.yml 2>/dev/null \
     || die "tollgate non è installato su protected: lancia prima run-p4-gate.sh installa protected"
@@ -251,7 +265,9 @@ passo4() {
 modo_registra() {
   require_cmds
   mkdir -p "$LOGS"
-  rot "$LOGS/versione-claude.txt" "$LOGS/sessioni.txt" "$LOGS/stats.json" "$LOGS/status.txt" "$LOGS/git-log-worktree.txt"
+  rot "$LOGS/versione-claude.txt" "$LOGS/sessioni.txt" "$LOGS/stats.json" "$LOGS/stats.err" "$LOGS/status.txt" \
+    "$LOGS/git-log-worktree.txt" "$LOGS/events.jsonl" "$LOGS/events.err" "$LOGS/hooks.log" "$LOGS/skipped.log" \
+    "$LOGS/audit.txt" "$LOGS/audit-esito.txt"
   if [ "$CHECK" != 1 ] && command -v claude >/dev/null 2>&1; then timeout 30 claude --version > "$LOGS/versione-claude.txt" 2>&1 < /dev/null; fi
   ( cd "$REPO" && env -u TOLLGATE_GH TOLLGATE_STATE="$STATE" "${TG[@]}" events > "$LOGS/events.jsonl" 2> "$LOGS/events.err"
     env -u TOLLGATE_GH TOLLGATE_STATE="$STATE" "${TG[@]}" stats > "$LOGS/stats.json" 2> "$LOGS/stats.err"
@@ -260,11 +276,17 @@ modo_registra() {
   python3 -B -I "$GH4/flowcheck.py" sessions "$LOGS" > "$LOGS/sessioni.txt"
   [ -f "$STATE/hook-errors.log" ] && cp "$STATE/hook-errors.log" "$LOGS/hooks.log" || : > "$LOGS/hooks.log"
   [ -f "$STATE/skipped.log" ] && cp "$STATE/skipped.log" "$LOGS/skipped.log"
+  # audit a valle: wrapper e transcript contro le forme ammesse; una voce fuori elenco rende la prova non riuscita
+  python3 -B -I "$GH4/flowcheck.py" audit "$LOGS" "$LOGS/gh-wrap.log" > "$LOGS/audit.txt" 2>&1
+  local audit_rc=$?
+  save_text "$LOGS/audit-esito.txt" "$(tail -n 1 "$LOGS/audit.txt")"
+  cat "$LOGS/audit.txt"
   save_text "$LOGS/ricapitolo.txt" "versione di claude: $(cat "$LOGS/versione-claude.txt" 2>/dev/null)" \
     "sessioni (passo, id, cartella):" "$(cat "$LOGS/sessioni.txt")" \
     "uscite dei passi: $(cat "$LOGS/exit-codes.txt" 2>/dev/null | tr '\n' ';')" \
     "uscita del tool Bash per \`command -v gh\` (passo shim): $(sed -n 's/^uscita del tool: //p' "$LOGS/shim-esito.txt" 2>/dev/null)"
   echo "registrato in $LOGS"
+  [ "$audit_rc" = 0 ] || { echo "AUDIT NON RIUSCITO: la prova del flusso è non riuscita (vedi $LOGS/audit.txt)" >&2; return 1; }
 }
 
 # ---------------------------------------------------------------- controlla (nessuna rete, nessun claude)
@@ -279,6 +301,8 @@ check_canned() {
     shim) tool_use='command -v gh'; result="$bindir/gh" ;;
     *) tool_use='gh pr list --head '"$branch"' --state all --limit 100 --json number,state,url,headRefOid,mergedAt,isCrossRepository'; result='[]' ;;
   esac
+  [ "$id" = shim ] || printf '%s gh pr list --head %s --state all --limit 100 --json number,state,url,headRefOid,mergedAt,isCrossRepository --repo %s\n' \
+    "$(date -u +%FT%TZ)" "$branch" "$PROT" >> "$LOGS/gh-wrap.log"
   python3 -B - "$LOGS/$id.jsonl" "$id" "$dir" "$tool_use" "$result" <<'PY'
 import json, sys
 path, sid, cwd, command, result = sys.argv[1:6]
@@ -350,6 +374,22 @@ modo_controlla() {
   run_mode passo4
   grep -q -- '--from-gate' "$LOGS_CHECK/passo4b.argv" 2>/dev/null || { echo "  passo4b senza task start --from-gate"; rc=1; }
   run_mode registra
+  run_mode registra            # una seconda registra non perde le uscite della prima (rotazione)
+  ls "$LOGS_CHECK"/events.jsonl.prev-* "$LOGS_CHECK"/audit.txt.prev-* >/dev/null 2>&1 || { echo "  la seconda registra non ha ruotato le uscite"; rc=1; }
+  # un transcript con un gh per percorso e un git push forzato verso main: l'audit di registra deve dire «non riuscito»
+  python3 -B - "$LOGS_CHECK/passo9.jsonl" <<'PY'
+import json, sys
+cmds = ["/usr/bin/gh pr merge 5 --squash", "git push --for" + "ce origin main"]
+lines = [{"type": "system", "subtype": "init", "session_id": "finto-9", "cwd": "/x"}]
+for i, c in enumerate(cmds):
+    lines.append({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "h%d" % i, "name": "Bash", "input": {"command": c}}]}})
+open(sys.argv[1], "w").write("".join(json.dumps(x) + "\n" for x in lines))
+PY
+  if bash "$here/run-p4-flow.sh" registra >"$T/modo-registra-ostile.log" 2>&1; then
+    echo "modo registra (transcript ostile): doveva uscire con 1"; rc=1
+  else echo "modo registra (transcript ostile): ok (audit non riuscito, come atteso)"; fi
+  grep -q 'git push --for' "$LOGS_CHECK/audit.txt" && grep -q 'audit: non riuscito' "$LOGS_CHECK/audit.txt" || { echo "  l'audit non ha segnalato il transcript ostile"; rc=1; }
+  mv "$LOGS_CHECK/passo9.jsonl" "$LOGS_CHECK/passo9.ostile.txt"
   echo "--- attese andate a tetto nei modi (nel banco di prova non devono esserci)"
   if grep -l "non completi\|non comparso\|non comparsi\|non completato" "$T"/modo-*.log 2>/dev/null; then rc=1; else echo "  nessuna"; fi
   echo "--- i comandi claude che verrebbero lanciati"

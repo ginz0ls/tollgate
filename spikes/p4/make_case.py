@@ -706,7 +706,7 @@ def _rosso_entita_tools(ctx):
 
 
 @case("error-sha-superato", "protected", "un secondo push mentre `tollgate-run` gira: lo SHA giudicato è superato",
-      expect=[Expect(push="p1", states=_states(ANY, ERROR, ERROR), merge_state="BLOCKED",
+      expect=[Expect(push="p1", states=_states(ANY, ERROR, ERROR),
                      note="verdict su A: error se la testa è già B; success se il run di A ha finito prima del push"),
               Expect(push="p2", states=_states(SUCCESS, SUCCESS, SUCCESS), comments=verdict_comment(),
                      merge_state="CLEAN")], oracle=False)
@@ -769,8 +769,14 @@ def _detect_closes(ctx):
     ctx.simple_pr(ctx.work_body(closes=ctx.extra_issue))
 
 
+@case("detect-push-diretto", "detect", "push diretto su main: tollgate/sentinel rosso e issue",
+      expect=[Expect(push="p1", states={"tollgate/sentinel": FAILURE}, sentinel_issue=True)], oracle=False)
+def _detect_push_diretto(ctx):
+    ctx.direct(f"notes/diretto-{ctx.ts}.md", "push diretto di prova")
+
+
 @case("detect-merge-rosso", "detect",
-      "PR con verdict rosso unita: tollgate/sentinel rosso e issue; poi un push diretto su main: stesso esito, "
+      "(ultimo caso detect: degrada la base di detect, i casi detect lanciati dopo partono da una base senza test_sottrai) PR con verdict rosso unita: tollgate/sentinel rosso e issue; poi un push diretto su main: stesso esito, "
       "commento sulla stessa issue",
       expect=[Expect(push="p1", states=_states(SUCCESS, FAILURE, SUCCESS), comments=verdict_comment()),
               Expect(push="p2", states={"tollgate/sentinel": FAILURE}, sentinel_issue=True),
@@ -780,12 +786,6 @@ def _detect_merge_rosso(ctx):
     work(ctx, "detect-merge-rosso", changes=feature_files(sottrai=False))
     ctx.wait("p1")
     ctx.merge(ctx.branch)
-    ctx.direct(f"notes/diretto-{ctx.ts}.md", "push diretto di prova")
-
-
-@case("detect-push-diretto", "detect", "push diretto su main: tollgate/sentinel rosso e issue",
-      expect=[Expect(push="p1", states={"tollgate/sentinel": FAILURE}, sentinel_issue=True)], oracle=False)
-def _detect_push_diretto(ctx):
     ctx.direct(f"notes/diretto-{ctx.ts}.md", "push diretto di prova")
 
 

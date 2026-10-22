@@ -78,10 +78,11 @@ wait_job_conclusion() { # <file view.out> -> conclusione del job tollgate-base (
 
 modo_installa() {
   local n="${1:-}" repo d sha prop f mode_line
+  INSTALL_FAIL=0
   case "$n" in protected|detect) ;; *) die "uso: $0 installa <protected|detect>" ;; esac
   require_tools
   repo="$(repo_of "$n")"; d="$WORK/$n"
-  if [ "$n" = protected ] && [ "${P4_CONFERMA_PUBBLICO:-0}" != 1 ] && [ "$CHECK" != 1 ]; then
+  if [ "$n" = protected ] && [ "${P4_CONFERMA_PUBBLICO:-0}" != 1 ]; then
     die "su protected il codice di tollgate (la copia del CLI in .github/tollgate) diventa pubblico: dillo all'utente e rilancia con P4_CONFERMA_PUBBLICO=1"
   fi
   clone_or_update "$n"
@@ -92,6 +93,7 @@ modo_installa() {
   if git -C "$d" cat-file -e origin/main:tollgate.toml 2>/dev/null; then
     save_text "$OUT/installa-$n-progetto.txt" "progetto di prova già sul predefinito: $(git -C "$d" rev-parse origin/main)"
   else
+    rot "$OUT/installa-$n-baseline-file.txt"
     python3 -B "$P4/make_case.py" baseline "$n" "$d" >"$OUT/installa-$n-baseline-file.txt" || die "file del progetto non scritti"
     git -C "$d" add -A && git -C "$d" commit -qm "progetto di prova del gate (tollgate P4)" || die "commit del progetto fallito"
     git_call "installa-$n-push-progetto" "$n" push origin main
@@ -137,6 +139,7 @@ modo_installa() {
     save_text "$OUT/installa-$n-commit-vuoto.txt" "$sha"
     installa_attese "$n" "$repo" "$sha" hit
   fi
+  return "$INSTALL_FAIL"
 }
 
 # close_sentinel_issues <etichetta> <repo>: le issue aperte di sentinel si chiudono, perché `sentinel_open` è una voce di
@@ -154,7 +157,7 @@ close_sentinel_issues() {
 # Il primo push (miss) non apre l'issue (criterio 34). Il secondo è un commit vuoto spinto direttamente: sentinel lo
 # segnala (nessuna PR) e apre l'issue; si registra e si chiude, così non pesa sui casi che seguono.
 installa_attese() {
-  local n="$1" repo="$2" sha="$3" kind="$4" label="installa-$n-$4" count
+  local n="$1" repo="$2" sha="$3" kind="$4" label="installa-$n-$4" count verdict34
   wait_run "$label-base" "$repo" tollgate-base.yml "$sha" "" 0 \
     || echo "tollgate-base non completato su $sha ($kind)" >&2
   [ -f "$OUT/$label-base-view.out" ] && save_text "$OUT/$label-base-conclusione.txt" \
@@ -163,11 +166,23 @@ installa_attese() {
   statuses "$label-statuses" "$repo" "$sha"
   if [ "$kind" = miss ]; then
     gh_call "$label-issue-list" issue list --repo "$repo" --state open --limit 100 --json number,title
-    count="$(jq --arg t "$SENTINEL_TITLE" '[.[] | select(.title == $t)] | length' "$OUT/$label-issue-list.out" 2>&1)"
-    save_text "$OUT/$label-issue-sentinel.txt" "issue di sentinel aperte dopo il primo push: $count (atteso 0, criterio 34)"
+    count="$(jq --arg t "$SENTINEL_TITLE" '[.[] | select(.title == $t)] | length' "$OUT/$label-issue-list.out" 2>"$OUT/$label-issue-sentinel.jqerr")"
+    if [ "$count" = 0 ]; then verdict34="riuscito"
+    else verdict34="non riuscito (conteggio: '${count:-illeggibile}', vedi $label-issue-sentinel.jqerr)"; INSTALL_FAIL=1; fi
+    save_text "$OUT/$label-issue-sentinel.txt" "criterio 34, issue di sentinel aperte dopo il primo push: ${count:-?} (atteso 0): $verdict34"
+    echo "criterio 34 ($n): $verdict34"
   else
+    fake_sentinel on
     close_sentinel_issues "$label" "$repo"
+    fake_sentinel off
   fi
+}
+
+# fake_sentinel on|off: solo nel modo controlla, il gh finto mostra o no un'issue di sentinel aperta
+fake_sentinel() {
+  [ "$CHECK" = 1 ] || return 0
+  mkdir -p "$P4_FAKE_STATE"
+  if [ "$1" = on ]; then : > "$P4_FAKE_STATE/sentinel"; else rm -f "$P4_FAKE_STATE/sentinel"; fi
 }
 
 # ---------------------------------------------------------------- protezione
@@ -344,6 +359,7 @@ collect_judged() {
   want_cmt="$(jq -r --arg id "$id" '.expect[] | select(.push == $id) | .sentinel_comments_min // 0' "$CASEJSON")"
   if [ -n "$want_sent" ]; then
     # sentinel scrive prima gli stati e poi l'issue o il commento: si attende che l'issue ci sia (con i commenti attesi)
+    fake_sentinel on
     sentinel_wait "$repo" "$want_cmt"
     gh_call "$label-$id-issue-list" issue list --repo "$repo" --state open --limit 100 --json number,title
     sent="$(jq --arg t "$SENTINEL_TITLE" '[.[] | select(.title == $t)] | length' "$OUT/$label-$id-issue-list.out" 2>/dev/null)"
@@ -402,6 +418,7 @@ modo_caso() {
   gh_call "$label-issue-close" issue close "$issue" --repo "$repo"
   if jq -e '[.expect[].sentinel_issue] | any(. != null)' "$CASEJSON" >/dev/null 2>&1; then
     close_sentinel_issues "$label-fine" "$repo"
+    fake_sentinel off
   fi
   git -C "$d" switch -q main 2>/dev/null
   save_text "$OUT/$label-esito.txt" "$([ "$fail" = 0 ] && echo riuscito || echo "non riuscito (vedi le righe sopra)")"

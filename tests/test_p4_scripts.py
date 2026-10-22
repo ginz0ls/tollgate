@@ -14,7 +14,7 @@ SPIKES = ROOT / "spikes"
 SCRIPTS = [SPIKES / "run-p4-gate.sh", SPIKES / "run-p4-flow.sh", SPIKES / "gh-p4" / "run-p4-checks.sh",
            SPIKES / "gh-p4" / "common.sh", SPIKES / "gh-p4" / "fakegh.sh", SPIKES / "gh-p4" / "bin" / "gh"]
 # una scelta dei casi per il controllo del gate: ogni famiglia di operazioni (PR semplice, due push, due PR, ramo `other`,
-# stato con il token personale, merge, push diretto) senza rifare i 38 casi
+# stato con il token personale, merge, push diretto) senza rifare i 37 casi
 GATE_CASES = "verde-pulita verde-edit error-sha-superato error-due-pr non-applicabile token-personale detect-merge-rosso detect-push-diretto"
 
 
@@ -37,11 +37,39 @@ class ScriptsTest(unittest.TestCase):
 
     def test_no_script_deletes_the_evidence_folders(self):
         for name in ("run-p4-gate.sh", "run-p4-flow.sh"):
-            text = (SPIKES / name).read_text()
+            text = re.sub(r'DISALLOWED="(?:[^"\\]|\\.)*"', "", (SPIKES / name).read_text(), flags=re.S)   # i divieti per il modello nominano push --force
             with self.subTest(name):
                 self.assertNotRegex(text, r"\brm\s+-[a-zA-Z]*r")
                 self.assertNotRegex(text, r"\b(pkill|killall)\b")
                 self.assertNotRegex(text, r"--force|push\s+(-f|--force)|--no-verify|reset --hard")
+
+
+class GiroUnoTest(unittest.TestCase):
+    def test_public_confirmation_does_not_depend_on_p4_check(self):
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-p4-conferma-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("P4_", "TOLLGATE_"))}
+        env.update(P4_CHECK="1", P4_OUT=str(tmp / "out"), P4_WORK=str(tmp / "work"))
+        r = subprocess.run(["bash", str(SPIKES / "run-p4-gate.sh"), "installa", "protected"], capture_output=True,
+                           text=True, env=env, timeout=60)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("diventa pubblico", r.stderr)
+        self.assertFalse((tmp / "work" / "protected").exists())
+
+    def test_baseline_output_is_rotated(self):
+        text = (SPIKES / "run-p4-gate.sh").read_text()
+        self.assertRegex(text, r'rot "\$OUT/installa-\$n-baseline-file\.txt"\n\s+python3 -B "\$P4/make_case\.py" baseline')
+
+    def test_flow_outputs_all_pass_through_rotation(self):
+        text = (SPIKES / "run-p4-flow.sh").read_text()
+        for name in ("events.jsonl", "events.err", "stats.err", "hooks.log", "skipped.log", "audit.txt"):
+            self.assertIn(f'"$LOGS/{name}"', text.split("modo_registra()")[1].split("rot ")[1].split("\n\n")[0], name)
+
+    def test_the_flow_forbids_forced_pushes_and_gh_by_path(self):
+        text = (SPIKES / "run-p4-flow.sh").read_text()
+        for rule in ("git push --force:", "git push -f:", "git push origin main:", "*/gh:", "command gh:", "env:", "P4_PROFILE=:"):
+            self.assertIn(f"Bash({rule}*)", text)
+        self.assertNotIn('P4_REPO="$PROT" P4_PROFILE', text)     # profilo e repo non passano dall'ambiente del passo
 
 
 class ControllaTest(unittest.TestCase):

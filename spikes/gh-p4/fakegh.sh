@@ -74,7 +74,7 @@ case "${1:-}" in
     case "$2" in
       create) n="$(counter issue 0)"; echo "https://github.com/ginz0ls/tollgate-p4-protected/issues/$n"; exit 0 ;;
       close|comment) exit 0 ;;
-      list) echo '[{"number":1,"title":"tollgate: merge non verificato"}]'; exit 0 ;;
+      list) if [ -f "$st/sentinel" ]; then echo '[{"number":1,"title":"tollgate: merge non verificato"}]'; else echo '[]'; fi; exit 0 ;;
       view) echo '{"number":1,"title":"tollgate: merge non verificato","comments":[{"body":"x"}]}'; exit 0 ;;
     esac ;;
   pr)

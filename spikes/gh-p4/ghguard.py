@@ -35,7 +35,9 @@ FIELDS_RE = re.compile(r"^[A-Za-z][A-Za-z,]*$")
 NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 STATES = {"open", "closed", "merged", "all"}
 PROFILES = ("script", "flow")
-FLOW_FORBIDDEN = {("issue", "create"), ("pr", "merge"), ("pr", "close"), ("run", "download")}
+FLOW_FORBIDDEN = {("issue", "create"), ("issue", "close"), ("issue", "comment"), ("pr", "merge"), ("pr", "close"),
+                  ("pr", "comment"), ("run", "download")}
+PROFILE = {"current": "script"}          # il profilo della chiamata in corso (letto da _infile)
 # scritture `gh api` ammesse (decisione 25): descrizione senza spazi, che `comandi.log` non conserva
 STATUS_DESCRIPTION = "prova-token-personale-p4"
 STATUS_CONTEXT = "tollgate/verdict"
@@ -56,6 +58,14 @@ def _under(var, v):
 
 
 def _temp_roots():
+    """Cartelle dei file temporanei dei programmi che chiamano gh per il gate (mktemp di protect.sh): /tmp e $TMPDIR.
+    Nel profilo flow nessuna: i file di ingresso stanno solo sotto P4_TMP, e $TMPDIR del modello non conta."""
+    if PROFILE["current"] == "flow":
+        return set()
+    return _temp_roots_all()
+
+
+def _temp_roots_all():
     """Cartelle dei file temporanei dei programmi che chiamano gh (mktemp di protect.sh, file del corpo di
     tollgate): /tmp e $TMPDIR, mai altrove."""
     roots = {"/tmp"}
@@ -67,6 +77,8 @@ def _temp_roots():
 def _infile(v):
     """File di ingresso letto da gh (--body-file, --input): percorso assoluto normalizzato sotto le cartelle
     dell'ambiente (P4_OUT, P4_WORK, P4_TMP) o sotto i file temporanei."""
+    if PROFILE["current"] == "flow":
+        return _under("P4_TMP", v)
     if _under("P4_OUT", v) or _under("P4_WORK", v) or _under("P4_TMP", v):
         return True
     return os.path.isabs(v) and os.path.normpath(v) == v and any(v.startswith(r + os.sep) for r in _temp_roots())
@@ -190,6 +202,8 @@ def _check_endpoint(ep):
         raise ValueError("endpoint non ammesso: %s" % ep)
     if not re.match(r"^[A-Za-z0-9._~/?&=%:,@+-]+$", ep):
         raise ValueError("endpoint con caratteri non ammessi: %s" % ep)
+    if re.search(r"/secrets(/|\?|$)", ep):
+        raise ValueError("endpoint dei segreti: vietato (decisione 25): %s" % ep)
     if re.search(r"%2e|%2f|%5c|%00", ep, re.IGNORECASE) or ".." in ep or "//" in ep:
         raise ValueError("endpoint con '..', '//' o codifiche sospette: %s" % ep)
     if any(seg == "." for seg in re.split(r"[/?&=]", ep)):
@@ -268,6 +282,12 @@ def _is_write(arg):
     return arg.startswith("-") and arg.split("=", 1)[0] in _WRITE_OPTS or arg[:2] in ("-X", "-f", "-F")
 
 
+def _flow_pr_edit(args):
+    """Nel flusso `pr edit` cambia solo il corpo, da file: mai base, titolo o testo in un argomento."""
+    return any(a.startswith(("--base", "--title", "--body", "-b", "-t")) and not a.startswith("--body-file")
+               for a in args[2:])
+
+
 def violation(args, lenient=False, profile="script"):
     """None se il comando è ammesso, altrimenti il motivo. `profile` è `script` (gli script di prova) o
     `flow` (il `claude -p` del flusso: niente creazione di issue, merge, chiusure, scritture `gh api`)."""
@@ -276,8 +296,11 @@ def violation(args, lenient=False, profile="script"):
     if profile not in PROFILES:
         return "profilo sconosciuto: %s" % profile
     first, second = args[0], (args[1] if len(args) > 1 else "")
+    PROFILE["current"] = profile
     if profile == "flow" and (first == "repo" or (first, second) in FLOW_FORBIDDEN):
         return "gh %s %s non ammesso nel flusso" % (first, second)
+    if profile == "flow" and (first, second) == ("pr", "edit") and _flow_pr_edit(args):
+        return "gh pr edit nel flusso solo con --body-file"
     try:
         if first == "--version":
             return None if len(args) == 1 else "--version con altro"
@@ -288,6 +311,9 @@ def violation(args, lenient=False, profile="script"):
                 if len(args) < 3 or args[2] not in REPOS:
                     return "repo create: repo non ammesso"
                 opts = args[3:]
+                want = "--public" if args[2] == PROT else "--private"
+                if want not in opts:
+                    return "repo create: %s va creato con %s" % (args[2], want)
                 if any(o not in REPO_CREATE_OPTS for o in opts):
                     return "repo create: opzione non ammessa (solo --public|--private --add-readme)"
                 if len(set(opts) & {"--public", "--private"}) != 1:

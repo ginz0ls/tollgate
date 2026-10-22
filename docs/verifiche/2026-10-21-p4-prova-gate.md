@@ -77,6 +77,8 @@ Un caso per riga; «atteso» e «ottenuto» sono gli stati `tollgate/guard`, `to
 | detect-merge-rosso | detect | | | | sentinel=failure | | | |
 | detect-push-diretto | detect | | | | sentinel=failure | | | |
 
+Nota: `detect-merge-rosso` unisce in `main` di detect un cambio con un test tolto e va lanciato per ultimo tra i casi detect: i casi detect lanciati dopo partono da una base degradata (gli identificativi della base non hanno `test_sottrai`). Un ripristino richiederebbe un commit nuovo, mai un reset.
+
 ## Forme lette dal vero (voci di `carry.md`)
 
 - `gh api --paginate --jq` su `statuses`, `issues/<n>/comments`: formato dell'uscita: [da compilare]. `-F body=@file` con `PATCH issues/comments/<id>` (commento aggiornato, non duplicato): [da compilare].

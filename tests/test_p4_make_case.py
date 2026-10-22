@@ -121,6 +121,15 @@ class CasesBuildTest(unittest.TestCase):
                         self.assertTrue(body.startswith(f"Closes #{data['issue']}\n"))
                     self.assertRegex(op["title"], r"^[^\n]+$")
 
+    def test_superseded_sha_case_judges_merge_state_only_on_the_last_push(self):
+        first, last = self.data["error-sha-superato"]["expect"]
+        self.assertIsNone(first["merge_state"])
+        self.assertEqual(last["merge_state"], "CLEAN")
+
+    def test_the_destructive_detect_case_is_the_last_detect_case(self):
+        detect = [n for n, c in make_case.CASES.items() if c.repo == "detect"]
+        self.assertEqual(detect[-1], "detect-merge-rosso")
+
     def test_branch_names(self):
         for name, data in self.data.items():
             with self.subTest(name):

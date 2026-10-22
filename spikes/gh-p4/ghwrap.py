@@ -71,5 +71,38 @@ def main(argv, env):
     os.execv(real, [real, *args])
 
 
+def make_wrapper(argv):
+    """`make-wrapper <file> --real GH --repo SLUG --profile P --log FILE --tmp DIR`: scrive un `gh` che fissa profilo, repo,
+    gh vero, registro e cartella dei file di ingresso al momento della generazione e scarta le variabili P4_*, TMPDIR e GH_REPO
+    dell'ambiente: ciò che il modello imposta nella sua shell non cambia niente. Il file è di sola lettura."""
+    import argparse
+    import shlex
+    ap = argparse.ArgumentParser(prog="ghwrap.py make-wrapper")
+    ap.add_argument("dest")
+    for opt in ("real", "repo", "profile", "log", "tmp"):
+        ap.add_argument("--" + opt, required=True)
+    a = ap.parse_args(argv)
+    if a.repo not in ghguard.REPOS or a.profile not in ghguard.PROFILES or not os.path.isfile(a.real):
+        print("make-wrapper: repo, profilo o gh vero non validi", file=sys.stderr)
+        return 2
+    here = os.path.dirname(os.path.abspath(__file__))
+    text = (
+        "#!/usr/bin/env bash\n"
+        "# gh con guardia generato da ghwrap.py make-wrapper: valori fissati alla generazione (non letti dall'ambiente)\n"
+        "unset P4_PROFILE P4_REPO P4_REAL_GH P4_LOG P4_OUT P4_WORK P4_TMP TMPDIR GH_REPO\n"
+        "export P4_PROFILE=%s P4_REPO=%s P4_REAL_GH=%s P4_LOG=%s P4_TMP=%s\n"
+        "exec python3 -B -I %s \"$@\"\n" % (
+            shlex.quote(a.profile), shlex.quote(a.repo), shlex.quote(a.real), shlex.quote(a.log), shlex.quote(a.tmp),
+            shlex.quote(os.path.join(here, "ghwrap.py"))))
+    if os.path.lexists(a.dest):
+        os.unlink(a.dest)
+    with open(a.dest, "w") as fh:
+        fh.write(text)
+    os.chmod(a.dest, 0o555)
+    return 0
+
+
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["make-wrapper"]:
+        sys.exit(make_wrapper(sys.argv[2:]))
     sys.exit(main(sys.argv[1:], os.environ))
