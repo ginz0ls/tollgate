@@ -22,9 +22,18 @@ _TAG = re.compile(r"(?:^\s*(?:-\s+)*|:\s*|[\[{,]\s*)!")
 # chiave complessa `? `
 _COMPLEX_KEY = re.compile(r"^\s*(?:-\s+)*\?(?:\s|$)")
 _TAB_INDENT = re.compile(r"^[ ]*\t")
-_BLOCK_HEADER = re.compile(r"^(\s*(?:-\s+)*)(?:\S.*?)?[:-]\s+[|>][-+0-9]*\s*$")
 _RUN_KEY = re.compile(r"^\s*(?:-\s+)*[\"']?run[\"']?\s*:\s*$")
-_NODE_START = "-:[{,?"
+# inizio nodo fuori da un flusso: a inizio riga, dopo soli indicatori (`- `, `? `, `--- `) o dopo
+# `: ` (uno scalare semplice non contiene `: `); `a - "x` è uno scalare semplice
+_LEAD = re.compile(r"[ \t]*(?:(?:-|\?|---)[ \t]+)*")
+_AFTER_COLON = re.compile(r":[ \t]+$")
+# intestazione di scalare a blocco: `|` o `>` (con `+`/`-` e una cifra) è l'intero valore di
+# `chiave:` o di `- `
+_BLOCK_HEADER = re.compile(
+    r"(?P<lead>[ ]*(?:-[ \t]+)*)"
+    r"(?:(?P<key>\"(?:[^\"\\]|\\.)*\"|'(?:[^']|'')*'"
+    r"|(?:[^\s\"'#\[\]{},&*!|>%@`?:-]|[?:-](?=\S))(?:[^:]|:(?=\S))*?)[ \t]*:[ \t]+)?"
+    r"[|>](?:(?P<width>[1-9])[-+]?|[-+](?P<width2>[1-9])?)?[ \t]*")
 
 
 def is_workflow_path(rel: str) -> bool:
@@ -75,50 +84,110 @@ def _next_value(lines: list[str], index: int) -> str:
     return ""
 
 
-def _escape_lines(lines: list[str]) -> tuple[list[int], set[int]]:
-    """I numeri di riga con un `\\` dentro una stringa a doppie virgolette, in qualunque punto,
-    tranne il valore di una chiave `run:`. Segue lo stato «dentro una stringa» da una riga
-    all'altra; le virgolette si aprono a inizio nodo (dopo `:`, `-`, `[`, `{`, `,`, `?` o a
-    inizio riga); nelle virgolette singole `\\` non è un escape; il contenuto di uno scalare a
-    blocco (`|`, `>`) è testo e non si guarda. Restituisce anche i numeri di riga di quei
-    contenuti."""
-    found: list[int] = []
+def _block_header(line: str) -> tuple[int, int | None] | None:
+    """Se `line` (fuori da stringhe e flussi) è l'intestazione di uno scalare a blocco: il rientro
+    del nodo che lo contiene (la colonna della chiave, o dell'ultimo `-` per `- |`) e il rientro
+    del contenuto, se l'indicatore lo fissa (altrimenti lo fissa la prima riga non vuota)."""
+    m = _BLOCK_HEADER.fullmatch(_strip_comment(line).rstrip())
+    if m is None:
+        return None
+    lead = m.group("lead")
+    if m.group("key") is not None:
+        base = len(lead)
+    elif "-" in lead:
+        base = lead.rfind("-")
+    else:
+        return None
+    width = m.group("width") or m.group("width2")
+    return base, base + int(width) if width else None
+
+
+def _flow_node_start(before: str, closed_at: int) -> bool:
+    """Una virgoletta dentro un flusso apre una stringa dopo `[`, `{`, `,`, `? `, `: `, a inizio
+    riga o dopo `:` attaccato a una chiave tra virgolette (`{"a":"b"}`)."""
+    head = before.rstrip()
+    if not head or head[-1] in "[{," or _AFTER_COLON.search(before):
+        return True
+    if head[-1] == "?" and head != before:
+        rest = head[:-1].rstrip()
+        return not rest or rest[-1] in "[{,"
+    return head[-1] == ":" and len(head) - 2 == closed_at
+
+
+def _scan(lines: list[str]) -> tuple[list[str], set[int]]:
+    """Legge il testo con lo stato di YAML che serve alle regole: dentro una stringa a doppie o a
+    singole virgolette, profondità di flusso, dentro uno scalare a blocco (col rientro del
+    contenuto). Restituisce i problemi che vede (un `\\` in una stringa a doppie virgolette fuori
+    dal valore di `run:`, un flusso che non si chiude sulla riga in cui si apre, una virgoletta
+    dentro un flusso fuori da inizio nodo, una stringa aperta a inizio riga che non si chiude
+    sulla stessa riga) e i numeri di riga del contenuto degli scalari a blocco, che è testo."""
+    found: list[str] = []
     blocks: set[int] = set()
-    in_dq = in_sq = dq_run = False
-    block_base: int | None = None
+    quote, run_value, depth = "", False, 0
+    block: tuple[int, int | None] | None = None
     for number, line in enumerate(lines, 1):
-        if block_base is not None and not in_dq and not in_sq:
-            if not line.strip() or _indent(line) > block_base:
+        if block is not None:
+            base, inner = block
+            if not line.strip():
                 blocks.add(number)
                 continue
-            block_base = None
-        i, flagged = 0, False
+            if inner is None and _indent(line) > base:
+                inner = _indent(line)
+            if inner is not None and _indent(line) >= inner:
+                block = (base, inner)
+                blocks.add(number)
+                continue
+            block = None
+        clean_start = not quote and depth == 0
+        flow_here = escape = stray = lead_quote = False
+        closed_at, i = -1, 0
         while i < len(line):
             c = line[i]
-            if in_dq:
+            if quote == '"':
                 if c == "\\":
-                    if not dq_run and not flagged:
-                        found.append(number)
-                        flagged = True
+                    if not run_value and not escape:
+                        found.append(f"escape (\\) in una stringa tra virgolette doppie fuori da "
+                                     f"run: (riga {number}): non si controlla")
+                        escape = True
                     i += 1
                 elif c == '"':
-                    in_dq = False
-            elif in_sq:
-                in_sq = c != "'"
+                    quote, closed_at = "", i
+            elif quote == "'":
+                if c == "'" and line[i + 1:i + 2] == "'":
+                    i += 1
+                elif c == "'":
+                    quote, closed_at = "", i
             elif c == "#" and (i == 0 or line[i - 1] in " \t"):
                 break
+            elif c in "[{" and (depth or _LEAD.fullmatch(line[:i]) or
+                                _AFTER_COLON.search(line[:i])):
+                flow_here = flow_here or not depth
+                depth += 1
+            elif c in "]}" and depth:
+                depth -= 1
+            elif c in "\"'" and depth:
+                if _flow_node_start(line[:i], closed_at):
+                    quote, run_value = c, False
+                elif not stray:
+                    found.append(f"virgolette dentro una collezione a flusso fuori da inizio "
+                                 f"nodo (riga {number}): non si controlla")
+                    stray = True
             elif c in "\"'":
-                before = line[:i].rstrip()
-                if not before or before[-1] in _NODE_START:
-                    if c == '"':
-                        in_dq, dq_run = True, _RUN_KEY.match(line[:i]) is not None
-                    else:
-                        in_sq = True
+                before = line[:i]
+                if _LEAD.fullmatch(before):
+                    quote, run_value, lead_quote = c, False, True
+                elif _AFTER_COLON.search(before):
+                    quote, run_value = c, _RUN_KEY.match(before) is not None
+                    lead_quote = False
             i += 1
-        if not in_dq and not in_sq:
-            m = _BLOCK_HEADER.match(_strip_comment(line))
-            if m:
-                block_base = len(m.group(1))
+        if depth and flow_here:
+            found.append(f"collezione a flusso su più righe (riga {number}): non si "
+                         f"controlla")
+        if quote and lead_quote and not depth:
+            found.append(f"stringa tra virgolette su più righe aperta a inizio riga (riga "
+                         f"{number}): non si controlla")
+        if clean_start and not flow_here and not quote and not depth:
+            block = _block_header(line)
     return found, blocks
 
 
@@ -127,7 +196,8 @@ def problems(text: str) -> list[str]:
     `pull_request_target` né `workflow_run` (nemmeno in una stringa), una chiave `statuses` o
     `checks` a qualunque livello solo con `read` o `none`, niente `write-all`, un blocco
     `permissions` di primo livello. Fail-closed: un testo che non si legge (tabulazione di
-    rientro, byte non UTF-8) o un'àncora, un alias o `<<:` YAML sono un problema."""
+    rientro, byte non UTF-8), un'àncora, un alias o `<<:` YAML, una collezione a flusso su più
+    righe sono un problema."""
     if any(c == "�" or c == "\x00" or "\ud800" <= c <= "\udfff" for c in text):
         return ["il file non si legge: byte non UTF-8 o caratteri di controllo"]
     lines = text.lstrip("﻿").splitlines()
@@ -135,7 +205,7 @@ def problems(text: str) -> list[str]:
         if _TAB_INDENT.match(line):
             return [f"il file non si legge: tabulazione nel rientro (riga {number})"]
     found: list[str] = []
-    escapes, blocks = _escape_lines(lines)
+    scanned, blocks = _scan(lines)
     top_permissions = False
     for number, raw in enumerate(lines, 1):
         line = _strip_comment(raw)
@@ -158,8 +228,7 @@ def problems(text: str) -> list[str]:
                          f"controlla")
         if number not in blocks and _TAG.search(line):
             found.append(f"tag YAML (riga {number}): non si controlla")
-    found += [f"escape (\\) in una stringa tra virgolette doppie fuori da run: (riga {n}): non "
-              f"si controlla" for n in escapes]
+    found += scanned
     if not top_permissions:
         found.append("manca il blocco permissions di primo livello")
     return found

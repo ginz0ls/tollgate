@@ -132,6 +132,69 @@ class WorkflowsTest(unittest.TestCase):
         text = wf('    steps:\n      - run: |\n          echo\n        env:\n          A: "x\\ny"\n')
         self.assert_red(text, "escape")
 
+    def test_flow_collection_over_several_lines_fails_closed(self):
+        BS = "\\"
+        red = [
+            # un `|` finale dentro un flusso non apre uno scalare a blocco
+            f'permissions: {{contents: read, a: b - |\n  , "{BS}x73tatuses": write}}\n',
+            f'on: {{push: {{}}, a: b - |\n  , !!str "pull_request_{BS}x74arget": {{}}}}\n',
+            "on: [push,\n  pull_request]\n",
+            "env: {A: '[',\n  B: x}\n",
+        ]
+        for body in red:
+            with self.subTest(body=body):
+                self.assert_red(wf("") + body, "flusso su più righe")
+        self.assertEqual(workflows.problems(wf("    env: {A: '[', B: \"}\"}\n")), [])
+
+    def test_quote_inside_a_flow_only_at_node_start(self):
+        BS = "\\"
+        self.assert_red(wf("", on=f'on: [push, -"x, "pull_request_{BS}x74arget"]\n'))
+        self.assert_red(wf("    env: {A: x\"y}\n"), "virgolette")
+        self.assertEqual(workflows.problems(wf("    env: {A: \"x\", 'B': 'y'}\n")), [])
+
+    def test_quote_at_line_start_spanning_lines_fails_closed(self):
+        BS = "\\"
+        # continuazione di uno scalare semplice: per YAML `"y` è testo, non una stringa
+        for cont in ('  "y\n', '  - "y\n'):
+            with self.subTest(cont=cont):
+                text = f'name: x\n{cont}on: [push, "pull_request_{BS}x74arget"]\n' \
+                       "permissions: {}\n"
+                self.assert_red(text, "su più righe")
+        self.assertEqual(workflows.problems(wf('    env:\n      A: x\n        "y" z\n')), [])
+
+    def test_single_quotes_doubled(self):
+        BS = "\\"
+        self.assert_red(wf("") + f"name: 'a'': \"'\non: [\"pull_request_{BS}x74arget\"]\n", "escape")
+        self.assertEqual(workflows.problems(wf("    env:\n      A: 'it''s # x'\n")), [])
+
+    def test_block_scalar_only_when_it_is_the_whole_value(self):
+        BS = "\\"
+        ok = [
+            "    steps:\n      - run: |\n          if [ -f x ]; then echo {\n          a=[\n",
+            "    steps:\n      - run: |2\n            &x y\n          ! grep z\n",
+            "    steps:\n      - run: >-  # commento\n          !x\n",
+            "    steps:\n      - |\n        !x\n",
+        ]
+        for body in ok:
+            with self.subTest(body=body):
+                self.assertEqual(workflows.problems(wf(body)), [])
+        red = [
+            ("    env:\n      A: a |\n        &x y\n", "àncora"),
+            ("    env:\n      A: a |\n        !!str x\n", "tag"),
+            ('    env:\n      A: a |\n        "' + BS + 'x41"\n', "escape"),
+            # la riga dopo la fine del blocco torna controllata
+            ("    steps:\n      - run: |\n          echo\n      - name: !!str x\n", "tag"),
+            ("    steps:\n      - run: |\n          echo\n        env: {A: \"" + BS + "t\"}\n",
+             "escape"),
+            # rientro del contenuto: la prima riga lo fissa, una riga meno rientrata chiude
+            ("    steps:\n      - run: |\n            echo\n          &a b\n", "àncora"),
+            # con l'indicatore il rientro è fissato: `|2` sotto `run` (colonna 8) vuole 10
+            ("    steps:\n      - run: |2\n         &a b\n", "àncora"),
+        ]
+        for body, needle in red:
+            with self.subTest(body=body):
+                self.assert_red(wf(body), needle)
+
     def test_complex_key_fails_closed(self):
         self.assert_red(wf("    permissions:\n      ? statuses\n      : write\n"), "chiave")
         self.assert_red(wf("    permissions:\n      ?\n"))
