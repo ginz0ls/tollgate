@@ -11,7 +11,7 @@ from unittest import mock
 from tests import test_gate_github
 from tests.flowkit import FAKEGH
 from tests.gatekit import GATE_TOML, GateLab
-from tests.helpers import TempState
+from tests.helpers import TempState, git
 from tollgate_core import ghcli, paths
 from tollgate_gate import baseids, cli, github, sentinel
 
@@ -169,6 +169,13 @@ class RunTest(SentinelBase):
         self.assertEqual(self.sentinel_statuses(c), [])
         self.assertEqual(self.issues(), [])
 
+    def test_dry_run_does_not_need_github_repository(self):
+        c = self.commit()
+        with mock.patch.dict(os.environ):
+            del os.environ["GITHUB_REPOSITORY"]
+            self.assertEqual(self.push(self.start, c, publish=False), 1)
+        self.assertIn(f"repos/{SLUG}/commits/{c}/pulls", self.calls()[0][-1])
+
     def test_merge_of_red_verdict(self):
         c = self.commit()
         self.set_gh(pulls={c: [merged()]}, statuses={PR_HEAD: [
@@ -186,6 +193,21 @@ class RunTest(SentinelBase):
         self.push(self.start, c)
         self.assertEqual(len(self.sentinel_statuses(c)), 1)
         self.assertEqual(len(self.issues()), 1)
+
+    def test_bot_login_without_suffix_not_trusted_for_statuses(self):
+        c = self.commit()
+        self.set_gh(pulls={c: [merged()]}, statuses={PR_HEAD: [
+            status("tollgate/verdict", "success", login="github-actions"),
+            status("tollgate/guard", "success")]})
+        self.push(self.start, c)
+        self.assertEqual(len(self.sentinel_statuses(c)), 1)
+
+    def test_statuses_written_before_the_issue(self):
+        c = self.commit()
+        self.push(self.start, c)
+        writes = [a[-1] for a in self.calls() if "--method" in a]
+        self.assertEqual(writes[0].split("/")[3], "statuses")
+        self.assertTrue(writes[1].endswith("/issues"), writes)
 
     def test_latest_status_wins(self):
         c = self.commit()
@@ -257,10 +279,47 @@ class RunTest(SentinelBase):
         self.assertEqual(self.pulls_calls(), [c])
         self.assertEqual(len(self.sentinel_statuses(c)), 1)
 
-    def test_unknown_before_checks_only_after(self):
+    def forced(self, before, after, **kw):
+        """Il push `before` → `after` con `after` in una PR verificata: solo la riscrittura
+        della storia può renderlo rosso."""
+        self.set_gh(pulls={after: [merged()]}, statuses={PR_HEAD: GREEN})
+        self.push(before, after, **kw)
+        return self.sentinel_statuses(after)
+
+    def test_unknown_before_is_forced_push(self):
         c = self.commit()
-        self.push("1" * 40, c)
+        [row] = self.forced("1" * 40, c)
+        self.assertEqual(row["state"], "failure")
+        self.assertIn("push forzato", row["description"])
+        self.assertIn("push forzato: intervallo non calcolabile", self.issues()[0]["body"])
         self.assertEqual(self.pulls_calls(), [c])
+
+    def test_rewritten_history_is_forced_push(self):
+        old = self.commit("old")
+        git(self.lab.repo, "checkout", "-q", "-b", "alt", self.start)
+        new = self.commit("new")
+        [row] = self.forced(old, new)
+        self.assertIn("push forzato", row["description"])
+        self.assertEqual(self.pulls_calls(), [new])        # `old..new` è calcolabile: solo `new`
+
+    def test_rewind_is_forced_push(self):
+        first = self.commit("a")
+        second = self.commit("b")
+        self.assertEqual(len(self.forced(second, first)), 1)
+
+    def test_forced_push_adds_to_the_range_checks(self):
+        old = self.commit("old")
+        git(self.lab.repo, "checkout", "-q", "-b", "alt", self.start)
+        mid, new = self.commit("mid"), self.commit("new")
+        self.set_gh(pulls={new: [merged()]}, statuses={PR_HEAD: GREEN})
+        self.push(old, new)
+        self.assertEqual([c for c in (mid, new) if self.sentinel_statuses(c)], [mid, new])
+        self.assertIn("push forzato", self.sentinel_statuses(new)[0]["description"])
+
+    def test_fast_forward_is_not_forced(self):
+        before = self.commit("a")
+        self.assertEqual(self.forced(before, self.commit("b")), [])
+        self.assertEqual(self.issues(), [])
 
     def test_other_branch_push_ignored(self):
         c = self.commit()
@@ -383,6 +442,20 @@ class BaseDetectTest(BasePublishBase):
         [issue] = self.issues()
         self.assertEqual(issue["title"], ghcli.SENTINEL_TITLE)
         self.assertIn(self.lab.base, issue["body"])
+
+    def test_unverified_commands_are_in_the_description(self):
+        self.publish(self.result("red", "unverified", "unverified"))
+        [row] = self.base_statuses()
+        self.assertIn("non verificati", row["description"])
+        self.assertLessEqual(len(row["description"]), 140)
+        self.publish(self.result("green", "unverified"))
+        self.assertIn("non verificati", self.base_statuses()[0]["description"])
+        self.assertEqual(self.base_statuses()[0]["state"], "success")
+
+    def test_base_status_written_before_the_issue(self):
+        self.publish(self.result("red"))
+        writes = [a[-1] for a in self.calls() if "--method" in a]
+        self.assertEqual(writes[0].split("/")[3], "statuses")
 
     def test_base_green_in_detect_is_success_without_comment(self):
         self.publish(self.result("green", "green"))

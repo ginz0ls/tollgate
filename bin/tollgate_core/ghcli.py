@@ -20,6 +20,9 @@ SENTINEL_TITLE = "tollgate: merge non verificato"
 # Il bot di GitHub Actions: `user.login` dell'API REST (con `user.type == "Bot"`) e
 # `author.login` di `gh pr view --json comments` (GraphQL, senza `[bot]`), osservati in V1.
 BOT_LOGINS = ("github-actions[bot]", "github-actions")
+# Per gli stati di commit (REST) il solo login legittimo è questo (V6): `github-actions` senza
+# `[bot]` è un nome utente qualunque.
+STATUS_BOT = "github-actions[bot]"
 
 _STATUS_LINE = re.compile(r"HTTP/\S+\s+(\d{3})\b")
 _HEADERS_END = re.compile(r"\r?\n\r?\n")

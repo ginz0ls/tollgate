@@ -72,10 +72,14 @@ def publish(repo: Path, *, config_sha: str, sha: str, result: dict,
         return
     state, slug = paths.resolve_state(environ), github.repo_slug(environ)
     red = sorted(name for name, st in result["commands"].items() if st == "red")
+    open_ = sorted(name for name, st in result["commands"].items() if st == "unverified")
+    extra = f"; non verificati: {', '.join(open_)}" if open_ else ""
     if not red:
         github.set_status(state, repo, slug, sha, context="tollgate/base", status="success",
-                          description="suite della base verde")
+                          description=f"suite della base verde{extra}")
         return
+    github.set_status(state, repo, slug, sha, context="tollgate/base", status="failure",
+                      description=f"suite della base rossa: {len(red)} comandi{extra}")
     with tempfile.TemporaryDirectory(prefix="tollgate-base-") as tmp:
         body = Path(tmp) / "body.md"
         body.write_text(
@@ -83,5 +87,3 @@ def publish(repo: Path, *, config_sha: str, sha: str, result: dict,
             f"`{sha}`. Comandi rossi: {', '.join(f'`{n}`' for n in red)}.\n\n"
             "Chiudi l'issue su GitHub dopo averla letta.\n", encoding="utf-8")
         github.report_sentinel(state, repo, slug, body_file=body)
-    github.set_status(state, repo, slug, sha, context="tollgate/base", status="failure",
-                      description=f"suite della base rossa: {len(red)} comandi")
