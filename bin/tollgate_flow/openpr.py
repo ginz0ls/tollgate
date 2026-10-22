@@ -2,8 +2,9 @@
 
 Le condizioni si raccolgono e si stampano tutte insieme (`rifiuto: …`, codice 1). Poi, nell'ordine
 della decisione 10: intento `pr:<lavoro>:<sha>`, push dello SHA, `ls-remote`, PR esistente?
-`pr edit` : `pr create`, numero e URL, evento, fase `pr_open`, intento eseguito e, per ultimo,
-l'atto consumato: un'interruzione lascia l'atto valido e la ripetizione aggiorna la stessa PR."""
+PATCH REST del corpo (`gh.pr_edit`: `gh pr edit` con gh 2.46 non funziona) : `pr create`, numero
+e URL, evento, fase `pr_open`, intento eseguito e, per ultimo, l'atto consumato: un'interruzione
+lascia l'atto valido e la ripetizione aggiorna la stessa PR."""
 from __future__ import annotations
 
 import json
@@ -256,8 +257,8 @@ def _open(state, conn, cwd: Path, update: bool, now, argv, via_sync, environ) ->
 
 def _publish(state, conn, work, wt, main, branch, head, remote, diverged, open_pr_, body_file,
              now) -> dict:
-    """Push, controllo con `ls-remote`, poi `pr edit` o `pr create`. Dà numero, URL e se la PR
-    è stata creata ora."""
+    """Push, controllo con `ls-remote`, poi la PATCH REST del corpo (`gh.pr_edit`) o `pr create`.
+    Dà numero, URL e se la PR è stata creata ora."""
     if remote != head:
         lease = None
         if diverged:
