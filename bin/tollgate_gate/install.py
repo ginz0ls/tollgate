@@ -17,7 +17,7 @@ SERVICES_MARKER = "# __SERVICES__"
 # i valori finiscono nello YAML tra virgolette singole (così `true` o `123` restano stringhe): le
 # regex escludono `'` e ogni carattere di controllo
 _BRANCH = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._/-]*")
-_SERVICE_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_-]*")
+_SERVICE_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")
 _IMAGE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/:@-]*")
 # workflow con un segnaposto dei servizi per ogni job che esegue la suite del progetto (I-1)
 SERVICES_WORKFLOWS = {"run": 2, "base": 1}
@@ -40,23 +40,32 @@ def fingerprint(bin_root: Path) -> str:
     return digest.hexdigest()
 
 
-def _services_block(services: dict[str, str], ports: dict[str, int]) -> str:
+def validate_services(services: dict[str, str], ports: dict[str, int] | None = None) -> None:
+    """La sola regola dei servizi (nome, immagine, porta): `ValueError` col motivo. La usa anche
+    `init` per rifiutare prima di scrivere qualunque cosa."""
+    ports = ports or {}
     unknown = sorted(set(ports) - set(services))
     if unknown:
         raise ValueError(f"porta per un servizio non dichiarato: {unknown[0]!r}")
-    lines = ["    services:"]
     for name, image in services.items():
         if not _SERVICE_NAME.fullmatch(name):
-            raise ValueError(f"nome di servizio non valido: {name!r}")
+            raise ValueError(f"nome di servizio non valido: {name!r} (solo a-z, 0-9 e -)")
         if not _IMAGE.fullmatch(image) or image.endswith(":"):
             raise ValueError(f"immagine del servizio {name!r} non valida: {image!r}")
-        lines += [f"      '{name}':", f"        image: '{image}'"]
         if name in ports:
             port = ports[name]
             if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
                 raise ValueError(f"porta del servizio {name!r} non valida: {port!r}")
+
+
+def _services_block(services: dict[str, str], ports: dict[str, int]) -> str:
+    validate_services(services, ports)
+    lines = ["    services:"]
+    for name, image in services.items():
+        lines += [f"      '{name}':", f"        image: '{image}'"]
+        if name in ports:
             # i servizi girano in container sull'host del job: senza `ports` il job non li raggiunge
-            lines += ["        ports:", f'          - "{port}:{port}"']
+            lines += ["        ports:", f'          - "{ports[name]}:{ports[name]}"']
     return "\n".join(lines)
 
 

@@ -15,9 +15,9 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
-from tollgate_analysis import workflows
+from tollgate_analysis import prbody, workflows
 from tollgate_core import VERSION, clock, config, db, git
-from tollgate_core.paths import State
+from tollgate_core.paths import State, repo_key
 from tollgate_gate import install, protection
 
 from . import gitw
@@ -28,7 +28,6 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = PLUGIN_ROOT / "templates" / "tollgate.toml"
 FREE_MINUTES = "2.000"                  # GitHub Free, repo privati (9.5)
 RECEIPT_SOURCES = ("finish", "verify")
-SERVICE_NAME = re.compile(r"^[a-z0-9-]+$")
 MODE_PLACEHOLDER = "__MODE__"
 
 _SECTION = re.compile(r"^\s*\[([^\[\]]*)\]\s*(?:#.*)?$")
@@ -53,10 +52,16 @@ class _Proposal:
     jest: bool = False
     jest_junit: bool = False
     seconds: float | None = None
+    from_template: bool = False
 
 
 def _refuse(*lines: str) -> InitResult:
     return InitResult(REFUSED, [f"tollgate: {line}" for line in lines])
+
+
+def _plain(text: str) -> str:
+    """Testo di un repo per l'uscita a terminale: i caratteri non stampabili diventano `?`."""
+    return "".join(c if c.isprintable() else "?" for c in text)
 
 
 def with_mode(text: str, mode: str) -> str:
@@ -81,15 +86,6 @@ def with_mode(text: str, mode: str) -> str:
     return "\n".join(lines).rstrip("\n") + f'\n\n[gate]\nmode = "{mode}"\n'
 
 
-def _services(services: dict[str, str]) -> str | None:
-    """Il motivo del rifiuto, o `None`. Il nome è più stretto di quello di `install`: minuscole,
-    cifre e `-`."""
-    for name in services:
-        if not SERVICE_NAME.match(name):
-            return f"nome di servizio non valido: {name!r} (solo a-z, 0-9 e -)"
-    return None
-
-
 def _mode_for(kind: str) -> str | None:
     return {protection.DETECT: "detect", protection.PROTECTED: "protected",
             protection.PROTECTED_UNSET: "protected"}.get(kind)
@@ -102,10 +98,11 @@ def _gate_commands(text: str) -> list[str]:
         return []
 
 
-def _gate_seconds(state: State, commands: list[str]) -> float | None:
-    """La somma di `receipts.duration` dell'ultima ricevuta per ciascun comando del gate, sullo
-    SHA più recente che ne ha una per **ogni** comando (con la durata scritta), prodotta da
-    `finish` o `verify`. `None` se non c'è: non si inventa una stima."""
+def _gate_seconds(state: State, key: str, commands: list[str]) -> float | None:
+    """La somma di `receipts.duration` dell'ultima ricevuta verde per ciascun comando del gate,
+    sullo SHA più recente che ne ha una per **ogni** comando (con la durata scritta), prodotta
+    da `finish` o `verify` per i lavori del repo `key`. Le ricevute di altri repo, quelle senza
+    lavoro e quelle non verdi non contano. `None` se non c'è: non si inventa una stima."""
     if not commands or not state.db_path.exists():
         return None
     try:
@@ -114,10 +111,11 @@ def _gate_seconds(state: State, commands: list[str]) -> float | None:
         return None
     try:
         rows = conn.execute(
-            f"SELECT sha, command, duration FROM receipts WHERE command IN "
-            f"({','.join('?' * len(commands))}) AND produced_by IN "
-            f"({','.join('?' * len(RECEIPT_SOURCES))}) ORDER BY id DESC",
-            [*commands, *RECEIPT_SOURCES]).fetchall()
+            f"SELECT r.sha, r.command, r.duration FROM receipts r "
+            f"JOIN work_items w ON w.id = r.work WHERE w.repo_key = ? AND r.state = 'green' "
+            f"AND r.command IN ({','.join('?' * len(commands))}) AND r.produced_by IN "
+            f"({','.join('?' * len(RECEIPT_SOURCES))}) ORDER BY r.id DESC",
+            [key, *commands, *RECEIPT_SOURCES]).fetchall()
     except sqlite3.Error:
         return None
     finally:
@@ -273,6 +271,9 @@ def _readme(p: _Proposal, *, update: bool, branch: str, merges: int,
                 f"(per esempio `cp -R {folder}/files/. .`).",
                 f"2. Fai un commit sul ramo predefinito (`{branch}`) e spingilo, prima di "
                 "attivare la protezione: il commit fa partire `tollgate-base`."]
+        if p.from_template:
+            out.insert(len(out) - 1, "   `tollgate.toml` viene dal modello: compila `[commands]` "
+                       "(`setup`, `verify`, `report`) prima del commit.")
         n = 3
     if (p.kind == protection.PROTECTED_UNSET) or p.missing:
         out.append(f"{n}. Quando `{protection.BASE_JOB}` è finito su quel commit, lancia "
@@ -295,11 +296,12 @@ def _readme(p: _Proposal, *, update: bool, branch: str, merges: int,
                 "`guard` controlla solo i workflow nuovi o modificati: questi esistono già e "
                 "restano fuori dal controllo. Valutali tu (per esempio `statuses: write` su "
                 "`pull_request` esegue il codice della PR con un token di scrittura).", ""]
-        out += [f"- `{rel}`: {problem}" for rel, problem in p.violations]
+        out += [prbody.neutralize("\n".join(f"{rel}: {problem}"
+                                            for rel, problem in p.violations))]
     if p.removed:
         out += ["", "## Da cancellare", "",
                 "File di tollgate presenti sul predefinito e assenti da questa versione "
-                "(da cancellare):", "", *[f"- `{rel}`" for rel in p.removed]]
+                "(da cancellare):", "", prbody.neutralize("\n".join(p.removed))]
     if p.jest:
         out += ["", "## jest-junit", "",
                 "Con la configurazione predefinita due test omonimi in file diversi hanno lo "
@@ -348,13 +350,17 @@ def propose(state: State, cwd: Path, *, update: bool, merges_per_month: int,
             ) -> InitResult:
     now = now or clock.now()
     ports = ports or {}
-    why = _services(services)
-    if why:
-        return _refuse(why)
+    try:
+        install.validate_services(services, ports)
+    except ValueError as e:
+        return _refuse(str(e))
     top = git.toplevel(cwd)
     if top is None:
         return _refuse("la cartella corrente non è in un repo git")
     main = git.main_worktree(top)
+    url = git.origin_url(main)
+    if not url:
+        return _refuse("il repo non ha il remote origin")
     notes = []
     if not gitw.fetch(main):
         notes.append("senza rete (git fetch origin non riuscito): uso l'ultimo stato noto di "
@@ -394,15 +400,22 @@ def propose(state: State, cwd: Path, *, update: bool, merges_per_month: int,
                          if rel not in tree)
         tree = {rel: data for rel, data in tree.items() if git.show(main, ref, rel) != data}
         if not tree and not removed:
-            return InitResult(OK, [*[f"avviso: {n}" for n in notes],
-                                   f"nulla da aggiornare: i file di tollgate su {ref} sono "
-                                   f"quelli della versione {VERSION} (modalità {mode})"])
+            lines = [*[f"avviso: {n}" for n in notes],
+                     f"nulla da aggiornare: i file di tollgate su {ref} sono quelli della "
+                     f"versione {VERSION} (modalità {mode})"]
+            if read.kind == protection.PROTECTED_UNSET:
+                lines.append(f"il ramo {default} è senza protezione: lancia "
+                             "/tollgate:init --propose per ottenere protect.sh")
+            lines += [f"protezione incompleta: manca {m}" for m in read.missing]
+            if read.missing:
+                lines.append("lancia /tollgate:init --propose per ottenere protect.sh")
+            return InitResult(OK, lines)
 
     jest, jest_junit = _jest(main, ref)
     proposal = _Proposal(
         mode=mode, kind=read.kind, missing=read.missing, files=tree, removed=removed,
         violations=_existing_violations(main, ref), jest=jest, jest_junit=jest_junit,
-        seconds=_gate_seconds(state, _gate_commands(toml)))
+        from_template=current is None, seconds=_gate_seconds(state, repo_key(url), _gate_commands(toml)))
     protect = (_protect_script(default), protection.body_template()) \
         if mode == "protected" and (read.kind == protection.PROTECTED_UNSET or read.missing) \
         else None
@@ -416,7 +429,7 @@ def propose(state: State, cwd: Path, *, update: bool, merges_per_month: int,
                  + (" (ramo senza protezione: la attiva protect.sh)"
                     if read.kind == protection.PROTECTED_UNSET else ""))
     lines += [f"protezione incompleta: manca {m}" for m in read.missing]
-    lines += [f"workflow esistente fuori regola: {rel}: {problem}"
+    lines += [f"workflow esistente fuori regola: {_plain(rel)}: {_plain(problem)}"
               for rel, problem in proposal.violations]
     lines.append(f"proposta scritta in {shown}/ ({len(tree)} file)"
                  + (f"; ramo suggerito tollgate-config/{VERSION}" if update else ""))

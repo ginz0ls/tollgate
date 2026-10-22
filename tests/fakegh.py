@@ -29,9 +29,9 @@ Letture: `commits/<sha>/check-runs` (da `check_runs[<sha>]`, righe `{name, statu
 app: {id, slug}}`): senza `--jq` il corpo REST `{"check_runs": [...]}`; con `--jq` il finto
 valuta **solo** il filtro di `protect.sh` (`.name == "<job>"`, e `.app.slug == "..."` se c'è) e
 stampa per riga `status<TAB>conclusion<TAB>app.id`. Poi `commits/<sha>/statuses` (da
-`commit_statuses`, vuoto se manca), `commits/<sha>/pulls` (da `commit_pulls`, vuoto se manca), `pulls/<n>` (da `pulls[<n>]`, come la REST: `body`,
-`head.sha|ref|repo.full_name`, `base.ref`, `state`; 404 se manca) e `issues?state=open` (da
-`open_issues`, senza le righe con `pull_request`, che il filtro scarta), un valore per riga; il
+`commit_statuses`, vuoto se manca), `commits/<sha>/pulls` (da `commit_pulls`, vuoto se manca),
+`pulls/<n>` (da `pulls[<n>]`, come la REST: `body`, `head.sha|ref|repo.full_name`, `base.ref`,
+`state`; 404 se manca) e `issues?state=open` (da `open_issues`, senza le righe con `pull_request`, che il filtro scarta), un valore per riga; il
 `--jq` non si valuta: i dati hanno già la forma che il filtro produce.
 `prs[].comments` si leggono con `pr view --json comments` come li dà GraphQL
 (`author.login = "github-actions"`) e con `api repos/o/r/issues/<n>/comments` come li dà REST

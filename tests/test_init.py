@@ -14,7 +14,7 @@ from tests.flowkit import FAKEGH, FlowLab
 from tests.helpers import ROOT, git
 from tests.hookkit import DEFAULT_TOML
 from tests.test_protection import DETECT_MSG, PATH as PROTECTION_PATH, good
-from tollgate_core import VERSION, clock, config, receipts
+from tollgate_core import VERSION, clock, config, phases, receipts
 from tollgate_flow import init
 from tollgate_gate import install, protection
 
@@ -241,7 +241,7 @@ class ServicesTest(InitCase):
         self.make(UNSET)
         for service in ("DB=x", "a b=x", "d:b=x", "-db=x", "db=x y", "db=x\ny", "db=",
                         "db=postgres:16,0", "db=postgres:16,70000", "db=postgres:16,54x2",
-                        "db=postgres:16,", "db", "=x", "db=x;rm", "db=$(x)"):
+                        "db=postgres:16,", "db", "=x", "db=x;rm", "db=$(x)", "db\n=x", "db=x\n", "d_b=x"):
             r = self.run_init("--propose", "--service", service)
             self.assertNotEqual(r.returncode, 0, service)
             self.assertFalse(self.folder.exists(), service)
@@ -250,12 +250,23 @@ class ServicesTest(InitCase):
         fl = self.make(UNSET)
         with mock.patch.dict(os.environ, fl.env()):
             for services in ({"Bad Name": "x"}, {"db": "x y"}, {"db": "x\n  evil: 1"},
-                             {"DB": "x"}, {"": "x"}):
+                             {"DB": "x"}, {"": "x"}, {"db\n": "x"}, {"db": "x\n"},
+                             {"db": "x:"}, {"d_b": "x"}):
                 got = init.propose(fl.ts.state, fl.main, update=False, merges_per_month=10,
                                    services=services)
                 self.assertEqual(got.code, init.REFUSED, services)
                 self.assertIsNone(got.folder)
         self.assertFalse(self.folder.exists())
+
+    def test_one_rule_for_init_and_install(self):
+        """La regola dei servizi sta in `install`: `files` rifiuta ciò che `init` rifiuta."""
+        for services in ({"db\n": "x"}, {"db": "x\n"}, {"DB": "x"}, {"d_b": "x"}, {"-db": "x"}):
+            with self.assertRaises(ValueError, msg=services):
+                install.files(ROOT, default_branch="main", services=services)
+            with self.assertRaises(ValueError, msg=services):
+                install.validate_services(services)
+        install.validate_services({"db": "postgres:16", "my-cache2": "redis"}, {"db": 5432})
+        self.assertFalse(hasattr(init, "SERVICE_NAME"))
 
     def test_duplicate_service_is_refused(self):
         self.make(UNSET)
@@ -264,11 +275,46 @@ class ServicesTest(InitCase):
 
 
 class EstimateTest(InitCase):
-    def receipt(self, sha, command, duration, produced_by="finish"):
+    def make(self, *args, **kw):
+        return super().make(*args, issue=7, **kw)
+
+    def receipt(self, sha, command, duration, produced_by="finish", state="green", work=None):
         self.fl.lab.now += timedelta(seconds=1)
-        receipts.add(self.fl.conn, work=None, sha=sha, command=command, resolved_command=None,
-                     exit_code=0, tests_run=1, tests_skipped=0, duration=duration, log=None,
-                     produced_by=produced_by, state="green", now=self.fl.lab.now)
+        receipts.add(self.fl.conn, work=work or self.fl.work, sha=sha, command=command,
+                     resolved_command=None, exit_code=0, tests_run=1, tests_skipped=0,
+                     duration=duration, log=None, produced_by=produced_by, state=state,
+                     now=self.fl.lab.now)
+
+    def other_repo_work(self):
+        return phases.create_work(self.fl.conn, repo_key="github.com/altro/repo", issue=3,
+                                  level="L1", now=self.fl.lab.now)
+
+    def test_receipts_of_another_repo_do_not_count(self):
+        self.make(UNSET)
+        self.receipt("a" * 40, "verify", 3000.0, work=self.other_repo_work())
+        self.proposal()
+        self.assertIn("non misurata", self.readme())
+        self.receipt("b" * 40, "verify", 90.0)
+        self.proposal("--merges-per-month", "10")
+        self.assertIn("40 minuti al mese", self.readme())
+
+    def test_receipts_without_work_do_not_count(self):
+        self.make(UNSET)
+        self.fl.lab.now += timedelta(seconds=1)
+        receipts.add(self.fl.conn, work=None, sha="a" * 40, command="verify",
+                     resolved_command=None, exit_code=0, tests_run=1, tests_skipped=0,
+                     duration=90.0, log=None, produced_by="finish", state="green",
+                     now=self.fl.lab.now)
+        self.proposal()
+        self.assertIn("non misurata", self.readme())
+
+    def test_only_green_receipts_count(self):
+        self.make(UNSET)
+        self.receipt("a" * 40, "verify", 90.0)
+        self.receipt("b" * 40, "verify", 9000.0, state="red")      # più recente ma rossa
+        self.receipt("c" * 40, "verify", 5.0, state="empty")
+        self.proposal("--merges-per-month", "10")
+        self.assertIn("40 minuti al mese", self.readme())
 
     def test_minutes_estimate(self):
         self.make(UNSET)
@@ -364,6 +410,42 @@ class HintsTest(InitCase):
         self.assertNotIn("tollgate-extra", text)
         self.assertIn("ci.yml", r.stdout)
 
+    def test_workflow_names_are_neutralized_in_the_readme(self):
+        self.make(UNSET)
+        evil = ".github/workflows/a`b\n## Falso.yml"
+        real_ls, real_text = init.git.ls_files_at, init.git.text_at
+
+        def ls(repo, ref, prefix):
+            return [evil] if prefix == ".github/workflows/" else real_ls(repo, ref, prefix)
+
+        def text(repo, ref, path):
+            return "on: pull_request_target\n" if path == evil else real_text(repo, ref, path)
+
+        with mock.patch.object(init.git, "ls_files_at", ls), \
+                mock.patch.object(init.git, "text_at", text):
+            fl = self.fl
+            with mock.patch.dict(os.environ, fl.env()):
+                got = init.propose(fl.ts.state, fl.main, update=False, merges_per_month=5,
+                                   services={})
+        self.assertEqual(got.code, init.OK)
+        text = self.readme()
+        self.assertLess(text.index("```"), text.index("## Falso"))      # dentro il recinto
+        self.assertLess(text.index("## Falso"), text.rindex("```"))
+        self.assertNotIn("\n## Falso", "\n".join(got.lines))
+
+    def test_template_readme_says_to_fill_commands(self):
+        fl = self.make(DETECT)
+        git(fl.main, "rm", "-q", "tollgate.toml")
+        git(fl.main, "commit", "-qm", "senza toml")
+        git(fl.main, "push", "-q", "origin", "main")
+        self.proposal()
+        self.assertIn("compila `[commands]`", self.readme())
+
+    def test_existing_toml_readme_does_not_ask_to_fill_commands(self):
+        self.make(DETECT)
+        self.proposal()
+        self.assertNotIn("compila `[commands]`", self.readme())
+
     def test_no_violations_no_section(self):
         self.make(UNSET)
         self.proposal()
@@ -401,6 +483,19 @@ class UpdateTest(InitCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("nulla da aggiornare", r.stdout)
         self.assertFalse(self.folder.exists())
+
+    def test_update_with_nothing_changed_still_reports_missing_protection(self):
+        self.make(UNSET)
+        tree = self.install_tree()
+        tree["tollgate.toml"] = DEFAULT_TOML
+        self.push(tree)
+        r = self.run_init("--update")
+        self.assertIn("nulla da aggiornare", r.stdout)
+        self.assertIn("senza protezione", r.stdout)
+        self.assertIn("--propose", r.stdout)
+        self.api(present())
+        r = self.run_init("--update")
+        self.assertNotIn("protezione", r.stdout)
 
     def test_update_new_mode_rewrites_toml(self):
         self.make(DETECT)
