@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from . import paths
 
 GH_ENV = "TOLLGATE_GH"
+# Nei test, le attese dei ritentativi separate da virgole (es. "0,0"): i sottoprocessi non dormono.
+RETRY_DELAYS_ENV = "TOLLGATE_GH_RETRY_DELAYS"
 GH_TIMEOUT_S = 60
 # Attese tra un tentativo e il successivo di una lettura (3 tentativi in tutto).
 RETRY_DELAYS_S = (2, 4)
@@ -34,7 +36,9 @@ _STATUS_LINE = re.compile(r"HTTP/\S+\s+(\d{3})\b")
 _HEADERS_END = re.compile(r"\r?\n\r?\n")
 # Un 5xx nello stderr di gh; con `--paginate` gh 2.46 riporta un 500 a corpo vuoto così.
 _TRANSIENT = re.compile(r"HTTP 5\d\d\b|unexpected end of JSON input")
-_WRITE_FLAGS = ("--method", "-X")
+# Argomenti che fanno di `gh api` una scrittura: `--method`, o i campi e `--input`, con cui gh
+# passa a POST anche senza `--method` (anche nelle forme `-fk=v`, `--field=k=v`, `--input=f`).
+_WRITE_FLAGS = ("--method", "-X", "-f", "-F", "--field", "--raw-field", "--input")
 
 _sleep = time.sleep      # sostituito nei test, che così non dormono
 
@@ -79,15 +83,19 @@ def _transient(r, include: bool) -> bool:
     return split is not None and split[0] >= 500
 
 
+def _retry_delays(state) -> tuple[float, ...]:
+    override = paths.test_env(state, RETRY_DELAYS_ENV)
+    return tuple(float(x) for x in override.split(",")) if override else RETRY_DELAYS_S
+
+
 def _run_retrying(state, repo, args) -> subprocess.CompletedProcess:
-    """`run`; una lettura di `gh api` (senza `--method`/`-X`) ritenta sugli errori transitori del
-    server, con le attese di `RETRY_DELAYS_S`. Il resto (`pr create`, POST, PATCH...) non è
+    """`run`; una lettura di `gh api` (senza `--method`, `-X`, campi né `--input`) ritenta sugli
+    errori transitori del server, con le attese di `RETRY_DELAYS_S`. Il resto (`pr create`, POST, PATCH...) non è
     idempotente e non si ritenta; nemmeno il timeout. Dopo l'ultimo tentativo `r` è l'ultima
     risposta, che il chiamante tratta come sempre."""
-    read = args[:1] == ["api"] and not any(
-        a in _WRITE_FLAGS or a.startswith(("--method=", "-X")) for a in args)
+    read = args[:1] == ["api"] and not any(a.startswith(_WRITE_FLAGS) for a in args)
     include = "--include" in args
-    for delay in (*RETRY_DELAYS_S, None):
+    for delay in (*_retry_delays(state), None):
         r = run(state, repo, args)
         if delay is None or not read or not _transient(r, include):
             return r

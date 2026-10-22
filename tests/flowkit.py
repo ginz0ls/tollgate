@@ -150,7 +150,8 @@ class FlowLab:
     def env(self) -> dict:
         e = self.ts.env()
         e.update(TOLLGATE_GH=str(FAKEGH), TOLLGATE_FAKEGH_DATA=str(self.gh_data),
-                 TOLLGATE_FAKEGH_LOG=str(self.gh_log), HOME=str(self.home))
+                 TOLLGATE_FAKEGH_LOG=str(self.gh_log), HOME=str(self.home),
+                 TOLLGATE_GH_RETRY_DELAYS="0,0")
         return e
 
     def cli(self, *argv, cwd=None, session=SESSION) -> subprocess.CompletedProcess:

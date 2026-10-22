@@ -3,8 +3,9 @@ import subprocess
 import unittest
 from unittest import mock
 
+from tests.helpers import TempState
 from tests.test_gh import FakeGhCase
-from tollgate_core import ghcli
+from tollgate_core import ghcli, paths
 from tollgate_flow import gh
 
 
@@ -106,6 +107,13 @@ class RetryTest(unittest.TestCase):
     """Le letture di `gh api` ritentano sui 5xx transitori; le scritture e i 4xx no."""
 
     def setUp(self):
+        self.ts = TempState()
+        self.addCleanup(self.ts.cleanup)
+        self.state = self.ts.state
+        env = mock.patch.dict(os.environ)
+        env.start()
+        self.addCleanup(env.stop)
+        os.environ.pop(ghcli.RETRY_DELAYS_ENV, None)
         self.sleeps = []
         patch = mock.patch.object(ghcli, "_sleep", self.sleeps.append)
         patch.start()
@@ -119,19 +127,19 @@ class RetryTest(unittest.TestCase):
 
     def test_get_500_then_ok(self):
         run = self.answers(HTTP_500, _done(stdout='{"a": 1}'))
-        self.assertEqual(ghcli.api(None, ".", "p/x").data, {"a": 1})
+        self.assertEqual(ghcli.api(self.state, ".", "p/x").data, {"a": 1})
         self.assertEqual((run.call_count, self.sleeps), (2, [2]))
 
     def test_paginate_empty_body_then_ok(self):
         run = self.answers(EMPTY_500, _done(stdout='{"n":1}\n{"n":2}\n'))
-        got = ghcli.api(None, ".", "p/x", paginate=True, jq=".[]")
+        got = ghcli.api(self.state, ".", "p/x", paginate=True, jq=".[]")
         self.assertEqual(got.data, [{"n": 1}, {"n": 2}])
         self.assertEqual(run.call_count, 2)
 
     def test_always_500_gives_todays_error(self):
         run = self.answers(HTTP_500, HTTP_500, HTTP_500)
         with self.assertRaises(ghcli.GhError) as e:
-            ghcli.api(None, ".", "p/x")
+            ghcli.api(self.state, ".", "p/x")
         self.assertEqual(str(e.exception), "gh api p/x: gh: Server Error (HTTP 500)")
         self.assertEqual((run.call_count, self.sleeps), (3, [2, 4]))
         self.assertEqual(ghcli.RETRY_DELAYS_S, (2, 4))
@@ -141,7 +149,7 @@ class RetryTest(unittest.TestCase):
             with self.subTest(method=method):
                 run = self.answers(HTTP_500, _done(stdout="{}"))
                 with self.assertRaises(ghcli.GhError):
-                    ghcli.api(None, ".", "p/x", method=method)
+                    ghcli.api(self.state, ".", "p/x", method=method)
                 self.assertEqual(run.call_count, 1)
         self.assertEqual(self.sleeps, [])
 
@@ -152,13 +160,13 @@ class RetryTest(unittest.TestCase):
         for code in (403, 404):
             with self.subTest(code=code):
                 run = self.answers(status(code), status(200))
-                got = ghcli.api(None, ".", "p/x", include=True)
+                got = ghcli.api(self.state, ".", "p/x", include=True)
                 self.assertEqual((got.status, got.data, run.call_count), (code, {"message": "m"}, 1))
         self.assertEqual(self.sleeps, [])
         # una riga di stato 502 ritenta anche se lo stderr non dice HTTP 5xx
         run = self.answers(_done(1, "HTTP/2.0 502 Bad Gateway\nA: b\r\n\r\n", "gh: boom\n"),
                            status(404))
-        self.assertEqual(ghcli.api(None, ".", "p/x", include=True).status, 404)
+        self.assertEqual(ghcli.api(self.state, ".", "p/x", include=True).status, 404)
         self.assertEqual((run.call_count, self.sleeps), (2, [2]))
 
     def test_4xx_without_include_is_not_retried(self):
@@ -166,19 +174,19 @@ class RetryTest(unittest.TestCase):
             with self.subTest(code=code):
                 run = self.answers(_done(1, stderr=f"gh: m (HTTP {code})\n"), _done(stdout="{}"))
                 with self.assertRaises(ghcli.GhError):
-                    ghcli.api(None, ".", "p/x")
+                    ghcli.api(self.state, ".", "p/x")
                 self.assertEqual(run.call_count, 1)
         self.assertEqual(self.sleeps, [])
 
     def test_timeout_is_not_retried(self):
         run = self.answers(ghcli.GhError("gh api p/x: timeout dopo 60 s"), _done(stdout="{}"))
         with self.assertRaises(ghcli.GhError):
-            ghcli.api(None, ".", "p/x")
+            ghcli.api(self.state, ".", "p/x")
         self.assertEqual((run.call_count, self.sleeps), (1, []))
 
     def test_run_json_lines_retries_api_reads_only(self):
         run = self.answers(EMPTY_500, _done(stdout='{"n":1}\n'))
-        self.assertEqual(ghcli.run_json_lines(None, ".", ["api", "--paginate", "--jq", ".[]", "p"]),
+        self.assertEqual(ghcli.run_json_lines(self.state, ".", ["api", "--paginate", "--jq", ".[]", "p"]),
                          [{"n": 1}])
         self.assertEqual(run.call_count, 2)
         for args in (["api", "--method", "POST", "p"], ["api", "-X", "POST", "p"],
@@ -186,17 +194,49 @@ class RetryTest(unittest.TestCase):
             with self.subTest(args=args):
                 run = self.answers(HTTP_500, _done(stdout='{"n":1}\n'))
                 with self.assertRaises(ghcli.GhError):
-                    ghcli.run_json_lines(None, ".", args)
+                    ghcli.run_json_lines(self.state, ".", args)
                 self.assertEqual(run.call_count, 1)
 
     def test_run_json_retries_api_reads_only(self):
         run = self.answers(HTTP_500, _done(stdout='{"a": 1}'))
-        self.assertEqual(ghcli.run_json(None, ".", ["api", "p"]), {"a": 1})
+        self.assertEqual(ghcli.run_json(self.state, ".", ["api", "p"]), {"a": 1})
         self.assertEqual(run.call_count, 2)
         run = self.answers(HTTP_500, _done(stdout="[]"))
         with self.assertRaises(ghcli.GhError):
-            ghcli.run_json(None, ".", ["pr", "create", "--title", "t"])
+            ghcli.run_json(self.state, ".", ["pr", "create", "--title", "t"])
         self.assertEqual(run.call_count, 1)
+
+    def test_api_field_arguments_make_a_write(self):
+        """gh passa a POST con `-f`/`-F`/`--field`/`--raw-field`/`--input` anche senza `--method`."""
+        for extra in (["-f", "x=y"], ["-F", "x=@f"], ["-fx=y"], ["--field", "x=y"],
+                      ["--field=x=y"], ["--raw-field", "x=y"], ["--raw-field=x=y"],
+                      ["--input", "in.json"], ["--input=in.json"]):
+            with self.subTest(extra=extra):
+                run = self.answers(HTTP_500, _done(stdout='{"n":1}\n'))
+                with self.assertRaises(ghcli.GhError):
+                    ghcli.run_json(self.state, ".", ["api", *extra, "p"])
+                self.assertEqual(run.call_count, 1)
+        for kw in ({"fields": {"x": "y"}}, {"file_fields": {"x": "f"}}, {"input_file": "in.json"}):
+            with self.subTest(kw=kw):
+                run = self.answers(HTTP_500, _done(stdout="{}"))
+                with self.assertRaises(ghcli.GhError):
+                    ghcli.api(self.state, ".", "p/x", **kw)
+                self.assertEqual(run.call_count, 1)
+        self.assertEqual(self.sleeps, [])
+
+    def test_delays_from_test_env_only_in_test_mode(self):
+        os.environ[ghcli.RETRY_DELAYS_ENV] = "0,0.5"
+        self.answers(HTTP_500, HTTP_500, HTTP_500)
+        with self.assertRaises(ghcli.GhError):
+            ghcli.api(self.state, ".", "p/x")
+        self.assertEqual(self.sleeps, [0, 0.5])
+        self.sleeps.clear()
+        real = paths.State(self.ts.dir, False)          # fuori dai test la variabile non conta
+        self.answers(HTTP_500, HTTP_500, HTTP_500)
+        with self.assertRaises(ghcli.GhError):
+            ghcli.api(real, ".", "p/x")
+        self.assertEqual(self.sleeps, [2, 4])
+        self.assertIn(ghcli.RETRY_DELAYS_ENV, paths.TEST_ENVS)
 
 
 class FakeGhFlakyTest(FakeGhCase):

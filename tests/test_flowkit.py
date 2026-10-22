@@ -76,6 +76,10 @@ class FlowLabTest(unittest.TestCase):
         self.assertEqual(json.loads(r.stdout)["statuses"][0]["state"], "success")
         self.assertEqual(len(self.fl.gh_calls()), 6)
 
+    def test_env_makes_gh_retries_wait_zero(self):
+        """I sottoprocessi del banco non dormono tra i ritentativi delle letture di `gh api`."""
+        self.assertEqual(self.fl.env()["TOLLGATE_GH_RETRY_DELAYS"], "0,0")
+
     def test_fakegh_exits_1_when_answer_missing(self):
         self.assertEqual(self.gh("issue", "view", "99", "--json", "title").returncode, 1)
         self.assertEqual(self.gh("api", "repos/o/r/commits/zzz/status").returncode, 1)
