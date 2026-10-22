@@ -1,4 +1,5 @@
 import os
+import subprocess
 import unittest
 from unittest import mock
 
@@ -91,6 +92,127 @@ class ApiIncludeTest(FakeGhCase):
         graphql = gh.pr_comments(self.state, self.tmp, 5)[0]["author"]["login"]
         rest = self.api("repos/o/r/issues/5/comments", paginate=True, jq=".[]").data[0]["user"]["login"]
         self.assertTrue({graphql, rest} <= set(ghcli.BOT_LOGINS))
+
+
+def _done(rc=0, stdout="", stderr=""):
+    return subprocess.CompletedProcess(["gh"], rc, stdout, stderr)
+
+
+EMPTY_500 = _done(1, stderr="unexpected end of JSON input\n")       # 500 a corpo vuoto, --paginate
+HTTP_500 = _done(1, stderr="gh: Server Error (HTTP 500)\n")
+
+
+class RetryTest(unittest.TestCase):
+    """Le letture di `gh api` ritentano sui 5xx transitori; le scritture e i 4xx no."""
+
+    def setUp(self):
+        self.sleeps = []
+        patch = mock.patch.object(ghcli, "_sleep", self.sleeps.append)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def answers(self, *results):
+        patch = mock.patch.object(ghcli, "run", side_effect=list(results))
+        run = patch.start()
+        self.addCleanup(patch.stop)
+        return run
+
+    def test_get_500_then_ok(self):
+        run = self.answers(HTTP_500, _done(stdout='{"a": 1}'))
+        self.assertEqual(ghcli.api(None, ".", "p/x").data, {"a": 1})
+        self.assertEqual((run.call_count, self.sleeps), (2, [2]))
+
+    def test_paginate_empty_body_then_ok(self):
+        run = self.answers(EMPTY_500, _done(stdout='{"n":1}\n{"n":2}\n'))
+        got = ghcli.api(None, ".", "p/x", paginate=True, jq=".[]")
+        self.assertEqual(got.data, [{"n": 1}, {"n": 2}])
+        self.assertEqual(run.call_count, 2)
+
+    def test_always_500_gives_todays_error(self):
+        run = self.answers(HTTP_500, HTTP_500, HTTP_500)
+        with self.assertRaises(ghcli.GhError) as e:
+            ghcli.api(None, ".", "p/x")
+        self.assertEqual(str(e.exception), "gh api p/x: gh: Server Error (HTTP 500)")
+        self.assertEqual((run.call_count, self.sleeps), (3, [2, 4]))
+        self.assertEqual(ghcli.RETRY_DELAYS_S, (2, 4))
+
+    def test_writes_are_not_retried(self):
+        for method in ("POST", "PATCH", "PUT", "DELETE"):
+            with self.subTest(method=method):
+                run = self.answers(HTTP_500, _done(stdout="{}"))
+                with self.assertRaises(ghcli.GhError):
+                    ghcli.api(None, ".", "p/x", method=method)
+                self.assertEqual(run.call_count, 1)
+        self.assertEqual(self.sleeps, [])
+
+    def test_include_4xx_is_a_result_and_5xx_is_retried(self):
+        def status(code):
+            return _done(1, f"HTTP/2.0 {code} X\nA: b\r\n\r\n{{\"message\": \"m\"}}",
+                         f"gh: m (HTTP {code})\n")
+        for code in (403, 404):
+            with self.subTest(code=code):
+                run = self.answers(status(code), status(200))
+                got = ghcli.api(None, ".", "p/x", include=True)
+                self.assertEqual((got.status, got.data, run.call_count), (code, {"message": "m"}, 1))
+        self.assertEqual(self.sleeps, [])
+        # una riga di stato 502 ritenta anche se lo stderr non dice HTTP 5xx
+        run = self.answers(_done(1, "HTTP/2.0 502 Bad Gateway\nA: b\r\n\r\n", "gh: boom\n"),
+                           status(404))
+        self.assertEqual(ghcli.api(None, ".", "p/x", include=True).status, 404)
+        self.assertEqual((run.call_count, self.sleeps), (2, [2]))
+
+    def test_4xx_without_include_is_not_retried(self):
+        for code in (404, 422):
+            with self.subTest(code=code):
+                run = self.answers(_done(1, stderr=f"gh: m (HTTP {code})\n"), _done(stdout="{}"))
+                with self.assertRaises(ghcli.GhError):
+                    ghcli.api(None, ".", "p/x")
+                self.assertEqual(run.call_count, 1)
+        self.assertEqual(self.sleeps, [])
+
+    def test_timeout_is_not_retried(self):
+        run = self.answers(ghcli.GhError("gh api p/x: timeout dopo 60 s"), _done(stdout="{}"))
+        with self.assertRaises(ghcli.GhError):
+            ghcli.api(None, ".", "p/x")
+        self.assertEqual((run.call_count, self.sleeps), (1, []))
+
+    def test_run_json_lines_retries_api_reads_only(self):
+        run = self.answers(EMPTY_500, _done(stdout='{"n":1}\n'))
+        self.assertEqual(ghcli.run_json_lines(None, ".", ["api", "--paginate", "--jq", ".[]", "p"]),
+                         [{"n": 1}])
+        self.assertEqual(run.call_count, 2)
+        for args in (["api", "--method", "POST", "p"], ["api", "-X", "POST", "p"],
+                     ["api", "--method=POST", "p"], ["pr", "list", "--json", "number"]):
+            with self.subTest(args=args):
+                run = self.answers(HTTP_500, _done(stdout='{"n":1}\n'))
+                with self.assertRaises(ghcli.GhError):
+                    ghcli.run_json_lines(None, ".", args)
+                self.assertEqual(run.call_count, 1)
+
+    def test_run_json_retries_api_reads_only(self):
+        run = self.answers(HTTP_500, _done(stdout='{"a": 1}'))
+        self.assertEqual(ghcli.run_json(None, ".", ["api", "p"]), {"a": 1})
+        self.assertEqual(run.call_count, 2)
+        run = self.answers(HTTP_500, _done(stdout="[]"))
+        with self.assertRaises(ghcli.GhError):
+            ghcli.run_json(None, ".", ["pr", "create", "--title", "t"])
+        self.assertEqual(run.call_count, 1)
+
+
+class FakeGhFlakyTest(FakeGhCase):
+    """`api_flaky` del gh finto: risponde prima con gli errori elencati, poi normalmente."""
+
+    def test_flaky_path_fails_then_answers(self):
+        sha = "a" * 40
+        self.set(commit_pulls={sha: [{"number": 1}]},
+                 api_flaky={f"repos/o/r/commits/{sha}/pulls": ["unexpected end of JSON input"]})
+        with mock.patch.object(ghcli, "_sleep") as sleep:
+            got = ghcli.api(self.state, self.tmp, f"repos/o/r/commits/{sha}/pulls?per_page=100",
+                            paginate=True, jq=".[]")
+        self.assertEqual(got.data, [{"number": 1}])
+        self.assertEqual(len(self.calls()), 2)
+        sleep.assert_called_once_with(2)
+        self.assertEqual(self.read()["api_flaky"], {f"repos/o/r/commits/{sha}/pulls": []})
 
 
 class ReexportTest(unittest.TestCase):

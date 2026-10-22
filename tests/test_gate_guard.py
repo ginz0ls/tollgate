@@ -298,6 +298,20 @@ class RunTest(GuardBase):
         self.assertEqual(self.run_guard(), 0)
         self.assertEqual(self.posted_statuses()[0]["state"], "success")
 
+    def test_transient_500_on_commit_pulls_is_retried(self):
+        """Prova P4: `commits/<sha>/pulls` risponde a volte 500 a corpo vuoto, che gh con
+        `--paginate` riporta come `unexpected end of JSON input`; la richiesta dopo va."""
+        self.push_pr_head()
+        sha = self.lab.head
+        pulls = [{"number": 1, "state": "open", "base": {"ref": "main"}, "head": {"sha": sha}}]
+        self.set_gh(commit_pulls={sha: pulls},
+                    api_flaky={f"repos/{SLUG}/commits/{sha}/pulls": ["unexpected end of JSON input"]})
+        with mock.patch.object(ghcli, "_sleep") as sleep:
+            self.assertEqual(self.run_guard(), 0)
+        sleep.assert_called_once_with(2)
+        [status] = self.posted_statuses()
+        self.assertEqual((status["context"], status["state"]), ("tollgate/guard", "success"))
+
     def test_red_comment_says_red_not_waiting(self):
         self.lab.commit("tollgate.toml", "schema_version = 1\n")
         self.push_pr_head()

@@ -33,6 +33,9 @@ stampa per riga `status<TAB>conclusion<TAB>app.id`. Poi `commits/<sha>/statuses`
 `pulls/<n>` (da `pulls[<n>]`, come la REST: `body`, `head.sha|ref|repo.full_name`, `base.ref`,
 `state`; 404 se manca) e `issues?state=open` (da `open_issues`, senza le righe con `pull_request`, che il filtro scarta), un valore per riga; il
 `--jq` non si valuta: i dati hanno già la forma che il filtro produce.
+`api_flaky` simula i 5xx transitori di GitHub (prova P4): `{"<percorso senza ?query>": ["<stderr>",
+...]}`; ogni `gh api` su quel percorso consuma il primo messaggio (riscrive il file dei dati), lo
+scrive su stderr ed esce con 1 senza stdout; finita la lista risponde normalmente.
 `prs[].comments` si leggono con `pr view --json comments` come li dà GraphQL
 (`author.login = "github-actions"`) e con `api repos/o/r/issues/<n>/comments` come li dà REST
 (`user.login = "github-actions[bot]"`, `user.type = "Bot"`); il `--jq` non si valuta.
@@ -377,6 +380,11 @@ def main(argv):
             print(json.dumps(out, separators=(",", ":")))
         return 0
     if argv[:1] == ["api"] and len(argv) > 1:
+        flaky = (data.get("api_flaky") or {}).get(argv[-1].split("?", 1)[0])
+        if flaky:
+            sys.stderr.write(flaky.pop(0) + "\n")
+            _save(path, data)
+            return 1
         entry = next((e for a in argv[1:] if (e := (data.get("api_status") or {}).get(a))), None)
         if entry is not None:
             return _api_status(entry, "--include" in argv)
