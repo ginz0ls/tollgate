@@ -204,6 +204,11 @@ class BaseIdsTest(GateRunBase):
                         environ=os.environ)
         self.assertIsNone(baseids.load(self.out / "ids.json", tree="0" * 40))
 
+    def test_load_rejects_deeply_nested_json(self):
+        path = self.out.parent / "ids.json"
+        path.write_text("[" * 100000)
+        self.assertIsNone(baseids.load(path, tree="t"))
+
     def test_load_rejects_unreadable_and_malformed(self):
         path = self.out.parent / "ids.json"
         self.assertIsNone(baseids.load(path, tree="t"))

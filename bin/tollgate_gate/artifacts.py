@@ -34,7 +34,7 @@ def _load_results(root: Path, max_file: int = MAX_FILE) -> tuple[dict | None, li
         if path.stat().st_size > max_file:
             return None, ["results.json troppo grande"]
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
         return None, ["results.json assente o illeggibile"]
     if not isinstance(data, dict) or data.get("v") != RESULTS_VERSION:
         return None, ["results.json: versione o forma inattesa"]
@@ -47,7 +47,11 @@ def validate(root: Path, *, max_file: int = MAX_FILE, max_total: int = MAX_TOTAL
     """I problemi degli artefatti sotto `root`, vuoto se vanno bene: collegamenti simbolici e file
     non regolari, file o totale oltre i limiti, XML con DOCTYPE o entità, `results.json` assente
     o con percorsi `report` fuori da `junit/`."""
-    root = Path(root)
+    return _check(Path(root), max_file, max_total)[0]
+
+
+def _check(root: Path, max_file: int, max_total: int) -> tuple[list[str], dict | None]:
+    """I problemi di `validate` e il contenuto di `results.json`, letto una volta sola."""
     problems: list[str] = []
     total = 0
     for dirpath, dirnames, filenames in os.walk(root):
@@ -82,9 +86,9 @@ def validate(root: Path, *, max_file: int = MAX_FILE, max_total: int = MAX_TOTAL
                 continue    # già segnalato sopra
             try:
                 parse_junit(p.read_bytes())
-            except (OSError, ValueError) as e:     # JunitError è un ValueError
+            except (OSError, ValueError, RecursionError) as e:     # JunitError è un ValueError
                 problems.append(f"{p.relative_to(root).as_posix()}: {e}")
-    return problems
+    return problems, data
 
 
 def _int_or_none(value) -> bool:
@@ -95,10 +99,9 @@ def read_results(root: Path) -> tuple[list[CommandResult] | None, bool, list[str
     """(risultati, `applicable`, problemi). Con problemi i risultati sono `None`; con
     `applicable` falso sono una lista vuota."""
     root = Path(root)
-    problems = validate(root)
-    if problems:
-        return None, False, problems
-    data, _ = _load_results(root)
+    problems, data = _check(root, MAX_FILE, MAX_TOTAL)
+    if problems or data is None:
+        return None, False, problems or ["results.json assente o illeggibile"]
     if not data["applicable"]:
         return [], False, []
     results: list[CommandResult] = []
@@ -112,7 +115,7 @@ def read_results(root: Path) -> tuple[list[CommandResult] | None, bool, list[str
         if cmd.get("report") is not None:
             try:
                 junit = parse_junit((root / cmd["report"]).read_bytes())
-            except (OSError, ValueError) as e:
+            except (OSError, ValueError, RecursionError) as e:
                 problems.append(f"results.json: report di {cmd['name']}: {e}")
                 continue
         results.append(CommandResult(cmd["name"], cmd["state"], cmd.get("exit"),

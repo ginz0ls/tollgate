@@ -41,7 +41,7 @@ def load(path: Path, *, tree: str) -> dict[str, set[str]] | None:
     albero."""
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
         return None
     if not isinstance(data, dict) or data.get("v") != IDS_VERSION or data.get("tree") != tree:
         return None

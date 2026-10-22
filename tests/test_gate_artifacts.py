@@ -86,6 +86,25 @@ class ArtifactsTest(unittest.TestCase):
             problems = artifacts.validate(self.root, max_file=100)
         self.assertTrue(any("results.json" in p for p in problems), problems)
 
+    def test_deeply_nested_results_json_is_a_problem(self):
+        (self.root / "results.json").write_text("[" * 100000)
+        self.assertTrue(artifacts.validate(self.root))
+        results, applicable, problems = artifacts.read_results(self.root)
+        self.assertEqual((results, applicable), (None, False))
+        self.assertTrue(problems)
+
+    def test_results_json_is_read_once(self):
+        real = Path.read_text
+        reads = []
+
+        def counting(path, *a, **k):
+            if path.name == "results.json":
+                reads.append(path)
+            return real(path, *a, **k)
+        with mock.patch.object(Path, "read_text", counting):
+            self.assertEqual(artifacts.read_results(self.root)[2], [])
+        self.assertEqual(len(reads), 1)
+
     def test_size_limits(self):
         (self.root / "big.log").write_bytes(b"x" * 100)
         self.assertEqual(artifacts.validate(self.root, max_file=1000), [])
