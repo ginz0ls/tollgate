@@ -77,7 +77,7 @@ Uscita del tool Bash per `command -v gh` nel passo `shim`: `/tmp/tollgate-p4/flo
 ## Difetti e osservazioni
 
 - Nessun difetto nuovo emerso dalle evidenze del flusso: uscite 0, 0 differenze di stato, 0 voci fuori elenco nell'audit, 0 veti.
-- Il clone del flusso in `/tmp/tollgate-p4/flow` è imposto dal brief; il controllo dei comandi (`raccogli-comandi-controllo.txt`) lo segnala come violazione, falso positivo del verificatore: il controllo vuole una cartella sotto `P4_WORK`. Riportato come tale nel rapporto del gate.
+- Il clone del flusso in `/tmp/tollgate-p4/flow` è imposto dal brief; il controllo dei comandi (`raccogli-comandi-controllo.txt`) lo segnalava come violazione: difetto del verificatore, non del flusso (il controllo voleva una cartella sotto `P4_WORK`). Corretto in 8fa32ba (`FlowCloneTest`); l'evidenza è antecedente alla correzione. Dettagli nel rapporto del gate.
 - Il modello ha scritto il piano da sé al passo 1 (invocando `superpowers:writing-plans`) e lo ha committato; al passo 2 il prompt di appoggio diceva di scriverlo solo se mancava, e non ha dovuto farlo.
 - Il flusso è stato eseguito una sola volta: l'esito «riuscito» è su una sola esecuzione, non dice nulla sulla ripetibilità né su L2.
 

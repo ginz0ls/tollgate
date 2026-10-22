@@ -1544,3 +1544,14 @@
 2026-10-22T19:27:24Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/39762927842/timing
 2026-10-22T19:27:24Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/39762927773/timing
 2026-10-22T19:27:25Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/39631102348/timing
+2026-10-22T20:11:47Z [controller] (protected) gh issue create --repo ginz0ls/tollgate-p4-protected --title prova criterio 11: start con la protezione completa --body issue di prova del criterio 11 (tollgate P4)
+2026-10-22T20:11:47Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova criterio 11: start con la protezione completa --body issue di prova del criterio 11 (tollgate P4)
+2026-10-22T20:11:48Z [controller] (protected) python3 -B /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate start 106
+2026-10-22T20:11:49Z gh auth status
+2026-10-22T20:11:50Z gh api repos/ginz0ls/tollgate-p4-protected/issues/106
+2026-10-22T20:11:51Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/pulls?state=all&per_page=100 --jq .[] | {number, headRefName: .head.ref, state: (if .merged_at then "MERGED" else (.state | ascii_upcase) end), url: .html_url}
+2026-10-22T20:11:51Z gh api repos/ginz0ls/tollgate-p4-protected/commits/b86dc8d09a7fb905abbedf71eb626169277596b5/status
+2026-10-22T20:11:52Z gh api repos/ginz0ls/tollgate-p4-protected/actions/permissions
+2026-10-22T20:11:53Z gh api --include repos/ginz0ls/tollgate-p4-protected/branches/main/protection
+2026-10-22T20:12:03Z [controller] (protected) gh issue close 106 -R ginz0ls/tollgate-p4-protected
+2026-10-22T20:12:03Z gh issue close 106 -R ginz0ls/tollgate-p4-protected
