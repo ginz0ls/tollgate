@@ -124,7 +124,7 @@ def render(sha: str, ev: Evaluation) -> str:
 
 
 def _guard_build(sha: str, problems: list[str], cap: int, keep: int | None) -> str:
-    out = [f"{GUARD_PREFIX} sha={sha} -->", "", f"## tollgate: in attesa sullo SHA `{sha}`", ""]
+    out = [f"{GUARD_PREFIX} sha={sha} -->", "", f"## tollgate/guard: rosso sullo SHA `{sha}`", ""]
     shown = problems if keep is None else problems[:keep]
     if shown:
         out += _lines(shown, cap)
@@ -134,7 +134,7 @@ def _guard_build(sha: str, problems: list[str], cap: int, keep: int | None) -> s
 
 
 def render_guard(sha: str, problems: list[str]) -> str:
-    """Il commento di `tollgate-guard` quando lo stato resta in attesa: spiega i problemi.
+    """Il commento di `tollgate-guard` quando `tollgate/guard` è rosso: spiega i problemi.
     Stesso tetto totale del commento del gate."""
     _check_sha(sha)
     minimal = _guard_build(sha, problems, 0, 0)

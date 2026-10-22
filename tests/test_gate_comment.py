@@ -33,6 +33,12 @@ class MarkerTest(unittest.TestCase):
     def test_marker_matches_fixtask(self):
         self.assertEqual(comment.MARKER_PREFIX, fixtask.GATE_MARKER)
 
+    def test_guard_comment_says_red_not_waiting(self):
+        body = comment.render_guard(SHA, ["un problema"])
+        self.assertNotIn("in attesa", body)
+        self.assertIn("tollgate/guard", body)
+        self.assertIn("rosso", body)
+
     def test_guard_marker(self):
         body = comment.render_guard(SHA, ["manca @team <!-- x --> il file"])
         self.assertTrue(body.startswith(f"{comment.GUARD_PREFIX} sha={SHA} -->"))

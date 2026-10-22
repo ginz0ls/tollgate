@@ -119,6 +119,15 @@ class CheckTest(GuardBase):
                                head_ref=BRANCH, cross_repo=False)
         self.assertTrue(any("VERSION" in p for p in problems))
 
+    def test_tollgate_file_moved_is_red(self):
+        self.lab.commit(".github/tollgate/VERSION", "1\n")
+        base = self.lab.head
+        git(self.lab.repo, "mv", ".github/tollgate/VERSION", "docs/VERSION")
+        git(self.lab.repo, "commit", "-qm", "sposta")
+        problems = guard.check(self.lab.repo, base_tip=base, head=self.lab.head,
+                               head_ref=BRANCH, cross_repo=False)
+        self.assertTrue(any(".github/tollgate/VERSION" in p for p in problems), problems)
+
     def test_config_branch_only_tollgate_files_passes(self):
         self.config_branch()
         self.lab.commit("tollgate.toml", self.lab.toml + "\n# nota\n")
@@ -278,6 +287,57 @@ class RunTest(GuardBase):
                                                    head_ref="tollgate-config/z")), 0)
         self.assertEqual(self.posted_statuses(), [])
 
+    def test_stacked_pr_does_not_make_sha_shared(self):
+        """`commits/<sha>/pulls` elenca anche la PR B impilata su A (V5b): non è testa di A."""
+        self.push_pr_head()
+        sha = self.lab.head
+        pulls = [{"number": 1, "state": "open", "base": {"ref": "main"}, "head": {"sha": sha}},
+                 {"number": 2, "state": "open", "base": {"ref": "main"},
+                  "head": {"sha": "b" * 40}}]
+        self.set_gh(commit_pulls={sha: pulls})
+        self.assertEqual(self.run_guard(), 0)
+        self.assertEqual(self.posted_statuses()[0]["state"], "success")
+
+    def test_red_comment_says_red_not_waiting(self):
+        self.lab.commit("tollgate.toml", "schema_version = 1\n")
+        self.push_pr_head()
+        self.run_guard()
+        [c] = self.comments()
+        self.assertNotIn("in attesa", c["body"])
+        self.assertIn("tollgate/guard", c["body"])
+        self.assertIn("rosso", c["body"])
+
+    def test_pr_advanced_since_the_event_writes_nothing(self):
+        old = self.lab.head
+        self.lab.commit("tollgate.toml", "schema_version = 1\n")
+        self.push_pr_head()
+        self.assertEqual(self.run_guard(self.event(sha=old)), 0)
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(self.comments(), [])
+
+    def test_hostile_file_names_stay_inert(self):
+        name = "a`b``` --> @x ::error::.txt"
+        self.config_branch()
+        self.lab.commit(name, "x\n")
+        self.push_pr_head()
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.run_guard(self.event(head_ref=CONFIG_BRANCH), publish=False)
+        for line in out.getvalue().splitlines():
+            self.assertFalse(line.startswith("::"), line)
+        self.assertEqual(self.run_guard(self.event(head_ref=CONFIG_BRANCH)), 0)
+        [c] = self.comments()
+        outside = c["body"].split("\n````", 1)
+        self.assertEqual(len(outside), 2, c["body"])
+        self.assertNotIn("@x", outside[0])
+        self.assertEqual(outside[0].count("-->"), 1)
+
+    def test_edit_to_other_base_after_green_guard_keeps_green_status(self):
+        self.push_pr_head()
+        self.run_guard()
+        self.run_guard(self.event(base="other"))
+        self.assertEqual([s["state"] for s in self.posted_statuses()], ["success"])
+
     def test_dry_run_publishes_nothing_and_returns_1_when_red(self):
         self.lab.commit("tollgate.toml", "schema_version = 1\n")
         self.push_pr_head()
@@ -302,8 +362,11 @@ class RunTest(GuardBase):
         self.push_pr_head()
         seen = {}
 
+        real = guard.git.fetch_ref
+
         def fake(repo, ref, *, token=None):
             seen.update(ref=ref, token=token)
+            real(repo, ref)
 
         with mock.patch.object(guard.git, "fetch_ref", fake), \
                 mock.patch.dict(os.environ, {"GH_TOKEN": "tkn-123"}):

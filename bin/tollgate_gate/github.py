@@ -172,12 +172,13 @@ def prs_for_commit(state, cwd, slug: str, sha: str) -> list[dict]:
 
 def shared_sha_prs(state, cwd, slug: str, sha: str, default_branch: str) -> list[dict]:
     """Le PR aperte verso il ramo predefinito che hanno `sha` come testa (decisione 5): più di
-    una vuol dire `error`. Un numero compare una volta sola."""
+    una vuol dire `error`. `commits/<sha>/pulls` elenca anche le PR impilate sulla testa (V5b):
+    contano solo quelle con `head.sha == sha`. Un numero compare una volta sola."""
     seen, found = set(), []
     for pr in prs_for_commit(state, cwd, slug, sha):
         number = pr.get("number")
         if (pr.get("state") == "open" and (pr.get("base") or {}).get("ref") == default_branch
-                and number not in seen):
+                and (pr.get("head") or {}).get("sha") == sha and number not in seen):
             seen.add(number)
             found.append(pr)
     return found

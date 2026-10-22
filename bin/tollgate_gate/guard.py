@@ -14,7 +14,6 @@ from tollgate_core import git, paths
 from . import comment, evaluate, github
 
 CONTEXT = "tollgate/guard"
-WAIVERS = [".tollgate/waivers/**"]
 MAX_LISTED = 50     # file nominati per voce: oltre, una riga di riepilogo
 DESC_OK = "file di tollgate e workflow del progetto in regola"
 DESC_SHARED = "SHA condiviso da più PR: chiudine una"
@@ -29,7 +28,7 @@ def _listed(paths_: list[str], template: str) -> list[str]:
 
 
 def _is_config_exempt(path: str) -> bool:
-    return protected.is_tollgate_file(path) or globs.match_any(WAIVERS, path)
+    return protected.is_tollgate_file(path) or globs.match_any(protected.WAIVER_FILES, path)
 
 
 def check(repo: Path, *, base_tip: str, head: str, head_ref: str, cross_repo: bool) -> list[str]:
@@ -105,6 +104,10 @@ def run(event_path: Path, *, publish: bool, environ: Mapping[str, str],
     head = git.resolve_ref(repo, pr.head_sha)
     if head is None:
         raise git.GitError("la testa della PR non è più quella dell'evento: la PR è cambiata")
+    if git.resolve_ref(repo, "FETCH_HEAD") != head:
+        print("guard: la PR è avanzata dopo l'evento, nessuna scrittura (la rigiudica l'evento "
+              "nuovo)")
+        return 0
     if publish:
         shared = github.shared_sha_prs(state, repo, slug, head, pr.default_branch)
         if len(shared) > 1:

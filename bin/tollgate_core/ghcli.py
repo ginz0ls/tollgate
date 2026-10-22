@@ -117,8 +117,8 @@ def api(state, cwd, path: str, *, method: str = "GET", fields: dict[str, str] | 
     """`gh api`. Con `include=True` il codice HTTP si legge dalla riga di stato e un 403 o 404 è un
     risultato (`status`, `data` col corpo JSON se c'è), non un errore; senza, l'uscita non zero è
     un `GhError`. `file_fields` passa il contenuto di un file come campo (`-F chiave=@file`): il
-    testo non fidato non entra mai negli argomenti. `paginate` vuole `jq` (G5: gli array delle pagine non si concatenano) e `data`
-    è la lista dei valori che il filtro stampa, uno per riga."""
+    testo non fidato non entra mai negli argomenti. `paginate` vuole `jq` (G5: gli array delle
+    pagine non si concatenano) e `data` è la lista dei valori che il filtro stampa, uno per riga."""
     if paginate and jq is None:
         raise ValueError("api --paginate richiede jq")
     if paginate and include:

@@ -7,8 +7,9 @@ from . import globs
 
 TOLLGATE_FILES = ["/tollgate.toml", ".github/workflows/tollgate-*.yml",
                   ".github/actions/tollgate-*/**", ".github/tollgate/**"]
-REPO_PROTECTED = TOLLGATE_FILES + [
-    ".tollgate/waivers/**", "docs/superpowers/reviews/**",
+WAIVER_FILES = [".tollgate/waivers/**"]
+REPO_PROTECTED = TOLLGATE_FILES + WAIVER_FILES + [
+    "docs/superpowers/reviews/**",
     ".claude/settings.json", ".claude/settings.local.json",
     ".git/hooks/**", ".git/config",
 ]
