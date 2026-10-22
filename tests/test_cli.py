@@ -45,6 +45,18 @@ class CliTest(CliBase):
         self.assertEqual(r.returncode, 0)
         self.assertIn("status", r.stdout)
 
+    def test_help_names_gate(self):
+        r = self.run_cli("-h")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("gate -h", r.stdout)
+
+    def test_gate_is_dispatched_before_the_core_cli(self):
+        r = self.run_cli("gate", "-h")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("base-ids", r.stdout)
+        self.assertNotEqual(self.run_cli("gate").returncode, 0)
+        self.assertFalse((self.t.dir / "tollgate.db").exists())
+
     def test_status_filters_by_repo(self):
         self.seed()
         r = self.run_cli("status", cwd=self.repo)

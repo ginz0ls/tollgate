@@ -43,7 +43,9 @@ def _issue_number(value: str) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="tollgate", description="CLI di tollgate")
+    p = argparse.ArgumentParser(
+        prog="tollgate", description="CLI di tollgate",
+        epilog="gate: il gate su GitHub (run, base-ids, ...), senza stato; aiuto in `gate -h`")
     p.add_argument("--version", action="version", version=f"tollgate {VERSION}")
     sub = p.add_subparsers(dest="cmd")
     st = sub.add_parser("status", help="stato dei lavori attivi (sola lettura)")

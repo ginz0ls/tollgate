@@ -98,6 +98,28 @@ class CliCallsTest(unittest.TestCase):
             self.lab.bash(f"python3 '{PROGRAM}' verify \"unchiuso", agent_id="ag-1").exit, 0)
         self.assertEqual(self.lab.bash(f"python3 '{PROGRAM}' start 7 \"unchiuso").exit, 0)
 
+    def test_gate_publish_denied_to_everyone(self):
+        for cmd in (f"'{PROGRAM}' gate base-ids --sha x --out o --publish",
+                    f'python3 "{PROGRAM}" gate base-ids --publish --sha x --out o',
+                    f"python3 -B '{PROGRAM}' gate evaluate --event e --publish",
+                    f"cd /tmp && '{PROGRAM}' gate sentinel --publish=1",
+                    f'p="{PROGRAM}"; python3 "$p" gate guard --publish'):
+            for agent in (None, "ag-1"):
+                with self.subTest(cmd=cmd, agent=agent):
+                    r = self.lab.bash(cmd, agent_id=agent)
+                    self.assertEqual(r.exit, 2)
+                    self.assertIn("GitHub Actions", r.stderr)
+        self.assertEqual(self.lab.bash(f"python3 '{PROGRAM}' gate base-ids \"unchiuso --publish",
+                                       ).exit, 2)
+
+    def test_gate_without_publish_is_not_denied(self):
+        for cmd in (f"'{PROGRAM}' gate run --event e --out o",
+                    f"'{PROGRAM}' gate base-ids --sha x --out o", f"'{PROGRAM}' verify --publish",
+                    "echo gate --publish"):
+            for agent in (None, "ag-1"):
+                with self.subTest(cmd=cmd, agent=agent):
+                    self.assertEqual(self.lab.bash(cmd, agent_id=agent).exit, 0)
+
     def test_other_subcommands_leave_no_signal(self):
         for cmd in (f"'{PROGRAM}' verify", f"'{PROGRAM}' task start 1",
                     f"'{PROGRAM}' status", "git status"):

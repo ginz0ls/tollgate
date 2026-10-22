@@ -2,7 +2,8 @@
 
 La CLI gira dentro Bash e non riceve il session_id: per `start` e `act`, i soli sottocomandi
 che leggono la sessione (e quelli di chiusura di P3b), il controllo lascia un segnale (operazione `cli_call`). Un subagente
-non può lanciare i comandi del coordinatore."""
+non può lanciare i comandi del coordinatore. `gate … --publish` scrive su GitHub con
+il token del processo: dentro Actions e nient'altro, quindi lo si nega a chiunque (D4)."""
 from __future__ import annotations
 
 import os
@@ -51,6 +52,16 @@ def _coordinator_only(sub: str | None, args: list[str]) -> bool:
     return sub in _COORDINATOR_ONLY or (sub == "status" and "--checkpoint" in args)
 
 
+def _publishes(sub: str | None, args: list[str]) -> bool:
+    return sub == "gate" and any(x == "--publish" or x.startswith("--publish=") for x in args)
+
+
+def _deny_publish():
+    return deny("il sottocomando gate con --publish pubblica su GitHub e si lancia solo dentro "
+                "GitHub Actions: in locale gli stati non contano e non si scrivono.",
+                rule="gate_publish")
+
+
 def _deny_subagent(sub: str | None, certain: bool):
     text = (f"tollgate {sub} è un comando del coordinatore: un subagente non lo lancia. "
             "Riporta al coordinatore (BLOCKED o NEEDS_CONTEXT).")
@@ -69,6 +80,8 @@ def decide(event, ctx):
         # Fail-closed per un subagente: non si capisce il comando, ma se nomina il programma con
         # un sottocomando del coordinatore non passa.
         words = set(re.findall(r"[\w-]+", raw))
+        if "tollgate" in raw and {"gate", "--publish"} <= words:
+            return [_deny_publish()]
         if event.agent_id and "tollgate" in raw and (words & {*_COORDINATOR_ONLY, "--checkpoint"}):
             return [deny("comando non analizzabile che nomina tollgate con un sottocomando del "
                          "coordinatore: un subagente non lo lancia. Riporta al coordinatore "
@@ -83,6 +96,8 @@ def decide(event, ctx):
             continue
         args, certain = found
         sub = _subcommand(args)
+        if _publishes(sub, args):
+            return [_deny_publish()]
         if event.agent_id:
             if _coordinator_only(sub, args):
                 return [_deny_subagent(sub, certain)]
