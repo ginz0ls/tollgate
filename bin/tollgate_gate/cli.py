@@ -13,7 +13,7 @@ from tollgate_core.config import ConfigError
 from tollgate_core.ghcli import GhError
 from tollgate_core.git import GitError
 
-from . import baseids, guard
+from . import baseids, guard, verdict
 from . import run as gate_run
 
 ACTIONS_ENV = "GITHUB_ACTIONS"
@@ -43,6 +43,13 @@ def build_parser() -> argparse.ArgumentParser:
                        help="controlla i file di tollgate e i workflow del progetto di una PR")
     g.add_argument("--event", required=True, metavar="FILE", help="evento della PR (JSON)")
     g.add_argument("--publish", action="store_true", help="solo dentro GitHub Actions")
+    e = sub.add_parser("evaluate", allow_abbrev=False,
+                       help="il verdetto: legge gli artefatti di run e pubblica gli stati")
+    e.add_argument("--event", required=True, metavar="FILE", help="evento workflow_run (JSON)")
+    e.add_argument("--artifacts", required=True, metavar="DIR", help="artefatti di tollgate-run")
+    e.add_argument("--base-ids-cache", metavar="FILE", help="ids.json ripristinato dalla cache")
+    e.add_argument("--base-ids-artifact", metavar="DIR", help="artefatto tollgate-base-ids")
+    e.add_argument("--publish", action="store_true", help="solo dentro GitHub Actions")
     return p
 
 
@@ -112,7 +119,17 @@ def cmd_guard(args) -> int:
     return guard.run(Path(args.event), publish=args.publish, environ=os.environ)
 
 
-HANDLERS = {"run": cmd_run, "base-ids": cmd_base_ids, "guard": cmd_guard}
+def cmd_evaluate(args) -> int:
+    _require_actions(args)
+    return verdict.main(
+        Path(args.event), artifacts=Path(args.artifacts),
+        base_ids_cache=Path(args.base_ids_cache) if args.base_ids_cache else None,
+        base_ids_artifact=Path(args.base_ids_artifact) if args.base_ids_artifact else None,
+        publish=args.publish, environ=os.environ)
+
+
+HANDLERS = {"run": cmd_run, "base-ids": cmd_base_ids, "guard": cmd_guard,
+            "evaluate": cmd_evaluate}
 
 
 def main(args: list[str]) -> int:

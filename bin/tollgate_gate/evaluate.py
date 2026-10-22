@@ -49,9 +49,12 @@ class Context:
 
     @cached_property
     def is_work(self) -> bool:
-        """La PR di un lavoro di tollgate: un ramo `tg/<N>-*` (in locale, il lavoro corrente)."""
+        """La PR di un lavoro di tollgate: un ramo `tg/<N>-*` dello stesso repo (da un fork il nome
+        lo sceglie chi apre la PR, decisione 4; in locale, il lavoro corrente)."""
         pr = self.inputs.pr
-        return prref.is_tg_branch(pr.head_ref) if pr else self.inputs.block is not None
+        if pr is None:
+            return self.inputs.block is not None
+        return prref.is_tg_branch(pr.head_ref) and not pr.cross_repo
 
     @cached_property
     def issue_no(self) -> int | None:
@@ -59,7 +62,8 @@ class Context:
         locale, senza PR, dal blocco o dall'issue letta."""
         i = self.inputs
         if i.pr is not None:
-            return prref.issue_from_branch(i.pr.head_ref) or prref.closes_issue(i.pr.body)
+            branch = None if i.pr.cross_repo else prref.issue_from_branch(i.pr.head_ref)
+            return branch or prref.closes_issue(i.pr.body)
         if i.block and isinstance(i.block.get("issue"), int):
             return i.block["issue"]
         return i.issue.number if i.issue else None
@@ -73,9 +77,9 @@ class Context:
             return None
         if i.issue is None:
             return None if self.is_github else n
-        if i.issue.number != n or i.issue.state != "open":
+        if i.issue.number != n or i.issue.state != "open" or i.issue.is_pr:
             return None
-        if i.pr is not None and prref.is_tg_branch(i.pr.head_ref):
+        if i.pr is not None and self.is_work:
             if prref.closes_issue(i.pr.body) != n or (
                     i.block is not None and i.block.get("issue") != n):
                 return None
@@ -620,6 +624,8 @@ def _config_item(ctx: Context, ev: Evaluation) -> None:
 def _issue_state(ev: Evaluation, facts, number: int) -> None:
     if facts is None or facts.number != number:
         _red(ev, "issue_invalid", "issue", f"l'issue #{number} della PR non risulta")
+    elif facts.is_pr:
+        _red(ev, "issue_invalid", "issue", f"#{number} è una PR, non un'issue")
     elif facts.state != "open":
         _red(ev, "issue_invalid", "issue", f"l'issue #{number} della PR non è aperta")
 

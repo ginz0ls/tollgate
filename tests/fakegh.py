@@ -22,7 +22,8 @@ accoda in testa a `commit_statuses[<sha>]` con `creator.login = "github-actions[
 (`-F body=@<file>`) si accodano a `comments` della PR o dell'issue (`POST issues/<n>/comments`) o
 si riscrivono (`PATCH issues/comments/<id>`); `POST repos/o/r/issues` accoda a `open_issues`.
 Letture: `commits/<sha>/statuses` (da `commit_statuses`, vuoto se manca), `commits/<sha>/pulls`
-(da `commit_pulls`, vuoto se manca) e `issues?state=open` (da `open_issues`), un valore per riga; il `--jq` non
+(da `commit_pulls`, vuoto se manca), `pulls/<n>` (da `pulls[<n>]`, come la REST: `body`,
+`head.sha|ref|repo.full_name`, `base.ref`, `state`; 404 se manca) e `issues?state=open` (da `open_issues`), un valore per riga; il `--jq` non
 si valuta: i dati hanno già la forma che il filtro produce.
 `prs[].comments` si leggono con `pr view --json comments` come li dà GraphQL
 (`author.login = "github-actions"`) e con `api repos/o/r/issues/<n>/comments` come li dà REST
@@ -51,6 +52,7 @@ _ISSUES_OPEN = re.compile(r"^repos/[^/]+/[^/]+/issues\?.*state=open")
 _ISSUES_NEW = re.compile(r"^repos/[^/]+/[^/]+/issues$")
 _COMMENT_EDIT = re.compile(r"^repos/[^/]+/[^/]+/issues/comments/(\d+)$")
 _PULLS = re.compile(r"^repos/[^/]+/[^/]+/pulls(\?.*)?$")
+_PULL_ONE = re.compile(r"^repos/[^/]+/[^/]+/pulls/(\d+)$")
 PR_FIELDS = frozenset({"number", "state", "url", "headRefName", "headRefOid", "mergedAt",
                        "title", "body", "comments", "isCrossRepository"})
 PULLS_FIELDS = ("number", "headRefName", "state", "url")
@@ -350,6 +352,12 @@ def main(argv):
                 _fail(f"stati del commit {m.group(1)} assenti dai dati")
             print(json.dumps(status))
             return 0
+        m = _PULL_ONE.match(argv[-1])
+        if m:
+            pull = (data.get("pulls") or {}).get(m.group(1))
+            if pull is None:
+                _fail(f"pulls/{m.group(1)} assente dai dati (HTTP 404)")
+            return _ok(argv, pull)
         m = _ISSUE_REST.match(argv[-1])
         if m:
             issue = (data.get("issues") or {}).get(m.group(1))

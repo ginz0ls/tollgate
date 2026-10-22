@@ -67,6 +67,16 @@ def _text(data, *keys) -> str:
     return value
 
 
+def run_sha(event: dict) -> str:
+    """Lo SHA della testa del run di un evento `workflow_run`."""
+    return _sha(_text(event, "workflow_run", "head_sha"))
+
+
+def event_repo(event: dict) -> tuple[str, str]:
+    """`(repository.full_name, repository.default_branch)` di un evento."""
+    return _text(event, "repository", "full_name"), _text(event, "repository", "default_branch")
+
+
 def pr_from_event(event: dict) -> PrFacts | None:
     """Le informazioni della PR in un evento `pull_request_target`; `None` se l'evento non ha
     una PR. Un campo che manca o non ha la forma attesa è un `ValueError`. Una testa senza
@@ -83,6 +93,27 @@ def pr_from_event(event: dict) -> PrFacts | None:
         default_branch=_text(event, "repository", "default_branch"),
         body=body if isinstance(body, str) else "",
         cross_repo=head_repo != _text(event, "repository", "full_name"))
+
+
+def pull(state, cwd, slug: str, n: int) -> dict:
+    """La PR `n` (`GET pulls/<n>`): il payload di `workflow_run` non porta corpo né repo della
+    testa. Una risposta che non è un oggetto è un `GhError`."""
+    data = ghcli.api(state, cwd, f"repos/{slug}/pulls/{_number(n)}").data
+    if not isinstance(data, dict):
+        raise ghcli.GhError(f"PR {n}: risposta inattesa")
+    return data
+
+
+def pr_from_rest(pull: dict, *, repo_full_name: str, default_branch: str) -> PrFacts:
+    """Le informazioni della PR in una risposta di `GET pulls/<n>`. Un campo che manca o non ha
+    la forma attesa è un `ValueError`; una testa senza repository (fork cancellato) vale come
+    fork."""
+    body = pull.get("body")
+    return PrFacts(
+        number=_number(pull.get("number")), head_sha=_sha(_text(pull, "head", "sha")),
+        head_ref=_text(pull, "head", "ref"), base_ref=_text(pull, "base", "ref"),
+        default_branch=default_branch, body=body if isinstance(body, str) else "",
+        cross_repo=_node(pull, "head", "repo", "full_name") != repo_full_name)
 
 
 def set_status(state, cwd, slug: str, sha: str, *, context: str, status: str,
@@ -110,18 +141,18 @@ def statuses(state, cwd, slug: str, sha: str) -> list[dict]:
 
 
 def issue(state, cwd, slug: str, n: int) -> IssueFacts | None:
-    """L'issue `n`; `None` se non esiste o se il numero è quello di una PR."""
+    """L'issue `n`; `None` se non esiste. Se il numero è quello di una PR (chiave `pull_request`
+    nella risposta) `is_pr` è vero: il gate lo giudica rosso, non lo scambia per un'issue."""
     got = ghcli.api(state, cwd, f"repos/{slug}/issues/{_number(n)}", include=True)
     if got.status == 404:
         return None
     data = got.data
     if got.status != 200 or not isinstance(data, dict):
         raise ghcli.GhError(f"issue {n}: risposta inattesa (HTTP {got.status})")
-    if data.get("pull_request"):
-        return None
     labels = tuple(x["name"] for x in data.get("labels") or []
                    if isinstance(x, dict) and isinstance(x.get("name"), str))
-    return IssueFacts(n, str(data.get("state", "")).lower(), labels)
+    return IssueFacts(n, str(data.get("state", "")).lower(), labels,
+                      is_pr=bool(data.get("pull_request")))
 
 
 def pr_comments(state, cwd, slug: str, n: int) -> list[dict]:

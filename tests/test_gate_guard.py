@@ -444,10 +444,10 @@ class GithubTest(GuardBase):
         self.assertEqual(self.call(github.issue, 7), IssueFacts(7, "open", ("security",)))
         self.assertIsNone(self.call(github.issue, 9))
 
-    def test_issue_that_is_a_pr_is_none(self):
-        self.set_gh(issues={"7": {"number": 7, "state": "open", "labels": [],
+    def test_issue_that_is_a_pr_is_flagged(self):
+        self.set_gh(issues={"7": {"number": 7, "state": "OPEN", "labels": [],
                                   "pull_request": {"url": "u"}}})
-        self.assertIsNone(self.call(github.issue, 7))
+        self.assertEqual(self.call(github.issue, 7), IssueFacts(7, "open", (), is_pr=True))
 
     def test_pr_comments_are_rest_with_ids(self):
         self.set_gh(prs=[{"number": 1, "comments": [

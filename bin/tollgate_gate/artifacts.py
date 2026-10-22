@@ -106,19 +106,25 @@ def _int_or_none(value) -> bool:
     return value is None or (isinstance(value, int) and not isinstance(value, bool))
 
 
-def read_results(root: Path) -> tuple[list[CommandResult] | None, bool, list[str]]:
+def read_results(root: Path, *, meta: dict | None = None
+                 ) -> tuple[list[CommandResult] | None, bool, list[str]]:
     """(risultati, `applicable`, problemi). Con problemi i risultati sono `None`; con
-    `applicable` falso sono una lista vuota."""
+    `applicable` falso sono una lista vuota. Se `meta` è un dizionario, vi si scrivono `sha` e
+    `config_sha` di `results.json` (valori non controllati: li confronta chi chiama), dalla
+    stessa lettura."""
     try:
-        return _read_results(Path(root))
+        return _read_results(Path(root), meta)
     except Exception as e:  # confine fail-closed su dati non fidati: nessuna eccezione sfugge
         return None, False, [f"{type(e).__name__}: {e}"]
 
 
-def _read_results(root: Path) -> tuple[list[CommandResult] | None, bool, list[str]]:
+def _read_results(root: Path, meta: dict | None
+                  ) -> tuple[list[CommandResult] | None, bool, list[str]]:
     problems, data = _check(root, MAX_FILE, MAX_TOTAL)
     if problems or data is None:
         return None, False, problems or ["results.json assente o illeggibile"]
+    if meta is not None:
+        meta.update(sha=data.get("sha"), config_sha=data.get("config_sha"))
     if not data["applicable"]:
         return [], False, []
     results: list[CommandResult] = []

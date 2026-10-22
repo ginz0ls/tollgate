@@ -42,9 +42,12 @@ class PrFacts:
 
 @dataclass(frozen=True)
 class IssueFacts:
+    """`is_pr`: il numero è quello di una PR, non di un'issue (l'API delle issue risponde anche
+    per le PR)."""
     number: int
     state: str
     labels: tuple[str, ...]
+    is_pr: bool = False
 
 
 @dataclass(frozen=True)
