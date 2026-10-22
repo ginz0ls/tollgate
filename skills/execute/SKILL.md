@@ -57,4 +57,6 @@ All'avviso del hook (`warn_pct`) scrivi il checkpoint con `<programma> status --
 
 Quando ogni task è `done`, di' all'utente di digitare `/tollgate:finish`: l'atto lo registra il hook solo quando lo digita lui, e la chiusura (controllo, revisione finale, PR) è di quella skill.
 
-Il task di correzione generato dai rilievi della revisione finale (`task start --from-findings <ciclo>`, lanciato da `/tollgate:finish`) o dal gate (`--from-gate`) è un task `fix` come gli altri: stesso ciclo di avvio, implementatore, revisione e `task done`, e alla fine di' di nuovo all'utente di digitare `/tollgate:finish`.
+Il task di correzione generato dai rilievi della revisione finale (`task start --from-findings <ciclo>`, lanciato da `/tollgate:finish`) o dal gate (`task start --from-gate`, quando il commento del gate sulla PR è rosso) è un task `fix` come gli altri: stesso ciclo di avvio, implementatore, revisione e `task done`, e alla fine di' di nuovo all'utente di digitare `/tollgate:finish`.
+
+`--from-gate` legge l'ultimo commento del gate sulla PR (solo quelli del bot di GitHub Actions, che cominciano col marcatore `<!-- tollgate-verdict`) e prende lo SHA dal marcatore: è la testa che il gate ha giudicato, non la punta di adesso. Se la PR non c'è, o non c'è un commento del gate, o il marcatore non porta lo SHA, il comando rifiuta: riporta il messaggio e non ricostruire il commento a mano. Vale in L1 e L2 (in L0 non ci sono task) e in fase `execution`.

@@ -324,6 +324,15 @@ class ManifestTest(unittest.TestCase):
         self.assertRegex(text, r"(?m)^name: reopen$")
         self.assertIn("act apply", text)
 
+    def test_init_model_invocable(self):
+        text = (ROOT / "skills" / "init" / "SKILL.md").read_text()
+        self.assertNotIn("disable-model-invocation", text)
+        self.assertRegex(text, r"(?m)^name: init$")
+        self.assertRegex(text, r"(?m)^description: \S")
+        self.assertIn('python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"', text)
+        self.assertIn("python3.11", text)
+        self.assertIn("indica il comando intero", text)
+
     def test_spec_audit_model_invocable(self):
         audit = (ROOT / "skills" / "spec-audit" / "SKILL.md").read_text()
         self.assertNotIn("disable-model-invocation", audit)

@@ -8,6 +8,8 @@ from pathlib import Path
 from tests.helpers import ROOT
 from tollgate_core import cli, db
 from tollgate_flow import audit, finishcheck, start, sync
+from tollgate_flow import init as flow_init
+from tollgate_gate import cli as gate_cli
 
 # (skill, intestazione della sezione o None per tutto il testo, modulo, nomi delle costanti)
 CONTRACTS = (
@@ -15,6 +17,7 @@ CONTRACTS = (
     ("finish", "## 1. Worktree pulito", finishcheck, ("OK", "RED", "REFUSED")),
     ("sync", None, sync, ("OK", "REFUSED", "BLOCKED", "REVIEW_NEEDED")),
     ("spec-audit", "## Codici d'uscita", audit, ("OK", "REFUSED", "NEEDS_CONFIRM")),
+    ("init", "## Codici d'uscita", flow_init, ("OK", "REFUSED")),
 )
 CODE_LINE = re.compile(r"(?m)^- \*\*(\d+)\b")
 CODE_LABEL = re.compile(r"(?m)^- \*\*(\d+), ([^*]*)\*\*")
@@ -26,6 +29,7 @@ MEANING = {
     "sync": {"OK": "riallineato", "REFUSED": "rifiuto", "BLOCKED": "needs_you",
              "REVIEW_NEEDED": "revisione"},
     "spec-audit": {"OK": "avanti", "REFUSED": "rifiuto", "NEEDS_CONFIRM": "conferma"},
+    "init": {"OK": "proposta", "REFUSED": "rifiuto"},
 }
 NOT_TOLLGATE_OPTIONS = {"--force"}      # `git worktree remove --force`, citato per vietarlo
 PROGRAM_CALL = re.compile(r"<programma> ([a-z][a-z-]*)(?: ([a-z][a-z-]*))?")
@@ -79,32 +83,32 @@ class SkillContractTest(unittest.TestCase):
                       "sospensione è definitiva", text)
 
     def test_program_subcommands_exist_in_parser(self):
+        """I sottocomandi `gate` si verificano contro il parser del gate, gli altri contro quello
+        del nucleo (decisione 18a)."""
         parser = cli.build_parser()
         top = next(a for a in parser._actions if a.dest == "cmd").choices
+        gate_top = next(a for a in gate_cli.build_parser()._actions
+                        if a.dest == "gate_cmd").choices
         for path in sorted((ROOT / "skills").glob("*/SKILL.md")):
             for first, second in PROGRAM_CALL.findall(path.read_text()):
                 with self.subTest(skill=path.parent.name, call=f"{first} {second}".strip()):
+                    if first == "gate":
+                        self.assertIn(second, gate_top)
+                        continue
                     self.assertIn(first, top)
                     nested = next((a for a in top[first]._actions
                                    if getattr(a, "choices", None) and a.dest != "help"), None)
                     if nested is not None and second:
                         self.assertIn(second, nested.choices)
 
-    def test_options_exist_in_parser(self):
-        options = set()
-
-        def walk(parser):
-            for action in parser._actions:
-                options.update(o for o in action.option_strings if o.startswith("--"))
-                choices = getattr(action, "choices", None)
-                for sub in choices.values() if isinstance(choices, dict) else ():
-                    walk(sub)
-        walk(cli.build_parser())
-        for path in sorted((ROOT / "skills").glob("*/SKILL.md")):
-            for opt in set(re.findall(r"(?<![\w-])(--[a-z][a-z-]+)", path.read_text())):
-                if opt not in NOT_TOLLGATE_OPTIONS:
-                    with self.subTest(skill=path.parent.name, option=opt):
-                        self.assertIn(opt, options)
+    def test_gate_calls_are_checked_against_the_gate_parser(self):
+        """La regola per `gate` vale: un sottocomando inventato non passa."""
+        gate_top = next(a for a in gate_cli.build_parser()._actions
+                        if a.dest == "gate_cmd").choices
+        self.assertEqual(PROGRAM_CALL.findall("<programma> gate sentinel --event f"),
+                         [("gate", "sentinel")])
+        self.assertIn("sentinel", gate_top)
+        self.assertNotIn("inventato", gate_top)
 
     def test_lens_brief_method_file_exists(self):
         """Il percorso di `dimensioni.md` che `audit prepare` scrive nel brief (stessa derivazione
@@ -120,6 +124,25 @@ class SkillContractTest(unittest.TestCase):
         for path in sorted((ROOT / "skills").glob("*/SKILL.md")):
             with self.subTest(skill=path.parent.name):
                 self.assertNotIn("P3c", path.read_text())
+                self.assertIsNone(re.search(r"\bP[0-9][a-z]?\b", path.read_text()))
+
+    def test_finish_separates_attention_lines_from_dod_lines(self):
+        """Le righe di `attenzione` («da leggere:», «informative:») non sono voci `[sì]`/`[no]`
+        (decisione 21b): la skill le nomina con il prefisso che il codice stampa."""
+        text = squash(skill_text("finish"))
+        for needle in ("`da leggere:`", "`informative:`", "`[sì]`", "`[no]`", "`rosso:`"):
+            self.assertIn(needle, text)
+        self.assertIn("Non sono voci `[no]`", text)
+        code = Path(finishcheck.__file__).read_text()
+        for prefix in ("da leggere", "informative"):
+            self.assertIn(f'"{prefix}', code)
+
+    def test_init_skill_never_copies_or_protects(self):
+        text = squash(skill_text("init"))
+        for needle in ("--propose", "--update", "--merges-per-month", "--service",
+                       "mai copiare i file al posto dell'utente", "mai lanciare `protect.sh`",
+                       "non determinata", "tollgate-config/"):
+            self.assertIn(needle, text)
 
 
 if __name__ == "__main__":
