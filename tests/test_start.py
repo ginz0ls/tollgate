@@ -631,6 +631,107 @@ class StartSpecTest(StartCase):
             self.assertIsNone(seen["spec"])
 
 
+class ProtectionTest(StartCase):
+    """Protezione del ramo e Actions letti da `start` (9.3, 9.6, decisione 19)."""
+    PROTECTION = "repos/{owner}/{repo}/branches/main/protection"
+    PERMISSIONS = "repos/{owner}/{repo}/actions/permissions"
+
+    def reads(self, fl, path):
+        return [c for c in fl.gh_calls() if path in c["argv"]]
+
+    def api(self, fl, protection=None, actions=True, **extra):
+        entries = {}
+        if protection is not None:
+            entries[self.PROTECTION] = protection
+        if actions is not None:
+            entries[self.PERMISSIONS] = {"status": 200, "body": {"enabled": actions}}
+        self.gh(fl, api_status=entries, **extra)
+
+    @staticmethod
+    def complete():
+        return {"required_pull_request_reviews": {},
+                "required_status_checks": {"strict": True, "contexts": [], "checks": [
+                    {"context": "tollgate/guard", "app_id": 15368},
+                    {"context": "tollgate/verdict", "app_id": 15368}]},
+                "enforce_admins": {"enabled": True}, "allow_force_pushes": {"enabled": False},
+                "allow_deletions": {"enabled": False}}
+
+    def test_protected_missing_fields_warned(self):
+        fl = self.make()
+        data = self.complete()
+        data["required_status_checks"]["strict"] = False
+        data["required_status_checks"]["checks"][1]["app_id"] = -1
+        self.api(fl, {"status": 200, "body": data})
+        r = fl.cli("start", "7")
+        self.assertEqual(r.returncode, 0, out(r))
+        self.assertIn("strict", out(r))
+        self.assertIn("tollgate/verdict", out(r))
+        self.assertEqual(len(self.rows(fl)), 1)
+
+    def test_complete_protection_has_no_warning(self):
+        fl = self.make()
+        self.api(fl, {"status": 200, "body": self.complete()})
+        r = fl.cli("start", "7")
+        self.assertEqual(r.returncode, 0, out(r))
+        self.assertNotIn("protezione", out(r))
+        self.assertNotIn("Actions", out(r))
+
+    def test_unreadable_protection_continues(self):
+        for entry in ({"status": 403, "message": "Must have admin rights to Repository.",
+                       "body": {"message": "Must have admin rights to Repository."}}, None):
+            with self.subTest(entry):
+                fl = self.make()
+                self.api(fl, entry)
+                r = fl.cli("start", "7")
+                self.assertEqual(r.returncode, 0, out(r))
+                self.assertIn("protezione non leggibile con queste credenziali: proseguo",
+                              out(r))
+                self.assertEqual(len(self.rows(fl)), 1)
+
+    def test_unprotected_branch_is_warned(self):
+        fl = self.make()
+        self.api(fl, {"status": 404, "message": "Branch not protected",
+                      "body": {"message": "Branch not protected"}})
+        r = fl.cli("start", "7")
+        self.assertEqual(r.returncode, 0, out(r))
+        self.assertIn("senza protezione", out(r))
+
+    def test_detect_does_not_read_protection(self):
+        fl = self.make(toml=DEFAULT_TOML.replace("protected", "detect"))
+        self.api(fl, {"status": 200, "body": {}})
+        r = fl.cli("start", "7")
+        self.assertEqual(r.returncode, 0, out(r))
+        self.assertEqual(self.reads(fl, self.PROTECTION), [])
+        self.assertEqual(len(self.reads(fl, self.PERMISSIONS)), 1)
+        self.assertNotIn("protezione", out(r))
+
+    def test_actions_disabled_warned(self):
+        for mode in ("protected", "detect"):
+            with self.subTest(mode):
+                fl = self.make(toml=DEFAULT_TOML.replace("protected", mode))
+                self.api(fl, {"status": 200, "body": self.complete()}, actions=False)
+                r = fl.cli("start", "7")
+                self.assertEqual(r.returncode, 0, out(r))
+                self.assertIn("GitHub Actions spente: il gate non gira", out(r))
+
+    def test_unreadable_actions_is_only_a_note(self):
+        fl = self.make()
+        self.api(fl, {"status": 200, "body": self.complete()}, actions=None)
+        r = fl.cli("start", "7")
+        self.assertEqual(r.returncode, 0, out(r))
+        self.assertIn("impostazioni di GitHub Actions non leggibili", out(r))
+        self.assertNotIn("spente", out(r))
+        self.assertEqual(len(self.rows(fl)), 1)
+
+    def test_resume_checks_too(self):
+        fl = self.make(issue=7)
+        self.api(fl, None, actions=False)
+        r = fl.cli("start", "7")
+        self.assertEqual(r.returncode, 0, out(r))
+        self.assertIn("GitHub Actions spente: il gate non gira", out(r))
+        self.assertIn("protezione non leggibile", out(r))
+
+
 class ResumeTest(StartCase):
     def make(self, **kw):
         return super().make(issue=7, **kw)

@@ -1,0 +1,16 @@
+# tollgate.toml: configurazione di tollgate (spec 11.4). Le chiavi che non scrivi hanno il predefinito.
+schema_version = 1
+
+[project]
+allow_no_tests = false
+
+[commands]
+# Da compilare con i comandi del progetto. `gate` elenca i nomi delle chiavi di [commands]
+# che il gate esegue.
+setup  = ""                  # per esempio "npm ci"
+verify = ""                  # per esempio "npm run check"
+gate   = ["verify"]
+report = ""                  # per esempio "junit:reports/junit.xml"
+
+[gate]
+mode = "__MODE__"            # protected | detect: lo scrive tollgate init dopo averlo misurato

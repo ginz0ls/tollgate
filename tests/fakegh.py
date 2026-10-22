@@ -22,8 +22,14 @@ accoda in testa a `commit_statuses[<sha>]` con `creator.login = "github-actions[
 commenti (`-F body=@<file>`) si accodano a `comments` della PR o dell'issue, anche di
 `open_issues` (`POST issues/<n>/comments`), o si riscrivono (`PATCH issues/comments/<id>`);
 `POST repos/o/r/issues` accoda a `open_issues` (con `body`).
-Letture: `commits/<sha>/statuses` (da `commit_statuses`, vuoto se manca), `commits/<sha>/pulls`
-(da `commit_pulls`, vuoto se manca), `pulls/<n>` (da `pulls[<n>]`, come la REST: `body`,
+`PUT repos/o/r/branches/<ramo>/protection` (corpo da `--input`) si accoda a `protection_puts` e
+risponde 200. La GET della protezione si dà con `api_status` (il percorso è quello letterale con
+`{owner}/{repo}`, come lo passa il codice) e `actions/permissions` lo stesso.
+Letture: `commits/<sha>/check-runs` (da `check_runs[<sha>]`, righe `{name, status, conclusion,
+app: {id, slug}}`): senza `--jq` il corpo REST `{"check_runs": [...]}`; con `--jq` il finto
+valuta **solo** il filtro di `protect.sh` (`.name == "<job>"`, e `.app.slug == "..."` se c'è) e
+stampa per riga `status<TAB>conclusion<TAB>app.id`. Poi `commits/<sha>/statuses` (da
+`commit_statuses`, vuoto se manca), `commits/<sha>/pulls` (da `commit_pulls`, vuoto se manca), `pulls/<n>` (da `pulls[<n>]`, come la REST: `body`,
 `head.sha|ref|repo.full_name`, `base.ref`, `state`; 404 se manca) e `issues?state=open` (da
 `open_issues`, senza le righe con `pull_request`, che il filtro scarta), un valore per riga; il
 `--jq` non si valuta: i dati hanno già la forma che il filtro produce.
@@ -49,6 +55,10 @@ _ISSUE_REST = re.compile(r"^repos/[^/]+/[^/]+/issues/(\d+)$")
 _PR_COMMENTS = re.compile(r"^repos/[^/]+/[^/]+/issues/(\d+)/comments(\?.*)?$")
 _STATUS_POST = re.compile(r"^repos/[^/]+/[^/]+/statuses/([0-9a-f]{40})$")
 _STATUS_LIST = re.compile(r"^repos/[^/]+/[^/]+/commits/([0-9a-f]{40})/statuses(\?.*)?$")
+_CHECK_RUNS = re.compile(r"^repos/[^/]+/[^/]+/commits/([0-9a-f]{40})/check-runs(\?.*)?$")
+_PROTECTION_PUT = re.compile(r"^repos/[^/]+/[^/]+/branches/[^?]+/protection$")
+_JQ_NAME = re.compile(r'\.name == "([^"]+)"')
+_JQ_SLUG = re.compile(r'\.app\.slug == "([^"]+)"')
 _COMMIT_PULLS = re.compile(r"^repos/[^/]+/[^/]+/commits/([0-9a-f]{40})/pulls(\?.*)?$")
 _ISSUES_OPEN = re.compile(r"^repos/[^/]+/[^/]+/issues\?.*state=open")
 _ISSUES_NEW = re.compile(r"^repos/[^/]+/[^/]+/issues$")
@@ -211,6 +221,11 @@ def _api_write(data, path_data, argv):
         comment["body"] = _file_field(argv, "body")
         _save(path_data, data)
         return _ok(argv, _rest_comment(comment))
+    if method == "PUT" and _PROTECTION_PUT.match(path):
+        with open(_flag(argv, "--input"), encoding="utf-8") as f:
+            data.setdefault("protection_puts", []).append(json.load(f))
+        _save(path_data, data)
+        return _ok(argv, {})
     if method == "POST" and _ISSUES_NEW.match(path):
         issues = data.setdefault("open_issues", [])
         number = max([i["number"] for i in issues] + [100]) + 1
@@ -220,6 +235,23 @@ def _api_write(data, path_data, argv):
         _save(path_data, data)
         return _ok(argv, {"number": number, "html_url": issues[-1]["url"]})
     return None
+
+
+def _check_runs(data, argv, sha):
+    """`commits/<sha>/check-runs`: il corpo REST, o il filtro di `protect.sh` valutato a mano."""
+    rows = (data.get("check_runs") or {}).get(sha) or []
+    jq = _flag(argv, "--jq")
+    if jq is None:
+        return _ok(argv, {"total_count": len(rows), "check_runs": rows})
+    name, slug = _JQ_NAME.search(jq), _JQ_SLUG.search(jq)
+    for row in rows:
+        app = row.get("app") or {}
+        if (name and row.get("name") != name.group(1)) or (
+                slug and app.get("slug") != slug.group(1)):
+            continue
+        print("\t".join([row.get("status") or "", row.get("conclusion") or "",
+                         str(app.get("id"))]))
+    return 0
 
 
 def _api_list(data, argv):
@@ -337,7 +369,7 @@ def main(argv):
         entry = next((e for a in argv[1:] if (e := (data.get("api_status") or {}).get(a))), None)
         if entry is not None:
             return _api_status(entry, "--include" in argv)
-        if _flag(argv, "--method") in ("POST", "PATCH"):
+        if _flag(argv, "--method") in ("POST", "PATCH", "PUT"):
             done = _api_write(data, path, argv)
             if done is not None:
                 return done
@@ -345,6 +377,9 @@ def main(argv):
             done = _api_list(data, argv)
             if done is not None:
                 return done
+        m = _CHECK_RUNS.match(argv[-1])
+        if m:
+            return _check_runs(data, argv, m.group(1))
         m = _PR_COMMENTS.match(argv[-1])
         if m:
             pr = next((p for p in data.get("prs") or [] if str(p.get("number")) == m.group(1)),

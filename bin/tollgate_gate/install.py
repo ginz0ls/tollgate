@@ -37,7 +37,10 @@ def fingerprint(bin_root: Path) -> str:
     return digest.hexdigest()
 
 
-def _services_block(services: dict[str, str]) -> str:
+def _services_block(services: dict[str, str], ports: dict[str, int]) -> str:
+    unknown = sorted(set(ports) - set(services))
+    if unknown:
+        raise ValueError(f"porta per un servizio non dichiarato: {unknown[0]!r}")
     lines = ["    services:"]
     for name, image in services.items():
         if not _SERVICE_NAME.match(name):
@@ -45,25 +48,33 @@ def _services_block(services: dict[str, str]) -> str:
         if not _IMAGE.match(image):
             raise ValueError(f"immagine del servizio {name!r} non valida: {image!r}")
         lines += [f"      {name}:", f"        image: {image}"]
+        if name in ports:
+            port = ports[name]
+            if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
+                raise ValueError(f"porta del servizio {name!r} non valida: {port!r}")
+            # i servizi girano in container sull'host del job: senza `ports` il job non li raggiunge
+            lines += ["        ports:", f'          - "{port}:{port}"']
     return "\n".join(lines)
 
 
-def _render(name: str, text: str, default_branch: str, services: dict[str, str]) -> str:
+def _render(name: str, text: str, default_branch: str, services: dict[str, str],
+            ports: dict[str, int]) -> str:
     text = text.replace(BRANCH_PLACEHOLDER, default_branch)
     if name != "run":
         return text
     marker = "    " + SERVICES_MARKER
     if marker not in text:
         raise ValueError("tollgate-run.yml senza il segnaposto dei servizi")
-    block = _services_block(services) + "\n" if services else ""
+    block = _services_block(services, ports) + "\n" if services else ""
     return text.replace(marker + "\n", block)
 
 
-def files(plugin_root: Path, *, default_branch: str, services: dict[str, str]
-          ) -> dict[str, bytes]:
+def files(plugin_root: Path, *, default_branch: str, services: dict[str, str],
+          ports: dict[str, int] | None = None) -> dict[str, bytes]:
     """Percorso nel repo del progetto → contenuto. Il ramo predefinito sostituisce
     `__DEFAULT_BRANCH__` nei workflow dei `push`; i servizi entrano nel job `head` di
-    `tollgate-run`."""
+    `tollgate-run`, e `ports` (nome del servizio → porta) li rende raggiungibili dal job
+    con `ports: ["P:P"]` (9.6)."""
     if not _BRANCH.match(default_branch):
         raise ValueError(f"nome del ramo predefinito non valido: {default_branch!r}")
     root = Path(plugin_root)
@@ -71,7 +82,7 @@ def files(plugin_root: Path, *, default_branch: str, services: dict[str, str]
     for name in WORKFLOW_NAMES:
         text = (root / WORKFLOWS_DIR / f"tollgate-{name}.yml").read_text(encoding="utf-8")
         out[f".github/workflows/tollgate-{name}.yml"] = _render(
-            name, text, default_branch, services).encode("utf-8")
+            name, text, default_branch, services, ports or {}).encode("utf-8")
     out[f"{INSTALL_DIR}/VERSION"] = f"{VERSION}\n".encode()
     out[f"{INSTALL_DIR}/FINGERPRINT"] = f"{fingerprint(root / 'bin')}\n".encode()
     for path in _sources(root / "bin"):

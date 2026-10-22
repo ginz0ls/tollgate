@@ -42,6 +42,28 @@ def _issue_number(value: str) -> int:
     return n
 
 
+def _positive(value: str) -> int:
+    try:
+        n = int(value)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError("numero intero atteso") from e
+    if n < 1:
+        raise argparse.ArgumentTypeError("serve un numero maggiore di zero")
+    return n
+
+
+def _service(value: str) -> tuple[str, str, int | None]:
+    """`NOME=IMMAGINE` o `NOME=IMMAGINE,PORTA` (la virgola, perché i due punti sono del tag
+    dell'immagine). Qui solo la forma: i caratteri ammessi li controlla `init`."""
+    name, eq, rest = value.partition("=")
+    image, comma, port = rest.partition(",")
+    if not eq or not name or not image or (comma and not port.isascii()) \
+            or (comma and not port.isdigit()):
+        raise argparse.ArgumentTypeError(
+            "forma attesa: NOME=IMMAGINE oppure NOME=IMMAGINE,PORTA (porta in sole cifre)")
+    return name, image, int(port) if comma else None
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="tollgate", description="CLI di tollgate",
@@ -70,6 +92,18 @@ def build_parser() -> argparse.ArgumentParser:
                     help="conferma gli avvisi che la prima chiamata ha elencato (codice 3)")
     sa.add_argument("--reopen-execution", action="store_true",
                     help="in review o pr_open riporta la fase a execution")
+    ip = sub.add_parser("init", help="misura la modalità del gate e propone i file (11.2)")
+    imode = ip.add_mutually_exclusive_group(required=True)
+    imode.add_argument("--propose", action="store_true",
+                       help="propone l'installazione in docs/superpowers/tollgate-init/")
+    imode.add_argument("--update", action="store_true",
+                       help="propone solo i file che differiscono dal ramo predefinito")
+    ip.add_argument("--merges-per-month", type=_positive, default=20, metavar="N",
+                    help="merge al mese per la stima dei minuti (predefinito 20)")
+    ip.add_argument("--service", action="append", default=[], type=_service,
+                    metavar="NOME=IMMAGINE[,PORTA]",
+                    help="servizio per i test in tollgate-run; con PORTA è raggiungibile "
+                         "dal job sull'host (porta:porta)")
     tp = sub.add_parser("task", help="task del piano (6.3)")
     tsub = tp.add_subparsers(dest="task_cmd", required=True)
     ts = tsub.add_parser("start", help="assegna il task a un implementatore e scrive il brief")
@@ -239,6 +273,18 @@ def main(argv: list[str]) -> int:
                                       argv=_hook_argv(argv, args.cmd))
             print("\n".join(result.lines))
             return result.code
+        if args.cmd == "init":
+            from tollgate_flow import init as flow_init
+            names = [n for n, _, _ in args.service]
+            if len(names) != len(set(names)):
+                parser.error("--service: nome ripetuto")
+            made = flow_init.propose(
+                state, Path.cwd(), update=args.update,
+                merges_per_month=args.merges_per_month,
+                services={n: image for n, image, _ in args.service},
+                ports={n: port for n, _, port in args.service if port is not None})
+            print("\n".join(made.lines))
+            return made.code
         if args.cmd == "sync":
             from tollgate_flow import sync as flow_sync
             synced = flow_sync.sync(state, Path.cwd(), argv=_hook_argv(argv, args.cmd))

@@ -18,6 +18,7 @@ from tollgate_analysis import approvals, brief, level as levels, naming
 from tollgate_core import (VERSION, active, clock, config, db, git, phases, sessions,
                            subagents)
 from tollgate_core.paths import State, repo_key
+from tollgate_gate import protection
 
 from . import gh, gitw, housekeeping, l2tree, prereq, prstate, sync as flow_sync
 
@@ -158,6 +159,7 @@ def _resume(state, conn, main, ref, cfg, row, session, *, fetched, confirm, reop
     notes.warnings.extend(_prerequisites(state, main, ref, claude_dir, notes))
     _check_main_clean(main, notes)
     _check_default_states(state, main, ref, notes, strict=False)
+    _check_gate_runs(state, main, ref, cfg, notes)
     branch = row["branch"]
     wt = Path(row["worktree"]) if row["worktree"] else gitw.worktree_dir(main, branch)
     try:
@@ -297,11 +299,38 @@ def _check_default_states(state, main, ref, notes: _Notes, *, strict: bool) -> N
                 notes.warnings.append(text)
 
 
+def _check_gate_runs(state, main, ref, cfg, notes: _Notes) -> None:
+    """Il gate non può girare (9.6) o il ramo non è protetto come serve (9.3): solo avvisi, mai un
+    rifiuto. Actions si legge in entrambe le modalità, la protezione solo in `protected`: in
+    `detect` non esiste e la lettura darebbe un 403 che non dice niente."""
+    enabled = protection.actions_enabled(state, main)
+    if enabled is False:
+        notes.warnings.append("GitHub Actions spente: il gate non gira")
+    elif enabled is None:
+        notes.warnings.append("impostazioni di GitHub Actions non leggibili: non so se il gate "
+                              "può girare")
+    if cfg.get("gate.mode") != "protected":
+        return
+    branch = ref.removeprefix("origin/")
+    seen = protection.read(state, main, branch)
+    if seen.kind == protection.PROTECTED:
+        notes.warnings.extend(f"protezione di {branch}: manca {m}" for m in seen.missing)
+    elif seen.kind == protection.PROTECTED_UNSET:
+        notes.warnings.append(f"il ramo {branch} è senza protezione: il merge non è impedito "
+                              "(lancia /tollgate:init)")
+    elif seen.kind == protection.DETECT:
+        notes.warnings.append(f"tollgate.toml dice protected ma il piano di GitHub non offre la "
+                              f"protezione di {branch}: lancia /tollgate:init --update")
+    else:
+        notes.warnings.append("protezione non leggibile con queste credenziali: proseguo")
+
+
 def _checks(state, main, ref, cfg, iss: gh.Issue, notes: _Notes) -> None:
     _check_main_clean(main, notes)
     if iss.state != "OPEN":
         notes.confirms.append(f"l'issue #{iss.number} è chiusa: serve conferma")
     _check_default_states(state, main, ref, notes, strict=True)
+    _check_gate_runs(state, main, ref, cfg, notes)
     if cfg.get("gate.mode") == "detect":
         notes.warnings.append("modalità rilevazione: il merge non è impedito")
         try:
