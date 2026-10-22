@@ -286,7 +286,8 @@ def _readme(p: _Proposal, *, update: bool, branch: str, merges: int,
     out += ["", "## Stima dei minuti di Actions", "", *_estimate_lines(p.seconds, merges)]
     if services:
         out += ["", "## Servizi", "",
-                "Messi nel job `head` di `tollgate-run`:", ""]
+                "Messi in ogni job che esegue la suite del progetto (`head` e `base` di "
+                "`tollgate-run`, `ids` di `tollgate-base`):", ""]
         for name, image in services.items():
             port = f", porta {ports[name]} esposta sull'host" if name in ports else \
                 ", nessuna porta esposta"

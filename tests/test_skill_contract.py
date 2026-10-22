@@ -9,6 +9,7 @@ from tests.helpers import ROOT
 from tollgate_core import cli, db
 from tollgate_flow import audit, finishcheck, start, sync
 from tollgate_flow import init as flow_init
+from tollgate_gate import attention, install
 from tollgate_gate import cli as gate_cli
 
 # (skill, intestazione della sezione o None per tutto il testo, modulo, nomi delle costanti)
@@ -33,6 +34,49 @@ MEANING = {
 }
 NOT_TOLLGATE_OPTIONS = {"--force"}      # `git worktree remove --force`, citato per vietarlo
 PROGRAM_CALL = re.compile(r"<programma> ([a-z][a-z-]*)(?: ([a-z][a-z-]*))?")
+
+
+def _subparsers(parser) -> dict:
+    return next((a.choices for a in parser._actions
+                 if isinstance(getattr(a, "choices", None), dict) and a.dest != "help"), {})
+
+
+def _options(parser) -> set[str]:
+    found = set()
+    for action in parser._actions:
+        found.update(o for o in action.option_strings if o.startswith("--"))
+        for sub in (action.choices.values() if isinstance(getattr(action, "choices", None), dict)
+                    else ()):
+            found |= _options(sub)
+    return found
+
+
+def call_problems(text: str) -> list[str]:
+    """I sottocomandi e le opzioni di `text` che il parser non conosce (decisione 18a): le righe
+    con `<programma> gate …` si verificano contro `tollgate_gate.cli.build_parser()`, le altre
+    contro `tollgate_core.cli.build_parser()`."""
+    core, gate = cli.build_parser(), gate_cli.build_parser()
+    top, gate_top = _subparsers(core), _subparsers(gate)
+    problems = []
+    for line in text.splitlines():
+        calls = PROGRAM_CALL.findall(line)
+        on_gate = any(first == "gate" for first, _ in calls)
+        for first, second in calls:
+            if first == "gate":
+                if second not in gate_top:
+                    problems.append(f"sottocomando gate sconosciuto: {second!r}")
+                continue
+            if first not in top:
+                problems.append(f"sottocomando sconosciuto: {first!r}")
+                continue
+            nested = _subparsers(top[first])
+            if nested and second and second not in nested:
+                problems.append(f"sottocomando sconosciuto: {first} {second!r}")
+        known = _options(gate if on_gate else core)
+        for opt in set(re.findall(r"(?<![\w-])(--[a-z][a-z-]+)", line)):
+            if opt not in known and opt not in NOT_TOLLGATE_OPTIONS:
+                problems.append(f"opzione sconosciuta: {opt}")
+    return problems
 
 
 def skill_text(name: str) -> str:
@@ -83,32 +127,28 @@ class SkillContractTest(unittest.TestCase):
                       "sospensione è definitiva", text)
 
     def test_program_subcommands_exist_in_parser(self):
-        """I sottocomandi `gate` si verificano contro il parser del gate, gli altri contro quello
-        del nucleo (decisione 18a)."""
-        parser = cli.build_parser()
-        top = next(a for a in parser._actions if a.dest == "cmd").choices
-        gate_top = next(a for a in gate_cli.build_parser()._actions
-                        if a.dest == "gate_cmd").choices
         for path in sorted((ROOT / "skills").glob("*/SKILL.md")):
-            for first, second in PROGRAM_CALL.findall(path.read_text()):
-                with self.subTest(skill=path.parent.name, call=f"{first} {second}".strip()):
-                    if first == "gate":
-                        self.assertIn(second, gate_top)
-                        continue
-                    self.assertIn(first, top)
-                    nested = next((a for a in top[first]._actions
-                                   if getattr(a, "choices", None) and a.dest != "help"), None)
-                    if nested is not None and second:
-                        self.assertIn(second, nested.choices)
+            with self.subTest(skill=path.parent.name):
+                self.assertEqual(
+                    [p for p in call_problems(path.read_text()) if "sottocomando" in p], [])
 
-    def test_gate_calls_are_checked_against_the_gate_parser(self):
-        """La regola per `gate` vale: un sottocomando inventato non passa."""
-        gate_top = next(a for a in gate_cli.build_parser()._actions
-                        if a.dest == "gate_cmd").choices
-        self.assertEqual(PROGRAM_CALL.findall("<programma> gate sentinel --event f"),
-                         [("gate", "sentinel")])
-        self.assertIn("sentinel", gate_top)
-        self.assertNotIn("inventato", gate_top)
+    def test_options_exist_in_parser(self):
+        for path in sorted((ROOT / "skills").glob("*/SKILL.md")):
+            with self.subTest(skill=path.parent.name):
+                self.assertEqual(
+                    [p for p in call_problems(path.read_text()) if "opzione" in p], [])
+
+    def test_call_check_handles_gate_and_core_calls(self):
+        """Il controllo D18a è lo stesso del test reale: `gate` si verifica contro il parser del
+        gate, il resto contro quello del nucleo, e un nome inventato viene trovato."""
+        self.assertEqual(call_problems(
+            "<programma> gate sentinel --event f --publish\n<programma> init --propose "
+            "--merges-per-month 3\n<programma> task start --from-gate"), [])
+        self.assertEqual(len(call_problems("<programma> gate inventato")), 1)
+        self.assertEqual(len(call_problems("<programma> gate sentinel --propose")), 1)
+        self.assertEqual(len(call_problems("<programma> init --event f")), 1)
+        self.assertEqual(len(call_problems("<programma> inventato")), 1)
+        self.assertEqual(len(call_problems("<programma> task inventato")), 1)
 
     def test_lens_brief_method_file_exists(self):
         """Il percorso di `dimensioni.md` che `audit prepare` scrive nel brief (stessa derivazione
@@ -136,6 +176,26 @@ class SkillContractTest(unittest.TestCase):
         code = Path(finishcheck.__file__).read_text()
         for prefix in ("da leggere", "informative"):
             self.assertIn(f'"{prefix}', code)
+
+    def test_finish_attention_groups_match_the_code(self):
+        """Le chiavi di ciascun gruppo nella skill sono quelle di `attention.GROUPS`."""
+        text = skill_text("finish")
+        for label, group in (("da leggere:", attention.READ), ("informative:", attention.INFO)):
+            line = next(x for x in text.splitlines()
+                        if x.lstrip().startswith(f"- **Righe `{label}`"))
+            with self.subTest(group=label):
+                self.assertEqual(set(re.findall(r"`([a-z_]+)`", line.split("**", 2)[2])),
+                                 {k for k, v in attention.GROUPS.items() if v == group})
+
+    def test_init_services_in_every_job_that_runs_the_suite(self):
+        """Il testo dei servizi nomina tutti i job con un segnaposto (`install.SERVICES_WORKFLOWS`):
+        due in `tollgate-run` e uno in `tollgate-base`."""
+        self.assertEqual(install.SERVICES_WORKFLOWS, {"run": 2, "base": 1})
+        for text in (skill_text("init"), Path(flow_init.__file__).read_text()):
+            flat = squash(text).replace('" "', "")
+            for needle in ("`head` e `base` di `tollgate-run`", "`ids` di `tollgate-base`"):
+                with self.subTest(needle=needle):
+                    self.assertIn(needle, flat)
 
     def test_init_skill_never_copies_or_protects(self):
         text = squash(skill_text("init"))

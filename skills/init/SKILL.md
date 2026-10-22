@@ -14,7 +14,7 @@ Sei il redattore di una proposta: lanci il comando, riferisci cosa ha misurato, 
 
 Lancia dal **checkout principale**, nel repo da installare. Prima di lanciare chiedi all'utente due cose, senza assumere:
 
-- **I servizi dei test** (per esempio un database): per ciascuno nome, immagine ed eventuale porta. Entrano nel job `head` di `tollgate-run` e si passano con `--service NOME=IMMAGINE` oppure `--service NOME=IMMAGINE,PORTA` (la virgola, perché i due punti sono del tag dell'immagine; con la porta il servizio è raggiungibile dal job sull'host). L'opzione si ripete. Senza servizi, nessuna opzione.
+- **I servizi dei test** (per esempio un database): per ciascuno nome, immagine ed eventuale porta. Entrano in ogni job che esegue la suite del progetto: `head` e `base` di `tollgate-run`, `ids` di `tollgate-base` e si passano con `--service NOME=IMMAGINE` oppure `--service NOME=IMMAGINE,PORTA` (la virgola, perché i due punti sono del tag dell'immagine; con la porta il servizio è raggiungibile dal job sull'host). L'opzione si ripete. Senza servizi, nessuna opzione.
 - **Il ritmo di merge**: quanti merge al mese, per la stima dei minuti di Actions. Si passa con `--merges-per-month N`; senza, il comando assume 20.
 
 ## 2. Lancio
