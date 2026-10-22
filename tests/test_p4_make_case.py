@@ -126,6 +126,37 @@ class CasesBuildTest(unittest.TestCase):
         self.assertIsNone(first["merge_state"])
         self.assertEqual(last["merge_state"], "CLEAN")
 
+    def test_merge_state_follows_the_rule_for_every_protected_case(self):
+        """Regola (esito reale su GitHub): guard o verdict non verdi -> BLOCKED; verdi con attention rossa o in errore -> UNSTABLE
+        (un controllo non obbligatorio rosso, la PR resta unibile); tutto verde -> CLEAN. Solo il caso del token personale la nega."""
+        checked = 0
+        for name, spec in make_case.CASES.items():
+            if spec.repo != "protected":
+                continue
+            for exp in spec.expect:
+                if exp.merge_state is None:
+                    continue
+                st = exp.states
+                if name == "token-personale":
+                    self.assertEqual(exp.merge_state, "BLOCKED")
+                    continue
+                if st["tollgate/guard"] != "success" or st["tollgate/verdict"] != "success":
+                    want = "BLOCKED"
+                elif st["tollgate/attention"] in ("failure", "error"):
+                    want = "UNSTABLE"
+                else:
+                    want = "CLEAN"
+                with self.subTest(name, push=exp.push):
+                    self.assertEqual(exp.merge_state, want)
+                    checked += 1
+        self.assertGreaterEqual(checked, 25)
+
+    def test_the_six_attention_cases_expect_unstable(self):
+        for name in ("verde-config", "verde-ramo-libero", "verde-workflow-ci", "attenzione-deroga-test",
+                     "attenzione-piano-testo", "attenzione-tetto-livello"):
+            with self.subTest(name):
+                self.assertEqual(make_case.CASES[name].expect[-1].merge_state, "UNSTABLE")
+
     def test_the_destructive_detect_case_is_the_last_detect_case(self):
         detect = [n for n, c in make_case.CASES.items() if c.repo == "detect"]
         self.assertEqual(detect[-1], "detect-merge-rosso")

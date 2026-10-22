@@ -38,7 +38,7 @@ stampa per riga `status<TAB>conclusion<TAB>app.id`. Poi `commits/<sha>/statuses`
 (`user.login = "github-actions[bot]"`, `user.type = "Bot"`); il `--jq` non si valuta.
 
 Le PR stanno in `prs`: `pr create` ne aggiunge una (numero successivo al più alto, stato OPEN) e
-`pr edit` riscrive `body`; entrambi riscrivono il file dei dati. `fail` elenca i comandi (le prime
+`api --method PATCH repos/o/r/pulls/<n> -F body=@<file>` riscrive `body` (come `pr edit`, che con gh 2.46 non funziona; `fail` lo chiama "pr edit"); entrambi riscrivono il file dei dati. `fail` elenca i comandi (le prime
 due parole, "pr create") che escono con 1 senza fare nulla, per simulare i guasti. Un campo di
 `--json` che `gh` non ha per le PR esce con 1: un nome sbagliato nel codice fa fallire i test.
 
@@ -56,6 +56,7 @@ _PR_COMMENTS = re.compile(r"^repos/[^/]+/[^/]+/issues/(\d+)/comments(\?.*)?$")
 _STATUS_POST = re.compile(r"^repos/[^/]+/[^/]+/statuses/([0-9a-f]{40})$")
 _STATUS_LIST = re.compile(r"^repos/[^/]+/[^/]+/commits/([0-9a-f]{40})/statuses(\?.*)?$")
 _CHECK_RUNS = re.compile(r"^repos/[^/]+/[^/]+/commits/([0-9a-f]{40})/check-runs(\?.*)?$")
+_PULL_PATCH = re.compile(r"^repos/[^/]+/[^/]+/pulls/(\d+)$")
 _PROTECTION_PUT = re.compile(r"^repos/[^/]+/[^/]+/branches/[^?]+/protection$")
 _JQ_NAME = re.compile(r'\.name == "([^"]+)"')
 _JQ_SLUG = re.compile(r'\.app\.slug == "([^"]+)"')
@@ -221,6 +222,16 @@ def _api_write(data, path_data, argv):
         comment["body"] = _file_field(argv, "body")
         _save(path_data, data)
         return _ok(argv, _rest_comment(comment))
+    if method == "PATCH" and (m := next((x for a in argv[1:] if (x := _PULL_PATCH.match(a))), None)):
+        # il corpo di una PR (sostituisce `pr edit`, rotto con gh 2.46): un solo campo, `-F body=@<file>`
+        if "pr edit" in (data.get("fail") or []):
+            _fail("pulls PATCH: guasto simulato")
+        pr = next((p for p in data.get("prs") or [] if str(p.get("number")) == m.group(1)), None)
+        if pr is None:
+            _fail(f"pull request {m.group(1)} assente dai dati (HTTP 404)")
+        pr["body"] = _file_field(argv, "body")
+        _save(path_data, data)
+        return _ok(argv, {"number": pr["number"], "body": pr["body"]})
     if method == "PUT" and _PROTECTION_PUT.match(path):
         with open(_flag(argv, "--input"), encoding="utf-8") as f:
             data.setdefault("protection_puts", []).append(json.load(f))

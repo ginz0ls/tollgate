@@ -112,6 +112,49 @@ class WriteFormsTest(GuardBase):
         self.no("api", "--method", "PUT", "--input", "/tmp/x", f"repos/{PROT}/branches/main/protection", profile="flow")
 
 
+class PullBodyPatchTest(GuardBase):
+    """L'unica scrittura nuova (scelta dell'utente del 22/10/2026): `api --method PATCH repos/<protected>/pulls/<n> -F body=@<file>`,
+    perché `gh pr edit` non funziona con gh 2.46."""
+
+    def patch(self, repo=PROT, number="3", body=None, extra=()):
+        body = body or f"{self.tmp}/out/body.md"
+        return ["api", "--method", "PATCH", f"repos/{repo}/pulls/{number}", "-F", f"body=@{body}", *extra]
+
+    def test_the_exact_form_is_allowed_in_both_profiles(self):
+        self.ok(*self.patch())
+        self.ok(*self.patch(body="/tmp/tollgate-body/b.md"))
+        self.ok(*self.patch(body=f"{self.tmp}/flow/wt/.tollgate-run/7/pr-body.md"), profile="flow")
+        args = self.patch()
+        args = [args[0], args[3], args[4], args[5], args[1], args[2]]       # altro ordine
+        self.ok(*args)
+
+    def test_everything_else_is_refused(self):
+        self.no(*self.patch(repo=DET))
+        self.no(*self.patch(repo=f"{ghguard.OWNER}/altro"))
+        self.no(*self.patch(number="3/merge"))
+        self.no(*self.patch(number="x"))
+        self.no("api", "--method", "PATCH", f"repos/{PROT}/pulls/3/merge", "-F", f"body=@{self.tmp}/out/b.md")
+        self.no("api", "--method", "PATCH", f"repos/{PROT}/issues/3", "-F", f"body=@{self.tmp}/out/b.md")
+        self.no(*self.patch(extra=["-f", "title=x"]))
+        self.no(*self.patch(extra=["-F", "title=@/tmp/x"]))
+        self.no(*self.patch(extra=["--input", "/tmp/x"]))
+        self.no("api", "--method", "PATCH", f"repos/{PROT}/pulls/3", "-f", "body=testo")
+        self.no("api", "--method", "PATCH", f"repos/{PROT}/pulls/3", "-F", "body=testo")
+        self.no("api", "--method", "PATCH", f"repos/{PROT}/pulls/3", "-F", "state=@/tmp/x")
+        self.no("api", "-X", "PATCH", f"repos/{ghguard.OWNER}/altro/pulls/3", "-F", "body=@/tmp/x")
+        self.no(*self.patch(body="/etc/passwd"))
+        self.no(*self.patch(body="relativo.md"))
+        self.no(*self.patch(body="/tmp/tollgate-body/b.md"), profile="flow")      # nel flusso solo sotto $FLOW
+        self.no("api", "--method", "DELETE", f"repos/{PROT}/pulls/3")
+
+    def test_comandi_log_accepts_the_patch(self):
+        log = self.tmp / "out" / "comandi.log"
+        log.write_text(f"2026-10-22T00:00:00Z gh api --method PATCH repos/{PROT}/pulls/3 -F body=@{self.tmp}/out/b.md\n")
+        r = subprocess.run([sys.executable, "-B", "-I", str(GH4 / "ghguard.py"), "comandi", str(log)], capture_output=True,
+                           text=True, env={**os.environ, "P4_OUT": str(self.tmp / "out"), "P4_WORK": str(self.tmp / "work")})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+
 class ReadFormsTest(GuardBase):
     def test_reads_that_the_scripts_use(self):
         self.ok("api", "--paginate", f"repos/{PROT}/commits/{SHA}/statuses?per_page=100", "--jq",
@@ -197,8 +240,7 @@ class TighteningTest(GuardBase):
 
     def test_flow_profile_has_only_the_flow_forms(self):
         body = f"{self.tmp}/flow/wt/.tollgate-run/7/pr-body.md"
-        self.ok("pr", "edit", "3", "--repo", PROT, "--body-file", body, profile="flow")
-        for args in (["issue", "close", "5", "--repo", PROT], ["issue", "comment", "5", "--repo", PROT, "--body", "x"],
+        for args in (["pr", "edit", "3", "--repo", PROT, "--body-file", body],["issue", "close", "5", "--repo", PROT], ["issue", "comment", "5", "--repo", PROT, "--body", "x"],
                      ["pr", "comment", "3", "--repo", PROT, "--body", "x"],
                      ["pr", "edit", "3", "--repo", PROT, "--base", "dev"],
                      ["pr", "edit", "3", "--repo", PROT, "--title", "x"],
@@ -479,7 +521,12 @@ class FlowCheckTest(unittest.TestCase):
         with mock.patch.dict(os.environ, {"P4_TMP": "/tmp/tollgate-p4/flow"}):
             self.assertEqual(quiet(flowcheck.cmd_shapes), 0)
             body = [a for shape in flowcheck.SHAPES for a in shape if a.endswith("pr-body.md")]
+            body = [b.removeprefix("body=@") for b in body]
             self.assertTrue(body and all(".tollgate-run/" in b and b.startswith("/tmp/tollgate-p4/flow/") for b in body))
+            self.assertIn(["api", "--method", "PATCH", "repos/{owner}/{repo}/pulls/3", "-F", f"body=@{flowcheck.BODY}"],
+                          flowcheck.SHAPES)
+            self.assertFalse([sh for sh in flowcheck.SHAPES if sh[:2] == ["pr", "edit"]])
+            self.assertIn(["pr", "edit", "3", "--body-file", flowcheck.BODY], flowcheck.FORBIDDEN_SHAPES)
 
     def test_sessions_are_listed(self):
         self.write("passo1.jsonl", stream(("ls", "x")))

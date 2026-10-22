@@ -40,13 +40,16 @@ SHAPES = [
     ["pr", "view", "3", "--json", "body"],
     ["pr", "view", "3", "--json", "comments"],
     ["pr", "create", "--head", "tg/7-prova", "--base", "main", "--title", "prova", "--body-file", BODY],
-    ["pr", "edit", "3", "--body-file", BODY],
+    ["api", "--method", "PATCH", "repos/{owner}/{repo}/pulls/3", "-F", "body=@" + BODY],
     ["api", "repos/{owner}/{repo}/commits/" + "a" * 40 + "/status"],
     ["api", "--include", "repos/{owner}/{repo}/branches/main/protection"],
     ["api", "repos/{owner}/{repo}/actions/permissions"],
 ]
 # ciò che al flusso non è ammesso
 FORBIDDEN_SHAPES = [
+    ["pr", "edit", "3", "--body-file", BODY],                     # rotto con gh 2.46: il corpo si aggiorna con la REST
+    ["api", "--method", "PATCH", "repos/{owner}/{repo}/pulls/3/merge", "-F", "body=@" + BODY],
+    ["api", "--method", "PATCH", "repos/{owner}/{repo}/pulls/3", "-f", "title=x"],
     ["issue", "create", "--title", "x"], ["repo", "clone", ghguard.PROT], ["repo", "delete", ghguard.PROT],
     ["pr", "merge", "3", "--squash"], ["pr", "close", "3"], ["auth", "login"], ["secret", "set", "X"],
     ["api", "--method", "POST", "repos/{owner}/{repo}/issues"],

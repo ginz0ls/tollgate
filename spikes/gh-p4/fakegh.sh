@@ -24,7 +24,7 @@ case "${1:-}" in
         --jq|-q) jq=1; i=$((i + 1)) ;;
         --method|-X) method="${args[$((i + 1))]}"; i=$((i + 1)) ;;
         --input) input="${args[$((i + 1))]}"; i=$((i + 1)) ;;
-        -f) i=$((i + 1)) ;;
+        -f|-F) i=$((i + 1)) ;;
         -*) ;;
         *) [ -n "$ep" ] || ep="$a" ;;
       esac

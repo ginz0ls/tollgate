@@ -35,7 +35,7 @@ FIELDS_RE = re.compile(r"^[A-Za-z][A-Za-z,]*$")
 NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 STATES = {"open", "closed", "merged", "all"}
 PROFILES = ("script", "flow")
-FLOW_FORBIDDEN = {("issue", "create"), ("issue", "close"), ("issue", "comment"), ("pr", "merge"), ("pr", "close"),
+FLOW_FORBIDDEN = {("pr", "edit"), ("issue", "create"), ("issue", "close"), ("issue", "comment"), ("pr", "merge"), ("pr", "close"),
                   ("pr", "comment"), ("run", "download")}
 PROFILE = {"current": "script"}          # il profilo della chiamata in corso (letto da _infile)
 # scritture `gh api` ammesse (decisione 25): descrizione senza spazi, che `comandi.log` non conserva
@@ -218,28 +218,32 @@ def _repo_of_endpoint(ep):
     return m.group(1) if m else None
 
 
-def _check_api_write(args):
+def _check_api_write(args, flow=False, lenient=False):
     """Scrittura `gh api` (argomenti dopo `api`): solo le tre forme esatte della decisione 25, ValueError
     altrimenti. Nessuna opzione fuori da `--method|-X`, `-f` (una per chiave) e `--input`."""
     method = endpoint = infile = None
-    fields = {}
+    fields, ffields = {}, {}
     i = 0
     while i < len(args):
         a = args[i]
-        if a in ("--method", "-X", "-f", "--input"):
+        if a in ("--method", "-X", "-f", "-F", "--input"):
             if i + 1 >= len(args):
                 raise ValueError("gh api: %s senza valore" % a)
             v = args[i + 1]
             i += 2
+            if lenient and a in ("-F", "--input"):      # nel registro gli spazi di un percorso sono andati persi
+                while i < len(args) and not args[i].startswith(("-", "repos/")):
+                    v, i = v + " " + args[i], i + 1
             if a in ("--method", "-X"):
                 if method is not None:
                     raise ValueError("gh api: metodo ripetuto")
                 method = v
-            elif a == "-f":
+            elif a in ("-f", "-F"):
                 key, eq, val = v.partition("=")
-                if not eq or key in fields:
-                    raise ValueError("gh api: campo -f non valido o ripetuto")
-                fields[key] = val
+                target = fields if a == "-f" else ffields
+                if not eq or key in fields or key in ffields:
+                    raise ValueError("gh api: campo %s non valido o ripetuto" % a)
+                target[key] = val
             else:
                 if infile is not None:
                     raise ValueError("gh api: --input ripetuto")
@@ -255,6 +259,17 @@ def _check_api_write(args):
         raise ValueError("gh api senza endpoint")
     _check_endpoint(endpoint)
     repo = _repo_of_endpoint(endpoint)
+    if method == "PATCH":
+        # unica forma: il corpo di una PR di protected da un file (gh pr edit non funziona con gh 2.46)
+        body = ffields.get("body", "")
+        if (repo == PROT and re.match(r"^repos/[^/]+/[^/]+/pulls/[0-9]+$", endpoint) and not fields and infile is None
+                and set(ffields) == {"body"} and body.startswith("@") and _infile(body[1:])):
+            return
+        raise ValueError("gh api PATCH: solo repos/%s/pulls/<n> con -F body=@<file> da una cartella ammessa" % PROT)
+    if flow:
+        raise ValueError("gh api in scrittura non ammesso nel flusso (solo PATCH del corpo di una PR)")
+    if ffields:
+        raise ValueError("gh api: -F non ammesso in questa forma")
     if method == "POST" and infile is None:
         ok = (re.match(r"^repos/[^/]+/[^/]+/statuses/[0-9a-f]{40}$", endpoint)
               and set(fields) == {"state", "context", "description"}
@@ -282,12 +297,6 @@ def _is_write(arg):
     return arg.startswith("-") and arg.split("=", 1)[0] in _WRITE_OPTS or arg[:2] in ("-X", "-f", "-F")
 
 
-def _flow_pr_edit(args):
-    """Nel flusso `pr edit` cambia solo il corpo, da file: mai base, titolo o testo in un argomento."""
-    return any(a.startswith(("--base", "--title", "--body", "-b", "-t")) and not a.startswith("--body-file")
-               for a in args[2:])
-
-
 def violation(args, lenient=False, profile="script"):
     """None se il comando è ammesso, altrimenti il motivo. `profile` è `script` (gli script di prova) o
     `flow` (il `claude -p` del flusso: niente creazione di issue, merge, chiusure, scritture `gh api`)."""
@@ -299,8 +308,6 @@ def violation(args, lenient=False, profile="script"):
     PROFILE["current"] = profile
     if profile == "flow" and (first == "repo" or (first, second) in FLOW_FORBIDDEN):
         return "gh %s %s non ammesso nel flusso" % (first, second)
-    if profile == "flow" and (first, second) == ("pr", "edit") and _flow_pr_edit(args):
-        return "gh pr edit nel flusso solo con --body-file"
     try:
         if first == "--version":
             return None if len(args) == 1 else "--version con altro"
@@ -338,9 +345,7 @@ def violation(args, lenient=False, profile="script"):
             return None
         if first == "api":
             if any(_is_write(a) for a in args[1:]):
-                if profile == "flow":
-                    return "gh api in scrittura non ammesso nel flusso"
-                _check_api_write(args[1:])
+                _check_api_write(args[1:], flow=(profile == "flow"), lenient=lenient)
                 return None
             ep = None
             i = 1

@@ -151,8 +151,10 @@ class PrWriteTest(FakeGhCase):
         gh.pr_edit(self.state, self.tmp, 1, body_file=body)
         (edited,) = self.read()["prs"]
         self.assertEqual(edited["body"], "Closes #7\nnuovo\n")
-        edit = [a for a in self.calls() if a[:2] == ["pr", "edit"]][0]
-        self.assertEqual(edit[:3], ["pr", "edit", "1"])
+        edit = [a for a in self.calls() if a[:3] == ["api", "--method", "PATCH"]]
+        self.assertEqual(edit, [["api", "--method", "PATCH", "repos/{owner}/{repo}/pulls/1", "-F",
+                                 f"body=@{body}"]])
+        self.assertEqual([a for a in self.calls() if a[:2] == ["pr", "edit"]], [])
 
     def test_injected_failure_leaves_no_pr(self):
         self.set(prs=[], fail=["pr create"])
@@ -162,6 +164,21 @@ class PrWriteTest(FakeGhCase):
             gh.pr_create(self.state, self.tmp, branch="tg/7-x", base="main", title="#7 x",
                          body_file=body)
         self.assertEqual(self.read()["prs"], [])
+
+    def test_edit_failure_is_a_gh_error_and_leaves_the_body(self):
+        self.set(prs=[{"number": 1, "headRefName": "tg/7-x", "baseRefName": "main", "state": "OPEN",
+                       "body": "vecchio", "comments": []}], fail=["pr edit"])
+        body = self.tmp / "b.md"
+        body.write_text("nuovo")
+        with self.assertRaises(gh.GhError):
+            gh.pr_edit(self.state, self.tmp, 1, body_file=body)
+        self.assertEqual(self.read()["prs"][0]["body"], "vecchio")
+
+    def test_edit_number_must_be_an_integer(self):
+        body = self.tmp / "b.md"
+        body.write_text("x")
+        with self.assertRaises(ValueError):
+            gh.pr_edit(self.state, self.tmp, "1; rm", body_file=body)
 
     def test_edit_unknown_pr_is_error(self):
         self.set(prs=[])

@@ -237,7 +237,8 @@ run_ops() {
         await_statuses "$repo" "${SHA[$id]}" $(expected_contexts "$id") || echo "attesa anticipata non riuscita per $id" >&2 ;;
       edit)
         br="$(jq -r ".ops[$i].branch" "$CASEJSON")"; pr="${PRN[$br]:-}"; [ -n "$pr" ] || die "edit senza PR per $br"
-        gh_call "$label-pr-edit" pr edit "$pr" --repo "$repo" --body-file "$(jq -r ".ops[$i].body_file" "$CASEJSON")"
+        # il corpo con la REST: `gh pr edit` esce con 1 con gh 2.46 (Projects classic); è la forma di bin/tollgate_flow/gh.py
+        gh_call "$label-pr-edit" api --method PATCH "repos/$repo/pulls/$pr" -F "body=@$(jq -r ".ops[$i].body_file" "$CASEJSON")"
         [ "$RC" = 0 ] || die "modifica della PR fallita (vedi $label-pr-edit.err)" ;;
       wait_count)
         id="$(jq -r ".ops[$i].push" "$CASEJSON")"

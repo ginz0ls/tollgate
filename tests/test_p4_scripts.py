@@ -72,6 +72,18 @@ class GiroUnoTest(unittest.TestCase):
         self.assertNotIn('P4_REPO="$PROT" P4_PROFILE', text)     # profilo e repo non passano dall'ambiente del passo
 
 
+class PullBodyTest(unittest.TestCase):
+    def test_gate_script_updates_the_pr_body_with_the_rest_form(self):
+        text = (SPIKES / "run-p4-gate.sh").read_text()
+        self.assertNotRegex(text, r"gh_call [^\n]*\bpr edit\b")
+        self.assertIn('api --method PATCH "repos/$repo/pulls/$pr" -F "body=@', text)
+
+    def test_the_cli_uses_the_rest_form_too(self):
+        text = (ROOT / "bin" / "tollgate_flow" / "gh.py").read_text()
+        self.assertNotIn('"pr", "edit"', text)
+        self.assertIn('"PATCH"', text)
+
+
 class StateVerificationTest(unittest.TestCase):
     def test_every_claude_step_is_wrapped_by_the_state_verification(self):
         text = (SPIKES / "run-p4-flow.sh").read_text()

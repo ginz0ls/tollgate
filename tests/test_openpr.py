@@ -616,7 +616,7 @@ class OpenForkPrTest(OpenCase):
                               body="corpo del fork")])
         r = self.go(fl)
         self.assertEqual(r.code, 0, r.lines)
-        self.assertEqual(self.calls(fl, "pr", "edit"), [])
+        self.assertEqual(self.calls(fl, "api", "--method", "PATCH"), [])
         by_number = {p["number"]: p for p in self.prs(fl)}
         self.assertEqual(by_number[1]["body"], "corpo del fork")
         self.assertIn("tollgate", by_number[2]["body"])
@@ -627,7 +627,7 @@ class OpenForkPrTest(OpenCase):
         r = self.go(fl)
         self.assertEqual(r.code, 1, r.lines)
         self.assertIn("#1", " ".join(self.refusals(r)))
-        self.assertEqual(self.calls(fl, "pr", "edit"), [])
+        self.assertEqual(self.calls(fl, "api", "--method", "PATCH"), [])
         self.assertEqual(self.prs(fl)[0]["body"], "vecchio")
         self.assertIsNone(work(fl)["pr_number"])
 
@@ -660,7 +660,7 @@ class OpenResumeTest(OpenCase):
         r = self.go(fl)
         self.assertEqual(r.code, 0, r.lines)
         self.assertEqual(self.calls(fl, "pr", "create"), [])
-        self.assertEqual(len(self.calls(fl, "pr", "edit")), 1)
+        self.assertEqual(len(self.calls(fl, "api", "--method", "PATCH")), 1)
         (only,) = self.prs(fl)
         self.assertTrue(only["body"].startswith("Closes #7"))
         w = work(fl)
@@ -706,7 +706,7 @@ class OpenResumeTest(OpenCase):
         phases.set_pr(fl.conn, fl.work, 2, "https://github.com/prova/flow/pull/2", now=fl.now)
         r = self.go(fl, update=True, via_sync="a-99")
         self.assertEqual(r.code, 0, r.lines)
-        self.assertEqual(len(self.calls(fl, "pr", "edit")), 1)
+        self.assertEqual(len(self.calls(fl, "api", "--method", "PATCH")), 1)
         self.assertEqual(work(fl)["phase"], "pr_open")
 
     def test_closed_pr_then_confirm_creates_new_pr(self):
@@ -715,7 +715,7 @@ class OpenResumeTest(OpenCase):
         r = self.go(fl)
         self.assertEqual(r.code, 0, r.lines)
         self.assertEqual(len(self.calls(fl, "pr", "create")), 1)
-        self.assertEqual(self.calls(fl, "pr", "edit"), [])
+        self.assertEqual(self.calls(fl, "api", "--method", "PATCH"), [])
         self.assertEqual([p["number"] for p in self.prs(fl)], [1, 2])
         self.assertEqual(work(fl)["pr_number"], 2)
 

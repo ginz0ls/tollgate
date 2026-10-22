@@ -187,7 +187,7 @@ class SyncRebaseTest(SyncCase):
         self.assertTrue(set(core_git.rev_list(fl.wt, tip, new_head)) <= recorded)
         self.assertEqual(fl.events("pr_updated")[-1], {"pr": 1, "sha": new_head})
         self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), new_head)
-        self.assertEqual(len(self.calls(fl, "pr", "edit")), 1)
+        self.assertEqual(len(self.calls(fl, "api", "--method", "PATCH")), 1)
         self.assertEqual(self.calls(fl, "pr", "create")[1:], [])
         self.assertEqual(self.intent_states(fl, "sync"), ["executed"])
         self.assertEqual(self.intent_states(fl, "force_push"), ["used"])
@@ -335,7 +335,7 @@ class SyncRebaseTest(SyncCase):
         self.assertEqual(r.code, sync.REVIEW_NEEDED, r.lines)
         self.assertIn("serve una nuova revisione: /tollgate:finish", "\n".join(r.lines))
         self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), old_head)       # nessun push
-        self.assertEqual(self.calls(fl, "pr", "edit"), [])
+        self.assertEqual(self.calls(fl, "api", "--method", "PATCH"), [])
         self.assertEqual(work(fl)["phase"], "review")
         self.assertEqual(fl.events("pr_updated"), [])
         self.assertEqual(reviews.count(fl.conn, fl.work), 1)
@@ -369,7 +369,7 @@ class SyncRebaseTest(SyncCase):
         self.assertEqual(r.code, 1, r.lines)
         self.assertEqual(gitw.remote_sha(fl.wt, BRANCH), manual)         # commit remoto intatto
         self.assertEqual(self.intent_states(fl, "force_push"), ["authorized"])
-        self.assertEqual(self.calls(fl, "pr", "edit"), [])
+        self.assertEqual(self.calls(fl, "api", "--method", "PATCH"), [])
 
     def test_stale_lease_is_renewed_and_open_pr_pushes(self):
         """I-4: il remoto è avanzato dopo l'autorizzazione e i suoi commit sono integrati."""
@@ -529,7 +529,7 @@ class SyncEdgeTest(SyncCase):
         self.assertEqual(work(fl)["work_base_sha"], tip)         # il rebase è stato fatto
         self.assertEqual(work(fl)["phase"], "execution")
         self.assertEqual(self.intent_states(fl, "sync"), ["executed"])
-        self.assertEqual(self.calls(fl, "pr", "edit"), [])
+        self.assertEqual(self.calls(fl, "api", "--method", "PATCH"), [])
 
 
 class SyncCliTest(SyncCase):

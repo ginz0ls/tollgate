@@ -4,8 +4,9 @@
 (PR, issue, protezione) lo dà lo script con il suo gh con guardia, in sola lettura, e arriva qui come testo.
 
 Modello di minaccia: il modello è cooperativo (esegue le skill di tollgate). `--disallowedTools`, il wrapper di gh e l'audit dei
-comandi (flowcheck.py) sono un primo argine e un segnale. La garanzia è questa verifica: non impedisce un effetto, lo rileva
-qualunque sia il comando che lo ha prodotto, e rende il caso «non riuscito».
+comandi (flowcheck.py) sono un primo argine e un segnale. La garanzia è questa verifica: non impedisce un effetto: rileva gli effetti
+elencati, qualunque sia il comando che li ha prodotti, e rende il caso «non riuscito». Commenti, label, il corpo di PR
+già esistenti, il repo detect e le impostazioni del repo restano fuori.
 
   flowstate.py snapshot <cartella> --repo DIR --log FILE --pr FILE --issue FILE --protection FILE --tool FILE...
   flowstate.py compare <prima> <dopo> --repo DIR      una riga per ogni differenza; uscita 1 se ce n'è

@@ -18,6 +18,7 @@ Il progetto di prova ha: `src/calc.py` con `tests/test_calc.py` (unittest, repor
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import re
 import subprocess
@@ -270,9 +271,22 @@ def _states(guard, verdict, attention, **more):
     return {"tollgate/guard": guard, "tollgate/verdict": verdict, "tollgate/attention": attention, **more}
 
 
+DERIVE = "derive"      # mergeStateStatus ricavato dalla regola di `merge_for`
+
+
+def merge_for(states: dict) -> str:
+    """mergeStateStatus atteso su `protected` (esito reale su GitHub): guard o verdict non verdi -> BLOCKED; verdi con `attention`
+    rossa o in errore (controllo non obbligatorio) -> UNSTABLE, la PR resta unibile; tutto verde -> CLEAN."""
+    if states.get("tollgate/guard") != SUCCESS or states.get("tollgate/verdict") != SUCCESS:
+        return "BLOCKED"
+    return "UNSTABLE" if states.get("tollgate/attention") in (FAILURE, ERROR) else "CLEAN"
+
+
 def case(name, repo, summary, *, expect, oracle=True):
     def register(fn):
-        CASES[name] = Case(name, repo, summary, fn, tuple(expect), oracle)
+        resolved = tuple(dataclasses.replace(e, merge_state=merge_for(e.states)) if e.merge_state == DERIVE else e
+                         for e in expect)
+        CASES[name] = Case(name, repo, summary, fn, resolved, oracle)
         return fn
     return register
 
@@ -437,13 +451,13 @@ def work(ctx: Ctx, slug: str, *, changes: dict[str, str] | None = None, modify=N
 # ---------------------------------------------------------------- i casi: verdi
 
 @case("verde-pulita", "protected", "PR pulita: moltiplica con il suo test",
-      expect=[Expect(states=_states(SUCCESS, SUCCESS, SUCCESS), comments=verdict_comment(), merge_state="CLEAN")])
+      expect=[Expect(states=_states(SUCCESS, SUCCESS, SUCCESS), comments=verdict_comment(), merge_state=DERIVE)])
 def _verde_pulita(ctx):
     work(ctx, "pulita")
 
 
 @case("verde-config", "protected", "ramo tollgate-config/*: solo tollgate.toml cambiato, `attenzione` rosso",
-      expect=[Expect(states=_states(SUCCESS, SUCCESS, FAILURE), comments=verdict_comment(), merge_state="CLEAN")])
+      expect=[Expect(states=_states(SUCCESS, SUCCESS, FAILURE), comments=verdict_comment(), merge_state=DERIVE)])
 def _verde_config(ctx):
     ctx.start(f"tollgate-config/p4-{ctx.ts}")
     ctx.commit_files({"tollgate.toml": ctx.read("tollgate.toml") + "\n[acts]\nttl_minutes = 11\n"},
@@ -452,7 +466,7 @@ def _verde_config(ctx):
 
 
 @case("verde-ramo-libero", "protected", "ramo non tg/*: nessun controllo di scope e piano, `attenzione` rosso",
-      expect=[Expect(states=_states(SUCCESS, SUCCESS, FAILURE), comments=verdict_comment(), merge_state="CLEAN")])
+      expect=[Expect(states=_states(SUCCESS, SUCCESS, FAILURE), comments=verdict_comment(), merge_state=DERIVE)])
 def _verde_ramo_libero(ctx):
     ctx.start(f"prova/p4-ramo-libero-{ctx.ts}")
     ctx.commit_files(feature_files(), "moltiplica")
@@ -462,7 +476,7 @@ def _verde_ramo_libero(ctx):
 @case("verde-edit", "protected",
       "PR pulita, poi il corpo modificato (`edited`): il commento del verdetto si aggiorna con PATCH, non si duplica",
       expect=[Expect(states=_states(SUCCESS, SUCCESS, SUCCESS), comments=verdict_comment(),
-                     comments_once=verdict_comment(), merge_state="CLEAN")], oracle=False)
+                     comments_once=verdict_comment(), merge_state=DERIVE)], oracle=False)
 def _verde_edit(ctx):
     work(ctx, "edit", push=False)
     body = ctx.work_body()
@@ -475,11 +489,11 @@ def _verde_edit(ctx):
 
 # ---------------------------------------------------------------- i casi: verdict rosso
 
-RED = Expect(states=_states(SUCCESS, FAILURE, SUCCESS), comments=verdict_comment(), merge_state="BLOCKED")
+RED = Expect(states=_states(SUCCESS, FAILURE, SUCCESS), comments=verdict_comment(), merge_state=DERIVE)
 
 
 def red(**states):
-    return Expect(states={**RED.states, **states}, comments=verdict_comment(), merge_state="BLOCKED")
+    return Expect(states={**RED.states, **states}, comments=verdict_comment(), merge_state=DERIVE)
 
 
 @case("rosso-test-tolti", "protected", "un test della base tolto dal file di test", expect=[red()])
@@ -560,7 +574,7 @@ def _rosso_zero_test(ctx):
 @case("rosso-piano-file-nuovo", "protected",
       "il piano cambiato dopo la registrazione per aggiungere un file: quel file è fuori scope",
       expect=[Expect(states=_states(SUCCESS, FAILURE, FAILURE), comments=verdict_comment(),
-                     merge_state="BLOCKED")])
+                     merge_state=DERIVE)])
 def _rosso_piano_file(ctx):
     work(ctx, "piano-file", push=False)
     ctx.write(ctx.plan_path, ctx.read(ctx.plan_path).replace(
@@ -572,7 +586,7 @@ def _rosso_piano_file(ctx):
 # ---------------------------------------------------------------- i casi: guard rosso
 
 GUARD_RED = Expect(states=_states(FAILURE, FAILURE, ANY), comments=(MARKERS["guard"], MARKERS["verdict"]),
-                   merge_state="BLOCKED")
+                   merge_state=DERIVE)
 
 WORKFLOWS = {
     "prt": ("on:\n  pull_request_target:\n    types: [opened]\npermissions:\n  contents: read\n",
@@ -604,7 +618,7 @@ for _v, (_, _why) in WORKFLOWS.items():
 
 @case("guard-toml", "protected", "tollgate.toml cambiato in una PR di lavoro",
       expect=[Expect(states=_states(FAILURE, SUCCESS, ANY), comments=(MARKERS["guard"], MARKERS["verdict"]),
-                     merge_state="BLOCKED")])
+                     merge_state=DERIVE)])
 def _guard_toml(ctx):
     toml = ctx.git("show", "origin/main:tollgate.toml") + "\n\n[acts]\nttl_minutes = 11\n"
     work(ctx, "guard-toml", changes={"tollgate.toml": toml},
@@ -621,7 +635,7 @@ def _guard_verdict(ctx):
 
 @case("verde-workflow-ci", "protected",
       "workflow ci.yml modificato (contents: read) con la deroga `ci`: `attenzione` rosso",
-      expect=[Expect(states=_states(SUCCESS, SUCCESS, FAILURE), comments=verdict_comment(), merge_state="CLEAN")])
+      expect=[Expect(states=_states(SUCCESS, SUCCESS, FAILURE), comments=verdict_comment(), merge_state=DERIVE)])
 def _verde_workflow_ci(ctx):
     path = ".github/workflows/ci.yml"
     work(ctx, "workflow-ci", changes={path: CI_WORKFLOW + "      - run: echo ancora ci\n"}, modify=[path], test=[],
@@ -629,7 +643,7 @@ def _verde_workflow_ci(ctx):
 
 
 @case("attenzione-deroga-test", "protected", "un test tolto con la deroga `test` che lo elenca",
-      expect=[Expect(states=_states(SUCCESS, SUCCESS, FAILURE), comments=verdict_comment(), merge_state="CLEAN")])
+      expect=[Expect(states=_states(SUCCESS, SUCCESS, FAILURE), comments=verdict_comment(), merge_state=DERIVE)])
 def _attenzione_deroga_test(ctx):
     work(ctx, "deroga-test", changes=feature_files(sottrai=False),
          waiver=[{"type": "test", "file": "tests/test_calc.py",
@@ -637,7 +651,7 @@ def _attenzione_deroga_test(ctx):
 
 
 @case("attenzione-piano-testo", "protected", "piano cambiato solo nel testo, senza file nuovi: `plan_changed`",
-      expect=[Expect(states=_states(SUCCESS, SUCCESS, FAILURE), comments=verdict_comment(), merge_state="CLEAN")])
+      expect=[Expect(states=_states(SUCCESS, SUCCESS, FAILURE), comments=verdict_comment(), merge_state=DERIVE)])
 def _attenzione_piano_testo(ctx):
     work(ctx, "piano-testo", push=False)
     ctx.write(ctx.plan_path, ctx.read(ctx.plan_path).replace("## Rischi\nNessuno: caso di prova.",
@@ -647,7 +661,7 @@ def _attenzione_piano_testo(ctx):
 
 
 @case("attenzione-tetto-livello", "protected", "percorso sensibile con livello L1 e un tetto dichiarato",
-      expect=[Expect(states=_states(SUCCESS, SUCCESS, FAILURE), comments=verdict_comment(), merge_state="CLEAN")])
+      expect=[Expect(states=_states(SUCCESS, SUCCESS, FAILURE), comments=verdict_comment(), merge_state=DERIVE)])
 def _attenzione_tetto(ctx):
     work(ctx, "tetto", changes={"src/auth/token.py": "TOKEN = 1\n"}, create=["src/auth/token.py"], modify=[],
          test=[], block_override={"level_cap": "L1", "level_cap_reason": "prova del tetto di livello"})
@@ -663,12 +677,12 @@ def _attenzione_zero_test(ctx):
 
 # ---------------------------------------------------------------- i casi: error e non applicabile (non modellati)
 
-ERR = Expect(states=_states(ERROR, ERROR, ERROR), merge_state="BLOCKED")
+ERR = Expect(states=_states(ERROR, ERROR, ERROR), merge_state=DERIVE)
 
 
 @case("error-dotdot", "protected",
       "un report di results.json con `..`: il ramo cambia la copia di gate run installata in .github/tollgate",
-      expect=[Expect(states=_states(FAILURE, ERROR, ERROR), comments=(MARKERS["guard"],), merge_state="BLOCKED")],
+      expect=[Expect(states=_states(FAILURE, ERROR, ERROR), comments=(MARKERS["guard"],), merge_state=DERIVE)],
       oracle=False)
 def _error_dotdot(ctx):
     path = ".github/tollgate/bin/tollgate_gate/run.py"
@@ -681,7 +695,7 @@ def _error_dotdot(ctx):
 
 @case("error-entita", "protected",
       "un report JUnit con un'entità XML copiato negli artefatti (la copia di gate run cambiata nel ramo)",
-      expect=[Expect(states=_states(FAILURE, ERROR, ERROR), comments=(MARKERS["guard"],), merge_state="BLOCKED")],
+      expect=[Expect(states=_states(FAILURE, ERROR, ERROR), comments=(MARKERS["guard"],), merge_state=DERIVE)],
       oracle=False)
 def _error_entita(ctx):
     path = ".github/tollgate/bin/tollgate_gate/run.py"
@@ -709,7 +723,7 @@ def _rosso_entita_tools(ctx):
       expect=[Expect(push="p1", states=_states(ANY, ERROR, ERROR),
                      note="verdict su A: error se la testa è già B; success se il run di A ha finito prima del push"),
               Expect(push="p2", states=_states(SUCCESS, SUCCESS, SUCCESS), comments=verdict_comment(),
-                     merge_state="CLEAN")], oracle=False)
+                     merge_state=DERIVE)], oracle=False)
 def _error_sha_superato(ctx):
     work(ctx, "sha-superato", push=False)
     first = ctx.push()
@@ -721,7 +735,7 @@ def _error_sha_superato(ctx):
 
 
 @case("error-due-pr", "protected", "due PR aperte sulla stessa testa (due rami allo stesso commit)",
-      expect=[Expect(push="p1", states=_states(ERROR, ERROR, ERROR), merge_state="BLOCKED")], oracle=False)
+      expect=[Expect(push="p1", states=_states(ERROR, ERROR, ERROR), merge_state=DERIVE)], oracle=False)
 def _error_due_pr(ctx):
     work(ctx, "due-pr", push=False)
     ctx.git("branch", f"tg/{ctx.issue}-due-pr-bis")

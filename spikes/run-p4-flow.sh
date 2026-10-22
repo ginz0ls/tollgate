@@ -20,8 +20,9 @@
 # eval, python -c, manomissioni dei file della guardia) ed è un segnale. La GARANZIA è la verifica dello stato prima e dopo ogni
 # passo (flowstate.py): hash di wrapper, guardia e script, registro gh-wrap.log copiato e solo crescente, `git ls-remote` con main
 # invariato e soli refs/heads/tg/* avanzati senza forzature, PR, issue e protezione di main invariate. Non impedisce un effetto:
-# lo rileva, qualunque sia il comando che lo ha prodotto, e rende il caso «non riuscito» (uscita 3, riga esplicita in
-# <id>-stato.txt). Il wrapper scarta GH_TOKEN e GH_CONFIG_DIR dell'ambiente: l'autenticazione di gh deve stare nella sua
+# rileva gli effetti elencati, qualunque sia il comando che li ha prodotti (commenti, label, corpo di PR esistenti, repo detect
+# e impostazioni del repo restano fuori), e rende il caso «non riuscito»: il passo ritorna 3, lo script esce con 1, con riga
+# esplicita in <id>-stato.txt. Il wrapper scarta GH_TOKEN e GH_CONFIG_DIR dell'ambiente: l'autenticazione di gh deve stare nella sua
 # configurazione, non in una variabile d'ambiente del controller (altrimenti il passo fallisce, in modo visibile).
 #
 # Cautele: `claude -p` solo qui, solo da /tmp/tollgate-p4/flow e sempre con --plugin-dir (lo script lo controlla).
@@ -116,7 +117,7 @@ state_snapshot() {
     --tool "$GH4/flowstate.py" --tool "$GH4/common.sh" --tool "$here/run-p4-flow.sh" || die "istantanea dello stato non riuscita"
 }
 
-# state_compare <id>: stato prima e dopo il passo; una differenza ferma lo script (uscita 3)
+# state_compare <id>: stato prima e dopo il passo; una differenza ritorna 3 e ferma lo script (uscita 1)
 state_compare() {
   local id="$1"
   rot "$LOGS/$id-stato.txt"
