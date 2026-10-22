@@ -249,7 +249,8 @@ _OPS = {
     "subagent_veto": lambda c, s, x, d: subagents.add_veto(c, d["agent_id"]),
     "subagent_finish": lambda c, s, x, d: subagents.finish(
         c, d["agent_id"], state=d["state"], declared_status=d.get("declared_status"),
-        tokens=d.get("tokens"), now=x.now, session=x.event.session),
+        tokens=d.get("tokens"), size_reason=d.get("size_reason"), now=x.now,
+        session=x.event.session),
     "subagent_interrupt": lambda c, s, x, d: subagents.interrupt(c, d["agent_id"], now=x.now,
                                                                  session=x.event.session),
     "task": lambda c, s, x, d: tasks.task_event(c, d["work"], d["number"], d["event"],

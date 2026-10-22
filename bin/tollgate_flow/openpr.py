@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from tollgate_analysis import (approvals as approvals_mod, level as lv, prblock, prbody,
-                               profiles as prof, waivers)
+                               profiles as prof, size, waivers)
 from tollgate_core import (VERSION, acts, clock, config, db, dod, events, git, intents, phases,
                            receipts, reviews, sessions, stats, verify, violations)
 from tollgate_core.paths import program_command
@@ -210,7 +210,7 @@ def _open(state, conn, cwd: Path, update: bool, now, argv, via_sync, environ) ->
     if problems:
         return _refuse(*problems, warnings=warnings)
 
-    labels, label_warning = _labels(state, main, work)
+    labels, label_warning = issue_labels(state, main, work)
     if label_warning:
         warnings.append(label_warning)
     if review.required and work["review_unverified"]:
@@ -368,7 +368,9 @@ def _waiver_lines(work, cfg, conn) -> list[str]:
             f"(costo: {w.cost})" for w in wf.waivers]
 
 
-def _labels(state, main, work) -> tuple[tuple[str, ...] | None, str | None]:
+def issue_labels(state, main, work) -> tuple[tuple[str, ...] | None, str | None]:
+    """Le etichette dell'issue del lavoro e, se `gh` non le legge, l'avviso: senza etichette il
+    livello minimo viene dal solo diff (`open-pr` e `finish check` lo dicono)."""
     try:
         return gh.issue(state, main, work["issue"]).labels, None
     except gh.GhError as e:
@@ -425,7 +427,8 @@ def facts(conn, state, work, cfg, wt: Path, head: str, *, now, dod=None, labels=
     last_on_head = cycle if cycle is not None and cycle["stage"] == "closed" else None
     findings = [
         {"id": r["id"], "severity": r["severity"], "confidence": r["confidence"],
-         "verification": r["verification"], "user_decision": r["user_decision"]}
+         "verification": r["verification"], "user_decision": r["user_decision"],
+         "blocking": bool(r["blocking"])}
         for r in conn.execute("SELECT * FROM findings WHERE work = ? ORDER BY cycle, rowid",
                               (wid,))]
     agents = conn.execute("SELECT count(*), coalesce(sum(tokens), 0) FROM subagents "
@@ -475,4 +478,53 @@ def facts(conn, state, work, cfg, wt: Path, head: str, *, now, dod=None, labels=
                                           (wid,))],
         "components_off": [k for k, v in cfg.get("components").items() if v is False],
         "off_periods": stats.off_periods(conn, clock.parse(work["created"]), now),
+        "tasks_over": _tasks_over(conn, wt, work, cfg),
+        "skills_absent": _skills_absent(conn, wid),
     }
+
+
+def _size_reasons(conn, wid: int) -> dict[int, str]:
+    """Il `size_reason` di ogni task: quello dell'ultimo evento `subagent_stop` che ne porta uno
+    (un giro di correzione senza motivo non cancella il precedente)."""
+    out: dict[int, str] = {}
+    for r in conn.execute("SELECT data FROM events WHERE work = ? AND type = 'subagent_stop' "
+                          "ORDER BY seq", (wid,)):
+        data = json.loads(r["data"])
+        if isinstance(data.get("task"), int) and data.get("size_reason"):
+            out[data["task"]] = data["size_reason"]
+    return out
+
+
+def _tasks_over(conn, wt: Path, work, cfg) -> list[dict]:
+    """I task oltre `task_lines_warn` righe (decisione 21): `size.task_lines` sui commit del
+    task. Un task senza commit, o con commit che una riscrittura ha tolto dalla storia, non si
+    misura."""
+    warn = cfg.get("tasks.task_lines_warn")
+    lockfiles = set(cfg.get("scope.lockfiles"))
+    reasons = _size_reasons(conn, work["id"])
+    out = []
+    for t in conn.execute("SELECT number, commits FROM tasks WHERE work = ? ORDER BY number",
+                          (work["id"],)):
+        commits = json.loads(t["commits"])
+        if not commits:
+            continue
+        try:
+            changes = git.changes(wt, git.range_base(wt, commits[0]), head=commits[-1])
+        except git.GitError:
+            continue
+        lines = size.task_lines(changes, lockfiles)
+        if lines > warn:
+            out.append({"task": t["number"], "lines": lines,
+                        "size_reason": reasons.get(t["number"])})
+    return out
+
+
+def _skills_absent(conn, wid: int) -> list[dict]:
+    """Le skill che `task start` ha tolto da un task perché assenti (evento `skills_absent`,
+    decisione 21): per ogni task l'ultima registrazione."""
+    latest: dict[int, list] = {}
+    for r in conn.execute("SELECT data FROM events WHERE work = ? AND type = 'skills_absent' "
+                          "ORDER BY seq", (wid,)):
+        data = json.loads(r["data"])
+        latest[data["task"]] = data["skills"]
+    return [{"task": t, "skills": latest[t]} for t in sorted(latest)]

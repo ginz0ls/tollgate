@@ -75,7 +75,8 @@ def add_veto(conn, agent_id: str) -> int:
 
 
 def finish(conn, agent_id: str, *, state: str, now, declared_status: str | None = None,
-           tokens: int | None = None, session: str | None = None) -> None:
+           tokens: int | None = None, session: str | None = None,
+           size_reason: str | None = None) -> None:
     if state not in STATES or state == "running":
         raise ValueError(f"stato di chiusura non ammesso: {state}")
     with db.tx(conn):
@@ -89,7 +90,8 @@ def finish(conn, agent_id: str, *, state: str, now, declared_status: str | None 
                       (now - started).total_seconds(), agent_id))
         record_event(conn, "subagent_stop",
                      {"id": agent_id, "type": row["type"], "task": row["task"],
-                      "declared_status": declared_status, "tokens": tokens, "state": state},
+                      "declared_status": declared_status, "tokens": tokens, "state": state,
+                      "size_reason": size_reason},
                      now=now, session=session or row["session"], work=row["work"])
 
 

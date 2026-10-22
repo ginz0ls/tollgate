@@ -11,7 +11,8 @@ from pathlib import Path
 
 from tollgate_analysis import (brief as briefs, naming, plan as planmod, profiles as prof,
                                report, size)
-from tollgate_core import clock, config, db, git, phases, reviews, scope as scopes, sessions, tasks
+from tollgate_core import (clock, config, db, events, git, phases, reviews, scope as scopes,
+                           sessions, tasks)
 from tollgate_core.paths import program_command
 
 from . import prereq
@@ -184,6 +185,9 @@ def _task_start(state, conn, cwd: Path, number: int, *, fix: bool, claude_dir: P
     # Un'unica transazione: se `assign` fallisce il task resta com'era (pending, o review).
     with db.tx(conn):
         tasks.set_skills_required(conn, work["id"], number, present)
+        if absent:
+            events.record_event(conn, "skills_absent", {"task": number, "skills": absent},
+                                now=now, work=work["id"])
         tasks.task_event(conn, work["id"], number, "fix" if fix else "start", now=now)
         tasks.assign(conn, work["id"], number, implementer=name, agent_type=routing.implementer,
                      pending=pending, reviewer_type=routing.reviewer, now=now)

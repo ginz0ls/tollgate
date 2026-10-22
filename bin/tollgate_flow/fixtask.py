@@ -10,12 +10,14 @@ import sqlite3
 from pathlib import Path
 
 from tollgate_analysis import brief as briefs
-from tollgate_core import clock, db, git, phases, reviews, scope as scopes, sessions, tasks
+from tollgate_core import (clock, db, ghcli, git, phases, reviews, scope as scopes, sessions,
+                           tasks)
+from tollgate_gate import comment
 
 from . import gh, taskcmd
 from .taskcmd import TaskError
 
-GATE_MARKER = "<!-- tollgate-verdict"     # contratto verso P4: il gate lo scrive in testa al commento
+GATE_MARKER = "<!-- tollgate-verdict"     # il prefisso del marcatore che `comment.marker` scrive
 MAX_COMMENT = 20000
 
 
@@ -53,14 +55,17 @@ def _gate(state, work, wt: Path) -> tuple[str, str]:
         comments = gh.pr_comments(state, git.main_worktree(wt), work["pr_number"])
     except gh.GhError as e:
         raise TaskError(f"commenti della PR non leggibili: {e}") from e
-    marked = [c.get("body") for c in comments
-              if isinstance(c.get("body"), str) and c["body"].lstrip().startswith(GATE_MARKER)]
+    # il marcatore lo scrive chiunque sappia commentare: contano solo i commenti del bot
+    marked = [c["body"] for c in comments
+              if isinstance(c.get("body"), str) and c["body"].lstrip().startswith(GATE_MARKER)
+              and (c.get("author") or {}).get("login") in ghcli.BOT_LOGINS]
     if not marked:
         raise TaskError(f"nessun commento del gate sulla PR #{work['pr_number']} (deve "
-                        f"cominciare con {GATE_MARKER})")
-    sha = git.head(wt)
+                        f"cominciare con {GATE_MARKER} e essere del bot di GitHub Actions)")
+    # lo SHA è quello che il gate ha giudicato, non la punta di adesso
+    sha = comment.marker_sha(marked[-1])
     if sha is None:
-        raise TaskError("il worktree non ha commit")
+        raise TaskError("commento del gate senza SHA: il marcatore non porta la testa giudicata")
     return f"gate:{sha}", briefs.gate_task_text(sha, marked[-1].strip()[:MAX_COMMENT])
 
 

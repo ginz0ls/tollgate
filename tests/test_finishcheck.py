@@ -16,6 +16,9 @@ SOMMA = "def somma(a, b):\n    return b + a\n"
 # gli identificativi del finto JUnit stanno in tests/ids.txt: non sono lavoro del piano
 TOML = JUNIT_TOML + '[scope]\nalways = ["tests/ids.txt"]\n'
 PROFILE_TOML = TOML + '[profiles.p]\npaths = ["src/**"]\ndod = ["lint"]\n'
+ISSUES = {"7": {"number": 7, "title": "Aggiungi export CSV", "body": "b", "state": "open",
+                "labels": [], "author_association": "OWNER"}}
+SECURITY = {"7": dict(ISSUES["7"], labels=[{"name": "security"}])}
 
 
 def phase(fl):
@@ -35,12 +38,18 @@ def item_lines(r):
 
 
 class FinishCheckCase(unittest.TestCase):
-    def lab(self, *, ids=BOTH_OK, toml=TOML, close=True, level="L1", plan=None):
+    def lab(self, *, ids=BOTH_OK, toml=TOML, close=True, level="L1", plan=None,
+            issues=ISSUES):
         """Lavoro L1 in execution: piano registrato e committato, un commit sul file dello
-        scope, task chiusi, report JUnit dagli identificativi."""
+        scope, task chiusi, report JUnit dagli identificativi. `finish check` legge l'issue
+        con `gh`: nei test è il finto (`issues` sono i suoi dati), mai quello vero."""
         fl = FlowLab(issue=7, phase="plan" if level != "L0" else "execution", toml=toml,
                      level=level)
         self.addCleanup(fl.close)
+        env = mock.patch.dict(os.environ, fl.env())
+        env.start()
+        self.addCleanup(env.stop)
+        fl.set_gh(issues=issues)
         if level != "L0":
             if plan is None:
                 fl.register_plan(tasks=1)
@@ -171,6 +180,109 @@ class GreenRedTest(FinishCheckCase):
             r = self.check(fl)
         self.assertEqual(r.code, finishcheck.OK, r.lines)
         self.assertTrue(r.lines[0].startswith("avviso:"))
+
+
+class GateFamiliesTest(FinishCheckCase):
+    """`finish check` usa il calcolo del gate (decisioni 3 e 20): le voci rosse delle famiglie
+    che il gate non ha nella DoD fermano il lavoro, quelle di `attenzione` si stampano."""
+
+    def report(self, fl):
+        return json.loads(phases.get_work(fl.conn, fl.work)["finish_report"])
+
+    def test_contract_unchanged(self):
+        fl = self.lab()
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.OK, r.lines)
+        self.assertEqual([i.key for i in r.items], list(dod.ITEMS_BY_LEVEL["L1"]))
+        report = self.report(fl)
+        self.assertEqual(report["items"], {"receipt": True, "guard_scope": True,
+                                           "tasks_approved": True, "findings": None,
+                                           "must_have": True, "skills": True})
+        self.assertEqual(report["manual"], [])
+        self.assertEqual(set(report), {"items", "manual", "gate"})
+        self.assertEqual(report["gate"]["red"], [])
+        self.assertIsInstance(report["gate"]["attention"], list)
+        self.assertEqual((finishcheck.OK, finishcheck.RED, finishcheck.REFUSED), (0, 1, 2))
+
+    def test_level_below_minimum_is_red(self):
+        """Decisione 20: un livello sotto il minimo senza tetto rende rosso `finish check`,
+        anche con la DoD verde (con l'etichetta `security` il minimo è L2)."""
+        fl = self.lab(issues=SECURITY)
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.RED, r.lines)
+        self.assertTrue(all(i.ok for i in r.items if i.ok is not None))
+        self.assertTrue(any(x.startswith("rosso:") and "sotto il minimo L2" in x
+                            for x in r.lines), r.lines)
+        self.assertEqual(phase(fl), "execution")
+        self.assertIsNone(phases.get_work(fl.conn, fl.work)["finish_sha"])
+        self.assertIn("rilancia", r.lines[-1])
+
+    def test_level_cap_is_attention_not_red(self):
+        fl = self.lab(issues=SECURITY)
+        fl.conn.execute("UPDATE work_items SET level_cap = 'L1', level_cap_reason = 'solo doc' "
+                        "WHERE id = ?", (fl.work,))
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.OK, r.lines)
+        self.assertTrue(any(x.startswith("da leggere:") and "livello dichiarato L1" in x
+                            for x in r.lines), r.lines)
+        self.assertIn("level_cap", self.report(fl)["gate"]["attention"])
+
+    def test_tollgate_file_changed_is_red(self):
+        toml = TOML.replace('always = ["tests/ids.txt"]',
+                            'always = ["tests/ids.txt", ".github/workflows/tollgate-run.yml"]')
+        fl = self.lab(toml=toml)
+        fl.commit(".github/workflows/tollgate-run.yml", "name: cambiato\n", "workflow")
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.RED, r.lines)
+        self.assertTrue(any(x.startswith("rosso:") and "file di tollgate modificati" in x
+                            and ".github/workflows/tollgate-run.yml" in x for x in r.lines),
+                        r.lines)
+        self.assertEqual(phase(fl), "execution")
+
+    def test_attention_printed_in_groups(self):
+        toml = TOML + '[project]\nallow_no_tests = true\n[components]\nreviewer_standard = false\n'
+        fl = self.lab(toml=toml)
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.OK, r.lines)
+        self.assertTrue(any(x.startswith("da leggere:") and "componenti spenti" in x
+                            and "reviewer_standard" in x for x in r.lines), r.lines)
+        self.assertTrue(any(x.startswith("informative:") and "allow_no_tests" in x
+                            for x in r.lines), r.lines)
+        self.assertEqual(self.report(fl)["gate"]["attention"],
+                         ["components_off", "allow_no_tests"])
+        self.assertTrue(r.lines[-1].startswith("prossimo passo"))
+        saved = self.check(fl)                      # lo stesso SHA in review: esito salvato
+        self.assertIn("da leggere (voci del gate): components_off", saved.lines)
+        self.assertIn("informative (voci del gate): allow_no_tests", saved.lines)
+
+    def test_issue_unreadable_warns_and_continues(self):
+        fl = self.lab(issues={})
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.OK, r.lines)
+        self.assertTrue(any(x.startswith("avviso:") and "level_minimum" in x
+                            for x in r.lines), r.lines)
+        self.assertEqual(phase(fl), "review")
+
+    def test_stale_approval_still_fails_dod_locally(self):
+        """Rilievo I-4: nel gate un'approvazione superata è `attenzione`; in locale resta una
+        voce `approvals` falsa e `finish check` rosso (decisione 10)."""
+        fl = self.lab()
+        fl.conn.execute("UPDATE work_items SET level = 'L2' WHERE id = ?", (fl.work,))
+        fl.write_spec()
+        fl.approve_spec_file()
+        fl.approve_plan_file()
+        fl.write_report("spec-adversarial")
+        fl.write_report("plan-adversarial")
+        header = {"kind": "plan-approval", "path": PLAN, "sha": "0" * 40,
+                  "spec_sha": core_git.blob_at(fl.wt, "HEAD", SPEC), "adversarial": "closed"}
+        fl.commit("docs/superpowers/reviews/7/plan-approval.md",
+                  approvals.render_approval(header), "approvazione del piano superata")
+        r = self.check(fl)
+        self.assertEqual(r.code, finishcheck.RED, r.lines)
+        self.assertFalse(self.item(r, "approvals").ok)
+        self.assertTrue(any(x.startswith("da leggere:") and "approvazione di L2 superata" in x
+                            for x in r.lines), r.lines)
+        self.assertFalse(any(x.startswith("rosso:") for x in r.lines), r.lines)
 
 
 class RerunTest(FinishCheckCase):

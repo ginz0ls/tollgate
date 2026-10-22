@@ -136,6 +136,20 @@ class BudgetAndSizeTest(Base):
         self.assertEqual(self.stop(text=report()).exit, 2)
         self.assertEqual(self.stop(text=report(size_reason="generato da uno schema")).exit, 0)
 
+    def test_size_reason_in_event(self):
+        """Decisione 21: il motivo dichiarato nel report arriva nell'evento `subagent_stop`,
+        da cui lo legge il blocco 18.1 (prima di P4 stava solo nel report)."""
+        self.green(self.commit())
+        self.assertEqual(self.stop(text=report(size_reason="generato da uno schema")).exit, 0)
+        [event] = self.lab.events("subagent_stop")
+        self.assertEqual((event["id"], event["size_reason"]), ("a1", "generato da uno schema"))
+
+    def test_event_without_size_reason_carries_null(self):
+        self.green(self.commit())
+        self.assertEqual(self.stop(text=report()).exit, 0)
+        [event] = self.lab.events("subagent_stop")
+        self.assertIsNone(event["size_reason"])
+
 
 class AllowNoTestsTest(Base):
     toml = DEFAULT_TOML + "[project]\nallow_no_tests = true\n"

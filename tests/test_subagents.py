@@ -1,3 +1,4 @@
+import json
 import unittest
 from datetime import datetime, timedelta, timezone
 
@@ -23,6 +24,17 @@ class SubagentsTest(unittest.TestCase):
         return subagents.start(self.conn, agent_id="a1", type_="tollgate:implementer",
                                session="s1", work=self.w, task=1, base_sha="b0",
                                fingerprint="f0", now=now)
+
+    def test_finish_records_size_reason_in_event(self):
+        self._start()
+        subagents.finish(self.conn, "a1", state="done", declared_status="DONE", now=T0,
+                         size_reason="generato")
+        subagents.start(self.conn, agent_id="a2", type_="tollgate:implementer", session="s1",
+                        work=self.w, task=1, base_sha="b0", fingerprint="f0", now=T0)
+        subagents.finish(self.conn, "a2", state="done", declared_status="DONE", now=T0)
+        data = [json.loads(r["data"]) for r in self.conn.execute(
+            "SELECT data FROM events WHERE type = 'subagent_stop' ORDER BY seq")]
+        self.assertEqual([d["size_reason"] for d in data], ["generato", None])
 
     def test_start_then_resume_keeps_base(self):
         self.assertFalse(self._start())

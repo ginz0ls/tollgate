@@ -16,6 +16,7 @@ from . import _common
 
 CHECK = {"api": 1, "events": ["subagent_stop"], "component": None, "order": 20}
 MAX_VETOES = 2
+MAX_SIZE_REASON = 500
 
 
 def _readonly(ctx, row, work):
@@ -28,6 +29,13 @@ def _readonly(ctx, row, work):
 
 def _task_lines(ctx, wt: Path, base: str, head: str) -> int:
     return size.task_lines(git.changes(wt, base, head=head), set(ctx.cfg("scope.lockfiles")))
+
+
+def _size_reason(rep) -> str | None:
+    """Il motivo dichiarato per un task oltre `task_lines_max`: va nell'evento, da cui lo legge
+    il blocco 18.1 (decisione 21). Testo del subagente, quindi tagliato."""
+    reason = rep.data.get("size_reason") if rep.valid else None
+    return str(reason)[:MAX_SIZE_REASON] if reason else None
 
 
 def _skill_missing(task) -> list[str]:
@@ -97,7 +105,8 @@ def _implementer(event, ctx, row, work):
     def veto(msg: str):
         if row["vetoes"] >= MAX_VETOES:
             out = [record("subagent_finish", agent_id=aid, state="done",
-                          declared_status=rep.status if rep.valid else None, tokens=tokens)]
+                          declared_status=rep.status if rep.valid else None, tokens=tokens,
+                          size_reason=_size_reason(rep))]
             if running:
                 out.append(record("task", work=wid, number=task["number"],
                                   event="report_blocked"))
@@ -142,7 +151,7 @@ def _implementer(event, ctx, row, work):
         if missing:
             return veto("skill dei profili non usate: " + ", ".join(missing))
     out = [record("subagent_finish", agent_id=aid, state="done", declared_status=rep.status,
-                  tokens=tokens)]
+                  tokens=tokens, size_reason=_size_reason(rep))]
     if running:
         if done:
             out.append(record("task", work=wid, number=task["number"], event="report_done"))

@@ -23,7 +23,8 @@ def facts(**kw):
         "dod": {"L": "L1", "items": {"receipt": True}},
         "verdict": {"outcome": "ok", "cycles": 1, "findings_confirmed": 0, "unverified": False},
         "findings": [], "fix_rounds": {}, "subagents": {"count": 0, "tokens": 0},
-        "effects": [], "components_off": [], "off_periods": [], "extra": "ignorato"}
+        "effects": [], "components_off": [], "off_periods": [], "tasks_over": [],
+        "skills_absent": [], "extra": "ignorato"}
     data.update(kw)
     return data
 
@@ -35,6 +36,19 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(list(prblock.FIELDS), SPEC_ORDER)
         self.assertEqual(prblock.SCHEMA_VERSION, 1)
         self.assertNotIn("extra", block)
+
+    def test_fields_order_with_new_fields(self):
+        """Decisione 21: `tasks_over` e `skills_absent` sono le ultime due voci; un blocco
+        scritto prima di P4, senza le due voci, si legge ancora."""
+        self.assertEqual(list(prblock.FIELDS[-2:]), ["tasks_over", "skills_absent"])
+        block = prblock.build(facts(tasks_over=[{"task": 2, "lines": 300, "size_reason": None}],
+                                    skills_absent=[{"task": 1, "skills": ["a"]}]))
+        self.assertEqual(list(block)[-2:], ["tasks_over", "skills_absent"])
+        old = {k: v for k, v in block.items() if k not in prblock.DEFAULTS}
+        parsed = prblock.parse(prblock.render(old))
+        self.assertEqual(parsed, old)
+        self.assertNotIn("tasks_over", parsed)
+        self.assertEqual(prblock.build({**old})["skills_absent"], [])
 
     def test_new_fields_default_to_empty_lists(self):
         block = prblock.build(facts())

@@ -7,7 +7,7 @@ from unittest import mock
 from tests.flowkit import JUNIT_TOML, PLAN, SESSION, SPEC, FlowLab, plan_text
 from tollgate_analysis import approvals, prblock, waivers
 from tollgate_core import (VERSION, acts, clock, config, effects, events, git as core_git,
-                           intents, phases, reviews)
+                           intents, phases, reviews, tasks)
 from tollgate_flow import finishcheck, gitw, openpr, prstate
 
 BRANCH = "tg/7-demo"
@@ -250,6 +250,7 @@ class OpenSuccessTest(OpenCase):
                           block["components_off"], block["off_periods"], block["effects"]),
                          ([], [], {}, [], [], []))
         self.assertEqual(block["subagents"], {"count": 0, "tokens": 0})
+        self.assertEqual((block["tasks_over"], block["skills_absent"]), ([], []))
 
     def test_notes_in_body_and_no_untrusted_text_in_arguments(self):
         fl = self.lab(cycle=None)
@@ -755,13 +756,16 @@ class FactsTest(OpenCase):
     def test_facts_keys_match_block_fields(self):
         fl = self.lab()
         data = self.facts(fl)
-        self.assertEqual(set(data) | set(prblock.DEFAULTS), set(prblock.FIELDS))
+        self.assertEqual(set(data), set(prblock.FIELDS))
         self.assertEqual((data["head_sha"], data["tollgate_version"]), (head(fl), VERSION))
         self.assertEqual((data["verdict"]["outcome"], data["verdict"]["cycles"]), ("ok", 1))
         self.assertEqual(self.facts(fl, cycle=None)["verdict"]["outcome"], None)
 
     def test_level_minimum_from_issue_labels(self):
-        fl = self.lab(issues={"7": dict(ISSUES["7"], labels=[{"name": "security"}])})
+        # `finish check` è rosso con un livello sotto il minimo (decisione 20): l'etichetta
+        # arriva dopo, con la PR da aprire
+        fl = self.lab()
+        fl.set_gh(prs=[], issues={"7": dict(ISSUES["7"], labels=[{"name": "security"}])})
         r = self.go(fl)
         self.assertEqual(r.code, 0, r.lines)
         block = prblock.parse(self.prs(fl)[0]["body"])
@@ -773,6 +777,38 @@ class FactsTest(OpenCase):
         self.assertEqual(r.code, 0, r.lines)
         self.assertTrue(any(x.startswith("avviso:") and "level_minimum" in x for x in r.lines))
         self.assertEqual(prblock.parse(self.prs(fl)[0]["body"])["level_minimum"], "L1")
+
+    def test_block_new_fields(self):
+        """Decisione 21: `findings[].blocking`, `tasks_over` e `skills_absent` arrivano nel
+        blocco scritto da `open-pr`; `size_reason` è l'ultimo non nullo tra gli eventi
+        `subagent_stop` del task."""
+        fl = self.lab(toml=TOML + "[tasks]\ntask_lines_warn = 1\n")
+        events.record_event(fl.conn, "subagent_stop", {
+            "id": "a1", "type": "tollgate:implementer", "task": 1, "declared_status": "DONE",
+            "tokens": 1, "state": "done", "size_reason": "generato"}, now=fl.now, work=fl.work)
+        events.record_event(fl.conn, "subagent_stop", {
+            "id": "a1", "type": "tollgate:implementer", "task": 1, "declared_status": "DONE",
+            "tokens": 1, "state": "done", "size_reason": None}, now=fl.now, work=fl.work)
+        events.record_event(fl.conn, "skills_absent", {"task": 1, "skills": ["ghost-skill"]},
+                            now=fl.now, work=fl.work)
+        tasks.add_commit(fl.conn, fl.work, 1, head(fl))
+        n = reviews.open_cycle(fl.conn, fl.work, sha=head(fl), patch_id=None, code="c1",
+                               reviewers=[REVIEWER], now=fl.now)
+        reviews.add_report(fl.conn, fl.work, n, source=REVIEWER, outcome="ok", findings=[
+            {"severity": "major", "confidence": 0.9, "file": "src/app.py", "line": 2,
+             "rule": "R-1", "text": "nota"},
+            {"severity": "major", "confidence": 0.9, "file": "src/app.py", "line": 2,
+             "rule": "piano:task 1", "text": "blocca"}],
+            rejected=[], blocking_rules=set(), known_rules={"R-1"}, now=fl.now)
+        data = self.facts(fl, cycle=None)
+        self.assertEqual([f["blocking"] for f in data["findings"]], [False, True])
+        self.assertEqual(data["tasks_over"], [{"task": 1, "lines": 2, "size_reason": "generato"}])
+        self.assertEqual(data["skills_absent"], [{"task": 1, "skills": ["ghost-skill"]}])
+
+    def test_tasks_over_only_above_warn_and_without_commits_skipped(self):
+        fl = self.lab()
+        tasks.add_commit(fl.conn, fl.work, 1, head(fl))
+        self.assertEqual(self.facts(fl)["tasks_over"], [])      # 2 righe, soglia 200
 
     def test_counters_and_reviews_dirs(self):
         fl = self.lab()

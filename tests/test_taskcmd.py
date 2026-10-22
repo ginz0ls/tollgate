@@ -153,6 +153,14 @@ class TaskStartTest(TaskCase):
         self.assertIn("- present-skill\n", brief)
         self.assertNotIn("s4", brief)  # tetto di 3: stesse skill nel brief e in skills_required
 
+    def test_absent_skills_recorded_as_event(self):
+        """Decisione 21: `task start` registra le skill che toglie, per il blocco 18.1."""
+        fl = self.make(toml=WEB_TOML, plan=plan_text("- Create: `web/page.tsx`"))
+        self.start(1)
+        self.assertEqual(fl.events("skills_absent"), [])      # nessuna skill assente nel task 1
+        self.start(2)
+        self.assertEqual(fl.events("skills_absent"), [{"task": 2, "skills": ["ghost-skill", "s3"]}])
+
     def test_plan_changed_after_registration_refuses(self):
         fl = self.make()
         (fl.wt / PLAN).write_text(plan_text() + "\nmodificato\n")
