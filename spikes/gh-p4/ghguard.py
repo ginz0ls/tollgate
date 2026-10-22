@@ -25,6 +25,7 @@ OWNER = "ginz0ls"
 PROT = OWNER + "/tollgate-p4-protected"
 DET = OWNER + "/tollgate-p4-detect"
 REPOS = (PROT, DET)
+FLOW_CLONE = "/tmp/tollgate-p4/flow/protected"      # cartella del clone del flusso (run-p4-flow.sh: $FLOW/protected)
 
 REPO_CREATE_OPTS = {"--public", "--private", "--add-readme"}
 API_FLAGS = {"--include", "--paginate", "--silent"}
@@ -331,8 +332,8 @@ def violation(args, lenient=False, profile="script"):
                     return "repo clone: repo non ammesso"
                 rest = args[3:]
                 if rest and not rest[0].startswith("-"):
-                    if not _under("P4_WORK", rest[0]):
-                        return "repo clone: la cartella deve stare sotto P4_WORK"
+                    if not _under("P4_WORK", rest[0]) and not (args[2] == PROT and rest[0] == FLOW_CLONE):
+                        return "repo clone: la cartella deve stare sotto P4_WORK (o essere il clone del flusso di protected)"
                     rest = rest[1:]
                 if rest not in ([], ["--", "-q"]):
                     return "repo clone: argomenti non ammessi"

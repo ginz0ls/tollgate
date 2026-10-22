@@ -112,6 +112,26 @@ class WriteFormsTest(GuardBase):
         self.no("api", "--method", "PUT", "--input", "/tmp/x", f"repos/{PROT}/branches/main/protection", profile="flow")
 
 
+class FlowCloneTest(GuardBase):
+    """Il clone del flusso (imposto dal brief) è ammesso solo per protected e solo nella cartella esatta."""
+
+    FLOW_DIR = "/tmp/tollgate-p4/flow/protected"
+
+    def test_the_flow_clone_of_protected_is_allowed(self):
+        self.ok("repo", "clone", PROT, self.FLOW_DIR, "--", "-q")
+        self.ok("repo", "clone", PROT, self.FLOW_DIR)
+
+    def test_other_repo_or_folder_is_refused(self):
+        self.no("repo", "clone", DET, self.FLOW_DIR, "--", "-q")
+        self.no("repo", "clone", PROT, "/tmp/tollgate-p4/flow/altro", "--", "-q")
+        self.no("repo", "clone", PROT, "/tmp/tollgate-p4/flow/protected/../x", "--", "-q")
+        self.no("repo", "clone", PROT, "/tmp/tollgate-p4/flow/protected/sotto", "--", "-q")
+        self.no("repo", "clone", PROT, "/tmp/tollgate-p4/flow", "--", "-q")
+
+    def test_the_flow_profile_still_refuses_repo_clone(self):
+        self.no("repo", "clone", PROT, self.FLOW_DIR, "--", "-q", profile="flow")
+
+
 class PullBodyPatchTest(GuardBase):
     """L'unica scrittura nuova (scelta dell'utente del 22/10/2026): `api --method PATCH repos/<protected>/pulls/<n> -F body=@<file>`,
     perché `gh pr edit` non funziona con gh 2.46."""
