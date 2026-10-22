@@ -1,0 +1,40 @@
+{
+  "name": "verde-ramo-libero",
+  "repo": "protected",
+  "summary": "ramo non tg/*: nessun controllo di scope e piano, `attenzione` rosso",
+  "issue": 78,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "prova/p4-ramo-libero-20261022-174157",
+      "sha": "57caf744bbbb046cd17d014a79ab2f4be533ee00"
+    },
+    {
+      "op": "pr",
+      "branch": "prova/p4-ramo-libero-20261022-174157",
+      "base": "main",
+      "title": "prova P4: verde-ramo-libero",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-ramo-libero-20261022-174157-body-prova-p4-ramo-libero-20261022-174157.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "success",
+        "tollgate/attention": "failure"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "UNSTABLE",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "prova/p4-ramo-libero-20261022-174157"
+}

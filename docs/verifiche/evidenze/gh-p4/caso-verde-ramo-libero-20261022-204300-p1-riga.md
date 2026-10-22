@@ -1,0 +1,1 @@
+| verde-ramo-libero | 94 | bea4372cb3 | guard=success (github-actions[bot]), verdict=success (github-actions[bot]), attention=failure (github-actions[bot]), merge=UNSTABLE | guard=success, verdict=success, attention=failure, merge=UNSTABLE | riuscito | |

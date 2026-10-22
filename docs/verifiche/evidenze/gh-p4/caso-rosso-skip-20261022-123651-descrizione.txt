@@ -1,0 +1,4 @@
+caso: rosso-skip
+repo: ginz0ls/tollgate-p4-protected
+issue: #21
+attesa: guard=success, verdict=failure, attention=success - un test della base marcato `unittest.skip`

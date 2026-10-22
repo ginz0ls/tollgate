@@ -1,0 +1,1 @@
+| rosso-or-true | 28 | eb61caf2e2 | guard=success (github-actions[bot]), verdict=failure (github-actions[bot]), attention=success (github-actions[bot]), merge=BLOCKED | guard=success, verdict=failure, attention=success, merge=BLOCKED | riuscito | |

@@ -1,0 +1,40 @@
+{
+  "name": "rosso-l2-mancante",
+  "repo": "protected",
+  "summary": "livello L2 dichiarato, senza approvazione n\u00e9 report di L2",
+  "issue": 31,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/31-l2-mancante",
+      "sha": "45c3917da6c8854f6f2745acf63fa47c15317299"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/31-l2-mancante",
+      "base": "main",
+      "title": "prova P4: rosso-l2-mancante",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-l2-mancante-20261022-124222-body-tg-31-l2-mancante.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "failure",
+        "tollgate/attention": "success"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/31-l2-mancante"
+}

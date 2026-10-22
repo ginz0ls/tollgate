@@ -1,0 +1,40 @@
+{
+  "name": "attenzione-zero-test",
+  "repo": "detect",
+  "summary": "profilo senza test con allow_no_tests = true (solo sul repo detect): `no_tests_counted`",
+  "issue": 4,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/4-zero-test",
+      "sha": "6d1574c9075fb69966432514c430b4d7d7880005"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/4-zero-test",
+      "base": "main",
+      "title": "prova P4: attenzione-zero-test",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-zero-test-20261022-125948-body-tg-4-zero-test.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "success",
+        "tollgate/attention": "failure"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": null,
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/4-zero-test"
+}

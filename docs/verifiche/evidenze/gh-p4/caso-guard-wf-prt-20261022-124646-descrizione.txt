@@ -1,0 +1,4 @@
+caso: guard-wf-prt
+repo: ginz0ls/tollgate-p4-protected
+issue: #39
+attesa: guard=failure, verdict=failure, attention=* - workflow nuovo del progetto che viola guard: usa pull_request_target

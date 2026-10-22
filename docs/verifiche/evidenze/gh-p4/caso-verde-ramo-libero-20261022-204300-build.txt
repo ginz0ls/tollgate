@@ -1,0 +1,1 @@
+{"ops": 2, "branch": "prova/p4-ramo-libero-20261022-204300"}

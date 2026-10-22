@@ -1,0 +1,4 @@
+passo1	482de4f5-099a-4911-9bcd-abc2d3aa7cc7	/tmp/tollgate-p4/flow/protected
+passo2	0bae512a-c61c-49c1-8639-015b1320947e	/tmp/tollgate-p4/flow/protected/.claude/worktrees/tg-104-prova-p4-del-flusso-dividi-a-b-in-src-ca
+passo3	02a55d4b-f373-44ec-a609-780106d8fa31	/tmp/tollgate-p4/flow/protected/.claude/worktrees/tg-104-prova-p4-del-flusso-dividi-a-b-in-src-ca
+shim	83f31dcd-92cc-4a1c-8d6c-ada7d4c3d799	/tmp/tollgate-p4/flow/protected

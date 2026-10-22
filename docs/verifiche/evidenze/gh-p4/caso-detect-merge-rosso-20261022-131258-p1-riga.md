@@ -1,0 +1,1 @@
+| detect-merge-rosso | 14 | ecfa975058 | guard=success (github-actions[bot]), verdict=failure (github-actions[bot]), attention=success (github-actions[bot]) | guard=success, verdict=failure, attention=success | riuscito | |

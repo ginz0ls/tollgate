@@ -1,0 +1,6 @@
+clone: /tmp/tollgate-p4/flow/protected (b86dc8d09a7fb905abbedf71eb626169277596b5)
+stato: /tmp/tollgate-p4/flow/state
+shim: /tmp/tollgate-p4/flow/shim/gh
+gh con guardia: /tmp/tollgate-p4/flow/ghbin/gh (gh vero: /usr/bin/gh)
+plugin: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4
+issue: 104

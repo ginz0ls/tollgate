@@ -1,0 +1,1 @@
+| error-sha-superato | 68 | 091676fba9 | guard=success (github-actions[bot]), verdict=success (github-actions[bot]), attention=success (github-actions[bot]), merge=CLEAN | guard=success, verdict=success, attention=success, merge=CLEAN | riuscito | |

@@ -1,0 +1,22 @@
+# Proposta di installazione di tollgate
+
+Preparata il 2026-10-22T10:28:34.214964Z da tollgate 0.1.0. I file qui sotto sono una proposta: li copi tu, tollgate non scrive mai nel repo i propri file.
+
+## Modalità del gate
+
+Il ramo `main` non ha protezione. Modalità `protected`: `protect.sh` la attiva (ultimo passo).
+
+## I tuoi passi
+
+1. Copia il contenuto di `docs/superpowers/tollgate-init/files` nella radice del repo (per esempio `cp -R docs/superpowers/tollgate-init/files/. .`).
+2. Fai un commit sul ramo predefinito (`main`) e spingilo, prima di attivare la protezione: il commit fa partire `tollgate-base`.
+3. Quando `tollgate-base` è finito su quel commit, lancia `bash docs/superpowers/tollgate-init/protect.sh` dalla radice del repo con le tue credenziali (non quelle dell'agente). Se il commit non è la punta di `origin/main`, passa lo SHA come primo argomento.
+
+## Stima dei minuti di Actions
+
+Durata del gate non misurata: manca una ricevuta di `finish check` o `verify` per ogni comando del gate sullo stesso commit. Chiudi un lavoro con /tollgate:finish e rilancia /tollgate:init.
+Riferimento: GitHub Free include 2.000 minuti al mese per i repo privati.
+
+## Token dell'agente
+
+Per l'agente usa un token GitHub separato dal tuo, con soli permessi su contenuti, pull request e issue: senza amministrazione e senza `project`. Con il tuo token l'agente potrebbe cambiare la protezione del ramo.

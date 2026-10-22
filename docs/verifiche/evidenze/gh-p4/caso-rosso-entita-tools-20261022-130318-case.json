@@ -1,0 +1,40 @@
+{
+  "name": "rosso-entita-tools",
+  "repo": "protected",
+  "summary": "un report JUnit con un'entit\u00e0 scritto da tools/unittest_junit.py: il report \u00e8 rifiutato, il comando \u00e8 rosso",
+  "issue": 65,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/65-entita-tools",
+      "sha": "f03de8d7ff0924d871eb0fccc7cbd33a0dbfb3ce"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/65-entita-tools",
+      "base": "main",
+      "title": "prova P4: rosso-entita-tools",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-entita-tools-20261022-130318-body-tg-65-entita-tools.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "failure",
+        "tollgate/attention": "success"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/65-entita-tools"
+}

@@ -1,0 +1,1 @@
+| guard-wf-ancora | 48 | 004f6f941d | guard=failure (github-actions[bot]), verdict=failure (github-actions[bot]), attention=success (github-actions[bot]), merge=BLOCKED | guard=failure, verdict=failure, attention=*, merge=BLOCKED | riuscito | |

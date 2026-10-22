@@ -1,0 +1,1 @@
+| error-entita | 64 | 6e241b4a5d | guard=failure (github-actions[bot]), verdict=error (github-actions[bot]), attention=error (github-actions[bot]), merge=BLOCKED | guard=failure, verdict=error, attention=error, merge=BLOCKED | riuscito | |

@@ -1,0 +1,4 @@
+caso: rosso-zero-test
+repo: ginz0ls/tollgate-p4-protected
+issue: #35
+attesa: guard=success, verdict=failure, attention=success - un profilo il cui comando non esegue test, con allow_no_tests = false

@@ -1,0 +1,3 @@
+tollgate-guard.yml	39810818664	pull_request_target	failure	10000	headSha e numero della PR in pull_requests
+tollgate-run.yml	39810818794	pull_request	success	12000	headSha e numero della PR in pull_requests
+tollgate-verdict.yml	39810858674	workflow_run	success	13000	finestra del run contiene lo stato verdict (2026-10-22T16:05:10Z)

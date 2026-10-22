@@ -1,0 +1,40 @@
+{
+  "name": "detect-closes",
+  "repo": "detect",
+  "summary": "tg/N-x con \u00abCloses #M\u00bb di un'issue chiusa: `closes_mismatch`",
+  "issue": 8,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/8-detect-closes",
+      "sha": "f2708119a31daf8581ebde2b596b3ae96da2c787"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/8-detect-closes",
+      "base": "main",
+      "title": "prova P4: detect-closes",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-detect-closes-20261022-131119-body-tg-8-detect-closes.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "failure",
+        "tollgate/attention": "success"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": null,
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/8-detect-closes"
+}

@@ -1,0 +1,1 @@
+| attenzione-deroga-test | 56 | 5c84538026 | guard=success (github-actions[bot]), verdict=success (github-actions[bot]), attention=failure (github-actions[bot]), merge=UNSTABLE | guard=success, verdict=success, attention=failure, merge=CLEAN | non riuscito: mergeStateStatus: atteso CLEAN, ottenuto UNSTABLE | |

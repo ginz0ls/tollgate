@@ -1,0 +1,1 @@
+{"body":"## tollgate: merge non verificato\n\nCommit arrivati sul ramo predefinito senza una PR unita con `tollgate/guard` e `tollgate/verdict` verdi:\n\n- `b86dc8d09a7fb905abbedf71eb626169277596b5`: nessuna PR unita nel ramo predefinito contiene il commit\n\nChiudi l'issue su GitHub dopo averla letta.\n","comments":[],"number":101,"title":"tollgate: merge non verificato"}

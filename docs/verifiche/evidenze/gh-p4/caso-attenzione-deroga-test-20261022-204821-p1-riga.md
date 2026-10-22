@@ -1,0 +1,1 @@
+| attenzione-deroga-test | 100 | 88c8da6eb5 | guard=success (github-actions[bot]), verdict=success (github-actions[bot]), attention=failure (github-actions[bot]), merge=UNSTABLE | guard=success, verdict=success, attention=failure, merge=UNSTABLE | riuscito | |

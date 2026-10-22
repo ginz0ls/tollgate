@@ -1,0 +1,192 @@
+﻿2026-10-22T18:27:20.4360609Z Current runner version: '2.338.0'
+2026-10-22T18:27:20.4388553Z ##[group]Runner Image Provisioner
+2026-10-22T18:27:20.4389698Z Hosted Compute Agent
+2026-10-22T18:27:20.4390475Z Version: 20261012.601
+2026-10-22T18:27:20.4391434Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+2026-10-22T18:27:20.4392311Z Build Date: 2026-10-12T17:48:21Z
+2026-10-22T18:27:20.4393217Z Worker ID: {54299022-40d5-4411-8356-c2e8abd5c9be}
+2026-10-22T18:27:20.4394084Z Region: eastus
+2026-10-22T18:27:20.4394772Z Cloud: Azure
+2026-10-22T18:27:20.4395491Z ##[endgroup]
+2026-10-22T18:27:20.4397075Z ##[group]Operating System
+2026-10-22T18:27:20.4397929Z Ubuntu
+2026-10-22T18:27:20.4398557Z 24.04.5
+2026-10-22T18:27:20.4399244Z LTS
+2026-10-22T18:27:20.4400069Z ##[endgroup]
+2026-10-22T18:27:20.4400808Z ##[group]Runner Image
+2026-10-22T18:27:20.4401619Z Image: ubuntu-24.04
+2026-10-22T18:27:20.4402306Z Version: 20261012.334.1
+2026-10-22T18:27:20.4403944Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+2026-10-22T18:27:20.4406038Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+2026-10-22T18:27:20.4407293Z ##[endgroup]
+2026-10-22T18:27:20.4409053Z ##[group]GITHUB_TOKEN Permissions
+2026-10-22T18:27:20.4411441Z Contents: read
+2026-10-22T18:27:20.4412197Z Metadata: read
+2026-10-22T18:27:20.4413017Z PullRequests: write
+2026-10-22T18:27:20.4413719Z Statuses: write
+2026-10-22T18:27:20.4414495Z ##[endgroup]
+2026-10-22T18:27:20.4417197Z Secret source: Actions
+2026-10-22T18:27:20.4418341Z Cache mode: read
+2026-10-22T18:27:20.4419341Z Prepare workflow directory
+2026-10-22T18:27:20.4777919Z Prepare all required actions
+2026-10-22T18:27:20.4832352Z Getting action download info
+2026-10-22T18:27:20.6739187Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-22T18:27:20.8651938Z Complete job name: tollgate-guard
+2026-10-22T18:27:20.9341481Z ##[group]Run actions/checkout@v4
+2026-10-22T18:27:20.9342157Z with:
+2026-10-22T18:27:20.9342543Z   ref: main
+2026-10-22T18:27:20.9342901Z   persist-credentials: false
+2026-10-22T18:27:20.9343299Z   fetch-depth: 0
+2026-10-22T18:27:20.9343683Z   repository: ginz0ls/tollgate-p4-protected
+2026-10-22T18:27:20.9346982Z   token: ***
+2026-10-22T18:27:20.9347333Z   ssh-strict: true
+2026-10-22T18:27:20.9347695Z   ssh-user: git
+2026-10-22T18:27:20.9348031Z   clean: true
+2026-10-22T18:27:20.9348395Z   sparse-checkout-cone-mode: true
+2026-10-22T18:27:20.9348808Z   fetch-tags: false
+2026-10-22T18:27:20.9349165Z   show-progress: true
+2026-10-22T18:27:20.9349648Z   lfs: false
+2026-10-22T18:27:20.9349990Z   submodules: false
+2026-10-22T18:27:20.9350361Z   set-safe-directory: true
+2026-10-22T18:27:20.9350773Z   allow-unsafe-pr-checkout: false
+2026-10-22T18:27:20.9351344Z ##[endgroup]
+2026-10-22T18:27:21.0142843Z Syncing repository: ginz0ls/tollgate-p4-protected
+2026-10-22T18:27:21.0145156Z ##[group]Getting Git version info
+2026-10-22T18:27:21.0146232Z Working directory is '/home/runner/work/tollgate-p4-protected/tollgate-p4-protected'
+2026-10-22T18:27:21.0147808Z [command]/usr/bin/git version
+2026-10-22T18:27:21.0528114Z git version 2.55.0
+2026-10-22T18:27:21.0544305Z ##[endgroup]
+2026-10-22T18:27:21.0556888Z Temporarily overriding HOME='/home/runner/work/_temp/c484eae2-f2aa-42f4-a70d-ad495458d8a9' before making global git config changes
+2026-10-22T18:27:21.0558722Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-22T18:27:21.0561727Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate-p4-protected/tollgate-p4-protected
+2026-10-22T18:27:21.0636499Z Deleting the contents of '/home/runner/work/tollgate-p4-protected/tollgate-p4-protected'
+2026-10-22T18:27:21.0644527Z ##[group]Initializing the repository
+2026-10-22T18:27:21.0652773Z [command]/usr/bin/git init /home/runner/work/tollgate-p4-protected/tollgate-p4-protected
+2026-10-22T18:27:21.0762666Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-22T18:27:21.0764218Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-22T18:27:21.0765079Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-22T18:27:21.0766063Z hint: call:
+2026-10-22T18:27:21.0766471Z hint:
+2026-10-22T18:27:21.0766972Z hint: 	git config --global init.defaultBranch <name>
+2026-10-22T18:27:21.0767552Z hint:
+2026-10-22T18:27:21.0768091Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-22T18:27:21.0768913Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-22T18:27:21.0769708Z hint:
+2026-10-22T18:27:21.0770138Z hint: 	git branch -m <name>
+2026-10-22T18:27:21.0770602Z hint:
+2026-10-22T18:27:21.0771169Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-22T18:27:21.0776989Z Initialized empty Git repository in /home/runner/work/tollgate-p4-protected/tollgate-p4-protected/.git/
+2026-10-22T18:27:21.0785541Z [command]/usr/bin/git remote add origin https://github.com/ginz0ls/tollgate-p4-protected
+2026-10-22T18:27:21.0832189Z ##[endgroup]
+2026-10-22T18:27:21.0833373Z ##[group]Disabling automatic garbage collection
+2026-10-22T18:27:21.0836100Z [command]/usr/bin/git config --local gc.auto 0
+2026-10-22T18:27:21.1258233Z ##[endgroup]
+2026-10-22T18:27:21.1259085Z ##[group]Setting up auth
+2026-10-22T18:27:21.1263560Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-22T18:27:21.1295493Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-22T18:27:21.1718549Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-22T18:27:21.1748703Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-22T18:27:21.1939248Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-22T18:27:21.1969012Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-22T18:27:21.2157974Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-22T18:27:21.2192795Z ##[endgroup]
+2026-10-22T18:27:21.2193514Z ##[group]Fetching the repository
+2026-10-22T18:27:21.2200175Z [command]/usr/bin/git -c protocol.version=2 fetch --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+2026-10-22T18:27:21.7310774Z From https://github.com/ginz0ls/tollgate-p4-protected
+2026-10-22T18:27:21.7312023Z  * [new branch]      main                    -> origin/main
+2026-10-22T18:27:21.7313097Z  * [new branch]      other                   -> origin/other
+2026-10-22T18:27:21.7314112Z  * [new branch]      p4-v1-20261021-175542   -> origin/p4-v1-20261021-175542
+2026-10-22T18:27:21.7315268Z  * [new branch]      p4-v4-20261021-175722   -> origin/p4-v4-20261021-175722
+2026-10-22T18:27:21.7316537Z  * [new branch]      p4-v4b-20261021-182256  -> origin/p4-v4b-20261021-182256
+2026-10-22T18:27:21.7317959Z  * [new branch]      p4-v5-merge-20261021-175823 -> origin/p4-v5-merge-20261021-175823
+2026-10-22T18:27:21.7319659Z  * [new branch]      p4-v5-rebase-20261021-175823 -> origin/p4-v5-rebase-20261021-175823
+2026-10-22T18:27:21.7321133Z  * [new branch]      p4-v5-squash-20261021-175823 -> origin/p4-v5-squash-20261021-175823
+2026-10-22T18:27:21.7322564Z  * [new branch]      p4-v5b-a-20261021-175649 -> origin/p4-v5b-a-20261021-175649
+2026-10-22T18:27:21.7323916Z  * [new branch]      p4-v5b-b-20261021-175649 -> origin/p4-v5b-b-20261021-175649
+2026-10-22T18:27:21.7325771Z  * [new branch]      prova/p4-non-applicabile-20261022-130749 -> origin/prova/p4-non-applicabile-20261022-130749
+2026-10-22T18:27:21.7327961Z  * [new branch]      prova/p4-ramo-libero-20261022-123355 -> origin/prova/p4-ramo-libero-20261022-123355
+2026-10-22T18:27:21.7329750Z  * [new branch]      prova/p4-ramo-libero-20261022-174157 -> origin/prova/p4-ramo-libero-20261022-174157
+2026-10-22T18:27:21.7331192Z  * [new branch]      tg/11-pulita            -> origin/tg/11-pulita
+2026-10-22T18:27:21.7332244Z  * [new branch]      tg/17-edit              -> origin/tg/17-edit
+2026-10-22T18:27:21.7333453Z  * [new branch]      tg/19-test-tolti        -> origin/tg/19-test-tolti
+2026-10-22T18:27:21.7334312Z  * [new branch]      tg/21-skip              -> origin/tg/21-skip
+2026-10-22T18:27:21.7334974Z  * [new branch]      tg/23-fuori-scope       -> origin/tg/23-fuori-scope
+2026-10-22T18:27:21.7335678Z  * [new branch]      tg/25-base-id           -> origin/tg/25-base-id
+2026-10-22T18:27:21.7336352Z  * [new branch]      tg/27-or-true           -> origin/tg/27-or-true
+2026-10-22T18:27:21.7337026Z  * [new branch]      tg/29-livello           -> origin/tg/29-livello
+2026-10-22T18:27:21.7337710Z  * [new branch]      tg/31-l2-mancante       -> origin/tg/31-l2-mancante
+2026-10-22T18:27:21.7338405Z  * [new branch]      tg/33-deroga-altra      -> origin/tg/33-deroga-altra
+2026-10-22T18:27:21.7339081Z  * [new branch]      tg/35-zero-test         -> origin/tg/35-zero-test
+2026-10-22T18:27:21.7340036Z  * [new branch]      tg/37-piano-file        -> origin/tg/37-piano-file
+2026-10-22T18:27:21.7340923Z  * [new branch]      tg/39-guard-wf-prt      -> origin/tg/39-guard-wf-prt
+2026-10-22T18:27:21.7342064Z  * [new branch]      tg/41-guard-wf-run      -> origin/tg/41-guard-wf-run
+2026-10-22T18:27:21.7343104Z  * [new branch]      tg/43-guard-wf-statuses -> origin/tg/43-guard-wf-statuses
+2026-10-22T18:27:21.7344005Z  * [new branch]      tg/45-guard-wf-writeall -> origin/tg/45-guard-wf-writeall
+2026-10-22T18:27:21.7344968Z  * [new branch]      tg/47-guard-wf-ancora   -> origin/tg/47-guard-wf-ancora
+2026-10-22T18:27:21.7345668Z  * [new branch]      tg/49-guard-toml        -> origin/tg/49-guard-toml
+2026-10-22T18:27:21.7346353Z  * [new branch]      tg/51-guard-verdict     -> origin/tg/51-guard-verdict
+2026-10-22T18:27:21.7347039Z  * [new branch]      tg/53-workflow-ci       -> origin/tg/53-workflow-ci
+2026-10-22T18:27:21.7347710Z  * [new branch]      tg/55-deroga-test       -> origin/tg/55-deroga-test
+2026-10-22T18:27:21.7348374Z  * [new branch]      tg/57-piano-testo       -> origin/tg/57-piano-testo
+2026-10-22T18:27:21.7349019Z  * [new branch]      tg/59-tetto             -> origin/tg/59-tetto
+2026-10-22T18:27:21.7349861Z  * [new branch]      tg/61-error-dotdot      -> origin/tg/61-error-dotdot
+2026-10-22T18:27:21.7350552Z  * [new branch]      tg/63-error-entita      -> origin/tg/63-error-entita
+2026-10-22T18:27:21.7351216Z  * [new branch]      tg/65-entita-tools      -> origin/tg/65-entita-tools
+2026-10-22T18:27:21.7351916Z  * [new branch]      tg/67-sha-superato      -> origin/tg/67-sha-superato
+2026-10-22T18:27:21.7352573Z  * [new branch]      tg/69-due-pr            -> origin/tg/69-due-pr
+2026-10-22T18:27:21.7353241Z  * [new branch]      tg/69-due-pr-bis        -> origin/tg/69-due-pr-bis
+2026-10-22T18:27:21.7354038Z  * [new branch]      tg/74-token-personale   -> origin/tg/74-token-personale
+2026-10-22T18:27:21.7355250Z  * [new branch]      tg/80-edit              -> origin/tg/80-edit
+2026-10-22T18:27:21.7356481Z  * [new branch]      tg/82-workflow-ci       -> origin/tg/82-workflow-ci
+2026-10-22T18:27:21.7357753Z  * [new branch]      tg/84-deroga-test       -> origin/tg/84-deroga-test
+2026-10-22T18:27:21.7358986Z  * [new branch]      tg/86-piano-testo       -> origin/tg/86-piano-testo
+2026-10-22T18:27:21.7360388Z  * [new branch]      tg/88-tetto             -> origin/tg/88-tetto
+2026-10-22T18:27:21.7361887Z  * [new branch]      tollgate-config/p4-20261022-123258 -> origin/tollgate-config/p4-20261022-123258
+2026-10-22T18:27:21.7363667Z  * [new branch]      tollgate-config/p4-20261022-172548 -> origin/tollgate-config/p4-20261022-172548
+2026-10-22T18:27:21.7365392Z  * [new branch]      tollgate-config/p4-20261022-202647 -> origin/tollgate-config/p4-20261022-202647
+2026-10-22T18:27:21.7367409Z ##[endgroup]
+2026-10-22T18:27:21.7368040Z ##[group]Determining the checkout info
+2026-10-22T18:27:21.7368599Z [command]/usr/bin/git branch --list --remote origin/main
+2026-10-22T18:27:21.7369197Z   origin/main
+2026-10-22T18:27:21.7370500Z ##[endgroup]
+2026-10-22T18:27:21.7371048Z [command]/usr/bin/git sparse-checkout disable
+2026-10-22T18:27:21.7409146Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-22T18:27:21.7435980Z ##[group]Checking out the ref
+2026-10-22T18:27:21.7438834Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-10-22T18:27:21.7557903Z Switched to a new branch 'main'
+2026-10-22T18:27:21.7562435Z branch 'main' set up to track 'origin/main'.
+2026-10-22T18:27:21.7566990Z ##[endgroup]
+2026-10-22T18:27:21.7602128Z [command]/usr/bin/git log -1 --format=%H
+2026-10-22T18:27:21.7624345Z e75adcbadef4df7f474a209ea581b2b00ab5166c
+2026-10-22T18:27:21.7632494Z ##[group]Removing auth
+2026-10-22T18:27:21.7634958Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-22T18:27:21.7662054Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-22T18:27:21.7847194Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-22T18:27:21.7869680Z http.https://github.com/.extraheader
+2026-10-22T18:27:21.7875464Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-22T18:27:21.7905115Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-22T18:27:21.8096143Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-22T18:27:21.8130302Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-22T18:27:21.8328769Z ##[endgroup]
+2026-10-22T18:27:21.8549171Z ##[group]Run python3 .github/tollgate/bin/tollgate gate guard --event "$GITHUB_EVENT_PATH" --publish
+2026-10-22T18:27:21.8551945Z [36;1mpython3 .github/tollgate/bin/tollgate gate guard --event "$GITHUB_EVENT_PATH" --publish[0m
+2026-10-22T18:27:21.8748227Z shell: /usr/bin/bash -e {0}
+2026-10-22T18:27:21.8749288Z env:
+2026-10-22T18:27:21.8758488Z   GH_TOKEN: ***
+2026-10-22T18:27:21.8759340Z ##[endgroup]
+2026-10-22T18:27:24.6269596Z gate guard: gh api --method: unexpected end of JSON input
+2026-10-22T18:27:24.6386803Z ##[error]Process completed with exit code 1.
+2026-10-22T18:27:24.7472348Z Post job cleanup.
+2026-10-22T18:27:24.8127673Z [command]/usr/bin/git version
+2026-10-22T18:27:24.8161670Z git version 2.55.0
+2026-10-22T18:27:24.8193129Z Temporarily overriding HOME='/home/runner/work/_temp/15294691-ad10-44ca-8f51-19374217a4d2' before making global git config changes
+2026-10-22T18:27:24.8194618Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-22T18:27:24.8196895Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate-p4-protected/tollgate-p4-protected
+2026-10-22T18:27:24.8676923Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-22T18:27:24.8712839Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-22T18:27:24.8921247Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-22T18:27:24.8957096Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-22T18:27:24.9146510Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-22T18:27:24.9177026Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-22T18:27:24.9490724Z Cleaning up orphan processes
+2026-10-22T18:27:24.9792910Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

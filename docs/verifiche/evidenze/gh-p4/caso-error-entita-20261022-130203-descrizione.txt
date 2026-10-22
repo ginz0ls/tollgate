@@ -1,0 +1,4 @@
+caso: error-entita
+repo: ginz0ls/tollgate-p4-protected
+issue: #63
+attesa: guard=failure, verdict=error, attention=error - un report JUnit con un'entità XML copiato negli artefatti (la copia di gate run cambiata nel ramo)

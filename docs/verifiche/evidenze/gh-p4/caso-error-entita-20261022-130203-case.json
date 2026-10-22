@@ -1,0 +1,40 @@
+{
+  "name": "error-entita",
+  "repo": "protected",
+  "summary": "un report JUnit con un'entit\u00e0 XML copiato negli artefatti (la copia di gate run cambiata nel ramo)",
+  "issue": 63,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/63-error-entita",
+      "sha": "6e241b4a5d13ba9d20784a95e200f14cfdd80e50"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/63-error-entita",
+      "base": "main",
+      "title": "prova P4: error-entita",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-entita-20261022-130203-body-tg-63-error-entita.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "failure",
+        "tollgate/verdict": "error",
+        "tollgate/attention": "error"
+      },
+      "comments": [
+        "<!-- tollgate-guard"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/63-error-entita"
+}

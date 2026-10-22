@@ -1,0 +1,11 @@
+2026-10-22T19:19:30Z gh auth status
+2026-10-22T19:19:30Z gh api repos/ginz0ls/tollgate-p4-protected/issues/104
+2026-10-22T19:19:32Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/pulls?state=all&per_page=100 --jq .[] | {number, headRefName: .head.ref, state: (if .merged_at then "MERGED" else (.state | ascii_upcase) end), url: .html_url}
+2026-10-22T19:19:32Z gh api repos/ginz0ls/tollgate-p4-protected/commits/b86dc8d09a7fb905abbedf71eb626169277596b5/status
+2026-10-22T19:19:33Z gh api repos/ginz0ls/tollgate-p4-protected/actions/permissions
+2026-10-22T19:19:33Z gh api --include repos/ginz0ls/tollgate-p4-protected/branches/main/protection
+2026-10-22T19:22:44Z gh api repos/ginz0ls/tollgate-p4-protected/issues/104
+2026-10-22T19:23:16Z gh pr list --head tg/104-prova-p4-del-flusso-dividi-a-b-in-src-ca --state all --limit 100 --json number,state,url,headRefOid,mergedAt,isCrossRepository --repo ginz0ls/tollgate-p4-protected
+2026-10-22T19:23:17Z gh api repos/ginz0ls/tollgate-p4-protected/issues/104
+2026-10-22T19:23:20Z gh pr create --head tg/104-prova-p4-del-flusso-dividi-a-b-in-src-ca --base main --title #104 prova p4 del flusso dividi a b in src ca --body-file /tmp/tollgate-p4/flow/protected/.claude/worktrees/tg-104-prova-p4-del-flusso-dividi-a-b-in-src-ca/.tollgate-run/104/pr-body.md --repo ginz0ls/tollgate-p4-protected
+2026-10-22T19:23:23Z gh pr list --head tg/104-prova-p4-del-flusso-dividi-a-b-in-src-ca --state all --limit 100 --json number,state,url,headRefOid,mergedAt,isCrossRepository --repo ginz0ls/tollgate-p4-protected

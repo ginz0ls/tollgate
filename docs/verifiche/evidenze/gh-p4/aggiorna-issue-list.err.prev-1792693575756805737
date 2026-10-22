@@ -1,0 +1,1 @@
+ghwrap: gh issue list -R ginz0ls/tollgate-p4-protected --state open --json number,title -q .[]|[.number,.title]|@tsv: opzione non ammessa: -q

@@ -1,0 +1,4 @@
+caso: attenzione-zero-test
+repo: ginz0ls/tollgate-p4-detect
+issue: #4
+attesa: guard=success, verdict=success, attention=failure - profilo senza test con allow_no_tests = true (solo sul repo detect): `no_tests_counted`

@@ -1,0 +1,1 @@
+| token-personale | 75 | 0a24f0e7d5 | guard=success (github-actions[bot]), verdict=success (ginz0ls), attention=success (github-actions[bot]), merge=BLOCKED | guard=success, verdict=success, attention=success, merge=BLOCKED (verdict: l'ultimo stato è quello dell'utente (success), ma non vale per la protezione) | riuscito | |

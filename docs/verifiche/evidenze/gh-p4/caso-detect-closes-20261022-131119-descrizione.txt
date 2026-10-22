@@ -1,0 +1,4 @@
+caso: detect-closes
+repo: ginz0ls/tollgate-p4-detect
+issue: #8 (extra #9)
+attesa: guard=success, verdict=failure, attention=success - tg/N-x con «Closes #M» di un'issue chiusa: `closes_mismatch`

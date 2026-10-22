@@ -1,0 +1,1 @@
+criterio 34, issue di sentinel aperte dopo il primo push: 0 (atteso 0): riuscito

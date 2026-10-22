@@ -1,0 +1,40 @@
+{
+  "name": "attenzione-deroga-test",
+  "repo": "protected",
+  "summary": "un test tolto con la deroga `test` che lo elenca",
+  "issue": 99,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/99-deroga-test",
+      "sha": "88c8da6eb520198e9b2bdb98d9f503110e7e37aa"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/99-deroga-test",
+      "base": "main",
+      "title": "prova P4: attenzione-deroga-test",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-204821-body-tg-99-deroga-test.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "success",
+        "tollgate/attention": "failure"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "UNSTABLE",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/99-deroga-test"
+}

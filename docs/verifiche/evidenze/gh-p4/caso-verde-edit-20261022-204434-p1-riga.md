@@ -1,0 +1,1 @@
+| verde-edit | 96 | 0ee64e20cd | guard=success (github-actions[bot]), verdict=success (github-actions[bot]), attention=success (github-actions[bot]), commenti «<!-- tollgate-verdict»=1, merge=CLEAN | guard=success, verdict=success, attention=success, un solo commento «<!-- tollgate-verdict», merge=CLEAN | riuscito | |

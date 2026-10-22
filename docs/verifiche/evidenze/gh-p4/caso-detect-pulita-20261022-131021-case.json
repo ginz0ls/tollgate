@@ -1,0 +1,40 @@
+{
+  "name": "detect-pulita",
+  "repo": "detect",
+  "summary": "PR pulita sul repo detect: stati guard e verdict verdi",
+  "issue": 6,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/6-detect-pulita",
+      "sha": "f6274f2f3222137f2e24959a4450c5cec49d8098"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/6-detect-pulita",
+      "base": "main",
+      "title": "prova P4: detect-pulita",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-detect-pulita-20261022-131021-body-tg-6-detect-pulita.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "success",
+        "tollgate/attention": "success"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": null,
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/6-detect-pulita"
+}

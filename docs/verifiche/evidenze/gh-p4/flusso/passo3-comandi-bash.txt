@@ -1,0 +1,6 @@
+git status --short
+python3 "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate" finish check; echo "exit=$?"
+python3 "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate" review prepare; echo "exit=$?"
+cat .tollgate-run/104/final-1.diff; cat docs/superpowers/plans/2026-10-22-dividi.md; cat .tollgate-run/104/issue.md; cat src/calc.py tests/test_calc.py
+python3 "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate" review prepare; echo "exit=$?"
+python3 "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate" finish open-pr; echo "exit=$?"

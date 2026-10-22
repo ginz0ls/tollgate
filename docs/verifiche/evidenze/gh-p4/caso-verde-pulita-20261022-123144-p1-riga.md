@@ -1,0 +1,1 @@
+| verde-pulita | 12 | 6c2beed822 | guard=success (github-actions[bot]), verdict=success (github-actions[bot]), attention=success (github-actions[bot]), merge=CLEAN | guard=success, verdict=success, attention=success, merge=CLEAN | riuscito | |

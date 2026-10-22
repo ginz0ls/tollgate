@@ -1,0 +1,4 @@
+caso: attenzione-tetto-livello
+repo: ginz0ls/tollgate-p4-protected
+issue: #88
+attesa: guard=success, verdict=success, attention=failure - percorso sensibile con livello L1 e un tetto dichiarato

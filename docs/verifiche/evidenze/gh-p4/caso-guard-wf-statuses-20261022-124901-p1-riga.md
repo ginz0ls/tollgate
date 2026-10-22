@@ -1,0 +1,1 @@
+| guard-wf-statuses | 44 | 9e4786b76b | guard=failure (github-actions[bot]), verdict=failure (github-actions[bot]), attention=success (github-actions[bot]), merge=BLOCKED | guard=failure, verdict=failure, attention=*, merge=BLOCKED | riuscito | |

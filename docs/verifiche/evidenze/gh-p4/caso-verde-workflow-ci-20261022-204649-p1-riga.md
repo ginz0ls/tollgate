@@ -1,0 +1,1 @@
+| verde-workflow-ci | 98 | 12869e5039 | guard=success (github-actions[bot]), verdict=success (github-actions[bot]), attention=failure (github-actions[bot]), merge=UNSTABLE | guard=success, verdict=success, attention=failure, merge=UNSTABLE | riuscito | |

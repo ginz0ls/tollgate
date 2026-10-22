@@ -1,0 +1,29 @@
+{
+  "name": "detect-push-diretto",
+  "repo": "detect",
+  "summary": "push diretto su main: tollgate/sentinel rosso e issue",
+  "issue": 11,
+  "ops": [
+    {
+      "op": "direct",
+      "id": "p1",
+      "file": "notes/diretto-20261022-131222.md",
+      "text": "push diretto di prova"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/sentinel": "failure"
+      },
+      "comments": [],
+      "comments_once": [],
+      "merge_state": null,
+      "sentinel_issue": true,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": null
+}

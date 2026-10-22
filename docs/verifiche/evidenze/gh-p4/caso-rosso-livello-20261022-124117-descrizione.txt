@@ -1,0 +1,4 @@
+caso: rosso-livello
+repo: ginz0ls/tollgate-p4-protected
+issue: #29
+attesa: guard=success, verdict=failure, attention=success - percorso sensibile (src/auth) con livello L1 senza tetto

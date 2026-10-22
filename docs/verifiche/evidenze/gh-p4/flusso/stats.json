@@ -1,0 +1,27 @@
+{
+  "blocks": 0,
+  "finding_overrides": 0,
+  "fix_rounds": 0,
+  "needs_you": 0,
+  "off_hours": 0.0,
+  "phase_hours": {
+    "execution": 0.04,
+    "plan": 0.01,
+    "pr_open": 0.03,
+    "review": 0.01
+  },
+  "review_cycles": 1,
+  "tokens": {
+    "by_agent": {
+      "tollgate:final-reviewer": 23181,
+      "tollgate:implementer": 39401,
+      "tollgate:task-reviewer": 25049
+    },
+    "total": 87631
+  },
+  "vetoes": {
+    "by_rule": {},
+    "total": 0
+  },
+  "waivers": 0
+}

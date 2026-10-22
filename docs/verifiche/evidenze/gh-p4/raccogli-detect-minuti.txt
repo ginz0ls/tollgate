@@ -1,0 +1,6 @@
+run sul repo detect: 23
+{
+  "run": 23,
+  "run_duration_ms_totale": 352000,
+  "fatturati_ubuntu_ms": 0
+}

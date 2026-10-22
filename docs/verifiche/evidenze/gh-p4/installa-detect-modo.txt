@@ -1,0 +1,2 @@
+tollgate.toml della proposta: mode = "detect"
+protect.sh: assente

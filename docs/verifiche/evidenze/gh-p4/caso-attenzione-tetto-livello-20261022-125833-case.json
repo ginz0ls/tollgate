@@ -1,0 +1,40 @@
+{
+  "name": "attenzione-tetto-livello",
+  "repo": "protected",
+  "summary": "percorso sensibile con livello L1 e un tetto dichiarato",
+  "issue": 59,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/59-tetto",
+      "sha": "fbeee673b07d4996fbef8a33e9f91c4e8b77b047"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/59-tetto",
+      "base": "main",
+      "title": "prova P4: attenzione-tetto-livello",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-tetto-livello-20261022-125833-body-tg-59-tetto.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "success",
+        "tollgate/attention": "failure"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "CLEAN",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/59-tetto"
+}

@@ -1,0 +1,41 @@
+{
+  "name": "guard-wf-ancora",
+  "repo": "protected",
+  "summary": "workflow nuovo del progetto che viola guard: \u00e0ncora YAML",
+  "issue": 47,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/47-guard-wf-ancora",
+      "sha": "004f6f941d84b65f552c10bddc3753458c5813b5"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/47-guard-wf-ancora",
+      "base": "main",
+      "title": "prova P4: guard-wf-ancora",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-wf-ancora-20261022-125118-body-tg-47-guard-wf-ancora.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "failure",
+        "tollgate/verdict": "failure",
+        "tollgate/attention": "*"
+      },
+      "comments": [
+        "<!-- tollgate-guard",
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/47-guard-wf-ancora"
+}

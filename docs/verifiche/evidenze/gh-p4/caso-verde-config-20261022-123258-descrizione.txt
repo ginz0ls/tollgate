@@ -1,0 +1,4 @@
+caso: verde-config
+repo: ginz0ls/tollgate-p4-protected
+issue: #13
+attesa: guard=success, verdict=success, attention=failure - ramo tollgate-config/*: solo tollgate.toml cambiato, `attenzione` rosso

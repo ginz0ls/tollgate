@@ -1,0 +1,2 @@
+command -v gh
+echo "$PATH"

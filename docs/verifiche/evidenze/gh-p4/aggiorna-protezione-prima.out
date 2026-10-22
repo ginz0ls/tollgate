@@ -1,0 +1,1 @@
+{"admins":true,"checks":[{"app_id":15368,"context":"tollgate/guard"},{"app_id":15368,"context":"tollgate/verdict"}],"contexts":["tollgate/guard","tollgate/verdict"],"strict":true}

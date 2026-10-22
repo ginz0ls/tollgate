@@ -1,0 +1,4 @@
+caso: verde-ramo-libero
+repo: ginz0ls/tollgate-p4-protected
+issue: #15
+attesa: guard=success, verdict=success, attention=failure - ramo non tg/*: nessun controllo di scope e piano, `attenzione` rosso

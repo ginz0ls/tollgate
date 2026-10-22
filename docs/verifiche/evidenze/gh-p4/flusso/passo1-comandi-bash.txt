@@ -1,0 +1,6 @@
+python3 "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate" start 104 --level L1; echo "exit=$?"
+git ls-files && cat src/calc.py tests/test_calc.py && ls docs/superpowers/plans 2>/dev/null; cat tollgate.toml 2>/dev/null | head -30
+cd /tmp/tollgate-p4/flow/protected/.claude/worktrees/tg-104-prova-p4-del-flusso-dividi-a-b-in-src-ca/.github/tollgate/bin/tollgate_analysis && sed -n 1,80p testids.py; grep -n "Punti di arresto\|Must-have\|Scope\|Interfacce" plan.py | head -30
+cd /tmp/tollgate-p4/flow/protected/.claude/worktrees/tg-104-prova-p4-del-flusso-dividi-a-b-in-src-ca && sed -n 80,125p .github/tollgate/bin/tollgate_analysis/testids.py; sed -n 100,260p .github/tollgate/bin/tollgate_analysis/plan.py; git log --oneline -3; ls docs 2>/dev/null
+cd /tmp/tollgate-p4/flow/protected/.claude/worktrees/tg-104-prova-p4-del-flusso-dividi-a-b-in-src-ca && sed -n 1,99p .github/tollgate/bin/tollgate_analysis/plan.py | grep -n "re.compile\|TEST_SEP\|SKILL_CAP\|def " ; grep -n "plan\|required_sections" tollgate.toml .github/tollgate/bin/tollgate_core/config.py | head -20
+git add docs/superpowers/plans/2026-10-22-dividi.md && git commit -q -m "piano per dividi(a, b) (#104) ⏎  ⏎ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>" && git log --oneline -1

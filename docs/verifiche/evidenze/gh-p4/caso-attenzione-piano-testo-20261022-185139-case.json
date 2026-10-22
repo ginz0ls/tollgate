@@ -1,0 +1,40 @@
+{
+  "name": "attenzione-piano-testo",
+  "repo": "protected",
+  "summary": "piano cambiato solo nel testo, senza file nuovi: `plan_changed`",
+  "issue": 86,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/86-piano-testo",
+      "sha": "f0cbb4d1d58d3f2e9e4f33af1e0c9a7bbb6bf284"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/86-piano-testo",
+      "base": "main",
+      "title": "prova P4: attenzione-piano-testo",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-piano-testo-20261022-185139-body-tg-86-piano-testo.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "success",
+        "tollgate/attention": "failure"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "UNSTABLE",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/86-piano-testo"
+}

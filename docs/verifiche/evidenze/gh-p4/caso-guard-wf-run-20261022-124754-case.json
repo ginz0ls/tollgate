@@ -1,0 +1,41 @@
+{
+  "name": "guard-wf-run",
+  "repo": "protected",
+  "summary": "workflow nuovo del progetto che viola guard: usa workflow_run",
+  "issue": 41,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/41-guard-wf-run",
+      "sha": "a836ddf10ce54c659a138699e9de78dbd96cb2ef"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/41-guard-wf-run",
+      "base": "main",
+      "title": "prova P4: guard-wf-run",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-wf-run-20261022-124754-body-tg-41-guard-wf-run.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "failure",
+        "tollgate/verdict": "failure",
+        "tollgate/attention": "*"
+      },
+      "comments": [
+        "<!-- tollgate-guard",
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/41-guard-wf-run"
+}

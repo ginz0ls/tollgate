@@ -1,0 +1,4 @@
+caso: error-sha-superato
+repo: ginz0ls/tollgate-p4-protected
+issue: #67
+attesa: guard=success, verdict=success, attention=success - un secondo push mentre `tollgate-run` gira: lo SHA giudicato è superato

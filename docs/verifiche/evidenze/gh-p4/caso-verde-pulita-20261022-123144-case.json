@@ -1,0 +1,40 @@
+{
+  "name": "verde-pulita",
+  "repo": "protected",
+  "summary": "PR pulita: moltiplica con il suo test",
+  "issue": 11,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/11-pulita",
+      "sha": "6c2beed8220cc2590edf77b05aebab2d132e6f50"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/11-pulita",
+      "base": "main",
+      "title": "prova P4: verde-pulita",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-pulita-20261022-123144-body-tg-11-pulita.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "success",
+        "tollgate/attention": "success"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "CLEAN",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/11-pulita"
+}

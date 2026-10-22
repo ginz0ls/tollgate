@@ -1,0 +1,1 @@
+| error-sha-superato | 68 | 33873526d7 | guard=success (github-actions[bot]), verdict=error (github-actions[bot]), attention=error (github-actions[bot]) | guard=*, verdict=error, attention=error (verdict su A: error se la testa è già B; success se il run di A ha finito prima del push) | riuscito | |

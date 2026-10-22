@@ -1,0 +1,4 @@
+caso: rosso-piano-file-nuovo
+repo: ginz0ls/tollgate-p4-protected
+issue: #37
+attesa: guard=success, verdict=failure, attention=failure - il piano cambiato dopo la registrazione per aggiungere un file: quel file è fuori scope

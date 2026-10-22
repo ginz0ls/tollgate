@@ -1,0 +1,80 @@
+{
+  "name": "detect-merge-rosso",
+  "repo": "detect",
+  "summary": "(ultimo caso detect: degrada la base di detect, i casi detect lanciati dopo partono da una base senza test_sottrai) PR con verdict rosso unita: tollgate/sentinel rosso e issue; poi un push diretto su main: stesso esito, commento sulla stessa issue",
+  "issue": 13,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/13-detect-merge-rosso",
+      "sha": "ecfa97505820025cc0d1833db011efcbdc9451a6"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/13-detect-merge-rosso",
+      "base": "main",
+      "title": "prova P4: detect-merge-rosso",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-detect-merge-rosso-20261022-131258-body-tg-13-detect-merge-rosso.md"
+    },
+    {
+      "op": "wait",
+      "push": "p1"
+    },
+    {
+      "op": "merge",
+      "id": "p2",
+      "branch": "tg/13-detect-merge-rosso",
+      "mode": "--squash"
+    },
+    {
+      "op": "direct",
+      "id": "p3",
+      "file": "notes/diretto-20261022-131258.md",
+      "text": "push diretto di prova"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "failure",
+        "tollgate/attention": "success"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": null,
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    },
+    {
+      "push": "p2",
+      "states": {
+        "tollgate/sentinel": "failure"
+      },
+      "comments": [],
+      "comments_once": [],
+      "merge_state": null,
+      "sentinel_issue": true,
+      "sentinel_comments_min": null,
+      "note": ""
+    },
+    {
+      "push": "p3",
+      "states": {
+        "tollgate/sentinel": "failure"
+      },
+      "comments": [],
+      "comments_once": [],
+      "merge_state": null,
+      "sentinel_issue": true,
+      "sentinel_comments_min": 1,
+      "note": ""
+    }
+  ],
+  "branch": "tg/13-detect-merge-rosso"
+}

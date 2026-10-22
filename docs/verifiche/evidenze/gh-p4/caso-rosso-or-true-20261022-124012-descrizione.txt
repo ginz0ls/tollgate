@@ -1,0 +1,4 @@
+caso: rosso-or-true
+repo: ginz0ls/tollgate-p4-protected
+issue: #27
+attesa: guard=success, verdict=failure, attention=success - comando del profilo web con `|| true` e un test che fallisce

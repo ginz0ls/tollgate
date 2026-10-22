@@ -1,0 +1,4 @@
+caso: non-applicabile
+repo: ginz0ls/tollgate-p4-protected
+issue: #72
+attesa: guard=none, verdict=none, attention=none - PR verso il ramo `other`: nessuno stato tollgate/*, solo il commento

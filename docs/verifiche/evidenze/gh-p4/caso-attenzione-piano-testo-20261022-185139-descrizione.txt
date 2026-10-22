@@ -1,0 +1,4 @@
+caso: attenzione-piano-testo
+repo: ginz0ls/tollgate-p4-protected
+issue: #86
+attesa: guard=success, verdict=success, attention=failure - piano cambiato solo nel testo, senza file nuovi: `plan_changed`

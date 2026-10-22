@@ -1,0 +1,4 @@
+shim: uscita 0 (cwd /tmp/tollgate-p4/flow/protected)
+passo1: uscita 0 (cwd /tmp/tollgate-p4/flow/protected)
+passo2: uscita 0 (cwd /tmp/tollgate-p4/flow/protected/.claude/worktrees/tg-104-prova-p4-del-flusso-dividi-a-b-in-src-ca)
+passo3: uscita 0 (cwd /tmp/tollgate-p4/flow/protected/.claude/worktrees/tg-104-prova-p4-del-flusso-dividi-a-b-in-src-ca)

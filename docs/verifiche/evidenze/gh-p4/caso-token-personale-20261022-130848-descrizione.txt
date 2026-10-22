@@ -1,0 +1,4 @@
+caso: token-personale
+repo: ginz0ls/tollgate-p4-protected
+issue: #74
+attesa: guard=success, verdict=success, attention=success - lo stato tollgate/verdict pubblicato con il token personale su una PR rossa: la PR resta BLOCKED

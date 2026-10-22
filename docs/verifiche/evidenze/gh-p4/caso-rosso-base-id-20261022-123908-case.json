@@ -1,0 +1,40 @@
+{
+  "name": "rosso-base-id",
+  "repo": "protected",
+  "summary": "la classe dei test rinominata: gli identificativi della base non ci sono",
+  "issue": 25,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/25-base-id",
+      "sha": "c63514981ba2749809bd9d9adf08d67635b84054"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/25-base-id",
+      "base": "main",
+      "title": "prova P4: rosso-base-id",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-base-id-20261022-123908-body-tg-25-base-id.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "failure",
+        "tollgate/attention": "success"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/25-base-id"
+}

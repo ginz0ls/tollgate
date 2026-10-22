@@ -1,0 +1,1 @@
+{"body":"\u003c!-- tollgate-verdict sha=5c845380262eae7cf9c12f84cabf392b17f5a9c7 --\u003e\n\n## tollgate: verdetto sullo SHA `5c845380262eae7cf9c12f84cabf392b17f5a9c7`\n\n### Da leggere\n\n- deroga w-55-1 (test)\n\n```\ntests/test_calc.py\nprova del gate\ncaso di prova\nnessuno\n```\n","id":6339050523,"user":"github-actions[bot]"}

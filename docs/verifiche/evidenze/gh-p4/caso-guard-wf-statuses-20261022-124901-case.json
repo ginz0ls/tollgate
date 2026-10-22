@@ -1,0 +1,41 @@
+{
+  "name": "guard-wf-statuses",
+  "repo": "protected",
+  "summary": "workflow nuovo del progetto che viola guard: statuses: write",
+  "issue": 43,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/43-guard-wf-statuses",
+      "sha": "9e4786b76b5f2ee929679caa4c426295a73e473a"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/43-guard-wf-statuses",
+      "base": "main",
+      "title": "prova P4: guard-wf-statuses",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-wf-statuses-20261022-124901-body-tg-43-guard-wf-statuses.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "failure",
+        "tollgate/verdict": "failure",
+        "tollgate/attention": "*"
+      },
+      "comments": [
+        "<!-- tollgate-guard",
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/43-guard-wf-statuses"
+}

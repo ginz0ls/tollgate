@@ -1,0 +1,40 @@
+{
+  "name": "error-dotdot",
+  "repo": "protected",
+  "summary": "un report di results.json con `..`: il ramo cambia la copia di gate run installata in .github/tollgate",
+  "issue": 61,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/61-error-dotdot",
+      "sha": "960b2a35817e242637187ecd088ddcabb99b6c27"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/61-error-dotdot",
+      "base": "main",
+      "title": "prova P4: error-dotdot",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-dotdot-20261022-130050-body-tg-61-error-dotdot.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "failure",
+        "tollgate/verdict": "error",
+        "tollgate/attention": "error"
+      },
+      "comments": [
+        "<!-- tollgate-guard"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/61-error-dotdot"
+}

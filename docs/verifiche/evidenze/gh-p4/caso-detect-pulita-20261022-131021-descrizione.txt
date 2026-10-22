@@ -1,0 +1,4 @@
+caso: detect-pulita
+repo: ginz0ls/tollgate-p4-detect
+issue: #6
+attesa: guard=success, verdict=success, attention=success - PR pulita sul repo detect: stati guard e verdict verdi

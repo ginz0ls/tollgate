@@ -1,0 +1,4 @@
+caso: attenzione-deroga-test
+repo: ginz0ls/tollgate-p4-protected
+issue: #99
+attesa: guard=success, verdict=success, attention=failure - un test tolto con la deroga `test` che lo elenca

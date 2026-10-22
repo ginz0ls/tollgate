@@ -1,0 +1,1 @@
+| rosso-piano-file-nuovo | 38 | 95cb780b3b | guard=success (github-actions[bot]), verdict=failure (github-actions[bot]), attention=failure (github-actions[bot]), merge=BLOCKED | guard=success, verdict=failure, attention=failure, merge=BLOCKED | riuscito | |

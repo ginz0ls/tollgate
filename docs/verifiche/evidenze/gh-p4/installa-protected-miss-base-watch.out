@@ -1,0 +1,115 @@
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* main tollgate-base · 39763379664
+Triggered via push less than a minute ago
+
+JOBS
+✓ ids in 8s (ID 119772786220)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ albero del commit
+  ✓ Run actions/cache/restore@v4
+  ✓ gate base-ids
+  ✓ Run actions/cache/save@v4
+  ✓ Run actions/upload-artifact@v4
+  ✓ Post Run actions/checkout@v4
+  ✓ Complete job
+* tollgate-base (ID 119772857907)
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/cache/save@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+ids: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+ids: .github#1
+
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* main tollgate-base · 39763379664
+Triggered via push less than a minute ago
+
+JOBS
+✓ ids in 8s (ID 119772786220)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ albero del commit
+  ✓ Run actions/cache/restore@v4
+  ✓ gate base-ids
+  ✓ Run actions/cache/save@v4
+  ✓ Run actions/upload-artifact@v4
+  ✓ Post Run actions/checkout@v4
+  ✓ Complete job
+* tollgate-base (ID 119772857907)
+  ✓ Set up job
+  * Run actions/checkout@v4
+  * Run actions/download-artifact@v4
+  * gate base-publish
+  * Post Run actions/checkout@v4
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/cache/save@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+ids: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+ids: .github#1
+
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* main tollgate-base · 39763379664
+Triggered via push less than a minute ago
+
+JOBS
+✓ ids in 8s (ID 119772786220)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ albero del commit
+  ✓ Run actions/cache/restore@v4
+  ✓ gate base-ids
+  ✓ Run actions/cache/save@v4
+  ✓ Run actions/upload-artifact@v4
+  ✓ Post Run actions/checkout@v4
+  ✓ Complete job
+* tollgate-base (ID 119772857907)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run actions/download-artifact@v4
+  ✓ gate base-publish
+  ✓ Post Run actions/checkout@v4
+  ✓ Complete job
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/cache/save@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+ids: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+ids: .github#1
+
+✓ main tollgate-base · 39763379664
+Triggered via push less than a minute ago
+
+JOBS
+✓ ids in 8s (ID 119772786220)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ albero del commit
+  ✓ Run actions/cache/restore@v4
+  ✓ gate base-ids
+  ✓ Run actions/cache/save@v4
+  ✓ Run actions/upload-artifact@v4
+  ✓ Post Run actions/checkout@v4
+  ✓ Complete job
+✓ tollgate-base in 6s (ID 119772857907)
+  ✓ Set up job
+  ✓ Run actions/checkout@v4
+  ✓ Run actions/download-artifact@v4
+  ✓ gate base-publish
+  ✓ Post Run actions/checkout@v4
+  ✓ Complete job
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/cache/save@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+ids: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+ids: .github#1
+

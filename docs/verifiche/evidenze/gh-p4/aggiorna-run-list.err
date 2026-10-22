@@ -1,0 +1,1 @@
+ghwrap: gh run list -R ginz0ls/tollgate-p4-protected -L 6 --json workflowName,status,conclusion,headSha: opzione non ammessa: -L

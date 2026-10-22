@@ -1,0 +1,4 @@
+caso: verde-pulita
+repo: ginz0ls/tollgate-p4-protected
+issue: #11
+attesa: guard=success, verdict=success, attention=success - PR pulita: moltiplica con il suo test

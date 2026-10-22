@@ -1,0 +1,47 @@
+{
+  "name": "non-applicabile",
+  "repo": "protected",
+  "summary": "PR verso il ramo `other`: nessuno stato tollgate/*, solo il commento",
+  "issue": 72,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p0",
+      "branch": "other",
+      "sha": "166d7280d480dcda5114a8f076bd69e1e48eca7f"
+    },
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "prova/p4-non-applicabile-20261022-130749",
+      "sha": "09030223e74db3f5e7deba3514ab1b6794fee352"
+    },
+    {
+      "op": "pr",
+      "branch": "prova/p4-non-applicabile-20261022-130749",
+      "base": "other",
+      "title": "prova P4: non-applicabile",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-non-applicabile-20261022-130749-body-prova-p4-non-applicabile-20261022-130749.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "none",
+        "tollgate/verdict": "none",
+        "tollgate/attention": "none"
+      },
+      "comments": [
+        "<!-- tollgate-guard",
+        "<!-- tollgate-na"
+      ],
+      "comments_once": [],
+      "merge_state": null,
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "prova/p4-non-applicabile-20261022-130749"
+}

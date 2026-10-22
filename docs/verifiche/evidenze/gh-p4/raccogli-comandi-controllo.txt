@@ -1,0 +1,22 @@
+comandi gh controllati: 1397 (escluse 9 righe annotate «(controller...)»)
+     5  gh --version
+   795  gh api
+     4  gh auth status
+    58  gh issue close
+    54  gh issue create
+    19  gh issue list
+     9  gh issue view
+    53  gh pr close
+     1  gh pr comment
+    59  gh pr create
+     1  gh pr edit
+    13  gh pr list
+     4  gh pr merge
+    95  gh pr view
+     3  gh repo clone
+     2  gh repo create
+    12  gh run download
+    23  gh run list
+    18  gh run view
+   169  gh run watch
+VIOLAZIONE (repo clone: la cartella deve stare sotto P4_WORK): repo clone ginz0ls/tollgate-p4-protected /tmp/tollgate-p4/flow/protected -- -q

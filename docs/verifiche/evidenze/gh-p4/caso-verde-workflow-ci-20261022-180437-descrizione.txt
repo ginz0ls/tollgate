@@ -1,0 +1,4 @@
+caso: verde-workflow-ci
+repo: ginz0ls/tollgate-p4-protected
+issue: #82
+attesa: guard=success, verdict=success, attention=failure - workflow ci.yml modificato (contents: read) con la deroga `ci`: `attenzione` rosso

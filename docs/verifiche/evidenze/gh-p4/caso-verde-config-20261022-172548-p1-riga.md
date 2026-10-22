@@ -1,0 +1,1 @@
+| verde-config | 77 | 3ccec30b2a | guard=none, verdict=success (github-actions[bot]), attention=failure (github-actions[bot]), merge=BLOCKED | guard=success, verdict=success, attention=failure, merge=UNSTABLE | non riuscito: tollgate/guard: atteso success, ottenuto none; mergeStateStatus: atteso UNSTABLE, ottenuto BLOCKED | |

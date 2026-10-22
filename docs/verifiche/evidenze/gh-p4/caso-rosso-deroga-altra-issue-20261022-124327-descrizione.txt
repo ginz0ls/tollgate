@@ -1,0 +1,4 @@
+caso: rosso-deroga-altra-issue
+repo: ginz0ls/tollgate-p4-protected
+issue: #33
+attesa: guard=success, verdict=failure, attention=success - un test tolto con la deroga nel file di un'altra issue (non vale)

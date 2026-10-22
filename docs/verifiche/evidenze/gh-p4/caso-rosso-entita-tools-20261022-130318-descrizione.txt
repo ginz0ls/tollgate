@@ -1,0 +1,4 @@
+caso: rosso-entita-tools
+repo: ginz0ls/tollgate-p4-protected
+issue: #65
+attesa: guard=success, verdict=failure, attention=success - un report JUnit con un'entità scritto da tools/unittest_junit.py: il report è rifiutato, il comando è rosso

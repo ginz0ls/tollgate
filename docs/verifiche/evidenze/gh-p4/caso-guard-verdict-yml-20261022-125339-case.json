@@ -1,0 +1,41 @@
+{
+  "name": "guard-verdict-yml",
+  "repo": "protected",
+  "summary": "tollgate-verdict.yml modificato in una PR di lavoro",
+  "issue": 51,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/51-guard-verdict",
+      "sha": "d906c73b2311a4ab13edb0bff4fddf788c634ecb"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/51-guard-verdict",
+      "base": "main",
+      "title": "prova P4: guard-verdict-yml",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-verdict-yml-20261022-125339-body-tg-51-guard-verdict.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "failure",
+        "tollgate/verdict": "failure",
+        "tollgate/attention": "*"
+      },
+      "comments": [
+        "<!-- tollgate-guard",
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/51-guard-verdict"
+}

@@ -1,0 +1,1 @@
+| verde-config | 103 | 343a8275ea | guard=success (github-actions[bot]), verdict=success (github-actions[bot]), attention=failure (github-actions[bot]), merge=UNSTABLE | guard=success, verdict=success, attention=failure, merge=UNSTABLE | riuscito | |

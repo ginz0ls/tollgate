@@ -1,0 +1,64 @@
+{
+  "name": "error-sha-superato",
+  "repo": "protected",
+  "summary": "un secondo push mentre `tollgate-run` gira: lo SHA giudicato \u00e8 superato",
+  "issue": 67,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/67-sha-superato",
+      "sha": "33873526d72590ddb442c2a8d064ddcb3053314d"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/67-sha-superato",
+      "base": "main",
+      "title": "prova P4: error-sha-superato",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-sha-superato-20261022-130434-body-tg-67-sha-superato.md"
+    },
+    {
+      "op": "sleep",
+      "s": 15
+    },
+    {
+      "op": "push",
+      "id": "p2",
+      "branch": "tg/67-sha-superato",
+      "sha": "091676fba9ed7aaf9ae8d7e77c46f71a141faa7a"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "*",
+        "tollgate/verdict": "error",
+        "tollgate/attention": "error"
+      },
+      "comments": [],
+      "comments_once": [],
+      "merge_state": null,
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": "verdict su A: error se la testa \u00e8 gi\u00e0 B; success se il run di A ha finito prima del push"
+    },
+    {
+      "push": "p2",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "success",
+        "tollgate/attention": "success"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "CLEAN",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/67-sha-superato"
+}

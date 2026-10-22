@@ -1,0 +1,40 @@
+{
+  "name": "verde-workflow-ci",
+  "repo": "protected",
+  "summary": "workflow ci.yml modificato (contents: read) con la deroga `ci`: `attenzione` rosso",
+  "issue": 82,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/82-workflow-ci",
+      "sha": "740580dd44a54815274bfeb2b80951d84c1c7873"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/82-workflow-ci",
+      "base": "main",
+      "title": "prova P4: verde-workflow-ci",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-180437-body-tg-82-workflow-ci.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "success",
+        "tollgate/attention": "failure"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "UNSTABLE",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/82-workflow-ci"
+}

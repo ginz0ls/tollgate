@@ -1,0 +1,40 @@
+{
+  "name": "verde-config",
+  "repo": "protected",
+  "summary": "ramo tollgate-config/*: solo tollgate.toml cambiato, `attenzione` rosso",
+  "issue": 76,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tollgate-config/p4-20261022-172548",
+      "sha": "3ccec30b2a6b944c5532cae77bd5b01600443839"
+    },
+    {
+      "op": "pr",
+      "branch": "tollgate-config/p4-20261022-172548",
+      "base": "main",
+      "title": "prova P4: verde-config",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-172548-body-tollgate-config-p4-20261022-172548.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "success",
+        "tollgate/attention": "failure"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "UNSTABLE",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tollgate-config/p4-20261022-172548"
+}

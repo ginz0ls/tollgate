@@ -1,0 +1,2 @@
+tollgate.toml della proposta: mode = "protected"
+protect.sh: presente

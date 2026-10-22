@@ -1,0 +1,3 @@
+veto: 0
+effect_requested: 0
+effect_executed: 0

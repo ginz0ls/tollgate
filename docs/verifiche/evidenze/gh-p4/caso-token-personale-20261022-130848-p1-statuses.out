@@ -1,0 +1,4 @@
+{"context":"tollgate/verdict","created_at":"2026-10-22T11:09:38Z","creator":"ginz0ls","description":"prova-token-personale-p4","state":"success"}
+{"context":"tollgate/attention","created_at":"2026-10-22T11:09:32Z","creator":"github-actions[bot]","description":"nessuna voce da leggere","state":"success"}
+{"context":"tollgate/verdict","created_at":"2026-10-22T11:09:31Z","creator":"github-actions[bot]","description":"2 voci da correggere: vedi il commento","state":"failure"}
+{"context":"tollgate/guard","created_at":"2026-10-22T11:09:08Z","creator":"github-actions[bot]","description":"file di tollgate e workflow del progetto in regola","state":"success"}

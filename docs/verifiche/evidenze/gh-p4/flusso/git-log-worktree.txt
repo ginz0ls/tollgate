@@ -1,0 +1,18 @@
+19369c2 aggiungi dividi(a, b) in src/calc.py
+0780dec piano per dividi(a, b) (#104)
+b86dc8d aggiorna tollgate: ritentativi delle scritture idempotenti (P4, giro 5)
+e75adcb aggiorna tollgate: letture di gh api ritentate sui 5xx (P4, giro 4)
+166d728 commit vuoto: stesso albero, hit della cache (P4)
+0eebf77 installa tollgate (P4)
+25670ec progetto di prova del gate (tollgate P4)
+a0c1e5f togli i workflow sonda (tollgate P4)
+32fb324 sonda 20261021-182256
+a51eeeb sonde tollgate P4: workflow delle verifiche
+cea7a38 sonda v5 push diretto 20261021-175823
+5eb103d sonda v5-rebase
+513f61b sonda v5-squash (#6)
+76d561a Merge pull request #5 from ginz0ls/p4-v5-merge-20261021-175823
+0fbc78d sonda v5-merge
+c03b433 sonda v4 push 20261021-175722
+e28b159 sonde tollgate P4: workflow delle verifiche
+d4f93aa Initial commit

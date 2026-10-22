@@ -1,0 +1,40 @@
+{
+  "name": "rosso-piano-file-nuovo",
+  "repo": "protected",
+  "summary": "il piano cambiato dopo la registrazione per aggiungere un file: quel file \u00e8 fuori scope",
+  "issue": 37,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/37-piano-file",
+      "sha": "95cb780b3bbd9cae6682086f13a0a2bac2befedc"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/37-piano-file",
+      "base": "main",
+      "title": "prova P4: rosso-piano-file-nuovo",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-piano-file-nuovo-20261022-124539-body-tg-37-piano-file.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "failure",
+        "tollgate/attention": "failure"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/37-piano-file"
+}

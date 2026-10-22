@@ -1,0 +1,4 @@
+caso: guard-wf-ancora
+repo: ginz0ls/tollgate-p4-protected
+issue: #47
+attesa: guard=failure, verdict=failure, attention=* - workflow nuovo del progetto che viola guard: àncora YAML

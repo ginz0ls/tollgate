@@ -1,0 +1,4 @@
+caso: guard-wf-writeall
+repo: ginz0ls/tollgate-p4-protected
+issue: #45
+attesa: guard=failure, verdict=failure, attention=* - workflow nuovo del progetto che viola guard: permissions: write-all

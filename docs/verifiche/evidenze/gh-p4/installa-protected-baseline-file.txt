@@ -1,0 +1,14 @@
+.github/workflows/ci.yml
+.gitignore
+notes/README.md
+src/__init__.py
+src/calc.py
+tests/__init__.py
+tests/test_calc.py
+tollgate.toml
+tools/empty_junit.py
+tools/unittest_junit.py
+web/__init__.py
+web/page.py
+web/tests/__init__.py
+web/tests/test_page.py

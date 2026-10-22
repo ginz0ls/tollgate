@@ -1,0 +1,6 @@
+{"context":"tollgate/attention","created_at":"2026-10-22T11:06:54Z","creator":"github-actions[bot]","description":"non calcolato: vedi tollgate/verdict","state":"error"}
+{"context":"tollgate/verdict","created_at":"2026-10-22T11:06:53Z","creator":"github-actions[bot]","description":"errore nel calcolo del gate: SHA condiviso da più PR: chiudine una","state":"error"}
+{"context":"tollgate/attention","created_at":"2026-10-22T11:06:53Z","creator":"github-actions[bot]","description":"non calcolato: vedi tollgate/verdict","state":"error"}
+{"context":"tollgate/verdict","created_at":"2026-10-22T11:06:52Z","creator":"github-actions[bot]","description":"errore nel calcolo del gate: SHA condiviso da più PR: chiudine una","state":"error"}
+{"context":"tollgate/guard","created_at":"2026-10-22T11:06:40Z","creator":"github-actions[bot]","description":"SHA condiviso da più PR: chiudine una","state":"error"}
+{"context":"tollgate/guard","created_at":"2026-10-22T11:06:36Z","creator":"github-actions[bot]","description":"SHA condiviso da più PR: chiudine una","state":"error"}

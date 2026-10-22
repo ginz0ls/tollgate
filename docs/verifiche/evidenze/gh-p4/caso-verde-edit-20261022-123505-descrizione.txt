@@ -1,0 +1,4 @@
+caso: verde-edit
+repo: ginz0ls/tollgate-p4-protected
+issue: #17
+attesa: guard=success, verdict=success, attention=success - PR pulita, poi il corpo modificato (`edited`): il commento del verdetto si aggiorna con PATCH, non si duplica

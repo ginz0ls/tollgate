@@ -1,0 +1,1 @@
+| attenzione-tetto-livello | 60 | fbeee673b0 | guard=success (github-actions[bot]), verdict=success (github-actions[bot]), attention=failure (github-actions[bot]), merge=UNSTABLE | guard=success, verdict=success, attention=failure, merge=CLEAN | non riuscito: mergeStateStatus: atteso CLEAN, ottenuto UNSTABLE | |

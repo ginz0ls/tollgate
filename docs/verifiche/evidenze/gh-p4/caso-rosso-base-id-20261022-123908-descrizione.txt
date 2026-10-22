@@ -1,0 +1,4 @@
+caso: rosso-base-id
+repo: ginz0ls/tollgate-p4-protected
+issue: #25
+attesa: guard=success, verdict=failure, attention=success - la classe dei test rinominata: gli identificativi della base non ci sono

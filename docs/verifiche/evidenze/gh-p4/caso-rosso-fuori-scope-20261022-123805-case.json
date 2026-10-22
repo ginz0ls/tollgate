@@ -1,0 +1,40 @@
+{
+  "name": "rosso-fuori-scope",
+  "repo": "protected",
+  "summary": "un file non elencato nel piano",
+  "issue": 23,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/23-fuori-scope",
+      "sha": "070a520be27c15efce2f78c5b8a7db835288cacd"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/23-fuori-scope",
+      "base": "main",
+      "title": "prova P4: rosso-fuori-scope",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-fuori-scope-20261022-123805-body-tg-23-fuori-scope.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "failure",
+        "tollgate/attention": "success"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/23-fuori-scope"
+}

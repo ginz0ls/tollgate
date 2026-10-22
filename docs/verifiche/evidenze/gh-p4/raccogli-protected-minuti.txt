@@ -1,0 +1,6 @@
+run sul repo protected: 190
+{
+  "run": 190,
+  "run_duration_ms_totale": 3693000,
+  "fatturati_ubuntu_ms": 0
+}

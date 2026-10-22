@@ -1,0 +1,40 @@
+{
+  "name": "rosso-test-tolti",
+  "repo": "protected",
+  "summary": "un test della base tolto dal file di test",
+  "issue": 19,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/19-test-tolti",
+      "sha": "726479fbed610076ce09a427b96753e33b4b123c"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/19-test-tolti",
+      "base": "main",
+      "title": "prova P4: rosso-test-tolti",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-test-tolti-20261022-123545-body-tg-19-test-tolti.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "failure",
+        "tollgate/attention": "success"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/19-test-tolti"
+}

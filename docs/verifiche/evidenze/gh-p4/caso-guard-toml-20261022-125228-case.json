@@ -1,0 +1,41 @@
+{
+  "name": "guard-toml",
+  "repo": "protected",
+  "summary": "tollgate.toml cambiato in una PR di lavoro",
+  "issue": 49,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/49-guard-toml",
+      "sha": "c9311bbbec14bd763f3cb1d5defafc0e0ca5143e"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/49-guard-toml",
+      "base": "main",
+      "title": "prova P4: guard-toml",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-toml-20261022-125228-body-tg-49-guard-toml.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "failure",
+        "tollgate/verdict": "success",
+        "tollgate/attention": "*"
+      },
+      "comments": [
+        "<!-- tollgate-guard",
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/49-guard-toml"
+}

@@ -1,0 +1,4 @@
+comando: command -v gh
+uscita del tool: /tmp/tollgate-p4/flow/shim/gh
+shim atteso: /tmp/tollgate-p4/flow/shim/gh
+uguali: sì

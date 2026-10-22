@@ -1,0 +1,4 @@
+caso: guard-verdict-yml
+repo: ginz0ls/tollgate-p4-protected
+issue: #51
+attesa: guard=failure, verdict=failure, attention=* - tollgate-verdict.yml modificato in una PR di lavoro

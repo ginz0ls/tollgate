@@ -1,0 +1,4 @@
+caso: rosso-fuori-scope
+repo: ginz0ls/tollgate-p4-protected
+issue: #23
+attesa: guard=success, verdict=failure, attention=success - un file non elencato nel piano

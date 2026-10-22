@@ -1,0 +1,1 @@
+| attenzione-zero-test | 5 | 6d1574c907 | guard=success (github-actions[bot]), verdict=success (github-actions[bot]), attention=failure (github-actions[bot]) | guard=success, verdict=success, attention=failure | riuscito | |

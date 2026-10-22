@@ -1,0 +1,40 @@
+{
+  "name": "rosso-or-true",
+  "repo": "protected",
+  "summary": "comando del profilo web con `|| true` e un test che fallisce",
+  "issue": 27,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/27-or-true",
+      "sha": "eb61caf2e22c19d05a5389a684a9112320f0b0ff"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/27-or-true",
+      "base": "main",
+      "title": "prova P4: rosso-or-true",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-or-true-20261022-124012-body-tg-27-or-true.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "failure",
+        "tollgate/attention": "success"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/27-or-true"
+}

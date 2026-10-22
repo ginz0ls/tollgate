@@ -1,0 +1,1 @@
+| detect-pulita | 7 | f6274f2f32 | guard=success (github-actions[bot]), verdict=success (github-actions[bot]), attention=success (github-actions[bot]) | guard=success, verdict=success, attention=success | riuscito | |

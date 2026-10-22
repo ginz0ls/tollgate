@@ -1,0 +1,48 @@
+{
+  "name": "token-personale",
+  "repo": "protected",
+  "summary": "lo stato tollgate/verdict pubblicato con il token personale su una PR rossa: la PR resta BLOCKED",
+  "issue": 74,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/74-token-personale",
+      "sha": "0a24f0e7d5fe557fca4063aba64f0ce618c78d99"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/74-token-personale",
+      "base": "main",
+      "title": "prova P4: token-personale",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-token-personale-20261022-130848-body-tg-74-token-personale.md"
+    },
+    {
+      "op": "wait",
+      "push": "p1"
+    },
+    {
+      "op": "post_status",
+      "push": "p1",
+      "context": "tollgate/verdict",
+      "state": "success"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "success",
+        "tollgate/attention": "success"
+      },
+      "comments": [],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": "verdict: l'ultimo stato \u00e8 quello dell'utente (success), ma non vale per la protezione"
+    }
+  ],
+  "branch": "tg/74-token-personale"
+}

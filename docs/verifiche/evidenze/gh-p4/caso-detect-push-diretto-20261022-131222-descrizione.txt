@@ -1,0 +1,4 @@
+caso: detect-push-diretto
+repo: ginz0ls/tollgate-p4-detect
+issue: #11
+attesa: sentinel=failure - push diretto su main: tollgate/sentinel rosso e issue

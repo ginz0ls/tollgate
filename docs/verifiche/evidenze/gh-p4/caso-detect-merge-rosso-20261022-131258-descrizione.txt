@@ -1,0 +1,4 @@
+caso: detect-merge-rosso
+repo: ginz0ls/tollgate-p4-detect
+issue: #13
+attesa: sentinel=failure - (ultimo caso detect: degrada la base di detect, i casi detect lanciati dopo partono da una base senza test_sottrai) PR con verdict rosso unita: tollgate/sentinel rosso e issue; poi un push diretto su main: stesso esito, commento sulla stessa issue

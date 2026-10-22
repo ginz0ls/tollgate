@@ -1,0 +1,8 @@
+PR #105, ramo tg/104-prova-p4-del-flusso-dividi-a-b-in-src-ca, testa 19369c22f36d394cd9f6a7bbe90f71ba44a4b371 (issue #104)
+atteso: tollgate/guard success, tollgate/verdict success, commento del bot con il marcatore e lo SHA della testa
+ottenuto:
+  tollgate/attention = success (github-actions[bot])
+  tollgate/guard = success (github-actions[bot])
+  tollgate/verdict = success (github-actions[bot])
+  commenti del bot con il marcatore e lo SHA: 1
+esito: riuscito

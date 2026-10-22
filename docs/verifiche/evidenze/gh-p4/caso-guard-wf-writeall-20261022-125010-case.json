@@ -1,0 +1,41 @@
+{
+  "name": "guard-wf-writeall",
+  "repo": "protected",
+  "summary": "workflow nuovo del progetto che viola guard: permissions: write-all",
+  "issue": 45,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/45-guard-wf-writeall",
+      "sha": "9489a0b1dd691b5b3c297bdbcff49d12fc13e874"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/45-guard-wf-writeall",
+      "base": "main",
+      "title": "prova P4: guard-wf-writeall",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-wf-writeall-20261022-125010-body-tg-45-guard-wf-writeall.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "failure",
+        "tollgate/verdict": "failure",
+        "tollgate/attention": "*"
+      },
+      "comments": [
+        "<!-- tollgate-guard",
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": "BLOCKED",
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/45-guard-wf-writeall"
+}

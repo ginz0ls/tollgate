@@ -1,0 +1,1 @@
+| rosso-deroga-altra-issue | 34 | 5f1a180034 | guard=success (github-actions[bot]), verdict=failure (github-actions[bot]), attention=success (github-actions[bot]), merge=BLOCKED | guard=success, verdict=failure, attention=success, merge=BLOCKED | riuscito | |

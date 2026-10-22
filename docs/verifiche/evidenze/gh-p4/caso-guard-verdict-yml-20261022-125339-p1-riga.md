@@ -1,0 +1,1 @@
+| guard-verdict-yml | 52 | d906c73b23 | guard=failure (github-actions[bot]), verdict=failure (github-actions[bot]), attention=success (github-actions[bot]), merge=BLOCKED | guard=failure, verdict=failure, attention=*, merge=BLOCKED | riuscito | |
