@@ -164,6 +164,17 @@ class CommandsTest(LabCase):
                 self.assertEqual(keys(ev.red, "commands"), ["command_red"])
                 self.assertIn(name, ev.red[0].text)
 
+    def test_setup_uncounted_is_neither_red_nor_missing(self):
+        lab = GateLab(toml=PROFILE_TOML)
+        self.addCleanup(lab.close)
+        for name in ("setup", "profile:web:setup"):
+            with self.subTest(name):
+                commands = lab.inputs().commands + [CommandResult(name, "uncounted", 0, None,
+                                                                  None)]
+                ev = evaluate(lab.inputs(commands=commands))
+                self.assertEqual((ev.red, ev.errors), ([], []))
+                self.assertEqual(ev.verdict_state, "success")
+
     def test_artifact_names_never_reach_item_text(self):
         hostile = "profile:inventato:setup"
         for name in (hostile, "evil:setup", "`@x` setup"):

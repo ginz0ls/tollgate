@@ -17,6 +17,13 @@ Dati (JSON):
 stato `HTTP/2.0 403 Forbidden` terminata da `\n`, le intestazioni terminate da `\r\n`, una riga
 vuota `\r\n`, il corpo JSON senza a capo finale; con codice >= 400 esce con 1 e su stderr
 `gh: <message> (HTTP <codice>)`. Senza `--include` il corpo è il solo stdout.
+Scritture (REST, `--method POST|PATCH`): `repos/o/r/statuses/<sha>` (corpo da `--input`) si
+accoda in testa a `commit_statuses[<sha>]` con `creator.login = "github-actions[bot]"`; i commenti
+(`-F body=@<file>`) si accodano a `comments` della PR o dell'issue (`POST issues/<n>/comments`) o
+si riscrivono (`PATCH issues/comments/<id>`); `POST repos/o/r/issues` accoda a `open_issues`.
+Letture: `commits/<sha>/statuses` (da `commit_statuses`, vuoto se manca), `commits/<sha>/pulls`
+(da `commit_pulls`, vuoto se manca) e `issues?state=open` (da `open_issues`), un valore per riga; il `--jq` non
+si valuta: i dati hanno già la forma che il filtro produce.
 `prs[].comments` si leggono con `pr view --json comments` come li dà GraphQL
 (`author.login = "github-actions"`) e con `api repos/o/r/issues/<n>/comments` come li dà REST
 (`user.login = "github-actions[bot]"`, `user.type = "Bot"`); il `--jq` non si valuta.
@@ -37,6 +44,12 @@ import sys
 _COMMITS_STATUS = re.compile(r"^repos/[^/]+/[^/]+/commits/([^/]+)/status$")
 _ISSUE_REST = re.compile(r"^repos/[^/]+/[^/]+/issues/(\d+)$")
 _PR_COMMENTS = re.compile(r"^repos/[^/]+/[^/]+/issues/(\d+)/comments(\?.*)?$")
+_STATUS_POST = re.compile(r"^repos/[^/]+/[^/]+/statuses/([0-9a-f]{40})$")
+_STATUS_LIST = re.compile(r"^repos/[^/]+/[^/]+/commits/([0-9a-f]{40})/statuses(\?.*)?$")
+_COMMIT_PULLS = re.compile(r"^repos/[^/]+/[^/]+/commits/([0-9a-f]{40})/pulls(\?.*)?$")
+_ISSUES_OPEN = re.compile(r"^repos/[^/]+/[^/]+/issues\?.*state=open")
+_ISSUES_NEW = re.compile(r"^repos/[^/]+/[^/]+/issues$")
+_COMMENT_EDIT = re.compile(r"^repos/[^/]+/[^/]+/issues/comments/(\d+)$")
 _PULLS = re.compile(r"^repos/[^/]+/[^/]+/pulls(\?.*)?$")
 PR_FIELDS = frozenset({"number", "state", "url", "headRefName", "headRefOid", "mergedAt",
                        "title", "body", "comments", "isCrossRepository"})
@@ -125,6 +138,95 @@ def _rest_comment(comment):
     return {"id": comment.get("id"), "body": comment.get("body", ""),
             "user": {"login": "github-actions[bot]" if bot else login,
                      "type": "Bot" if bot else "User"}}
+
+
+def _ok(argv, obj):
+    """`obj` come lo stampa `gh api`: con `--include` preceduto da riga di stato e intestazioni."""
+    text = json.dumps(obj, separators=(",", ":"))
+    if "--include" in argv:
+        sys.stdout.write("HTTP/2.0 200 OK\nContent-Type: application/json; charset=utf-8\r\n\r\n"
+                         + text)
+    else:
+        print(text)
+    return 0
+
+
+def _file_field(argv, name):
+    """Il contenuto del file di `-F <name>=@<file>`."""
+    for i, a in enumerate(argv[:-1]):
+        if a == "-F" and argv[i + 1].startswith(f"{name}=@"):
+            with open(argv[i + 1].split("@", 1)[1], encoding="utf-8") as f:
+                return f.read()
+    _fail(f"manca -F {name}=@<file>")
+
+
+def _commented(data, number):
+    """La PR o l'issue `number` dei dati, con la lista dei commenti."""
+    for group in (data.get("prs") or [], list((data.get("issues") or {}).values())):
+        for item in group:
+            if str(item.get("number")) == str(number):
+                item.setdefault("comments", [])
+                return item
+    _fail(f"PR o issue {number} assente dai dati")
+
+
+def _all_comments(data):
+    for group in (data.get("prs") or [], list((data.get("issues") or {}).values())):
+        for item in group:
+            yield from item.get("comments") or []
+
+
+def _api_write(data, path_data, argv):
+    """POST e PATCH di `gh api` che i test del gate usano; `None` se il percorso non è noto."""
+    method, path = _flag(argv, "--method"), argv[-1]
+    if method == "POST" and (m := _STATUS_POST.match(path)):
+        with open(_flag(argv, "--input"), encoding="utf-8") as f:
+            body = json.load(f)
+        entry = {**body, "creator": {"login": "github-actions[bot]"}}
+        data.setdefault("commit_statuses", {}).setdefault(m.group(1), []).insert(0, entry)
+        _save(path_data, data)
+        return _ok(argv, entry)
+    if method == "POST" and (m := _PR_COMMENTS.match(path)):
+        target = _commented(data, m.group(1))
+        ids = [c.get("id") or 0 for c in _all_comments(data)]
+        comment = {"id": max(ids, default=1000) + 1, "author": {"login": "github-actions"},
+                   "body": _file_field(argv, "body")}
+        target["comments"].append(comment)
+        _save(path_data, data)
+        return _ok(argv, _rest_comment(comment))
+    if method == "PATCH" and (m := _COMMENT_EDIT.match(path)):
+        comment = next((c for c in _all_comments(data) if str(c.get("id")) == m.group(1)), None)
+        if comment is None:
+            _fail(f"commento {m.group(1)} assente dai dati")
+        comment["body"] = _file_field(argv, "body")
+        _save(path_data, data)
+        return _ok(argv, _rest_comment(comment))
+    if method == "POST" and _ISSUES_NEW.match(path):
+        issues = data.setdefault("open_issues", [])
+        number = max([i["number"] for i in issues] + [100]) + 1
+        issues.append({"number": number, "title": _flag(argv, "-f").split("=", 1)[1],
+                       "url": f"https://github.com/prova/flow/issues/{number}"})
+        _save(path_data, data)
+        return _ok(argv, {"number": number, "html_url": issues[-1]["url"]})
+    return None
+
+
+def _api_list(data, argv):
+    """Le letture a più valori del gate, un valore per riga; `None` se il percorso non è noto."""
+    path = argv[-1]
+    if (m := _STATUS_LIST.match(path)):
+        rows = (data.get("commit_statuses") or {}).get(m.group(1), [])
+    elif (m := _COMMIT_PULLS.match(path)):
+        rows = (data.get("commit_pulls") or {}).get(m.group(1), [])
+    elif _ISSUES_OPEN.match(path):
+        if "open_issues" not in data:
+            _fail("open_issues assente dai dati")
+        rows = data["open_issues"]
+    else:
+        return None
+    for row in rows:
+        print(json.dumps(row, separators=(",", ":")))
+    return 0
 
 
 def _fail(msg):
@@ -224,6 +326,14 @@ def main(argv):
         entry = next((e for a in argv[1:] if (e := (data.get("api_status") or {}).get(a))), None)
         if entry is not None:
             return _api_status(entry, "--include" in argv)
+        if _flag(argv, "--method") in ("POST", "PATCH"):
+            done = _api_write(data, path, argv)
+            if done is not None:
+                return done
+        elif "--paginate" in argv:
+            done = _api_list(data, argv)
+            if done is not None:
+                return done
         m = _PR_COMMENTS.match(argv[-1])
         if m:
             pr = next((p for p in data.get("prs") or [] if str(p.get("number")) == m.group(1)),
@@ -240,13 +350,12 @@ def main(argv):
                 _fail(f"stati del commit {m.group(1)} assenti dai dati")
             print(json.dumps(status))
             return 0
-        m = _ISSUE_REST.match(argv[1])
+        m = _ISSUE_REST.match(argv[-1])
         if m:
             issue = (data.get("issues") or {}).get(m.group(1))
             if issue is None:
                 _fail(f"issue {m.group(1)} assente dai dati")
-            print(json.dumps(issue))
-            return 0
+            return _ok(argv, issue)
     _fail(f"chiamata non prevista: {' '.join(argv)}")
 
 

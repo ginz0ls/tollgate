@@ -79,6 +79,12 @@ class ApiIncludeTest(FakeGhCase):
         self.assertEqual(self.calls()[0], ["api", "--method", "POST", "-f", "state=success",
                                            "--input", str(self.tmp / "in.json"), "p/x"])
 
+    def test_file_fields_go_as_body_from_file(self):
+        self.set(api_status={"p/x": {"status": 200, "body": {}}})
+        self.api("p/x", method="POST", file_fields={"body": self.tmp / "b.md"})
+        self.assertEqual(self.calls()[0], ["api", "--method", "POST", "-F",
+                                           f"body=@{self.tmp / 'b.md'}", "p/x"])
+
     def test_bot_logins_cover_rest_and_graphql(self):
         self.assertEqual(ghcli.BOT_LOGINS, ("github-actions[bot]", "github-actions"))
         self.set(prs=[self.pr(5, comments=[{"body": "x", "author": {"login": "github-actions"}}])])

@@ -112,11 +112,12 @@ def _split_include(stdout: str) -> tuple[int, str] | None:
 
 
 def api(state, cwd, path: str, *, method: str = "GET", fields: dict[str, str] | None = None,
-        input_file=None, include: bool = False, paginate: bool = False,
-        jq: str | None = None) -> ApiResult:
+        file_fields: dict[str, object] | None = None, input_file=None, include: bool = False,
+        paginate: bool = False, jq: str | None = None) -> ApiResult:
     """`gh api`. Con `include=True` il codice HTTP si legge dalla riga di stato e un 403 o 404 è un
     risultato (`status`, `data` col corpo JSON se c'è), non un errore; senza, l'uscita non zero è
-    un `GhError`. `paginate` vuole `jq` (G5: gli array delle pagine non si concatenano) e `data`
+    un `GhError`. `file_fields` passa il contenuto di un file come campo (`-F chiave=@file`): il
+    testo non fidato non entra mai negli argomenti. `paginate` vuole `jq` (G5: gli array delle pagine non si concatenano) e `data`
     è la lista dei valori che il filtro stampa, uno per riga."""
     if paginate and jq is None:
         raise ValueError("api --paginate richiede jq")
@@ -133,6 +134,8 @@ def api(state, cwd, path: str, *, method: str = "GET", fields: dict[str, str] | 
         args += ["--jq", jq]
     for key, value in (fields or {}).items():
         args += ["-f", f"{key}={value}"]
+    for key, value in (file_fields or {}).items():
+        args += ["-F", f"{key}=@{value}"]
     if input_file is not None:
         args += ["--input", str(input_file)]
     args.append(path)

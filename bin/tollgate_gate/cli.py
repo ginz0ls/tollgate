@@ -13,7 +13,7 @@ from tollgate_core.config import ConfigError
 from tollgate_core.ghcli import GhError
 from tollgate_core.git import GitError
 
-from . import baseids
+from . import baseids, guard
 from . import run as gate_run
 
 ACTIONS_ENV = "GITHUB_ACTIONS"
@@ -39,7 +39,16 @@ def build_parser() -> argparse.ArgumentParser:
                    help="checkout da cui calcolare l'albero (predefinito: la cartella corrente)")
     b.add_argument("--event", metavar="FILE", help="evento da cui leggere il ramo predefinito")
     b.add_argument("--publish", action="store_true", help="solo dentro GitHub Actions")
+    g = sub.add_parser("guard", allow_abbrev=False,
+                       help="controlla i file di tollgate e i workflow del progetto di una PR")
+    g.add_argument("--event", required=True, metavar="FILE", help="evento della PR (JSON)")
+    g.add_argument("--publish", action="store_true", help="solo dentro GitHub Actions")
     return p
+
+
+def _require_actions(args) -> None:
+    if args.publish and os.environ.get(ACTIONS_ENV) != "true":
+        raise GateUsageError(f"--publish si usa solo dentro GitHub Actions ({ACTIONS_ENV}=true)")
 
 
 def _read_event(path: str) -> dict:
@@ -81,8 +90,7 @@ def cmd_run(args) -> int:
 
 
 def cmd_base_ids(args) -> int:
-    if args.publish and os.environ.get(ACTIONS_ENV) != "true":
-        raise GateUsageError(f"--publish si usa solo dentro GitHub Actions ({ACTIONS_ENV}=true)")
+    _require_actions(args)
     cwd = Path.cwd()
     root = Path(args.root) if args.root else cwd
     default = (_field(_read_event(args.event), "repository", "default_branch") if args.event
@@ -99,7 +107,12 @@ def cmd_base_ids(args) -> int:
     return 0
 
 
-HANDLERS = {"run": cmd_run, "base-ids": cmd_base_ids}
+def cmd_guard(args) -> int:
+    _require_actions(args)
+    return guard.run(Path(args.event), publish=args.publish, environ=os.environ)
+
+
+HANDLERS = {"run": cmd_run, "base-ids": cmd_base_ids, "guard": cmd_guard}
 
 
 def main(args: list[str]) -> int:
