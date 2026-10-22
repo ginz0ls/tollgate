@@ -43,6 +43,16 @@ class RoundsTest(AuditsCase):
         self.assertIsNone(audits.open_round_row(self.conn, self.w))
         self.assertEqual(self.open("spec-lens", "executor"), 1)
 
+    def test_min_number_raises_the_number(self):
+        """`min_number` dà il numero minimo (report già nel ramo): vince il più alto."""
+        kw = dict(kind="spec-adversarial", sha="s1", spec_sha="s1", viewpoint=None,
+                  code="abcd1234", now=T0)
+        self.assertEqual(audits.open_round(self.conn, self.w, min_number=3, **kw), 3)
+        self.close("spec-adversarial", 3)
+        self.assertEqual(audits.open_round(self.conn, self.w, min_number=2, **kw), 4)
+        self.close("spec-adversarial", 4)
+        self.assertEqual(audits.open_round(self.conn, self.w, **kw), 5)
+
     def test_unknown_kind_refused(self):
         with self.assertRaises(ValueError):
             self.open("altro")

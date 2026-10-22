@@ -2,6 +2,7 @@ import json
 import types
 from datetime import timedelta
 from pathlib import Path
+from unittest import mock
 
 import tests.test_audit_prepare as tap
 from tests.flowkit import SESSION, SPEC, round_message
@@ -136,6 +137,18 @@ class ReportTest(RoundCase):
         text = (fl.wt / REPORT).read_text()
         self.assertIn("rilievo meccanico: manca la sezione «## Cosa non fare»", text)
         self.assertNotIn("Tane di coniglio»", text)
+
+    def test_unreadable_spec_adds_major(self):
+        """Riga 19: se il blob della spec non si legge il rilievo meccanico non sparisce in
+        silenzio, ma conta come un major."""
+        fl = self.lab()
+        fl.write_spec()
+        self.assertEqual(self.prepare().code, audit.OK)
+        with mock.patch("tollgate_checks.audit_round.git.blob_text", return_value=None):
+            self.assertEqual(fl.report_round(counts=CLEAN).returncode, 0)
+        head = self.header()
+        self.assertEqual((head["counts"]["major"], head["outcome"]), (1, "findings"))
+        self.assertIn("rilievo meccanico: la spec del giro non si legge", (fl.wt / REPORT).read_text())
 
     def test_spec_pitch_off_no_mechanical_finding(self):
         toml = DEFAULT_TOML + "[components]\nspec_pitch = false\n"

@@ -433,6 +433,23 @@ class ApproveFindingTest(ReviewApplyCase):
         self.assertEqual(self.decision(f"f-{n}-1"), "dismissed")
         self.assertEqual(self.cycle_row(n)["outcome"], "superseded")
 
+    def test_superseded_refusal_leaves_block_and_act(self):
+        """Riga 34 (8.4): dopo il rifiuto del caso superseded il blocco dei cicli resta aperto
+        e l'atto è consumato, senza un secondo tentativo."""
+        fl = self.make(phase="review")
+        n = self.cycle(close=False)
+        reviews.supersede(fl.conn, fl.work, n, now=fl.now)
+        self.open_block(reviews.CAP_REASON)
+        a = self.act("tollgate:approve", f"finding f-{n}-1 dismiss non più valido")
+        with self.assertRaisesRegex(actapply.ActApplyError, "non ricalcolabile.*superseded"):
+            self.apply(a)
+        self.assertEqual(self.open_reasons(), [reviews.CAP_REASON])
+        self.assertEqual(self.work()["phase"], "blocked")
+        self.assertEqual(self.state_of(a), "consumed")
+        with self.assertRaises(actapply.ActApplyError):
+            self.apply(a)
+        self.assertEqual(self.open_reasons(), [reviews.CAP_REASON])
+
     def cycle_row(self, n):
         return self.fl.conn.execute("SELECT * FROM review_cycles WHERE work = ? AND number = ?",
                                     (self.fl.work, n)).fetchone()

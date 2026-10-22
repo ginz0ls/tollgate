@@ -354,6 +354,43 @@ class SpecRoundsTest(AuditCase):
         self.assertIn("virgolette", self.text(r))
         self.assertEqual(self.rows(), [])
 
+    def test_backtick_path_refused(self):
+        fl = self.lab()
+        fl.commit("docs/superpowers/specs/a`b.md", "x\n", "spec")
+        r = self.prepare()
+        self.assertEqual(r.code, audit.REFUSED)
+        self.assertIn("backtick", self.text(r))
+        self.assertEqual(self.rows(), [])
+
+    def test_registered_path_missing_named(self):
+        """m-4: il rifiuto di un documento registrato ma assente nomina il percorso registrato
+        e dice che il nome non si cambia."""
+        fl = self.lab()
+        fl.write_spec()
+        self.assertEqual(self.prepare().code, audit.OK)
+        fl.git("rm", "-q", SPEC, repo=fl.wt)
+        fl.git("commit", "-q", "-m", "spec spostata", repo=fl.wt)
+        r = self.prepare()
+        self.assertEqual(r.code, audit.REFUSED)
+        text = self.text(r)
+        self.assertIn(f"la spec {SPEC} non è nel ramo", text)
+        self.assertIn("percorso registrato", text)
+        self.assertIn("il nome non si cambia", text)
+
+    def test_numbering_after_lost_db(self):
+        """m-2: report `plan-adversarial-1.md` e `-2.md` già nel ramo e DB nuovo: il giro aperto
+        è il 3, i report committati non si sovrascrivono."""
+        fl = self.plan_lab()
+        fl.write_l2_plan()
+        fl.write_report("plan-adversarial", 1)
+        fl.write_report("plan-adversarial", 2)
+        self.assertEqual(self.rows(), [])
+        r = self.prepare()
+        self.assertEqual(r.code, audit.OK, self.text(r))
+        row, = self.rows()
+        self.assertEqual((row["kind"], row["number"]), ("plan-adversarial", 3))
+        self.assertIn("plan-adversarial-3.md", r.launches[0].brief.name)
+
 
 class DeclineTest(AuditCase):
     def test_decline_opens_block(self):
@@ -661,6 +698,19 @@ class ApprovalPhaseTest(AuditCase):
         self.assertIn("/tollgate:reopen plan", self.text(r))
         self.assertIn("/tollgate:reopen plan", audit.peek(fl.conn, self.work()))
 
+    def test_approval_with_plan_adversary_off_and_spec_changed(self):
+        """Caso (b): con l'avversario del piano spento la spec cambiata dopo `approve spec` si
+        rifiuta come fa `approve plan` (uscita `reopen spec`); `peek` dice lo stesso."""
+        fl = self.plan_lab(toml=self.off("plan_adversary"))
+        fl.write_l2_plan()
+        fl.goto("approval")
+        fl.write_spec(note="spec cambiata in approval")
+        r = self.prepare()
+        self.assertEqual(r.code, audit.REFUSED)
+        self.assertIn("spec cambiata dopo approve spec: /tollgate:reopen spec", self.text(r))
+        self.assertIn("/tollgate:reopen spec", audit.peek(fl.conn, self.work()))
+        self.assertEqual(self.work()["phase"], "approval")
+
     def test_plan_adversary_off_never_refuses(self):
         fl = self.plan_lab(toml=self.off("plan_adversary"))
         fl.write_l2_plan()
@@ -730,6 +780,17 @@ class PeekTest(AuditCase):
         fl.write_spec()
         fl.closed_round("spec-adversarial", CLEAN)
         self.assertIn(fixed("approve_spec"), audit.peek(fl.conn, self.work()))
+
+    def test_peek_needs_confirm_says_confirm(self):
+        fl = self.lab()
+        fl.write_spec(slices=3)
+        fl.closed_round("spec-adversarial", CLEAN)
+        self.assertEqual(self.prepare().code, audit.NEEDS_CONFIRM)
+        step = audit.peek(fl.conn, self.work())
+        self.assertIn("--confirm", step)
+        self.assertIn("audit decline", step)
+        self.assertNotIn("<programma>", step)
+        assert_program_before_prepare(self, step)
 
     def test_peek_never_raises(self):
         fl = self.lab()

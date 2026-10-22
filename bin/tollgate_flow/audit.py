@@ -189,11 +189,11 @@ def adversarial_ok(conn, work: sqlite3.Row, cfg, spec_blob: str | None) -> bool:
 
 
 def _check_path(path: str) -> None:
-    """D12: un percorso con a capo, `"` o caratteri di controllo non entra in un brief, in una
-    riga di lancio né in un file di approvazione."""
-    if any(unicodedata.category(c) in ("Cc", "Zl", "Zp") or c == '"' for c in path):
-        raise _Refuse("il percorso del documento contiene un a capo, delle virgolette o "
-                      "caratteri di controllo: rinomina il file")
+    """D12: un percorso con a capo, `"`, backtick o caratteri di controllo non entra in un brief,
+    in una riga di lancio né in un file di approvazione (il backtick chiuderebbe un recinto)."""
+    if any(unicodedata.category(c) in ("Cc", "Zl", "Zp") or c in '"`' for c in path):
+        raise _Refuse("il percorso del documento contiene un a capo, delle virgolette, dei "
+                      "backtick o caratteri di controllo: rinomina il file")
 
 
 class Uncommitted(Exception):
@@ -219,12 +219,19 @@ def committed_blob(wt: Path, path: str) -> str:
     return blob
 
 
+REGISTERED_NOTE = (": è il percorso registrato e il nome non si cambia, rimetti il contenuto "
+                   "sotto questo nome")
+
+
 def _committed(ctx: _Ctx, path: str, what: str, step: str) -> str:
     try:
         return committed_blob(ctx.wt, path)
     except Uncommitted as e:
         if e.missing:
-            raise _Refuse(f"{what} {path} non è nel ramo", step) from e
+            raise _Refuse(f"{what} {path} non è nel ramo"
+                          + (REGISTERED_NOTE if path in (ctx.work["spec_path"],
+                                                         ctx.work["plan_path"]) else ""),
+                          step) from e
         raise _Refuse(f"committa {path} prima del giro") from e
 
 
@@ -404,6 +411,12 @@ def _decide_approval(ctx: _Ctx) -> _Act:
         if last is not None and plan_blob is not None and spec_blob is not None \
                 and (last["sha"], last["spec_sha"]) != (plan_blob, spec_blob):
             raise _Refuse(PLAN_CHANGED.format(number=last["number"]))
+    if spec_path and not on(cfg, PLAN_KIND):
+        # senza l'avversario non c'è un giro con cui confrontare: la spec in HEAD deve essere
+        # ancora quella approvata, come per `approve plan` (caso (b))
+        spec_blob = git.blob_at(ctx.wt, "HEAD", spec_path)
+        if spec_blob is not None:
+            _spec_approval_current(ctx, spec_path, spec_blob)
     return _Act("approve_plan")
 
 
@@ -472,6 +485,17 @@ def _launch(ctx: _Ctx, rnd: _Round, number: int, code: str, *, again: bool) -> P
                               f"prossimo passo: {_step_text('launch')}"], [launch])
 
 
+def _next_report_number(ctx: _Ctx, kind: str) -> int:
+    """Il numero che segue l'ultimo report del tipo già in `reviews/<N>/` a HEAD: dopo un DB perso
+    la numerazione del DB riparte da 1 e il giro nuovo sovrascriverebbe un report committato."""
+    folder = f"{approvals.REVIEWS_DIR}/{ctx.work['issue']}"
+    paths = git.ls_files_at(ctx.wt, "HEAD", f"{folder}/")
+    numbers = [int(name[len(kind) + 1:-3]) for name in
+               (p.rpartition("/")[2] for p in approvals.report_listing(paths, [folder]))
+               if name.startswith(f"{kind}-")]
+    return max(numbers, default=0) + 1
+
+
 def _execute(state, ctx: _Ctx, act: _Act, now) -> PrepareResult:
     conn, wid = ctx.conn, ctx.work["id"]
     if act.supersede is not None:
@@ -488,7 +512,8 @@ def _execute(state, ctx: _Ctx, act: _Act, now) -> PrepareResult:
         try:
             number = audits.open_round(conn, wid, kind=rnd.kind, sha=rnd.doc_blob,
                                        spec_sha=rnd.spec_blob, viewpoint=rnd.viewpoint,
-                                       code=code, now=now)
+                                       code=code, now=now,
+                                       min_number=_next_report_number(ctx, rnd.kind))
         except ValueError as e:
             raise AuditError(str(e)) from e
         return _launch(ctx, rnd, number, code, again=False)
@@ -592,4 +617,6 @@ def peek(conn, work: sqlite3.Row) -> str:
         return _step_text("approve_spec", fette=act.slices)
     if act.kind == "approve_plan":
         return _step_text("approve_plan")
+    if act.kind == "confirm":
+        return CONFIRM_STEP.replace("<programma>", _prog())
     return fallback

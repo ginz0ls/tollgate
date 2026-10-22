@@ -390,6 +390,29 @@ class L2FlowTest(L2Helpers):
         self.assertEqual((block_json["level"], block_json["spec"]), ("L2", SPEC))
         self.assertEqual(self.work()["phase"], "pr_open")
 
+    def test_plan_cap_chain_to_approve_plan(self):           # riga 22 del registro dei rinviati
+        self.spec_to_plan()
+        for tasks in (2, 3):                                 # due giri del piano non puliti
+            self.write(PLAN, plan_text(tasks=tasks))
+            self.commit([PLAN], f"piano {tasks}")
+            self.round("plan-adversarial", {"major": 1})
+        ((block, reason),) = [(r["id"], r["reason"]) for r in self.fl.conn.execute(
+            "SELECT id, reason FROM blocks WHERE work = ? AND closed IS NULL", (self.fl.work,))]
+        self.assertEqual((reason, self.work()["phase"]),
+                         (audits.cap_reason("plan-adversarial", 2), "blocked"))
+        self.assertEqual(self.cli("audit", "prepare").returncode, 1)      # si passa da resolve
+
+        r = self.act("resolve", f"{block} deciso")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("avversario del piano sospeso", r.stdout)
+        self.assertEqual(self.work()["phase"], "plan")
+        self.assertEqual(audits.suspended(self.fl.conn, self.fl.work), {"plan-adversarial": 2})
+        self.assertIn("/tollgate:approve plan", self.prepare_step())
+        self.assertEqual(self.work()["phase"], "approval")
+        self.approve("plan")
+        self.assertEqual(self.header(approvals.approval_paths(7)[1])["adversarial"], "suspended")
+        self.assertEqual(self.work()["phase"], "execution")
+
     def test_three_slices_lens_audit_and_component_off(self):    # criteri 24 e 35 (parte locale)
         self.write(SPEC, spec_text(3))
         self.commit([SPEC], "spec")
@@ -476,6 +499,61 @@ class SpecAuditOffTest(L2Helpers):
         self.assertEqual((header["slices"], header["adversarial"], header["lens"]),
                          (3, "closed", "off"))
         self.assertEqual(self.work()["phase"], "plan")
+
+
+class LaterSliceOtherApprovalTest(L2Helpers):
+    """Review Focus 6: la fetta successiva ha la propria approvazione assente, quella dell'issue 3
+    è superata e quella dell'issue 9 è corrente (caso (a)): `audit prepare`, `approve plan` e
+    `finish check` rispondono tutti «corrente»."""
+
+    OTHER_ISSUE, OWN_ISSUE = 9, 12
+
+    def setUp(self):
+        files = first_slice_files()
+        text = spec_text(3)
+        stale = {"kind": "spec-approval", "path": SPEC, "sha": blob(spec_text(3, note="vecchia")),
+                 "slices": 3, "adversarial": "closed", "lens": "closed", "act_id": "a-1",
+                 "approved_at": "2026-10-19T10:00:00Z"}
+        files[approvals.approval_paths(FIRST_ISSUE)[0]] = approvals.render_approval(stale)
+        files[approvals.approval_paths(self.OTHER_ISSUE)[0]] = approvals.render_approval(
+            {**stale, "sha": blob(text), "act_id": "a-2"})
+        for kind in ("spec-adversarial", "spec-lens"):   # i report stanno con l'approvazione corrente
+            old = f"{approvals.REVIEWS_DIR}/{FIRST_ISSUE}/{kind}-1.md"
+            files[f"{approvals.REVIEWS_DIR}/{self.OTHER_ISSUE}/{kind}-1.md"] = files.pop(old)
+        self.make_lab(files=files, issues={
+            str(self.OWN_ISSUE): {**ISSUES["7"], "number": self.OWN_ISSUE, "title": "Terza fetta"}})
+
+    def test_later_slice_with_other_current_approval_end_to_end(self):
+        r = self.cli("start", str(self.OWN_ISSUE), "--spec", SPEC, cwd=self.fl.main)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        row = self.enter_worktree()
+        self.assertEqual((row["issue"], row["phase"], row["spec_path"]),
+                         (self.OWN_ISSUE, "plan", SPEC))
+        self.assertFalse((self.wt / approvals.approval_paths(self.OWN_ISSUE)[0]).exists())
+
+        self.write(PLAN, plan_text(tasks=2, task2=f"- Create: `{LOGIN}`"))
+        self.commit([PLAN], "piano")
+        opened = self.cli("audit", "prepare")                # apre il giro del piano
+        self.assertEqual(opened.returncode, 0, opened.stdout + opened.stderr)
+        self.assertNotIn("reopen", opened.stdout)
+        self.assertEqual(audits.open_round_row(self.fl.conn, self.fl.work)["kind"],
+                         "plan-adversarial")
+        self.round_closed("plan-adversarial")
+        self.assertIn("/tollgate:approve plan", self.prepare_step())
+        self.assertEqual(self.work()["phase"], "approval")
+        self.approve("plan")
+        self.assertEqual(self.work()["phase"], "execution")
+        self.commit_reviews(self.OWN_ISSUE, "approvazione del piano e report")
+        self.run_tasks()
+        r = self.finish_check()
+        self.assertIn("[sì] " + dod.LABELS["approvals"], r.stdout)
+        self.assertNotIn("[no]", r.stdout)
+
+    def round_closed(self, kind):
+        """L'agente del giro già aperto riporta senza rilievi."""
+        row = audits.open_round_row(self.fl.conn, self.fl.work)
+        self.agent(audits.AGENTS[kind], round_message(row, {}))
+        self.assertIsNone(audits.open_round_row(self.fl.conn, self.fl.work))
 
 
 def db_row(conn):

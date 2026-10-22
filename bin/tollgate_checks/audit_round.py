@@ -19,16 +19,18 @@ from . import _common
 CHECK = {"api": 1, "events": ["subagent_stop"], "component": None, "order": 15}
 MAX_VETOES = 2
 ADV_KIND = "spec-adversarial"
+UNREADABLE_SPEC = "la spec del giro non si legge: le sezioni del pitch non sono state controllate"
 
 
 def _mechanical(ctx, work, rnd) -> list[str]:
     """I rilievi meccanici (decisione 8): con `spec_pitch` acceso, una riga per ogni sezione
-    della spec che manca. Si legge il blob del giro, non il file del worktree."""
+    della spec che manca. Si legge il blob del giro, non il file del worktree; se il blob non si
+    legge il controllo non può dire che la spec è a posto: un rilievo solo."""
     if rnd["kind"] != ADV_KIND or not ctx.component("spec_pitch"):
         return []
     wt = Path(work["worktree"]) if work["worktree"] else None
     text = git.blob_text(wt, rnd["sha"]) if wt is not None and wt.is_dir() else None
-    return specdoc.pitch_problems(text) if text is not None else []
+    return specdoc.pitch_problems(text) if text is not None else [UNREADABLE_SPEC]
 
 
 def decide(event, ctx):

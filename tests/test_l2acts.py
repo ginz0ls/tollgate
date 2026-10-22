@@ -425,6 +425,17 @@ class ApprovePlanTest(L2Case):
         self.approve("plan")
         self.assertEqual(self.phase(), "execution")
 
+    def test_registered_plan_missing_names_the_path(self):
+        """m-4: il piano registrato ma assente dal ramo è nominato, e il nome non si cambia."""
+        fl = self.to_approval()
+        fl.git("rm", "-q", PLAN, repo=fl.wt)
+        fl.git("commit", "-q", "-m", "piano spostato", repo=fl.wt)
+        msg = self.refused("plan")
+        self.assertIn(f"il piano {PLAN} non è nel ramo", msg)
+        self.assertIn("percorso registrato", msg)
+        self.assertIn("il nome non si cambia", msg)
+        self.assertIsNone(self.work()["plan_sha"])
+
     def test_dirty_plan_round_refused(self):
         fl = self.to_approval()
         fl.closed_round(PLAN_ADV, MAJOR)

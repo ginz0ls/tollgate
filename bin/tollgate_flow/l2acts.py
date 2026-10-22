@@ -63,12 +63,13 @@ def _no_open_round(conn, work) -> None:
 
 
 def _committed(wt: Path, path: str, what: str) -> tuple[str, str]:
-    """`(blob a HEAD, testo a HEAD)` di `path`, solo se il file del worktree è identico."""
+    """`(blob a HEAD, testo a HEAD)` di `path`, solo se il file del worktree è identico. I
+    percorsi qui sono sempre quelli registrati nel lavoro."""
     try:
         blob = audit.committed_blob(wt, path)
     except audit.Uncommitted as e:
         if e.missing:
-            raise Refused(f"{what} {path} non è nel ramo") from e
+            raise Refused(f"{what} {path} non è nel ramo{audit.REGISTERED_NOTE}") from e
         raise Refused(f"committa {path} prima di approvare") from e
     return blob, git.text_at(wt, "HEAD", path) or ""
 

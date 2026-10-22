@@ -31,16 +31,18 @@ def _check_kind(kind: str) -> None:
 
 
 def open_round(conn, work: int, *, kind: str, sha: str, spec_sha: str, viewpoint: str | None,
-               code: str, now) -> int:
-    """Apre un giro e ne dà il numero: per tipo, da 1, senza riusare quello di un giro superato.
-    Un solo giro aperto per lavoro."""
+               code: str, now, min_number: int = 1) -> int:
+    """Apre un giro e ne dà il numero: per tipo, da 1, senza riusare quello di un giro superato;
+    `min_number` lo alza (i report già nel ramo dopo un DB perso: il numero è il più alto tra
+    quello del DB e `min_number`). Un solo giro aperto per lavoro."""
     _check_kind(kind)
     with db.tx(conn):
         phases.get_work(conn, work)
         if open_round_row(conn, work) is not None:
             raise ValueError("c'è già un giro di audit aperto")
-        number = conn.execute("SELECT coalesce(max(number), 0) + 1 FROM spec_audit "
-                              "WHERE work = ? AND kind = ?", (work, kind)).fetchone()[0]
+        number = max(conn.execute("SELECT coalesce(max(number), 0) + 1 FROM spec_audit "
+                                  "WHERE work = ? AND kind = ?", (work, kind)).fetchone()[0],
+                     min_number)
         conn.execute("INSERT INTO spec_audit (work, kind, number, viewpoint, sha, spec_sha, "
                      "code, stage, opened) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)",
                      (work, kind, number, viewpoint, sha, spec_sha, code, clock.fmt(now)))
