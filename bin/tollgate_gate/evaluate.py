@@ -115,9 +115,10 @@ class Context:
 
     @cached_property
     def is_config_branch(self) -> bool:
-        """La PR di aggiornamento di tollgate: un ramo `tollgate-config/*`."""
+        """La PR di aggiornamento di tollgate: un ramo `tollgate-config/*` dello stesso repo (da
+        un fork il nome lo sceglie chi apre la PR: vale come ramo qualunque, rilievo M-7)."""
         pr = self.inputs.pr
-        return pr is not None and prref.is_config_branch(pr.head_ref)
+        return pr is not None and not pr.cross_repo and prref.is_config_branch(pr.head_ref)
 
     @cached_property
     def diff_level(self) -> str:
@@ -467,8 +468,8 @@ def must_have(ctx: Context, ev: Evaluation) -> None:
 
 def level(ctx: Context, ev: Evaluation) -> None:
     """Livello dichiarato contro minimo (spec 5, 9.2, criterio 22): rosso se è sotto il minimo
-    senza un tetto dichiarato, `level_cap` («da leggere») con un tetto. Solo per le PR dei
-    lavori."""
+    senza un tetto dichiarato; `level_cap` («da leggere») ogni volta che il blocco dichiara un
+    tetto. Solo per le PR dei lavori."""
     block = ctx.inputs.block
     if block is None or not ctx.is_work:
         return
@@ -477,14 +478,15 @@ def level(ctx: Context, ev: Evaluation) -> None:
         _red(ev, "level_invalid", "level", "livello dichiarato nel blocco non valido")
         return
     minimum = ctx.min_level
-    if levelmod.LEVELS.index(declared) >= levelmod.LEVELS.index(minimum):
-        return
-    text = f"livello dichiarato {declared} sotto il minimo {minimum}"
+    below = levelmod.LEVELS.index(declared) < levelmod.LEVELS.index(minimum)
     if block.get("level_cap") in levelmod.LEVELS:
-        _attention(ev, "level_cap", "level", text + ", con un tetto dichiarato",
+        _attention(ev, "level_cap", "level",
+                   f"livello dichiarato {declared} sotto il minimo {minimum}, con un tetto "
+                   f"dichiarato" if below else f"tetto di livello dichiarato ({declared})",
                    str(block.get("level_cap_reason") or ""))
-    else:
-        _red(ev, "level_below_minimum", "level", text)
+    elif below:
+        _red(ev, "level_below_minimum", "level",
+             f"livello dichiarato {declared} sotto il minimo {minimum}")
 
 
 def _path(value) -> str | None:
@@ -682,7 +684,8 @@ def _findings(ctx: Context, ev: Evaluation) -> None:
             continue
         severity = _effective_severity(f)
         if severity in _BLOCKING_SEVERITIES:
-            if isinstance(last, int) and _finding_cycle(f) in (None, last):
+            # senza un ultimo ciclo leggibile nessun rilievo si scarta (fail-closed)
+            if not isinstance(last, int) or _finding_cycle(f) in (None, last):
                 blocking.append(str(f.get("id")))
         elif f.get("severity") in _BLOCKING_SEVERITIES:
             overridden.append(f"{f.get('id')}: {f.get('user_decision')}")

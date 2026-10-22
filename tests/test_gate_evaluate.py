@@ -616,6 +616,15 @@ class LevelTest(LabCase):
         ev = self.run_gate(block=self.lab.block(level="L2"))
         self.assertEqual(keys(ev.red, "level") + keys(ev.attention, "level"), [])
 
+    def test_cap_is_reported_even_above_the_minimum(self):
+        ev = self.run_gate(block=self.lab.block(level_cap="L1", level_cap_reason="tetto"))
+        self.assertEqual((keys(ev.red, "level"), keys(ev.attention, "level")),
+                         ([], ["level_cap"]))
+        self.assertEqual(ev.attention_state, "failure")
+        self.sensitive()
+        ev = self.run_gate(block=self.lab.block(level="L2", level_cap="L2"))
+        self.assertEqual(keys(ev.attention, "level"), ["level_cap"])
+
     def test_unknown_declared_level_is_red(self):
         ev = self.run_gate(block=self.lab.block(level="L9"))
         self.assertEqual(keys(ev.red, "level"), ["level_invalid"])
@@ -742,6 +751,24 @@ class IssueTest(LabCase):
         ev = self.run_gate()
         self.assertEqual(keys(ev.red, "issue") + keys(ev.attention, "issue"), [])
 
+    def test_block_missing_on_tg_is_red_even_with_dod_off(self):
+        lab = GateLab(toml=GATE_TOML + "[components]\ndefinition_of_done = false\n")
+        self.addCleanup(lab.close)
+        ev = evaluate(lab.inputs(block=None))
+        self.assertEqual(keys(ev.red, "issue"), ["block_missing"])
+
+    def test_config_branch_from_a_fork_is_a_manual_pr(self):
+        branch = "tollgate-config/0.2.0"
+        git(self.lab.repo, "checkout", "-q", "-b", branch, self.lab.base)
+        self.lab.delete("tests/test_app.py")
+        self.lab.commit("src/stray.py", "x = 1\n", "fuori scope")
+        pr = self.lab.with_pr(head_ref=branch, body="", cross_repo=True)
+        ev = self.run_gate(pr=pr, block=None, issue=None)
+        self.assertIn("test_deleted", keys(ev.red, "diff"))
+        self.assertEqual(sorted(keys(ev.attention, "issue")), ["no_issue", "not_tg_branch"])
+        same = self.run_gate(pr=dataclasses.replace(pr, cross_repo=False), block=None, issue=None)
+        self.assertEqual(keys(same.red, "diff"), [])
+
     def test_block_missing_on_tg_is_red(self):
         ev = self.run_gate(block=None)
         self.assertEqual(keys(ev.red, "issue"), ["block_missing"])
@@ -809,6 +836,15 @@ class DeclaredTest(LabCase):
         self.assertEqual(keys(ev.red, "declared") + keys(ev.attention, "declared"), [])
         ev = self.declared(findings=[finding(blocking=True)])
         self.assertEqual(keys(ev.red, "declared"), ["finding_blocking"])
+
+    def test_blocking_finding_without_usable_verdict_is_red(self):
+        for name, value in (("absent", None), ("cycles not int", {"cycles": "1"}),
+                            ("not a dict", "x")):
+            with self.subTest(name):
+                ev = self.declared(findings=[finding(cycle=1)], verdict=value)
+                self.assertEqual(keys(ev.red, "declared"), ["finding_blocking"])
+        ev = self.declared(findings=[finding(blocking=False)], verdict=None)
+        self.assertEqual(keys(ev.red, "declared"), [])
 
     def test_not_confirmed_or_minor_findings_do_not_block(self):
         for name, f in (("rejected", finding(verification="rejected")),
@@ -959,6 +995,14 @@ class TollgateFilesTest(LabCase):
         self.assertEqual(tollgate_files_changed(self.lab.repo, self.lab.base, self.lab.head),
                          [".github/tollgate/VERSION", ".github/workflows/tollgate-verdict.yml",
                           "tollgate.toml"])
+
+    def test_moved_tollgate_file_counts_by_its_old_name(self):
+        lab = GateLab(files={**DEFAULT_FILES, ".github/tollgate/VERSION": "1\nuna versione\n"})
+        self.addCleanup(lab.close)
+        git(lab.repo, "mv", ".github/tollgate/VERSION", "docs/VERSION")
+        git(lab.repo, "commit", "-qm", "sposta")
+        self.assertEqual(tollgate_files_changed(lab.repo, lab.base, lab.head),
+                         [".github/tollgate/VERSION"])
 
     def test_deleted_and_moved_tollgate_files_count(self):
         lab = GateLab(files={**DEFAULT_FILES, ".github/tollgate/VERSION": "1\n"})
