@@ -35,7 +35,8 @@ stampa per riga `status<TAB>conclusion<TAB>app.id`. Poi `commits/<sha>/statuses`
 `--jq` non si valuta: i dati hanno già la forma che il filtro produce.
 `api_flaky` simula i 5xx transitori di GitHub (prova P4): `{"<percorso senza ?query>": ["<stderr>",
 ...]}`; ogni `gh api` su quel percorso consuma il primo messaggio (riscrive il file dei dati), lo
-scrive su stderr ed esce con 1 senza stdout; finita la lista risponde normalmente.
+scrive su stderr ed esce con 1 senza stdout; finita la lista risponde normalmente. La chiave
+`"<METODO> <percorso>"` (es. `"POST repos/o/r/statuses/<sha>"`) vale solo per quel metodo.
 `prs[].comments` si leggono con `pr view --json comments` come li dà GraphQL
 (`author.login = "github-actions"`) e con `api repos/o/r/issues/<n>/comments` come li dà REST
 (`user.login = "github-actions[bot]"`, `user.type = "Bot"`); il `--jq` non si valuta.
@@ -380,7 +381,10 @@ def main(argv):
             print(json.dumps(out, separators=(",", ":")))
         return 0
     if argv[:1] == ["api"] and len(argv) > 1:
-        flaky = (data.get("api_flaky") or {}).get(argv[-1].split("?", 1)[0])
+        flaky_path = argv[-1].split("?", 1)[0]
+        flakes = data.get("api_flaky") or {}
+        flaky = flakes.get(f"{_flag(argv, '--method') or 'GET'} {flaky_path}") \
+            or flakes.get(flaky_path)
         if flaky:
             sys.stderr.write(flaky.pop(0) + "\n")
             _save(path, data)

@@ -238,6 +238,28 @@ class RetryTest(unittest.TestCase):
         self.assertEqual(self.sleeps, [2, 4])
         self.assertIn(ghcli.RETRY_DELAYS_ENV, paths.TEST_ENVS)
 
+    def test_write_declared_idempotent_is_retried(self):
+        run = self.answers(EMPTY_500, _done(stdout='{"a": 1}'))
+        got = ghcli.api(self.state, ".", "p/x", method="POST", input_file="in.json", retry=True)
+        self.assertEqual((got.data, run.call_count, self.sleeps), ({"a": 1}, 2, [2]))
+        self.sleeps.clear()
+        run = self.answers(HTTP_500, HTTP_500, HTTP_500)
+        with self.assertRaises(ghcli.GhError) as e:
+            ghcli.api(self.state, ".", "p/x", method="PATCH", retry=True)
+        self.assertEqual(str(e.exception), "gh api --method: gh: Server Error (HTTP 500)")
+        self.assertEqual((run.call_count, self.sleeps), (3, [2, 4]))
+        self.sleeps.clear()
+        run = self.answers(HTTP_500, _done(stdout="{}"))       # di default una scrittura no
+        with self.assertRaises(ghcli.GhError):
+            ghcli.api(self.state, ".", "p/x", method="POST")
+        self.assertEqual((run.call_count, self.sleeps), (1, []))
+
+    def test_retry_true_keeps_4xx_final(self):
+        run = self.answers(_done(1, stderr="gh: m (HTTP 422)\n"), _done(stdout="{}"))
+        with self.assertRaises(ghcli.GhError):
+            ghcli.api(self.state, ".", "p/x", method="POST", retry=True)
+        self.assertEqual((run.call_count, self.sleeps), (1, []))
+
 
 class FakeGhFlakyTest(FakeGhCase):
     """`api_flaky` del gh finto: risponde prima con gli errori elencati, poi normalmente."""

@@ -312,6 +312,17 @@ class RunTest(GuardBase):
         [status] = self.posted_statuses()
         self.assertEqual((status["context"], status["state"]), ("tollgate/guard", "success"))
 
+    def test_transient_500_on_guard_status_post_is_retried(self):
+        """Prova P4 (giro 5): il POST di `tollgate/guard` ha avuto un 500 a corpo vuoto."""
+        self.push_pr_head()
+        sha = self.lab.head
+        self.set_gh(api_flaky={f"POST repos/{SLUG}/statuses/{sha}": ["unexpected end of JSON input"]})
+        with mock.patch.object(ghcli, "_sleep") as sleep:
+            self.assertEqual(self.run_guard(), 0)
+        sleep.assert_called_once_with(2)
+        [status] = self.posted_statuses()
+        self.assertEqual((status["context"], status["state"]), ("tollgate/guard", "success"))
+
     def test_red_comment_says_red_not_waiting(self):
         self.lab.commit("tollgate.toml", "schema_version = 1\n")
         self.push_pr_head()
@@ -432,6 +443,49 @@ class GithubTest(GuardBase):
         [argv] = [a for a in self.calls() if "--method" in a]
         self.assertIn("--input", argv)
         self.assertNotIn("failure", " ".join(argv))
+
+    def test_set_status_retries_transient_500(self):
+        sha = self.lab.head
+        self.set_gh(api_flaky={f"POST repos/{SLUG}/statuses/{sha}": ["unexpected end of JSON input"]})
+        with mock.patch.object(ghcli, "_sleep") as sleep:
+            self.call(github.set_status, sha, context="tollgate/guard", status="success",
+                      description="d")
+        sleep.assert_called_once_with(2)
+        [status] = self.posted_statuses()
+        self.assertEqual(status["state"], "success")
+        self.assertEqual(len([a for a in self.calls() if "--method" in a]), 2)
+
+    def test_new_comment_and_issue_are_not_retried(self):
+        self.set_gh(issues={"12": {"number": 12, "state": "open", "labels": [], "comments": []}},
+                    api_flaky={f"POST repos/{SLUG}/issues/12/comments": ["gh: boom (HTTP 500)"],
+                               f"POST repos/{SLUG}/issues": ["gh: boom (HTTP 500)"]})
+        with mock.patch.object(ghcli, "_sleep") as sleep:
+            with self.assertRaises(ghcli.GhError):
+                self.call(github.comment_issue, 12, body_file=self.body_file("ciao"))
+            with self.assertRaises(ghcli.GhError):
+                self.call(github.create_issue, title=ghcli.SENTINEL_TITLE,
+                          body_file=self.body_file("corpo"))
+        sleep.assert_not_called()
+        self.assertEqual(len(self.calls()), 2)
+        self.assertEqual(self.gh_data()["issues"]["12"]["comments"], [])
+
+    def test_upsert_patch_is_retried_but_new_comment_post_is_not(self):
+        prefix = comment.GUARD_PREFIX
+        self.set_gh(prs=[{"number": 1, "comments": [
+            {"id": 5, "body": prefix + " a", "author": {"login": "github-actions"}}]}],
+            api_flaky={f"PATCH repos/{SLUG}/issues/comments/5": ["unexpected end of JSON input"]})
+        with mock.patch.object(ghcli, "_sleep") as sleep:
+            self.call(github.upsert_comment, 1, prefix=prefix,
+                      body_file=self.body_file(prefix + " b"))
+        sleep.assert_called_once_with(2)
+        self.assertEqual([c["body"] for c in self.comments()], [prefix + " b"])
+        self.set_gh(api_flaky={f"POST repos/{SLUG}/issues/1/comments": ["gh: boom (HTTP 500)"]})
+        with mock.patch.object(ghcli, "_sleep") as sleep:
+            with self.assertRaises(ghcli.GhError):
+                self.call(github.upsert_comment, 1, prefix=prefix,
+                          body_file=self.body_file(prefix + " c"))
+        sleep.assert_not_called()
+        self.assertEqual(self.comments(), [])
 
     def test_set_status_validates(self):
         good = {"context": "tollgate/guard", "status": "success"}
