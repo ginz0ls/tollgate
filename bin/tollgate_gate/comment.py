@@ -17,8 +17,8 @@ from .model import Evaluation, Item
 MARKER_PREFIX = "<!-- tollgate-verdict"     # uguale a fixtask.GATE_MARKER (lo controlla un test)
 GUARD_PREFIX = "<!-- tollgate-guard"
 _SHA = re.compile(r"[0-9a-f]{40}")
-_MARKER = re.compile(re.escape(MARKER_PREFIX) + r" ([0-9a-f]{40}) -->")
-_CAPS = (prbody.MAX_TEXT, 1000, 500, 250, 120, 60, 30)
+_MARKER = re.compile(re.escape(MARKER_PREFIX) + r" sha=([0-9a-f]{40}) -->")
+_TICKS = re.compile(r"`{3,}")
 
 
 def _check_sha(sha: str) -> str:
@@ -28,7 +28,7 @@ def _check_sha(sha: str) -> str:
 
 
 def marker(sha: str) -> str:
-    return f"{MARKER_PREFIX} {_check_sha(sha)} -->"
+    return f"{MARKER_PREFIX} sha={_check_sha(sha)} -->"
 
 
 def marker_sha(body: str) -> str | None:
@@ -37,8 +37,15 @@ def marker_sha(body: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _one_line(text: str, cap: int) -> str:
+    """`Item.text` lo scrive tollgate, ma può portare un valore letto altrove (difesa in
+    profondità, D19): una riga sola, senza recinti né tag, menzioni e commenti spenti."""
+    line = " ".join(text.split()).replace("<", "&lt;")
+    return prbody.defuse(_TICKS.sub(lambda m: "'" * len(m.group()), prbody.cap(line, cap)))
+
+
 def _item(item: Item, cap: int) -> list[str]:
-    out = [f"- {prbody.defuse(item.text)}"]
+    out = [f"- {_one_line(item.text, cap)}"]
     if item.data:
         out += ["", prbody.neutralize(item.data, cap), ""]
     return out
@@ -46,7 +53,7 @@ def _item(item: Item, cap: int) -> list[str]:
 
 def _lines(items: list[str], cap: int) -> list[str]:
     """Un solo recinto per un elenco di stringhe: il tetto vale per ogni voce."""
-    joined = "\n".join(prbody._cap(x, cap) for x in items)
+    joined = "\n".join(prbody.cap(x, cap) for x in items)
     return ["", prbody.neutralize(joined, len(joined)), ""]
 
 
@@ -90,29 +97,45 @@ def _build(sha: str, ev: Evaluation, cap: int, keep: int | None) -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
-def render(sha: str, ev: Evaluation) -> str:
-    """Il commento del gate per lo SHA `sha`. Sta entro `MAX_BODY`: prima si accorciano le voci,
-    poi si tolgono dalla coda con una nota."""
-    _check_sha(sha)
-    for cap in _CAPS:
-        body = _build(sha, ev, cap, None)
+def _fit(build, count: int, last_resort: str) -> str:
+    """Il primo testo entro `MAX_BODY`: prima si accorciano le voci (`prbody.CAPS`), poi si
+    tolgono dalla coda con una nota; in ultimo `last_resort`, che sta sempre nel tetto."""
+    for cap in prbody.CAPS:
+        body = build(cap, None)
         if len(body) <= MAX_BODY:
             return body
-    keep = max(len(ev.errors), len(ev.red), len(ev.attention), len(ev.watch))
+    keep = count
     while keep > 1:
         keep //= 2
-        body = _build(sha, ev, _CAPS[-1], keep)
+        body = build(prbody.CAPS[-1], keep)
         if len(body) <= MAX_BODY:
             return body
-    return body
+    return last_resort
+
+
+def render(sha: str, ev: Evaluation) -> str:
+    """Il commento del gate per lo SHA `sha`, sempre entro `MAX_BODY`."""
+    _check_sha(sha)
+    count = max(len(ev.errors), len(ev.red), len(ev.attention), len(ev.watch))
+    minimal = (f"{marker(sha)}\n\n## tollgate: verdetto sullo SHA `{sha}`\n\n"
+               f"… (troncato: commento ridotto, {len(ev.errors)} errori, {len(ev.red)} voci rosse, "
+               f"{len(ev.attention)} di attenzione)\n")
+    return _fit(lambda cap, keep: _build(sha, ev, cap, keep), count, minimal)
+
+
+def _guard_build(sha: str, problems: list[str], cap: int, keep: int | None) -> str:
+    out = [f"{GUARD_PREFIX} sha={sha} -->", "", f"## tollgate: in attesa sullo SHA `{sha}`", ""]
+    shown = problems if keep is None else problems[:keep]
+    if shown:
+        out += _lines(shown, cap)
+    if len(shown) < len(problems):
+        out += [f"… (troncato: altri {len(problems) - len(shown)} problemi omessi)", ""]
+    return "\n".join(out).rstrip() + "\n"
 
 
 def render_guard(sha: str, problems: list[str]) -> str:
-    """Il commento di `tollgate-guard` quando lo stato resta in attesa: spiega i problemi."""
-    out = [f"{GUARD_PREFIX} {_check_sha(sha)} -->", "",
-           f"## tollgate: in attesa sullo SHA `{sha}`", ""]
-    if problems:
-        out += _lines(problems[:50], prbody.MAX_TEXT)
-        if len(problems) > 50:
-            out += [f"… (troncato: altri {len(problems) - 50} problemi omessi)", ""]
-    return "\n".join(out).rstrip() + "\n"
+    """Il commento di `tollgate-guard` quando lo stato resta in attesa: spiega i problemi.
+    Stesso tetto totale del commento del gate."""
+    _check_sha(sha)
+    minimal = _guard_build(sha, problems, 0, 0)
+    return _fit(lambda cap, keep: _guard_build(sha, problems, cap, keep), len(problems), minimal)

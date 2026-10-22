@@ -300,6 +300,14 @@ class DiffTest(LabCase):
                 ev = self.run_gate(**override)
                 self.assertTrue({"test_deleted", "skip_added"} <= set(keys(ev.red, "diff")))
 
+    def test_untrusted_ids_stay_in_data_not_text(self):
+        self.lab.commit("tests/test_app.py", "def test_zero():\n    assert 1\n", "toglie un test")
+        ev = self.run_gate()
+        item = next(i for i in ev.red if i.key == "test_id_missing")
+        self.assertIn("test_somma", item.data)
+        self.assertNotIn("test_somma", item.text)
+        self.assertEqual(item.text, "test della base assenti o saltati (test)")
+
     def test_out_of_scope_tg_only(self):
         self.lab.commit("src/stray.py", "x = 1\n", "fuori scope")
         ev = self.run_gate()

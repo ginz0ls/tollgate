@@ -122,6 +122,24 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(prblock.parse(body), BLOCK)
         self.assertIn("voci omesse", body)
 
+    def test_single_huge_entry_stays_under_cap_and_keeps_block(self):
+        for kw in ({"notes": [{"severity": "minor", "file": "a.py", "line": 1, "rule": "R",
+                               "text": "x" * 100_000}]},
+                   {"dod_lines": ["d" * 100_000]},
+                   {"warnings": ["w" * 100_000] * 3, "waivers": ["v" * 100_000]}):
+            body = render(**kw)
+            self.assertLessEqual(len(body), prbody.MAX_BODY)
+            self.assertEqual(prblock.parse(body), BLOCK)
+            self.assertTrue(body.rstrip().endswith("-->"))
+
+    def test_defuse_html_comment_closers(self):
+        self.assertNotIn("--!>", prbody.defuse("a --!> b"))
+
+    def test_public_cap_and_caps_ladder(self):
+        self.assertEqual(prbody.cap("x" * 20, 10), "x" * 10 + prbody.TRUNCATED)
+        self.assertEqual(prbody.CAPS[0], prbody.MAX_TEXT)
+        self.assertEqual(list(prbody.CAPS), sorted(prbody.CAPS, reverse=True))
+
 
 if __name__ == "__main__":
     unittest.main()

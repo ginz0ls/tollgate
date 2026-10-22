@@ -430,7 +430,10 @@ def diff(ctx: Context, ev: Evaluation) -> None:
         registered_plan=registered, approved_spec=approved, waiver_file=ctx.waiver_file,
         components=ctx.components, plan_change_is_attention=ctx.is_github)
     for v in check.violations:
-        _red(ev, v.kind, "diff", f"{v.detail} ({v.waiver_type})", v.path)
+        # la parte dopo «: » del dettaglio è letta dal codice della PR (identificativi di test,
+        # soglie): va in `data`, nel testo resta la frase di tollgate
+        said, _, read = v.detail.partition(": ")
+        _red(ev, v.kind, "diff", f"{said} ({v.waiver_type})", f"{v.path}\n{read}" if read else v.path)
     ev.watch = list(check.watched)
     if ctx.is_github:
         _plan_changed(ctx, ev, registered)

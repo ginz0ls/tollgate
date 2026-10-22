@@ -17,13 +17,16 @@ def ev(**kw):
 class MarkerTest(unittest.TestCase):
     def test_marker_first_line_with_sha(self):
         body = comment.render(SHA, ev())
-        self.assertEqual(body.splitlines()[0], f"<!-- tollgate-verdict {SHA} -->")
+        self.assertEqual(body.splitlines()[0], f"<!-- tollgate-verdict sha={SHA} -->")
         self.assertEqual(comment.marker_sha(body), SHA)
         self.assertEqual(comment.marker(SHA), body.splitlines()[0])
 
     def test_marker_sha_rejects_bad(self):
-        for text in (f"<!-- tollgate-verdict {'a' * 39} -->", f"<!-- tollgate-verdict {'A' * 40} -->",
-                     f"<!-- tollgate-verdict {'g' * 40} -->", f"<!-- tollgate-verdict {'a' * 41} -->",
+        for text in (f"<!-- tollgate-verdict sha={'a' * 39} -->",
+                     f"<!-- tollgate-verdict sha={'A' * 40} -->",
+                     f"<!-- tollgate-verdict sha={'g' * 40} -->",
+                     f"<!-- tollgate-verdict sha={'a' * 41} -->",
+                     f"<!-- tollgate-verdict {'a' * 40} -->",
                      "<!-- tollgate-verdict -->", "ciao", ""):
             self.assertIsNone(comment.marker_sha(text), text)
 
@@ -32,7 +35,7 @@ class MarkerTest(unittest.TestCase):
 
     def test_guard_marker(self):
         body = comment.render_guard(SHA, ["manca @team <!-- x --> il file"])
-        self.assertTrue(body.startswith(f"{comment.GUARD_PREFIX} {SHA} -->"))
+        self.assertTrue(body.startswith(f"{comment.GUARD_PREFIX} sha={SHA} -->"))
         self.assertIsNone(comment.marker_sha(body))
         self.assertNotIn("@team", body)
         self.assertEqual(body.count("-->"), 1)
@@ -103,6 +106,42 @@ class RenderTest(unittest.TestCase):
         self.assertLessEqual(len(body), comment.MAX_BODY)
         self.assertIn("voci omesse", body)
         self.assertIn("</details>", body)
+
+    def test_hostile_item_text_is_one_line_and_inert(self):
+        hostile = "a\n```\n</details>\n@x --> <!-- --!> <b>"
+        e = ev(red=[Item("r", "f", hostile)], attention=[Item(INFO_KEY, "f", hostile)])
+        body = comment.render(SHA, e)
+        for bad in ("\n```", "@x", "<!-- --!>", "<b>"):
+            self.assertNotIn(bad, body)
+        self.assertEqual(body.count("</details>"), 1)
+        self.assertEqual(body.count("-->"), 1)
+
+    def test_single_huge_entry_stays_under_cap(self):
+        huge = "z" * 100_000
+        for e in (ev(red=[Item("r", "f", huge)]), ev(red=[Item("r", "f", "t", huge)]),
+                  ev(errors=[huge]), ev(watch=[huge]),
+                  ev(attention=[Item(READ_KEY, "f", huge), Item(INFO_KEY, "f", huge)]),
+                  ev(red=[Item("r", "f", huge)] * 5, errors=[huge] * 5, watch=[huge] * 5)):
+            body = comment.render(SHA, e)
+            self.assertLessEqual(len(body), comment.MAX_BODY)
+            self.assertEqual(comment.marker_sha(body), SHA)
+            self.assertIn("troncato", body)
+
+    def test_many_groups_under_cap(self):
+        e = ev(red=[Item("r", "f", f"r{i}", "y" * 5000) for i in range(4000)],
+               attention=[Item(k, "f", f"a{i}", "y" * 5000) for i in range(4000)
+                          for k in (READ_KEY, INFO_KEY)],
+               watch=["w" * 5000] * 4000, errors=["e" * 5000] * 4000)
+        body = comment.render(SHA, e)
+        self.assertLessEqual(len(body), comment.MAX_BODY)
+        self.assertEqual(body.count("<details>"), body.count("</details>"))
+
+    def test_guard_total_cap(self):
+        for problems in (["p" * 2000] * 50, ["p" * 5000] * 1000, ["p" * 100_000]):
+            body = comment.render_guard(SHA, problems)
+            self.assertLessEqual(len(body), comment.MAX_BODY)
+            self.assertIn("troncato", body)
+            self.assertTrue(body.startswith(f"{comment.GUARD_PREFIX} sha={SHA} -->"))
 
 
 if __name__ == "__main__":
