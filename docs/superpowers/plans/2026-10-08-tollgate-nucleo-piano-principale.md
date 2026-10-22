@@ -95,7 +95,73 @@ Regola: `tollgate_analysis` non importa mai `tollgate_core`. `tollgate_flow` imp
 | P4 | P3 | `finish check` usa il calcolo del gate dietro la stessa interfaccia (rischio 2 chiuso): `finishcheck.check` costruisce `GateInputs(where="local", …)` e chiama `tollgate_gate.evaluate.evaluate`; firma, codici e `finish_report` invariati, più il campo `"gate": {"red": [...], "attention": [...]}` che `open-pr` ignora. Non lancia `gate run` |
 | P4 | P5 | **Moduli e interfacce di P4.** `tollgate_gate.evaluate.evaluate(inputs: GateInputs) -> Evaluation` (`red`, `attention`, `errors`, `watch`, `verdict_state`, `attention_state`; voci `Item(key, family, text, data)`, con il testo non fidato solo in `data`); famiglie `commands`, `base_ids`, `diff`, `level`, `l2`, `must_have`, `issue`, `declared`, `guard_local`, più `components`, `notes`, `workflows`; `GateInputs.where` vale `"github"` o `"local"`. `attention.GROUPS` (chiave → `read` o `info`). `tollgate_core`: `runner` (`CommandSpec`, `gate_commands`, `dod_commands`, `ids_commands`, `receipt_state`, `executed_ids`, `run_one`), `ghcli` (`api(state, cwd, path, *, method, fields, input_file, include, paginate, jq, retry) -> ApiResult(status, data, stderr)`, `BOT_LOGINS`, `STATUS_BOT`, `REQUIRED_CONTEXTS`, `SENTINEL_TITLE`, ritentativi `RETRY_DELAYS_S`), `diffcheck` (`diff_check`, `diff_findings`), `git` (`fetch_ref`, `object_in_history`, `_check_ref`). `tollgate_analysis`: `prref` (`issue_from_branch`, `closes_issue`), `workflows.problems`, `approvals.check_l2_detail` e `L2Problem`, `prblock.FIELDS` a 29 campi (`tasks_over`, `skills_absent`; `findings[].blocking`), `prbody.MAX_BODY` e `cap`. `tollgate_flow.init` (`propose`), `start` che legge protezione e `actions/permissions`. Evento nuovo `skills_absent` {task, skills}; `subagent_stop` porta `size_reason`. File installati: `gate/workflows/tollgate-{guard,run,verdict,base,sentinel}.yml` (nomi di `prereq.GATE_FILES`, invariati), `.github/tollgate/bin/`, `.github/tollgate/VERSION`, `.github/tollgate/FINGERPRINT` (`install.fingerprint`); job `tollgate-base` col nome che `protect.sh` cerca (`protection.BASE_JOB`). Script delle prove reali: `spikes/run-p4-gate.sh` (con `spikes/p4/make_case.py`, `spikes/gh-p4/ghguard.py`) e `spikes/run-p4-flow.sh` (sostituisce `run-p3c-flow.sh` per la prova con il modello) |
 | P4 | P5 | **Vincoli e rinvii per P5.** (1) Le azioni dei workflow sono alla versione maggiore `@v4`: il fissaggio per SHA è di P5 (`actions/permissions` ha già `sha_pinning_required`, V9). (2) Gli eval con il modello coprono ciò che le prove reali di P3c e P4 non hanno esercitato: audit a lenti con `spec-auditor`, `reopen`, `start --spec`, i tetti, più fette, `/tollgate:finish` e la PR in L2, il rientro dal gate rosso con `task start --from-gate`, più task, l'unione della PR (una prova con il modello costa più di 500k token; i test dal programma vero li coprono). (3) I limiti di 1.2 della rev 25 diventano documentazione d'uso: identificativi della base presi da un run della PR, codice unito eseguito da `tollgate-base`, artefatti con collegamenti seguiti, workflow già presenti, PR da fork, `--publish` solo in Actions. (4) Rinviati di P3c con motivo (decisione 24 di P4): riga 11 (`v` nella riga dei giri: serve solo con una versione 2), riga 12 (`close_round` non valida `outcome` e `counts`: un solo chiamante con valori calcolati), riga 20 (dopo «report non scritto» solo il veto: il giro resta aperto e `audit prepare` lo ristampa), righe 13, 15, 24-28, 36 e la duplicazione «base o predefinito più `load_config`» (posizione di test, refactoring e testo senza guasti). (5) La CI del plugin (P5) deve girare in un checkout con spazi nel percorso o correggere i tre test che ne dipendono (minore del Task 1, sotto). (6) La cache in sola lettura dei job `workflow_run` va riletta sul privato quando capita (provata sul pubblico, V4) |
-| P4 | P5 | **Minori rinviati dalle revisioni dei task di P4** (righe «minor (deferred)» del registro del controller; i residui della revisione finale del ramo si aggiungono al suo giro di correzione). Script della prova (Task 1 e 16): `wait_run` con ripiego può agganciare un run estraneo; `merge_pr` ripete il merge anche se il primo ha avuto effetto; `v8-find.txt` ha percorsi locali assoluti; la PR del commit originale del rebase non è provata in V5; V4 scritto più generale del provato (rileggere sul privato); `ghguard.py log` non legge `comandi.log`; la guardia del Task 1 ammetteva solo `gh api` in lettura; regex con `$` in `ghguard.py` e `str.isdigit()` che accetta cifre Unicode; un `__pycache__` aggiunto e tolto resta nella storia del ramo; nel profilo `flow` la PATCH del corpo vale per qualsiasi PR di protected (M3-2) e una riga di test senza spazio dopo la virgola (M3-3); `TOLLGATE_GH_RETRY_DELAYS` malformato solleva `ValueError` in stato di test (M4-3). Test: tre test (`test_check_cli_calls::…test_python_form_with_double_quoted_spaced_path`, `test_prstate::…test_closed_unmerged_returns_closed`, `test_taskcmd::…test_task_start_writes_brief_and_assigns`) falliscono in un checkout senza spazi nel percorso; `test_same_result_as_diff_violations` non confronta due cammini indipendenti; `test_db.BackupRaceTest.test_concurrent_migration_of_v1_db_with_rows` è fallito una volta sotto carico; `test_findings_carry_blocking_field` passa anche senza il codice; `CoverageTest` rilancia il modulo dentro la corsa completa; `tests/test_gate_evaluate.py` oltre le 1000 righe; il nome di `test_deleted_and_moved_tollgate_files_count`; il `gh` finto non pagina (`test_sentinel_issues_paginated`); manca un test per un `edited` che cambia la base della PR; il test di M-3 dei servizi scrive i nomi dei job; due test della skill `init`/`finish` controllano sottostringhe; il RED del TDD dei Task 3 e 4 ricostruito a posteriori; rientro anomalo in `test_token_only_in_env`; nel Task 14 il test del caso (b) confronta la stringa senza invocare `approve plan`, una riga oltre 100 caratteri in `test_check_audit_round.py` e un `assertRaises` senza il messaggio. Codice: `api(paginate=True)` rifiuta valori non oggetto; `_run_checked` di `flow/gh.py` duplica `ghcli._failed`; doppio calcolo del blob in `diffcheck` e `violations`; `closes_issue` conta anche righe citate e commenti HTML (falso rosso possibile, non un bypass); `{statuses:write}` senza spazio non è rosso (in YAML è un'altra chiave) e valori spazzatura diversi da `write` restano verdi; `base_path` con moduli che finiscono con un segmento maiuscolo; `evaluate()` cattura solo `GitError` per il diff; `exit=None` dichiarato verde diventa rosso senza un avviso; `waivers._ID` accetta un `\n` finale; il diff del piano superato ricalcolato a mano in `_stale_diffs`; le voci `notes` non girano in locale; i tagli di emergenza del commento non raggiunti da un test; `_one_line` non spegne link e immagini Markdown nel testo delle voci; `read_results` non restituisce `sha` e `config_sha`; `runner.py` cattura solo `JunitError`; un guard verde non aggiorna un commento rosso precedente; il motivo di un'eccezione entra non neutralizzato nella descrizione dello stato (una riga, troncato); una PR solo verso un altro ramo con un `GhError` nel ricontrollo riceve `error` invece di nessuno stato; fino a 10 s di attesa per ogni commit non verificato di `sentinel`; con molti comandi `unverified` la descrizione di `tollgate/base` può troncare l'elenco; M-4 l'`extraheader` costruito in shell nel passo della chiave di `verdict` (servirebbe `gate cache-key`); M-9 la cache del job `base` di `tollgate-run` avvelenabile dal job `head` (dentro il limite di 1.2); `ConfigError`/`GitError` in `baseids.publish_from` danno uscita 1 senza stato `error` (job rosso, la sentinella copre); `with_mode` con valori ad apici singoli in `tollgate.toml`; `environ` di `_gate_inputs` inutilizzato, `warnings` come secondo canale, il dettaglio `approvals` con righe di diff, una chiamata `gh` a ogni `finish check` (fino a 60 s offline); `_next_report_number` vede solo i report committati |
+| P4 | P5 | **Minori rinviati dalle revisioni dei task di P4** (righe «minor (deferred)» del registro del controller; i residui della revisione finale del ramo si aggiungono al suo giro di correzione): elenco sotto la tabella, «Minori rinviati di P4». |
+
+#### Minori rinviati di P4
+
+Script della prova (Task 1 e 16):
+- `wait_run` con ripiego può agganciare un run estraneo;
+- `merge_pr` ripete il merge anche se il primo ha avuto effetto;
+- `v8-find.txt` ha percorsi locali assoluti;
+- la PR del commit originale del rebase non è provata in V5;
+- V4 scritto più generale del provato (rileggere sul privato);
+- `ghguard.py log` non legge `comandi.log`;
+- la guardia del Task 1 ammetteva solo `gh api` in lettura;
+- regex con `$` in `ghguard.py` e `str.isdigit()` che accetta cifre Unicode;
+- un `__pycache__` aggiunto e tolto resta nella storia del ramo;
+- nel profilo `flow` la PATCH del corpo vale per qualsiasi PR di protected (M3-2) e una riga di test senza spazio dopo la virgola (M3-3);
+- `TOLLGATE_GH_RETRY_DELAYS` malformato solleva `ValueError` in stato di test (M4-3).
+
+Test:
+- tre test (`test_check_cli_calls::…test_python_form_with_double_quoted_spaced_path`, `test_prstate::…test_closed_unmerged_returns_closed`, `test_taskcmd::…test_task_start_writes_brief_and_assigns`) falliscono in un checkout senza spazi nel percorso;
+- `test_same_result_as_diff_violations` non confronta due cammini indipendenti;
+- `test_db.BackupRaceTest.test_concurrent_migration_of_v1_db_with_rows` è fallito una volta sotto carico;
+- `test_findings_carry_blocking_field` passa anche senza il codice;
+- `CoverageTest` rilancia il modulo dentro la corsa completa;
+- `tests/test_gate_evaluate.py` oltre le 1000 righe;
+- il nome di `test_deleted_and_moved_tollgate_files_count`;
+- il `gh` finto non pagina (`test_sentinel_issues_paginated`);
+- manca un test per un `edited` che cambia la base della PR;
+- il test di M-3 dei servizi scrive i nomi dei job;
+- due test della skill `init`/`finish` controllano sottostringhe;
+- il RED del TDD dei Task 3 e 4 ricostruito a posteriori;
+- rientro anomalo in `test_token_only_in_env`;
+- nel Task 14 il test del caso (b) confronta la stringa senza invocare `approve plan`, una riga oltre 100 caratteri in `test_check_audit_round.py` e un `assertRaises` senza il messaggio.
+
+Codice:
+- `api(paginate=True)` rifiuta valori non oggetto;
+- `_run_checked` di `flow/gh.py` duplica `ghcli._failed`;
+- doppio calcolo del blob in `diffcheck` e `violations`;
+- `closes_issue` conta anche righe citate e commenti HTML (falso rosso possibile, non un bypass);
+- `{statuses:write}` senza spazio non è rosso (in YAML è un'altra chiave) e valori spazzatura diversi da `write` restano verdi;
+- `base_path` con moduli che finiscono con un segmento maiuscolo;
+- `evaluate()` cattura solo `GitError` per il diff;
+- `exit=None` dichiarato verde diventa rosso senza un avviso;
+- `waivers._ID` accetta un `\n` finale;
+- il diff del piano superato ricalcolato a mano in `_stale_diffs`;
+- le voci `notes` non girano in locale;
+- i tagli di emergenza del commento non raggiunti da un test;
+- `_one_line` non spegne link e immagini Markdown nel testo delle voci;
+- `read_results` non restituisce `sha` e `config_sha`;
+- `runner.py` cattura solo `JunitError`;
+- un guard verde non aggiorna un commento rosso precedente;
+- il motivo di un'eccezione entra non neutralizzato nella descrizione dello stato (una riga, troncato);
+- una PR solo verso un altro ramo con un `GhError` nel ricontrollo riceve `error` invece di nessuno stato;
+- fino a 10 s di attesa per ogni commit non verificato di `sentinel`;
+- con molti comandi `unverified` la descrizione di `tollgate/base` può troncare l'elenco;
+- M-4 l'`extraheader` costruito in shell nel passo della chiave di `verdict` (servirebbe `gate cache-key`);
+- M-9 la cache del job `base` di `tollgate-run` avvelenabile dal job `head` (dentro il limite di 1.2);
+- `ConfigError`/`GitError` in `baseids.publish_from` danno uscita 1 senza stato `error` (job rosso, la sentinella copre);
+- `with_mode` con valori ad apici singoli in `tollgate.toml`;
+- `environ` di `_gate_inputs` inutilizzato, `warnings` come secondo canale, il dettaglio `approvals` con righe di diff, una chiamata `gh` a ogni `finish check` (fino a 60 s offline);
+- `_next_report_number` vede solo i report committati.
+
+Dalla revisione finale del ramo (giro di correzione), rinviati a P5:
+- M-1 (revisione finale) il confronto degli identificativi della base non dà nessuna voce quando un comando richiesto manca da `base_ids` o nella base non è girato (setup fallito, nessun report), anche con una cache `tollgate-ids-<albero>` scritta con una configurazione precedente: servirebbe una voce «da leggere» (dichiarato in spec 1.2);
+- M-3 (revisione finale) dopo `edited` (corpo o base cambiati) o `reopened` il `tollgate/verdict` precedente dello stesso SHA resta valido fino al nuovo verdetto; l'agente non può unire, resta il merge umano nella finestra: servirebbe un `pending` pubblicato da `guard` (dichiarato in spec 1.2);
+- M-4 (revisione finale) `[skip ci]` nel commit di testa di un push sul predefinito salta `tollgate-sentinel` per quel push, e in `detect` è l'unico controllo: servirebbe far partire l'intervallo della sentinella dall'ultimo commit controllato (dichiarato in spec 1.2);
+- M-5 (revisione finale) `config_sha` di `results.json` confrontato per commit, come vuole la lettera della decisione 13: ogni merge sul predefinito durante un `tollgate-run` dà `error` alle PR in volo anche se `tollgate.toml` non è cambiato; confrontare il blob di `tollgate.toml` darebbe lo stesso fail-closed con meno rumore;
+- M-9 (revisione finale) `AgreementTest` non parte dagli ingressi del gate vero (configurazione della punta, `merge-base`, blocco dal corpo, artefatti): manca un test di accordo che faccia girare `verdict.main` sullo stesso albero e confronti le chiavi rosse con `finish check`.
 
 ---
 
