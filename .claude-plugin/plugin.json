@@ -1,9 +1,10 @@
 {
   "name": "tollgate",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Dall'issue GitHub alla PR verificata: guardrail locali per Claude Code e gate su GitHub.",
   "author": {"name": "sAInapse"},
   "license": "MIT",
+  "experimental": {"evals": "evals"},
   "dependencies": [
     {"name": "superpowers", "marketplace": "claude-plugins-official"}
   ]

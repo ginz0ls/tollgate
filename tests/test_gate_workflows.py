@@ -136,6 +136,61 @@ def checkouts(text: str) -> list[list[str]]:
     return [s for s in steps(text) if (field(s, "uses") or "").startswith("actions/checkout@")]
 
 
+PINS_FILE = ROOT / install.WORKFLOWS_DIR / "PINS"
+PINNED = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$")
+
+
+def pins() -> dict[str, tuple[str, str]]:
+    """`gate/workflows/PINS` (`<azione> <tag> <sha>`, una riga per azione): azione → (tag, sha)."""
+    out = {}
+    for line in PINS_FILE.read_text(encoding="utf-8").splitlines():
+        if line.strip() and not line.startswith("#"):
+            action, tag, sha = line.split()
+            out[action] = (tag, sha)
+    return out
+
+
+def uses_of(text: str) -> list[str]:
+    """Il valore di ogni `uses:` (azione, SHA e commento) del testo."""
+    return [m.group(1).strip() for m in re.finditer(r"(?m)^\s*(?:- )?uses:\s*(.*)$", text)]
+
+
+class PinTest(unittest.TestCase):
+    def test_pins_file_format(self):
+        found = pins()
+        self.assertTrue(found)
+        for action, (tag, sha) in found.items():
+            self.assertRegex(action, r"^actions/[\w./-]+$")
+            self.assertRegex(tag, r"^v\d+\.\d+\.\d+$")
+            self.assertRegex(sha, r"^[0-9a-f]{40}$")
+
+    def test_every_uses_pinned(self):
+        for name in NAMES:
+            found = uses_of(read(name))
+            for uses in found:
+                self.assertRegex(uses, PINNED, name)
+        self.assertTrue(any(uses_of(read(name)) for name in NAMES))
+
+    def test_pins_match_file(self):
+        want = pins()
+        used = set()
+        for name in NAMES:
+            for uses in uses_of(read(name)):
+                ref, comment = uses.split(" # ")
+                action, sha = ref.split("@")
+                self.assertIn(action, want, f"{name}: {action} non è in PINS")
+                self.assertEqual((comment, sha), want[action], f"{name}: {action}")
+                used.add(action)
+        # `setup-python` serve solo alla CI del plugin, che legge la stessa fonte
+        ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        used |= {uses.split("@")[0] for uses in uses_of(ci)}
+        self.assertEqual(used, set(want), "PINS ha azioni che nessun workflow usa")
+
+    def test_no_major_tag_left(self):
+        for name in NAMES:
+            self.assertNotRegex(read(name), r"@v\d", name)
+
+
 class WorkflowFilesTest(unittest.TestCase):
     def test_names_match_gate_files(self):
         gate = [f for f in prereq.GATE_FILES if f.startswith(".github/workflows/")]

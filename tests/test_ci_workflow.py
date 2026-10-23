@@ -1,10 +1,9 @@
 """La CI del plugin (`.github/workflows/ci.yml`): la suite su GitHub, con la stessa forma della
 macchina di sviluppo (checkout in un percorso con uno spazio, `ResourceWarning` come errori)."""
-import re
 import unittest
 
 from tests.helpers import ROOT
-from tests.test_gate_workflows import EXPR, field, jobs, mapping, run_lines, section, steps
+from tests.test_gate_workflows import EXPR, PINNED, field, jobs, mapping, pins, run_lines, section, steps, uses_of
 from tollgate_analysis import workflows
 
 CI = ROOT / ".github" / "workflows" / "ci.yml"
@@ -78,6 +77,14 @@ class CiWorkflowTest(unittest.TestCase):
     def test_passes_workflow_rules(self):
         self.assertEqual(workflows.problems(text()), [])
 
-    def test_actions_use_current_major_versions(self):
-        uses = re.findall(r"uses:\s*(\S+)", text())
-        self.assertEqual(uses, ["actions/checkout@v7", "actions/setup-python@v7"])
+    def test_ci_workflow_pinned(self):
+        """Le stesse azioni dei workflow del gate, fissate per SHA dalla stessa fonte (`PINS`)."""
+        want = pins()
+        found = uses_of(text())
+        self.assertEqual(len(found), 2)
+        for uses in found:
+            self.assertRegex(uses, PINNED)
+            ref, comment = uses.split(" # ")
+            action, sha = ref.split("@")
+            self.assertEqual((comment, sha), want[action], action)
+        self.assertEqual([u.split("@")[0] for u in found], ["actions/checkout", "actions/setup-python"])

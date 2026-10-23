@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from tests.flowkit import FlowLab
+from tollgate_core import VERSION
 from tollgate_flow import prereq
 
 REGISTRY = "plugins/installed_plugins.json"
@@ -58,7 +59,7 @@ class PrereqTest(unittest.TestCase):
     def test_gate_status(self):
         fl = FlowLab()
         try:
-            self.assertEqual(prereq.gate_status(fl.main, "origin/main"), ([], "0.1.0"))
+            self.assertEqual(prereq.gate_status(fl.main, "origin/main"), ([], VERSION))
         finally:
             fl.close()
         fl = FlowLab(gate=False)
@@ -77,7 +78,7 @@ class PrereqTest(unittest.TestCase):
             fl.git("commit", "-qm", "senza run")
             fl.git("push", "-q", "origin", "main")
             self.assertEqual(prereq.gate_status(fl.main, "origin/main"),
-                             ([".github/workflows/tollgate-run.yml"], "0.1.0"))
+                             ([".github/workflows/tollgate-run.yml"], VERSION))
         finally:
             fl.close()
 

@@ -13,6 +13,7 @@ from unittest import mock
 from tests.flowkit import FAKEGH, FlowLab
 from tests.helpers import ROOT, git
 from tests.hookkit import DEFAULT_TOML
+from tests.test_gate_workflows import PINNED, uses_of
 from tests.test_protection import DETECT_MSG, PATH as PROTECTION_PATH, good
 from tollgate_core import VERSION, clock, config, phases, receipts
 from tollgate_flow import init
@@ -195,6 +196,17 @@ class FilesTest(InitCase):
         self.assertLess(commit, script)
         self.assertIn("protect.sh", readme[script:script + 400])
         self.assertIn(f"{FOLDER}/files", readme)
+
+    def test_proposal_workflows_pinned(self):
+        """Le azioni del gate (fissate per SHA) arrivano intatte nella proposta di `init`."""
+        self.make(UNSET)
+        self.proposal()
+        for name in install.WORKFLOW_NAMES:
+            rel = f"gate/workflows/tollgate-{name}.yml"
+            proposed = (self.folder / f"files/.github/workflows/tollgate-{name}.yml").read_text()
+            self.assertEqual(uses_of(proposed), uses_of((ROOT / rel).read_text()), name)
+            for uses in uses_of(proposed):
+                self.assertRegex(uses, PINNED)
 
     def test_default_branch_in_push_workflows(self):
         self.make(UNSET)

@@ -61,6 +61,10 @@ class ManifestTest(unittest.TestCase):
                          ("superpowers", "claude-plugins-official"))
         self.assertNotIn("version", dep)
 
+    def test_experimental_evals(self):
+        p = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())
+        self.assertEqual(p["experimental"], {"evals": "evals"})
+
     def test_off_on_skills_user_only(self):
         for name in ("off", "on"):
             text = (ROOT / "skills" / name / "SKILL.md").read_text()
