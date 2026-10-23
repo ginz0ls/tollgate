@@ -960,7 +960,7 @@ Il comando lo esegui tu. `start` prova a leggere la protezione e segnala i campi
 
 **Stima.** Per ogni merge sul ramo predefinito: `base` + `gate` × (PR aperte che `strict` rende vecchie e che vanno risincronizzate). `init` misura la durata di `finish check` e mostra la stima in minuti al mese per un ritmo di merge che indichi tu. Riferimento: GitHub Free include 2.000 minuti al mese per i repo privati (docs.github.com, «About billing for GitHub Actions»).
 
-`base_test_ids` si può spegnere; senza, `tollgate-base` non gira.
+`base_test_ids` si può spegnere; senza, la suite della base non gira: `gate base-ids` scrive un `ids.json` senza comandi, `tollgate-base` finisce verde e in `detect` pubblica `tollgate/base` `success` (il testo dello stato non dice ancora che il componente è spento: rinviato a P5).
 
 **Misurato nella prova reale di P4** (repo di prova piccolo, unittest): un `tollgate-run`, un `guard` e un `verdict` per caso, circa 0,6-0,7 minuti a caso; sul flusso con `claude -p` 40 s in tutto (`tollgate-run` 10 s, `guard` 12 s, `verdict` 18 s). La stima di `init` (11.2) usa le ricevute, non questi numeri.
 

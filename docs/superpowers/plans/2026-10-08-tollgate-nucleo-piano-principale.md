@@ -163,6 +163,10 @@ Dalla revisione finale del ramo (giro di correzione), rinviati a P5:
 - M-5 (revisione finale) `config_sha` di `results.json` confrontato per commit, come vuole la lettera della decisione 13: ogni merge sul predefinito durante un `tollgate-run` dà `error` alle PR in volo anche se `tollgate.toml` non è cambiato; confrontare il blob di `tollgate.toml` darebbe lo stesso fail-closed con meno rumore;
 - M-9 (revisione finale) `AgreementTest` non parte dagli ingressi del gate vero (configurazione della punta, `merge-base`, blocco dal corpo, artefatti): manca un test di accordo che faccia girare `verdict.main` sullo stesso albero e confronti le chiavi rosse con `finish check`.
 
+Residui della ri-revisione della correzione finale, rinviati a P5:
+- con `base_test_ids` spento, in `detect` `tollgate/base` dice «suite della base verde» anche se non è girato nulla: il testo dovrebbe dire che il componente è spento;
+- righe oltre 100 caratteri in `tests/fakegh.py:46,230,231`.
+
 ---
 
 ## 4. Matrice di copertura
