@@ -1,0 +1,40 @@
+name: ci-probe
+# Sonda VC1 di tollgate P5: durata della suite sui runner per 3.11 e 3.13, con e senza PYTHONWARNINGS=error::ResourceWarning
+# (sottoprocessi che controllano lo stderr), checkout in una cartella con uno spazio. Si copia come
+# .github/workflows/ci-probe.yml su un ramo p5-probe-*. Nessuna espressione dentro le righe run:.
+on:
+  push:
+    branches: ["p5-probe-*"]
+permissions:
+  contents: read
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+        warnings: ["off", "error"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: "tollgate src"
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: suite
+        working-directory: tollgate src
+        env:
+          WARNINGS_MODE: ${{ matrix.warnings }}
+        run: |
+          if [ "$WARNINGS_MODE" = error ]; then export PYTHONWARNINGS=error::ResourceWarning; fi
+          python --version
+          start="$(date +%s)"
+          set +e
+          PYTHONS=python tests/run 2>&1 | tee "$RUNNER_TEMP/suite.log"
+          rc="${PIPESTATUS[0]}"
+          echo "sonda: rc=$rc durata=$(( $(date +%s) - start ))s modo-avvisi=$WARNINGS_MODE"
+          echo "sonda: righe unclosed database: $(grep -c 'unclosed database' "$RUNNER_TEMP/suite.log")"
+          exit "$rc"
