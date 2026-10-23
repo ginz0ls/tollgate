@@ -1,0 +1,11 @@
+## Global Constraints
+
+- Solo libreria standard in `bin/` e nei test (spec 3). Python ≥ 3.11. Ogni task chiude con `tests/run` verde (`python3.11` e `python3`).
+- **Strati** (spec 3, `tests/test_layers.py`, decisione 1): `tollgate_analysis` non importa nulla di tollgate; `tollgate_gate` importa solo `tollgate_analysis` e i moduli senza stato di `tollgate_core` (`__init__`, `clock`, `paths`, `git`, `config`, `runner`, `diffcheck`, `ghcli`), mai `db` né `sqlite3`; `tollgate_flow` importa `tollgate_core`, `tollgate_analysis` e `tollgate_gate`; `tollgate_core` non importa `tollgate_gate`, `tollgate_flow`, `tollgate_hooks` né `tollgate_checks`, tranne `tollgate_core/cli.py`.
+- Scritture nel DB solo con le funzioni di `tollgate_core`; `set_phase`, `open_block` e `close_block` fuori da una transazione; `db.DbError` e `sqlite3.Error` diventano rifiuti, mai traceback.
+- **Programma nei comandi per il modello:** ogni comando in un messaggio della CLI, di un hook, di un brief, di una skill o di un agente usa `tollgate_core.paths.program_command`; le skill scrivono `python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"`.
+- La configurazione si legge dalla base del lavoro o dalla punta del ramo predefinito, mai dal working tree; **nel gate sempre dalla punta del ramo predefinito** (9.2). Gli hook non usano la rete.
+- **Testo non fidato** (corpo della PR, issue, commenti, rilievi, nomi di rami, messaggi dei comandi): mai in un argomento di `git` o `gh`, mai interpolato in una riga `run:` di un workflow (nessuna `${{ … }}` dentro `run:`). Va su file o in variabili d'ambiente, nei commenti in un recinto più lungo di ogni sequenza di backtick, marcato come dato (`prbody.neutralize`).
+- Nessuna rete nei test: `gh` è `tests/fakegh.py` con `TOLLGATE_GH` e la sentinella. Nessun test tocca `~/.local/state/tollgate`, `~/.claude/settings.json` o `~/.claude/plugins/`. I test non lanciano `claude`.
+- **GitHub vero solo nel Task 1 e nel Task 16**, eseguiti dal controller, solo sui repo `ginz0ls/tollgate-p4-protected` (pubblico) e `ginz0ls/tollgate-p4-detect` (privato) e solo con le operazioni della decisione 25. Un `claude -p` solo nel Task 16.
+- Identificatori in inglese, testi per l'utente in italiano. Nessun `__pycache__` nel repo (`-B`). Commit dopo ogni task.

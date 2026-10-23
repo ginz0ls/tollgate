@@ -1,0 +1,2 @@
+- (Task 15, D18a) `test_skill_contract.py`: i sottocomandi `gate` citati si verificano contro `tollgate_gate.cli.build_parser()`, gli altri contro `tollgate_core.cli.build_parser()`.
+- (Task 15, D21b) La skill `finish` distingue le righe di `attenzione` («da leggere», «informative») da quelle `[sì]`/`[no]`.

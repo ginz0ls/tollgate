@@ -1,0 +1,7 @@
+ERROR: test_exit_codes_keep_their_meaning (tests.test_skill_contract.SkillContractTest.test_exit_codes_keep_their_meaning)
+ERROR: test_exit_codes_match_constants (tests.test_skill_contract.SkillContractTest.test_exit_codes_match_constants) (skill='init')
+ERROR: test_init_skill_never_copies_or_protects (tests.test_skill_contract.SkillContractTest.test_init_skill_never_copies_or_protects)
+ERROR: test_init_model_invocable (tests.test_manifest.ManifestTest.test_init_model_invocable)
+FAIL: test_finish_separates_attention_lines_from_dod_lines (tests.test_skill_contract.SkillContractTest.test_finish_separates_attention_lines_from_dod_lines)
+Ran 43 tests in 0.348s
+FAILED (failures=1, errors=4)

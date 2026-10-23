@@ -1,0 +1,54 @@
+f981c97 tollgate P4: piano principale, stato, interfacce P4 → P5 e prove dei criteri di P4 (Task 17)
+463cc84 tollgate P4: spec rev 25 (decisioni 1-27, esiti di V1-V9 e delle prove reali) (Task 17)
+17e8cc7 tollgate P4: prove dei criteri 10, 18, 35 e 44 dal programma vero; docstring di open-pr sulla PATCH REST (Task 17)
+e658b49 tollgate P4: rapporto della prova, classificata l'ultima riga gh --version (Task 16)
+e101992 tollgate P4: rapporti della prova, correzioni della revisione (Task 16)
+c310d04 tollgate P4: prova reale del gate sui due repo e del flusso con claude -p
+8fa32ba tollgate P4: il controllo dei comandi ammette il clone del flusso (Task 16)
+c178f03 tollgate P4: ritentativi anche per stati e modifiche di commenti, scritture idempotenti (Task 16, giro 5)
+aa1a0b3 tollgate P4: ritentativi solo per le letture vere e attese brevi nei test (Task 16, giro 4, minori)
+e7dd195 tollgate P4: le letture di gh api ritentano sui 5xx transitori di GitHub (Task 16, giro 4)
+f301c6e tollgate P4: corpo della PR aggiornato con la REST (gh pr edit rotto con gh 2.46) e attesa UNSTABLE con attenzione rossa (Task 16)
+a768319 tollgate P4: verifica dello stato attorno ai passi del flusso (Task 16, giro 2)
+fcb22a3 tollgate P4: correzioni della revisione degli script della prova (Task 16, giro 1)
+62a6220 tollgate P4: skill e contratto, correzioni (Task 15, fix round 1)
+84c8dc3 tollgate P4: script della prova reale del gate e del flusso (Task 16, senza esecuzione)
+201a868 tollgate P4: skill init e skill aggiornate, contratto tra skill e codice
+aeb5109 tollgate P4: casi lasciati da P3c (approvazione corrente, approval con avversario spento, numerazione dopo DB perso) e rinviati del percorso L2
+c63f8a0 tollgate P4: finish check usa il calcolo del gate; campi nuovi del blocco; marcatore letto da --from-gate
+195d750 tollgate P4: una regola dei servizi in install, stima dalle ricevute verdi del repo, README neutralizzato (Task 12, fix round 1)
+8c3b417 tollgate P4: tollgate-base diviso in ids e pubblicazione, servizi in ogni job con la suite (Task 11, fix round 1)
+5475e54 tollgate P4: init con la misura della modalità e la proposta dei file; protezione letta da start
+89acde5 tollgate P4: i cinque workflow del gate e i file da installare
+32264ae tollgate P4: push forzato non verificato, stati fidati solo da github-actions[bot], stati prima dell'issue (Task 10, fix round 1)
+d8e8606 tollgate P4: confine d'errore esplicito in verdict, regola unica dell'issue della PR (Task 9, fix round 1)
+aad7df7 tollgate P4: sentinel, tollgate/base in detect, issue di sentinel paginate
+6afc140 tollgate P4: gate evaluate su GitHub (controlli preliminari, stati, commento)
+3df4592 tollgate P4: codifica XML sconosciuta e confini fail-closed degli artefatti (Task 7, fix round 3)
+f7d992e tollgate P4: PR impilate non condividono lo SHA, commento guard rosso, ricontrollo della testa (Task 8, fix round 1)
+5863fcf tollgate P4: JSON annidato e results.json letto una volta sola (Task 7, fix round 2)
+60a4cf6 tollgate P4: gate guard (file di tollgate, workflow del progetto, tollgate-config)
+4250bcf tollgate P4: abbreviazioni di --publish negate, report con caratteri di controllo rifiutati, lettura degli artefatti fail-closed (Task 7, fix round 1)
+e51939f tollgate P4: commento del gate, testo non fidato fuori da Item.text, tetti duri, marcatori con sha= (Task 6, fix round 1)
+3be5dea tollgate P4: i report dei Task 6 e 7 restano fuori dal repo (cartella sdd ignorata)
+1bb2c06 report del Task 7 del piano P4
+3fb65e9 tollgate P4: gate run e base-ids senza stato, artefatti validati
+6279719 tollgate P4: commento del gate con lo SHA nel marcatore; tetto del corpo della PR
+039146b tollgate P4: calcolo del gate, ramo di configurazione solo dello stesso repo, rilievi fail-closed, level_cap sempre riportato (Task 5, fix round 1)
+00065d7 tollgate P4: workflow, scanner con stato YAML: flussi su più righe rossi, blocchi solo veri, virgolette solo a inizio nodo (Task 3, fix round 4)
+b02b53b tollgate P4: calcolo del gate (livello, L2, issue, DoD dichiarata, componenti)
+fcd85e1 tollgate P4: workflow, rosso per i tag YAML e tabulazioni dopo i due punti nei permessi (Task 3, fix round 3)
+a085abe tollgate P4: piano cambiato solo attenzione nel gate, setup rossi solo dai nomi della configurazione (Task 4, fix round 1)
+61d2d9c tollgate P4: workflow, rosso per ogni escape in una stringa a doppie virgolette fuori da run: (scanner con stato tra le righe) (Task 3, fix round 2)
+cc49a86 tollgate P4: calcolo del gate (comandi, base, diff, piano, must-have) e gruppi di attenzione
+9e52745 tollgate P4: un solo giudizio sulla spec approvata (judge_spec), workflow fail-closed su escape e chiavi complesse (Task 3, fix round 1)
+c9b7170 tollgate P4: guardia gh a elenco chiuso anche per pr, issue e run; prova negativa estesa e controllo di comandi.log (Task 1, fix round 2)
+8210169 tollgate P4: approvazioni L2 dettagliate (corrente vince, report sullo sha approvato), regole dei workflow, issue della PR
+82a962b tollgate P4: _check_ref in blob_text e GIT_TERMINAL_PROMPT=0 in fetch_ref (Task 2, fix round 1)
+02f9637 tollgate P4: toglie __pycache__ finito per errore nel commit precedente (Task 1, fix round 1)
+48b624b tollgate P4: guardia dei comandi gh a lista di ammessi in un solo punto (ghguard.py), prova negativa, SHA di pulizia corretti (Task 1, fix round 1)
+7102192 tollgate P4: moduli senza stato (runner, ghcli, diffcheck), pacchetto tollgate_gate, strati
+bae003e tollgate P4: verifiche reali su GitHub (campi di gh, eventi, cache, commit e PR)
+6b4a1b4 tollgate P4: sonda V4b (scrittura della cache nei job push, pull_request e workflow_run) (Task 1)
+b8987b2 tollgate P4: sonde V3b (fetch di refs/pull su privato) e V5b (PR impilate) nelle verifiche su GitHub (Task 1)
+d2378bd tollgate P4: script e sonde delle verifiche reali su GitHub (Task 1)

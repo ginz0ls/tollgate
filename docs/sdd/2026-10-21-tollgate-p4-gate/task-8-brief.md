@@ -1,0 +1,16 @@
+### Task 8: `gate guard`
+
+**Files:**
+- Create: `bin/tollgate_gate/guard.py`, `bin/tollgate_gate/github.py`, `tests/test_gate_guard.py`
+- Modify: `bin/tollgate_gate/cli.py`, `tests/fakegh.py` (stati, commenti delle issue, `refs/pull`)
+
+**Interfaces:**
+- Consumes: `evaluate.tollgate_files_changed`, `workflows.problems`, `prref`, `comment.render_guard`, `ghcli.api`.
+- Produces in `github.py` (solo `ghcli`, tutti con `repo_slug` da `GITHUB_REPOSITORY`): `read_event(path) -> dict`; `pr_from_event(event) -> PrFacts | None`; `set_status(state, cwd, slug, sha, *, context, status, description) -> None`; `statuses(state, cwd, slug, sha) -> list[dict]` (con `creator.login`, `api --paginate`, dal più recente); `issue(state, cwd, slug, n) -> IssueFacts | None`; `pr_comments(state, cwd, slug, n) -> list[dict]` (REST, con `id`, `user.login`, `body`); `upsert_comment(state, cwd, slug, n, *, prefix: str, body_file: Path) -> None` (decisione 14: cerca per prefisso e autore in `ghcli.BOT_LOGINS`); `prs_for_commit(state, cwd, slug, sha) -> list[dict]`; `open_sentinel_issues(state, cwd, slug) -> list[dict]` (decisione 16); `comment_issue(...)`, `create_issue(...)`. Il testo dei commenti passa sempre da file (`-F body=@<file>`).
+- Produces in `guard.py`: `check(repo: Path, *, base_tip: str, head: str, head_ref: str, cross_repo: bool) -> list[str]` (decisione 15); `run(event_path: Path, *, publish: bool, environ) -> int` (fa `git fetch origin refs/pull/<n>/head`, pubblica `tollgate/guard` e, se rosso, il commento). Prima di pubblicare applica le stesse regole di `verdict` (decisione 5, rilievo N-3): una PR non verso il predefinito non riceve nessuno stato, solo il commento «non applicabile»; uno SHA che è la testa di più PR aperte verso il predefinito riceve `error`. La regola comune è `github.shared_sha_prs(state, cwd, slug, sha, default_branch) -> list[dict]`, usata da `guard` e da `verdict.prechecks`.
+
+- [ ] **Step 1: Test** `test_gate_guard.py` (criterio 10, «guard rosso»): `test_tollgate_toml_changed`; `test_verdict_workflow_changed_outside_config_branch`; `test_config_branch_only_tollgate_files_passes` e `test_config_branch_with_code_is_red`; `test_project_workflow_rules` (aggiunto con `statuses: write`, con `checks: write`, con `pull_request_target`, con `workflow_run`, senza `permissions` → cinque problemi distinti); `test_project_workflow_modified_ok_passes` (`permissions: contents: read` → guard verde; la deroga `ci` la chiede `verdict`, criterio 10 «verde con attenzione»); `test_publish_uses_files_not_args` (con il `gh` finto: nessun argomento contiene testo del corpo o del nome del ramo; il commento è passato con `body=@`); `test_fork_pr` (ramo `tg/7-x` da un fork: le regole valgono uguali); `test_fork_config_branch_gets_no_exception` (rilievo M-7); `test_yaml_extension_checked`; `test_not_default_base_writes_no_status` e `test_shared_sha_is_error` (rilievo N-3: una PR verso `other` da `tollgate-config/z` sulla stessa testa di una PR verso il predefinito non sovrascrive `tollgate/guard`).
+- [ ] **Step 2: Fallimento, implementazione, verifica, `tests/run`, commit** «tollgate P4: gate guard (file di tollgate, workflow del progetto, tollgate-config)».
+
+---
+

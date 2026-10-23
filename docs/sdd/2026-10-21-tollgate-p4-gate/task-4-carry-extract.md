@@ -1,0 +1,5 @@
+- (Task 4, D3) `prblock.FIELDS` riceve in coda `tasks_over` e `skills_absent` (difetto: liste vuote) e i rilievi accettano il campo `blocking`; `prblock.build` li accetta. Il Task 13 li riempie da `openpr.facts`. Aggiornare i test di `test_prblock.py` che confrontano l'elenco dei campi.
+- (Task 4, D6) Violazione `base_ids`: `path` derivato dall'identificativo `classname::name` (il `classname` se contiene `/`; altrimenti modulo con i punti → percorso `.py`); violazioni raggruppate per `path`; copertura con `waivers.covers` (file o pattern, **tutti** gli identificativi).
+- (Task 4, D13) Test in più: `test_plan_sha_absent_is_red`, `test_l0_without_plan_over_thresholds_is_red`. Chiave `task_over_max` in `GROUPS` con valore `"info"`.
+- (Task 4, D17e) «`plan_sha` presente nella storia della testa» = `git log -n 1 --format=%H --find-object=<plan_sha> <testa> --` non vuoto, con una funzione in `tollgate_core.git` (non `cat-file -t`).
+- (Task 4, D5) Una voce di `results.json` per i `setup` (nome `setup` o `profile:<p>:setup`) con `state = "red"` è trattata da `evaluate` come comando del gate rosso.

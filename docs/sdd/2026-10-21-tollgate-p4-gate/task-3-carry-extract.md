@@ -1,0 +1,2 @@
+- (Task 3, D10) Aggiornare al caso (a) `tests/test_approvals.py::LocateTest.test_locate_own_then_other_issue` e `tests/test_audit_prepare.py::SpecApprovalOfLaterSliceTest.test_helper_own_stale_approval`; `tests/test_l2tree.py` è un file **nuovo** (testa `tollgate_gate.l2tree` e il re-export di `tollgate_flow.l2tree`).
+- (Task 3, D17a) `prref.issue_from_branch` è la sola fonte di `^tg/(\d+)-`: `tollgate_hooks/_common.py:16` e `tollgate_flow/closing.py:24` la usano, comportamento invariato (i loro test esistenti devono passare).

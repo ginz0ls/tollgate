@@ -1,0 +1,2 @@
+- (Task 6, D17c) Una sola costante `prbody.MAX_BODY`; `comment` la importa (niente `comment.MAX_BODY` separata, o al più un alias dello stesso oggetto).
+- (Task 6, D19) Il testo non fidato dei diff sta solo in `Item.data`; `comment.render` non ha i parametri `plan_diff` e `approval_diff`.
