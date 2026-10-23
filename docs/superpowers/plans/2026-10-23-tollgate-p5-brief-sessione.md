@@ -45,12 +45,14 @@ Il lavoro è finito quando:
 
 ## Punti delicati del piano
 
-- **La sandbox di `claude plugin eval`** (decisione 3): casa temporanea per corsa, rete chiusa, Superpowers assente, all'agente solo variabili `EVAL_*`, hook del plugin attivi fuori dalla sandbox, `scaffold_script` solo con `--scaffold`, grader senza codice. Lo stato di tollgate lo costruisce lo scaffold con il programma vero; il `gh` è uno shim nel `PATH` di chi lancia l'eval. Il Task 1 (VE1-VE9) prova ciò che la documentazione non dice; la decisione 9 fissa il ripiego (copia senza `dependencies`, esecutore locale `local.py`).
+- **La sandbox di `claude plugin eval`** (decisione 3): casa temporanea per corsa, rete chiusa, Superpowers assente, all'agente solo variabili `EVAL_*`, hook del plugin attivi fuori dalla sandbox, `scaffold_script` solo con `--scaffold`, grader senza codice. Lo stato di tollgate lo costruisce lo scaffold con il programma vero; il `gh` è uno shim nel `PATH` di chi lancia l'eval. Il Task 1 (VE1-VE11) prova ciò che la documentazione non dice; la decisione 9 fissa il ripiego: (a) copia senza `dependencies`, (c) copia fuori da `/home` se la radice del plugin non si legge, (b) esecutore locale `local.py` con `claude -p` **solo con l'OK dell'utente**. Lo shim di `gh` sta in `tests/evalbin/`, non sotto `evals/` (una corsa non legge la cartella degli eval).
 - **`--no-publish` sempre**: senza, `claude plugin eval` pubblica il rapporto su claude.ai.
 - **`socat` manca sulla macchina** (verificato il 23/10/2026): `claude plugin eval` su Linux richiede `bubblewrap` (c'è) e `socat`. Lo Step 0 del Task 1 si ferma e chiede all'utente di installarlo.
 - **Punteggio sull'esito** (decisione 2): un modello che rispetta l'obbligo senza tentare la scorciatoia non perde punti; il testo del veto è un indicatore, tranne nei casi che chiedono l'azione vietata in modo esplicito.
 - **Un solo calcolo del gate**: le voci nuove (M-1) vanno in `evaluate` con il loro gruppo.
-- **`pending` di `guard`** (decisione 15): solo su `edited`/`reopened` e solo verso il predefinito; mai stati sulle PR verso altri rami.
+- **`pending` di `guard`** (decisione 15): solo su `opened`/`edited`/`reopened` e solo verso il predefinito; mai stati sulle PR verso altri rami.
+- **Sentinella** (decisione 16): da P5 ogni push controllato lascia `tollgate/sentinel` `success` su `after`, ed è quel segnale che la salita cerca; senza, M-4 non si chiude.
+- **Guardia dei comandi `gh`**: il profilo `p5` di `ghguard.py` si scrive nel Task 1, prima del primo `gh` vero.
 - **Versione 0.2.0** (decisione 13): cambia `.github/tollgate/VERSION` atteso dai banchi e l'avviso di `start` sulle installazioni vecchie; detect si aggiorna con la procedura di 9.4 nel Task 13.
 
 ## Stato al momento di questo brief

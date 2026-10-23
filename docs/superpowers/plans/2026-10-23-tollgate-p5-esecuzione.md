@@ -22,7 +22,7 @@ Dopo il Task 1 e prima del Task 2, un analista sonnet in sola lettura scrive `pr
 - i conflitti con la spec rev 25, con il codice reale di `main` e con gli esiti del Task 1.
 
 Lo giudichi tu: per ogni conflitto una riga `Ruling:` nel ledger e una voce in `carry.md` (o nel `task-N-carry-extract.md`) per i task che ne dipendono, **prima** di lanciarli. Punti da far guardare apposta:
-- gli esiti VE1-VE9 contro le decisioni 2, 3 e 9: se scatta il ripiego della decisione 9, una `Ruling:` dice quali casi girano con `local.py` e il Task 11 riceve lo Step condizionale;
+- gli esiti VE1-VE11 contro le decisioni 2, 3 e 9: (a) e (c) si applicano con una `Ruling:`; se scatta (b), fermati e chiedi all'utente prima di scrivere `local.py` e prima di ogni `claude -p`, e la `Ruling:` registra la sua risposta;
 - `scaffold.build` (Task 7) contro `tests/flowkit.py` e `tests/hookkit.py`: segnale della sessione, forma degli eventi, cartella di stato; nessun accesso diretto al DB;
 - le chiavi nuove di `attention.GROUPS` (Task 4) contro `CoverageTest` e contro il commento del gate;
 - `guard` con `pending` (Task 5) contro la regola «nessuno stato sulle PR verso altri rami» (decisione 5 di P4) e contro `verdict._statuses`;
@@ -65,15 +65,17 @@ Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincol
 - Mai installare, abilitare o disinstallare plugin: niente `claude plugin install` né `claude plugin marketplace add`. `claude plugin validate` è ammesso.
 
 **Esperimenti e rete (subagenti)**
-- Nessun `claude -p`, nessun `claude plugin eval`, nessun altro `claude` vero (un `claude` finto nel `PATH` dei test è ammesso), nessuna chiamata di rete, nessun repo su GitHub, nessun push verso la rete. Il solo push ammesso è verso i repo nudi locali dei banchi. `gh` nei test è `tests/fakegh.py` (o lo shim `evals/_kit/bin/gh`). Mai `gh auth`, `gh api` o `gh pr create` col `gh` vero.
+- Nessun `claude -p`, nessun `claude plugin eval`, nessun altro `claude` vero (un `claude` finto nel `PATH` dei test è ammesso), nessuna chiamata di rete, nessun repo su GitHub, nessun push verso la rete. Il solo push ammesso è verso i repo nudi locali dei banchi. `gh` nei test è `tests/fakegh.py` (o lo shim `tests/evalbin/gh`). Mai `gh auth`, `gh api` o `gh pr create` col `gh` vero.
 - Negli script dei Task 1 e 13 e in `evals/run.sh` i subagenti usano solo `bash -n` e il modo `controlla` con `gh` e `claude` finti.
 
 **Eccezioni per il controller (decisioni 8, 20, 21 e 22 del piano)**
-- `ginz0ls/tollgate` (privato): `gh repo create ginz0ls/tollgate --private`, una volta, nel Task 1, **dopo** la ricerca di token in tutta la storia (`ghp_`, `gho_`, `ghs_`, `github_pat_`, `sk-ant-`, `AKIA`): se ne trovi, fermati e chiedi. Poi `git push` di `main` (solo il `main` locale com'è, mai forzato), del ramo `p5-eval-ci` e dei rami `p5-probe-*`; `git push --delete` dei soli `p5-probe-*`; `gh run list|view|watch|download|rerun`; `gh api` in lettura.
+- Ogni `gh` del controller passa da `spikes/gh-p4/ghguard.py` con il profilo `p5`, scritto e testato nel Task 1 (Step 1) prima del primo uso.
+- `ginz0ls/tollgate` (privato): `gh repo create ginz0ls/tollgate --private`, una volta, nel Task 1, **dopo** la ricerca di token in tutta la storia (`ghp_`, `gho_`, `ghs_`, `github_pat_`, `sk-ant-`, `AKIA`): se ne trovi, fermati e chiedi. Poi, nei Task 1, 13 e 14, nei giri di correzione della revisione finale e nella chiusura: `git push` di `main` (solo il `main` locale com'è, mai forzato; dopo il merge con l'OK dell'utente, il `main` nuovo), del ramo `p5-eval-ci` e dei rami `p5-probe-*`; `git push --delete` dei soli `p5-probe-*`; `gh run list|view|watch|download|rerun`; `gh api` in lettura.
 - `ginz0ls/tollgate-p4-detect` (privato), solo nei Task 1 e 13: `git push` di rami e di `main` (mai forzato; il push diretto su `main` solo nel caso `skip-ci`); `gh pr create|close|merge|view|list|comment` e la PATCH REST del corpo; `gh issue close|comment|view|list`; `gh run list|view|watch|download|rerun`; `gh api` in lettura; `PUT repos/ginz0ls/tollgate-p4-detect/actions/permissions` per `sha_pinning_required`, rimesso al valore iniziale alla fine del Task 13.
 - `git ls-remote` sui repo `actions/*` (Task 1, VC2). `gh auth status` (sola lettura).
 - **Vietati**: ogni comando su `ginz0ls/tollgate-p4-protected` (lo cancella l'utente) e su altri repo; segreti; cambi di visibilità; cancellare repo; ogni `gh auth` diverso da `status`; `gh api user`.
-- `claude plugin eval` solo dal controller, solo da `evals/run.sh` (Task 14) o dallo script della sonda (Task 1), sempre con `--no-publish`, `--trust-plugin`, `--model claude-sonnet-5-5` e `--max-cost-usd` uguale al residuo del tetto. **Tetto complessivo 80 USD** (`docs/verifiche/evidenze/eval-p5/budget.tsv`): al tetto ti fermi e chiedi all'utente. `claude -p` solo se scatta la decisione 9 (b), solo da `evals/_kit/local.py`, solo da cartelle temporanee fuori dal repo, con `--plugin-dir`, e conta nello stesso tetto.
+- `claude plugin eval` solo dal controller, solo da `evals/run.sh` (Task 14) o dallo script della sonda (Task 1), sempre con `--no-publish`, `--trust-plugin`, `--model claude-sonnet-5-5` e `--max-cost-usd` uguale al residuo del tetto. **Tetto complessivo 80 USD** (`docs/verifiche/evidenze/eval-p5/budget.tsv`): al tetto ti fermi e chiedi all'utente. `claude -p` solo se scatta la decisione 9 (b) **e l'utente ha dato l'OK**, solo da `evals/_kit/local.py` (o dalla verifica VE11), con la `HOME` vera, `TOLLGATE_STATE` con la sentinella sotto `/tmp/tollgate-p5-eval/`, `--plugin-dir`, le esclusioni della configurazione dell'utente e i `--disallowedTools` della decisione 9 (b), e conta nello stesso tetto.
+- `claude plugin validate --strict` è ammesso anche agli implementatori (non lancia il modello).
 - I repo restano alla fine: `ginz0ls/tollgate` è il repo del plugin; detect lo cancella l'utente quando vuole.
 
 **Processi, git e segreti**
@@ -92,7 +94,8 @@ Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincol
 
 Solo in questi casi:
 - `socat` assente (Task 1, Step 0), o una ricerca di token che trova qualcosa;
-- il tetto di 80 USD raggiunto;
+- il tetto di 80 USD raggiunto, o un costo ignoto dopo una corsa (`evals/run.sh` si ferma);
+- la decisione 9 (b) che scatta: serve l'OK dell'utente per l'esecutore locale con `claude -p`;
 - un'operazione distruttiva o irreversibile, o un'operazione su GitHub fuori dall'elenco qui sopra;
 - un'azione fuori da questo worktree, come un merge su `main`;
 - un piano rotto al punto che ogni strada è un'ipotesi (per esempio un esito del Task 1 che smentisce insieme le decisioni 3 e 9).
