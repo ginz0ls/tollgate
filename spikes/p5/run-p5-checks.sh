@@ -179,35 +179,87 @@ budget_cap() {
 
 # ---------------------------------------------------------------- eval della sonda
 
-# copy_run_files <cartella dell'invocazione> <file marcatore>: copia nelle evidenze i soli file prodotti dalla sonda nelle
-# cartelle delle corse tenute da --keep-temp (esiti, registri degli hook, file dello scaffold, i file creati). Le cartelle
-# candidate sono i percorsi stampati da claude sotto la cartella temporanea e quelle che contengono file della sonda nuovi.
-copy_run_files() {
-  local dir="$1" mark="$2" tmp="${TMPDIR:-/tmp}" cand f n=0
-  {
-    cat "$dir/stdout.txt" "$dir/stderr.txt" 2>/dev/null | grep -aoE "/[^[:space:]\"'<>]+"
-    find "$tmp" -maxdepth 7 -type f \( -name sonda-hooks.jsonl -o -name sonda-scaffold.txt -o -name esiti.txt \) -newer "$mark" \
-      -exec dirname {} \; 2>/dev/null
-  } | sort -u > "$dir/cartelle-candidate.txt"
-  while IFS= read -r cand; do
-    [ -f "$cand" ] && cand="$(dirname "$cand")"
-    [ -d "$cand" ] || continue
-    [ "$cand" != "$tmp" ] && [ "$cand" != /tmp ] || continue
-    case "$cand" in "$tmp"/*|/tmp/*) ;; *) continue ;; esac
-    case "$cand" in "$EOUT"/*|"$OUT"/*|"$root"/*) continue ;; esac
+# copy_one_run <cartella della corsa tenuta> <cartella di evidenza>: le corse tenute da --keep-temp sono in
+# <TMPDIR>/claude-eval-<sigla>/ con out/trace.jsonl e config/settings.json leggibili e home/ e tmp/ sigillati in sealed/ (modo 000):
+# si rendono leggibili (chmod 700 della corsa e di sealed) e si copiano SOLO la trace, settings.json (se non contiene credenziali),
+# i file della sonda del workspace (sealed/home/cwd), lo stato della sonda e il registro dei plugin scritto dallo scaffold.
+SONDA_FILES=(-name 'sonda-*' -o -name esiti.txt -o -name scritto-da-hook.md -o -name ws-file -o -name NEGATO -o -name AMMESSO
+             -o -name WT-OK -o -name EW-OK -o -name SONDA-WRITE)
+copy_one_run() {
+  local run="$1" evid="$2" dest f n=0 name
+  name="$(basename "$run")"
+  dest="$evid/corse/$name"
+  [ -d "$run" ] || { echo "corsa non trovata: $run"; return 1; }
+  chmod 700 "$run" 2>/dev/null; [ -d "$run/sealed" ] && chmod 700 "$run/sealed" 2>/dev/null
+  mkdir -p "$dest"
+  if [ -f "$run/out/trace.jsonl" ]; then cp -n -- "$run/out/trace.jsonl" "$dest/trace.jsonl" && n=$((n + 1)); fi
+  if [ -f "$run/config/settings.json" ]; then
+    if grep -qiE "$TOKEN_PATTERN|\"[A-Za-z_]*(token|api_?key|secret|password)[A-Za-z_]*\"[[:space:]]*:[[:space:]]*\"[^\"]+\"" "$run/config/settings.json"; then
+      echo "settings.json contiene forme di credenziali: non copiato" > "$dest/settings-non-copiato.txt"
+    else
+      cp -n -- "$run/config/settings.json" "$dest/settings.json" && n=$((n + 1))
+    fi
+  fi
+  if [ -d "$run/sealed/home/cwd" ]; then
     while IFS= read -r f; do
-      mkdir -p "$dir/files/$(dirname "${f#/}")"
-      [ -e "$dir/files/${f#/}" ] || { cp -- "$f" "$dir/files/${f#/}" && n=$((n + 1)); }
-    done < <(find "$cand" -maxdepth 8 -type f -size -300k \( -name 'sonda-*' -o -name esiti.txt -o -name hooks.jsonl -o -name bin-sonda.txt \
-                -o -name installed_plugins.json -o -name SONDA-WRITE -o -name NEGATO -o -name AMMESSO -o -name WT-OK -o -name EW-OK \) 2>/dev/null)
-  done < "$dir/cartelle-candidate.txt"
-  echo "file della sonda copiati nelle evidenze: $n"
+      mkdir -p "$dest/cwd/$(dirname "${f#"$run/sealed/home/cwd/"}")"
+      cp -n -- "$f" "$dest/cwd/${f#"$run/sealed/home/cwd/"}" && n=$((n + 1))
+    done < <(find "$run/sealed/home/cwd" -maxdepth 6 -type f -size -300k \( "${SONDA_FILES[@]}" \) 2>/dev/null)
+  fi
+  for f in .local/state/sonda/hooks.jsonl .local/state/sonda/bin-sonda.txt .claude/plugins/installed_plugins.json; do
+    if [ -f "$run/sealed/home/$f" ]; then
+      mkdir -p "$dest/home/$(dirname "$f")"
+      cp -n -- "$run/sealed/home/$f" "$dest/home/$f" && n=$((n + 1))
+    fi
+  done
+  echo "corsa $name: $n file copiati in ${dest#"$root/"}"
+}
+
+# copy_run_files <cartella dell'invocazione>: le corse tenute sono quelle che claude stampa in stderr («kept <cartella>:»)
+copy_run_files() {
+  local dir="$1" run
+  grep -ahoE "kept (/[^[:space:]:]+)" "$dir/stdout.txt" "$dir/stderr.txt" 2>/dev/null | sed 's/^kept //' | sort -u > "$dir/cartelle-tenute.txt"
+  while IFS= read -r run; do
+    case "$run" in */claude-eval-*) copy_one_run "$run" "$dir" ;; *) echo "cartella tenuta ignorata (fuori dallo schema claude-eval-*): $run" ;; esac
+  done < "$dir/cartelle-tenute.txt"
+}
+
+# raccogli-corse <cartella della corsa>...: la stessa copia per corse già fatte; la cartella di evidenza è quella il cui
+# result.json ha una tracePath dentro la corsa
+modo_raccogli_corse() {
+  local run evid r
+  [ "$#" -gt 0 ] || die "uso: raccogli-corse <cartella della corsa tenuta>..."
+  mkdir -p "$EOUT"
+  for run in "$@"; do
+    run="${run%/}"
+    evid=""
+    for r in "$EOUT"/*/result.json; do
+      [ -e "$r" ] || continue
+      if jq -e --arg d "$run/" '[.. | objects | select(has("tracePath")) | .tracePath | startswith($d)] | any' "$r" >/dev/null 2>&1; then
+        evid="$(dirname "$r")"; break
+      fi
+    done
+    [ -n "$evid" ] || { echo "nessun result.json in $EOUT ha una tracePath dentro $run: salto"; continue; }
+    copy_one_run "$run" "$evid"
+  done
+}
+
+# eval_tmpdir: la cartella dei file temporanei di claude plugin eval, fuori da /tmp, /var/tmp e /dev/shm (la sandbox li ha in
+# denyWrite e quel divieto prevale sulle cartelle della corsa); predefinita $HOME/.cache/tollgate-p5-eval-tmp, modo 700
+eval_tmpdir() {
+  local d="${P5_EVAL_TMPDIR:-$HOME/.cache/tollgate-p5-eval-tmp}"
+  case "$d" in /*) ;; *) die "P5_EVAL_TMPDIR deve essere un percorso assoluto: $d" ;; esac
+  if [ "$CHECK" != 1 ]; then
+    case "$d" in /tmp|/tmp/*|/var/tmp|/var/tmp/*|/dev/shm|/dev/shm/*) die "P5_EVAL_TMPDIR non può stare sotto /tmp, /var/tmp o /dev/shm: $d" ;; esac
+  fi
+  mkdir -p "$d" && chmod 700 "$d" || die "cartella temporanea $d non creabile"
+  printf '%s\n' "$d"
 }
 
 # eval_run <etichetta> <ablation> <cartella del plugin> <caso> [cartella dello shim]: UNA invocazione di `claude plugin eval`
 # con tutte le cautele. Lo shim (predefinito probe-bin accanto allo script) va in testa al PATH di chi lancia l'eval.
 eval_run() {
-  local label="$1" abl="$2" target="$3" case_name="$4" shim_dir="${5:-$here/probe-bin}" cap stamp dir rc cost dur casi src shown
+  local label="$1" abl="$2" target="$3" case_name="$4" shim_dir="${5:-$here/probe-bin}" cap stamp dir rc cost dur casi src shown evtmp
   if [ -n "${P5_ONLY:-}" ]; then
     case ",$P5_ONLY," in *",$label,"*) ;; *) echo "== $label: saltata (P5_ONLY)"; return 0 ;; esac
   fi
@@ -217,7 +269,8 @@ eval_run() {
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
   dir="$EOUT/$stamp-$label"
   mkdir -p "$dir"
-  : > "$dir/.marcatore"
+  evtmp="$(eval_tmpdir)" || die "cartella temporanea dell'eval non pronta"
+  printf '%s\n' "TMPDIR dell eval: ${evtmp/#$HOME/\$HOME}" > "$dir/tmpdir.txt"
   local -a cmd=(claude plugin eval "$target" --no-publish --trust-plugin --runs 1 --model "$MODEL" --scaffold
                 --allow-tools Bash Write Edit --ablation "$abl" --case "$case_name" --threshold 0 --keep-temp
                 --max-cost-usd "$cap" --json "$dir/result.json" --output-dir "$dir" --report "$dir/report.html")
@@ -225,7 +278,7 @@ eval_run() {
   printf '%s claude %s\n' "$(date -u +%FT%TZ)" "${shown#claude }" >> "$EOUT/comandi.log"
   echo "== $label: ablation $abl, caso $case_name, tetto $cap USD"
   # lo shim della sonda va in testa al PATH di chi lancia l'eval: l'agente eredita il PATH del chiamante
-  ( cd "$root" && PATH="$shim_dir:$PATH" timeout "${P5_EVAL_TIMEOUT:-1800}" "${cmd[@]}" >"$dir/stdout.txt" 2>"$dir/stderr.txt" </dev/null )
+  ( cd "$root" && PATH="$shim_dir:$PATH" TMPDIR="$evtmp" timeout "${P5_EVAL_TIMEOUT:-1800}" "${cmd[@]}" >"$dir/stdout.txt" 2>"$dir/stderr.txt" </dev/null )
   rc=$?
   echo "$rc" > "$dir/claude.rc"
   src="$dir/result.json"
@@ -242,7 +295,7 @@ eval_run() {
   [ -n "$casi" ] || casi="$case_name"
   printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$label ($abl)" "$cost" "$dur" "$casi" >> "$BUDGET"
   echo "   uscita $rc, costo $cost USD, durata ${dur}s"
-  copy_run_files "$dir" "$dir/.marcatore"
+  copy_run_files "$dir"
   return 0
 }
 
@@ -772,7 +825,7 @@ modo_controlla() {
   # variabili del modo controlla: i modi girano come sottoprocessi con questo ambiente
   export P5_CHECK=1 P5_OUT="$T/out" P5_EVAL_OUT="$T/eval" P5_WORK="$T/work" P5_PINS="$T/pins" P5_GIT_BASE="$T/remote" \
          P5_SOURCE_DIR="$T/src" P5_FAKE_LOG="$T/gh.log" P5_FAKE_CLAUDE_LOG="$T/claude.log" P5_FAKE_STATE="$T/fake" \
-         P5_FAKE_RUNS="$T/runs" P5_TMP_TARGET="$T/tmp-target" P5_WAIT_MAX=5 P5_POLL=0 P5_RETRY_SLEEP=0 P5_EVAL_TIMEOUT=60 TMPDIR="$T/runs"
+         P5_FAKE_RUNS="$T/runs" P5_EVAL_TMPDIR="$T/evtmp" P5_TMP_TARGET="$T/tmp-target" P5_WAIT_MAX=5 P5_POLL=0 P5_RETRY_SLEEP=0 P5_EVAL_TIMEOUT=60 TMPDIR="$T/runs"
   : > "$P5_FAKE_LOG"; : > "$P5_FAKE_CLAUDE_LOG"
   OUT="$T/out"; EOUT="$T/eval"; WORK="$T/work"; PINS="$T/pins"; BUDGET="$EOUT/budget.tsv"
   export P4_OUT="$OUT" P4_WORK="$WORK" P5_PR_REGISTRY="$OUT/prs-aperte.txt"
@@ -842,6 +895,22 @@ modo_controlla() {
   run_fails eval-solo-etichetta-sbagliata eval-sonda P5_EVAL_OUT="$T/eval-b4" P5_ONLY=sonda-skill,sonda-sbagliata
   run_mode eval-solo eval-sonda P5_EVAL_OUT="$T/eval-b4" P5_ONLY=sonda-skill,sonda-ve1-dependencies
   echo "eval-sonda con P5_ONLY: $(($(wc -l < "$T/eval-b4/budget.tsv") - 1)) invocazioni registrate"
+  echo "--- copia delle corse tenute (cartelle sigillate)"
+  hit="$(ls -d "$T"/eval/*-sonda-skill | head -n 1)"
+  kept="$(head -n 1 "$hit/cartelle-tenute.txt")"
+  [ -f "$hit/corse/$(basename "$kept")/trace.jsonl" ] && echo "corsa tenuta: trace copiata" || { echo "TRACE NON COPIATA"; rc=1; }
+  [ -f "$hit/corse/$(basename "$kept")/cwd/esiti.txt" ] && [ -f "$hit/corse/$(basename "$kept")/home/.local/state/sonda/hooks.jsonl" ] && echo "corsa tenuta: file della sonda copiati" || { echo "FILE DELLA SONDA NON COPIATI"; rc=1; }
+  if [ -e "$hit/corse/$(basename "$kept")/cwd/altro.txt" ] || [ -e "$hit/corse/$(basename "$kept")/home/.bashrc" ]; then echo "COPIATO QUALCOSA DI TROPPO"; rc=1; else echo "corsa tenuta: nient'altro copiato"; fi
+  mv "$hit/corse" "$hit/corse.prima"
+  if bash "$here/run-p5-checks.sh" raccogli-corse "$kept" >"$T/modo-raccogli-corse.log" 2>&1; then echo "modo raccogli-corse: ok"
+  else echo "modo raccogli-corse: FALLITO (vedi $T/modo-raccogli-corse.log)"; rc=1; fi
+  [ -f "$hit/corse/$(basename "$kept")/trace.jsonl" ] && echo "raccogli-corse: corsa riassegnata alla sua evidenza dalla tracePath" || { echo "RACCOGLI-CORSE NON HA COPIATO"; rc=1; }
+  mkdir -p "$T/eval-b5"
+  run_mode eval-settings-con-credenziali eval-sonda P5_EVAL_OUT="$T/eval-b5" P5_ONLY=sonda-skill P5_FAKE_SETTINGS_TOKEN=1
+  hit5="$(ls -d "$T"/eval-b5/*-sonda-skill | head -n 1)"
+  if [ -f "$hit5/corse/$(basename "$(head -n 1 "$hit5/cartelle-tenute.txt")")/settings-non-copiato.txt" ] && [ -z "$(find "$hit5/corse" -name settings.json)" ]; then echo "settings.json con credenziali: non copiato e registrato"; else echo "SETTINGS CON CREDENZIALI COPIATO"; rc=1; fi
+  echo "TMPDIR dell'eval: $(cat "$hit/tmpdir.txt")"
+  [ -d "$T/evtmp" ] && echo "P5_EVAL_TMPDIR usato per le corse" || { echo "P5_EVAL_TMPDIR NON USATO"; rc=1; }
   echo "--- ambiente dei gh finti e di git"
   if awk -F'\t' 'BEGIN { bad = 0 } { for (i = 1; i < NF; i++) { split($i, kv, "="); if (kv[2] != "") bad++ } } END { exit bad > 0 }' "$P5_FAKE_LOG.env"; then
     echo "gh finti: GH_HOST, GH_REPO e i token enterprise non arrivano mai"
@@ -882,7 +951,7 @@ modo_controlla() {
   echo "--- evidenze degli eval"
   hit="$(ls -d "$T"/eval/*-sonda-skill 2>/dev/null | head -n 1)"
   if [ -n "$hit" ]; then
-    echo "  copiati: $(find "$hit/files" -type f 2>/dev/null | wc -l) file della sonda; result.json: $([ -s "$hit/result.json" ] && echo sì || echo no); aggregate-result.json: $([ -s "$hit/aggregate-result.json" ] && echo sì || echo no)"
+    echo "  copiati: $(find "$hit/corse" -type f 2>/dev/null | wc -l) file delle corse; result.json: $([ -s "$hit/result.json" ] && echo sì || echo no); aggregate-result.json: $([ -s "$hit/aggregate-result.json" ] && echo sì || echo no)"
   else
     echo "  cartella di sonda-skill assente"; rc=1
   fi
@@ -895,6 +964,7 @@ modo_controlla() {
 case "$MODE" in
   eval-sonda|ci-sonda|pins|detect-cache|detect-pin|raccogli|cerca-token)
     mkdir -p "$OUT" "$WORK"; "modo_${MODE//-/_}" ;;
+  raccogli-corse) shift; modo_raccogli_corse "$@" ;;
   controlla) modo_controlla ;;
-  *) echo "uso: $0 eval-sonda|ci-sonda|pins|detect-cache|detect-pin|raccogli|cerca-token|controlla" >&2; exit 2 ;;
+  *) echo "uso: $0 eval-sonda|ci-sonda|pins|detect-cache|detect-pin|raccogli|raccogli-corse|cerca-token|controlla" >&2; exit 2 ;;
 esac

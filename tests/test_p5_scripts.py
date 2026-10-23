@@ -35,7 +35,7 @@ def clean_env(**extra):
 
 class ScriptShapeTest(unittest.TestCase):
     def test_syntax(self):
-        for script in [SCRIPT, P5 / "probe-bin" / "sonda-shim", *[c / "scaffold.sh" for c in CASES]]:
+        for script in [SCRIPT, P5 / "probe-bin" / "sonda-shim", P5 / "probe-bin" / "python3", *[c / "scaffold.sh" for c in CASES]]:
             with self.subTest(script.name):
                 r = subprocess.run(["bash", "-n", str(script)], capture_output=True, text=True)
                 self.assertEqual(r.returncode, 0, r.stderr)
@@ -191,8 +191,26 @@ class ControllaTest(unittest.TestCase):
         folder = next((self.tmp / "eval").glob("*-sonda-skill"))
         for name in ("result.json", "aggregate-result.json", "report.html", "stdout.txt", "stderr.txt"):
             self.assertTrue((folder / name).exists(), name)
-        names = {p.name for p in (folder / "files").rglob("*") if p.is_file()}
-        self.assertTrue({"esiti.txt", "sonda-hooks.jsonl", "sonda-scaffold.txt", "WT-OK", "hooks.jsonl"} <= names, names)
+        names = {p.name for p in (folder / "corse").rglob("*") if p.is_file()}
+        self.assertTrue({"trace.jsonl", "settings.json", "esiti.txt", "sonda-hooks.jsonl", "sonda-scaffold.txt", "scritto-da-hook.md",
+                         "WT-OK", "hooks.jsonl", "installed_plugins.json"} <= names, names)
+        self.assertFalse({"altro.txt", ".bashrc"} & names)                    # dalla home sigillata solo i file della sonda
+        self.assertIn("TMPDIR dell eval:", (folder / "tmpdir.txt").read_text())
+
+    def test_sealed_runs_are_made_readable_and_only_the_probe_files_are_copied(self):
+        for line in ("corsa tenuta: trace copiata", "corsa tenuta: file della sonda copiati", "corsa tenuta: nient'altro copiato",
+                     "P5_EVAL_TMPDIR usato per le corse"):
+            self.assertIn(line, self.out)
+        self.assertTrue(list((self.tmp / "evtmp").glob("claude-eval-*")))     # TMPDIR passato al solo claude plugin eval
+        for run in (self.tmp / "evtmp").glob("claude-eval-*"):
+            self.assertTrue(os.access(run / "sealed", os.R_OK | os.X_OK), run)
+
+    def test_raccogli_corse_finds_the_evidence_folder_from_the_trace_path(self):
+        self.assertIn("modo raccogli-corse: ok", self.out)
+        self.assertIn("raccogli-corse: corsa riassegnata alla sua evidenza dalla tracePath", self.out)
+
+    def test_settings_with_credentials_are_not_copied_and_the_fact_is_recorded(self):
+        self.assertIn("settings.json con credenziali: non copiato e registrato", self.out)
 
     def test_pins_pick_the_latest_tag_of_each_major_dereferenced(self):
         rows = [r.split("\t") for r in (self.tmp / "out" / "pins.tsv").read_text().splitlines()[1:]]
@@ -254,6 +272,31 @@ class ControllaTest(unittest.TestCase):
         log = (self.tmp / "out" / "comandi.log").read_text()
         self.assertGreater(len(re.findall(r"gh run list --repo ginz0ls/tollgate --workflow ci-probe\.yml", log)), 0)
         self.assertEqual(log.count(" gh run list --repo"), (self.tmp / "gh.log").read_text().count("run\tlist\t"))
+
+
+class ProbeBinTest(unittest.TestCase):
+    def test_python3_shim_skips_pyenv_and_runs_the_system_python(self):
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-p5-shim-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        pyenv = tmp / "pyenv" / "shims"
+        pyenv.mkdir(parents=True)
+        (pyenv / "python3").write_text("#!/usr/bin/env bash\necho shim di pyenv >&2\nexit 127\n")
+        (pyenv / "python3").chmod(0o755)
+        probe = str(P5 / "probe-bin")
+        env = {"PATH": f"{probe}:{pyenv}:/usr/bin:/bin"}
+        r = subprocess.run(["python3", "-c", "print(6*7)"], capture_output=True, text=True, env=env)
+        self.assertEqual((r.returncode, r.stdout.strip()), (0, "42"), r.stderr)
+        self.assertNotIn("pyenv", r.stderr)
+        self.assertTrue(os.access(P5 / "probe-bin" / "python3", os.X_OK))
+        # il PATH di chi lancia resta com'era dopo lo shim, e sonda-shim gira dalla stessa cartella
+        r = subprocess.run(["sonda-shim"], capture_output=True, text=True, env=env)
+        self.assertEqual(r.stdout.strip(), "SONDA-SHIM-OK")
+
+    def test_python3_shim_without_usr_bin_takes_the_first_python_outside_home(self):
+        text = (P5 / "probe-bin" / "python3").read_text()
+        self.assertIn("/usr/bin/python3", text)
+        self.assertIn("/home/*", text)
+        self.assertIn("exit 127", text)
 
 
 class ProbePluginTest(unittest.TestCase):
@@ -509,7 +552,8 @@ class ProbeCasesTest(unittest.TestCase):
         self.assertRegex(text, r"(?s)path: AMMESSO\n    exists: true")
         self.assertRegex(text, r"(?s)path: \.claude/worktrees/sonda-wt/WT-OK\n    exists: true")
         self.assertIn("SONDA-MOTIVO-NEGATO-7f3a", text)
-        self.assertIn("`cd`", text)
+        self.assertIn("`cd .claude/worktrees/sonda-wt && touch WT-OK && pwd`", text)       # un solo comando: VE10 anche se il cd non persiste
+        self.assertIn("esegui solo `pwd`", text)                                           # e un comando separato per misurare se persiste
         self.assertNotIn("/sonda:", text)
 
     def test_hook_diagnostics_d18_and_ve12_graders(self):

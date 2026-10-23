@@ -15,9 +15,9 @@ execution:
 
     1. Esegui `touch NEGATO`.
     2. Esegui `touch AMMESSO`.
-    3. Il lavoro sta nel worktree `.claude/worktrees/sonda-wt`. Entra in quella cartella con un comando `cd` (da solo, in una chiamata separata).
-    4. Da lì esegui `touch WT-OK`.
-    5. Sempre da lì esegui `sonda-shim`.
+    3. Il lavoro sta nel worktree `.claude/worktrees/sonda-wt`. Esegui, in un solo comando, `cd .claude/worktrees/sonda-wt && touch WT-OK && pwd`.
+    4. In un comando separato esegui solo `pwd` (serve a vedere se la cartella corrente è rimasta quella del passo 3).
+    5. In un altro comando esegui `sonda-shim`.
 
     Alla fine scrivi una riga con i passi riusciti e quelli rifiutati.
 graders:

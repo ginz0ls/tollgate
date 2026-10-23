@@ -27,25 +27,43 @@ if os.environ.get("P5_FAKE_CLAUDE_MODE") == "nojson":
     sys.exit(1)
 case = opt("--case") or "tutti"
 out_dir = opt("--output-dir")
+tmp = os.environ.get("TMPDIR") or os.environ["P5_FAKE_RUNS"]
+os.makedirs(tmp, exist_ok=True)
+n = len([d for d in os.listdir(tmp) if d.startswith("claude-eval-")]) + 1
+run_dir = os.path.join(tmp, "claude-eval-fake%d" % n)
+ws, home = os.path.join(run_dir, "sealed", "home", "cwd"), os.path.join(run_dir, "sealed", "home")
+os.makedirs(os.path.join(ws, ".claude", "worktrees", "sonda-wt"))
+os.makedirs(os.path.join(home, ".local", "state", "sonda"))
+os.makedirs(os.path.join(home, ".claude", "plugins"))
+os.makedirs(os.path.join(run_dir, "out"))
+os.makedirs(os.path.join(run_dir, "config"))
+os.makedirs(os.path.join(run_dir, "sealed", "tmp"))
+for rel, text in (("esiti.txt", "PYTHON3=ok 3\n"), ("sonda-hooks.jsonl", '{"event": "PreToolUse"}\n'),
+                  ("sonda-scaffold.txt", "PWD=x\n"), ("scritto-da-hook.md", "x\n"), ("altro.txt", "non va copiato\n"),
+                  (".claude/worktrees/sonda-wt/WT-OK", "")):
+    with open(os.path.join(ws, rel), "w") as fh:
+        fh.write(text)
+for rel, text in ((".local/state/sonda/hooks.jsonl", '{"event": "PreToolUse"}\n'), (".claude/plugins/installed_plugins.json", "{}\n"),
+                  (".bashrc", "non va copiato\n")):
+    with open(os.path.join(home, rel), "w") as fh:
+        fh.write(text)
+with open(os.path.join(run_dir, "out", "trace.jsonl"), "w") as fh:
+    fh.write('{"type": "system", "subtype": "init"}\n')
+settings = {"sandbox": {"enabled": True}}
+if os.environ.get("P5_FAKE_SETTINGS_TOKEN") == "1":
+    settings["apiKeyHelper"] = {"token": "valore-finto"}
+with open(os.path.join(run_dir, "config", "settings.json"), "w") as fh:
+    json.dump(settings, fh)
+os.chmod(os.path.join(run_dir, "sealed"), 0)           # come l'eval vero: la corsa tenuta è in sola lettura, sealed/ a modo 000
+os.chmod(run_dir, 0o500)
 result = {"schemaVersion": 1, "costUsd": float(os.environ.get("P5_FAKE_COST", "0.25")), "durationSeconds": 12.5,
-          "claudeVersion": "2.1.309 (finto)", "cases": [{"name": case, "aggregates": {"score": 1.0}}],
+          "claudeVersion": "2.1.309 (finto)", "cases": [{"name": case, "aggregates": {"score": 1.0},
+                                                           "arms": {"with": [{"tracePath": os.path.join(run_dir, "out", "trace.jsonl")}]}}],
           "aggregates": {"overallScore": 1.0}}
 for path in (opt("--json"), os.path.join(out_dir, "aggregate-result.json")):
     with open(path, "w") as fh:
         json.dump(result, fh)
 with open(opt("--report"), "w") as fh:
     fh.write("<html><body>report finto</body></html>\n")
-runs = os.environ["P5_FAKE_RUNS"]
-n = len([d for d in os.listdir(runs) if d.startswith("eval-run-")]) + 1
-run_dir = os.path.join(runs, "eval-run-%d" % n)
-ws, home = os.path.join(run_dir, "workspace"), os.path.join(run_dir, "home")
-os.makedirs(os.path.join(ws, ".claude", "worktrees", "sonda-wt"))
-os.makedirs(os.path.join(home, ".local", "state", "sonda"))
-for rel, text in (("esiti.txt", "PYTHON3=ok 3\n"), ("sonda-hooks.jsonl", '{"event": "PreToolUse"}\n'),
-                  ("sonda-scaffold.txt", "PWD=x\n"), (".claude/worktrees/sonda-wt/WT-OK", "")):
-    with open(os.path.join(ws, rel), "w") as fh:
-        fh.write(text)
-with open(os.path.join(home, ".local", "state", "sonda", "hooks.jsonl"), "w") as fh:
-    fh.write('{"event": "PreToolUse"}\n')
-sys.stderr.write("Preserved sandbox: %s\n" % run_dir)
+sys.stderr.write("\u26a0 kept %s: home/ and tmp/ in it were written by the plugin under test and are sealed in %s/sealed (mode 000)\n" % (run_dir, run_dir))
 print("fatto (finto)")
