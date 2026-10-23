@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Shim della sonda (VE3): lo script lo mette in testa al PATH di chi lancia l'eval; se arriva al Bash dell'agente, risponde.
+echo SONDA-SHIM-OK

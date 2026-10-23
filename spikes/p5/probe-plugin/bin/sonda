@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""Sonda VE3: dal Bash dell'agente scrive in `esiti.txt` (cartella corrente) una riga CHIAVE=valore per ogni fatto.
+Lanciato dalla skill `prova` col percorso `${CLAUDE_PLUGIN_ROOT}/bin/sonda`. Non legge né scrive fuori da: radice del
+plugin (sola lettura), `$HOME/.local/state/sonda`, `$HOME/.claude/plugins/installed_plugins.json` (sola lettura) e
+`<cartella corrente>/.claude/worktrees/…`. Mai la cartella di stato di tollgate."""
+import hashlib
+import os
+import subprocess
+import sys
+
+lines = []
+
+
+def put(key, value):
+    lines.append("%s=%s" % (key, str(value).replace("\n", " ")))
+
+
+def attempt(key, fn):
+    try:
+        fn()
+        put(key, "ok")
+    except OSError as exc:
+        put(key, "fail:%s:%s" % (type(exc).__name__, exc.errno))
+    except Exception as exc:                                    # noqa: BLE001 - la sonda registra e prosegue
+        put(key, "fail:%s" % type(exc).__name__)
+
+
+home = os.environ.get("HOME", "")
+cwd = os.getcwd()
+root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
+put("PYTHON3", "ok %s" % sys.version.split()[0])
+try:
+    out = subprocess.run(["git", "--version"], capture_output=True, text=True, timeout=20).stdout.strip()
+    put("GIT", "ok %s" % out)
+except (OSError, subprocess.SubprocessError) as exc:
+    put("GIT", "fail:%s" % type(exc).__name__)
+
+plugin_json = os.path.join(root, ".claude-plugin", "plugin.json")
+try:
+    with open(plugin_json, encoding="utf-8") as fh:
+        fh.read(10)
+    put("PLUGIN_ROOT_READABLE", "yes")
+except OSError as exc:
+    put("PLUGIN_ROOT_READABLE", "no:%s" % type(exc).__name__)
+put("PLUGIN_ROOT_FROM_FILE", root)
+env_root = os.environ.get("CLAUDE_PLUGIN_ROOT")
+put("ENV_CLAUDE_PLUGIN_ROOT", env_root if env_root else "UNSET")
+put("ENV_CLAUDE_PLUGIN_ROOT_EQUALS_FILE_ROOT",
+    "unset" if not env_root else ("yes" if os.path.realpath(env_root) == root else "no"))
+put("HOME", home or "UNSET")
+put("CLAUDE_CONFIG_DIR", os.environ.get("CLAUDE_CONFIG_DIR") or "UNSET")
+put("CWD", cwd)
+
+state = os.path.join(home, ".local", "state", "sonda")
+attempt("STATE_MKDIR", lambda: os.makedirs(state, exist_ok=True))
+attempt("STATE_WRITE", lambda: open(os.path.join(state, "bin-sonda.txt"), "w").write("scritto da bin/sonda\n"))
+attempt("STATE_READ", lambda: open(os.path.join(state, "bin-sonda.txt")).read())
+
+registry = os.path.join(home, ".claude", "plugins", "installed_plugins.json")
+try:
+    with open(registry, "rb") as fh:
+        digest = hashlib.sha256(fh.read()).hexdigest()
+    put("INSTALLED_PLUGINS_READ", "ok")
+    put("INSTALLED_PLUGINS_SHA256", digest)
+    expected = None
+    try:
+        with open(os.path.join(cwd, "sonda-scaffold.txt"), encoding="utf-8") as fh:
+            for line in fh:
+                if line.startswith("INSTALLED_PLUGINS_SHA256="):
+                    expected = line.strip().split("=", 1)[1]
+    except OSError:
+        pass
+    put("INSTALLED_PLUGINS_UNCHANGED", "unknown" if expected is None else ("yes" if expected == digest else "no"))
+except OSError as exc:
+    put("INSTALLED_PLUGINS_READ", "fail:%s:%s" % (type(exc).__name__, exc.errno))
+    put("INSTALLED_PLUGINS_UNCHANGED", "unknown")
+
+worktrees = os.path.join(cwd, ".claude", "worktrees")
+attempt("WORKTREES_WRITE_EXISTING", lambda: open(os.path.join(worktrees, "sonda-wt", "SONDA-WRITE"), "w").write("x\n"))
+attempt("WORKTREES_WRITE_NEW", lambda: (os.makedirs(os.path.join(worktrees, "sonda-nuovo"), exist_ok=True),
+                                         open(os.path.join(worktrees, "sonda-nuovo", "SONDA-WRITE"), "w").write("x\n")))
+
+entries = [e for e in os.environ.get("PATH", "").split(os.pathsep) if e]
+put("PATH_ENTRIES", len(entries))
+shim = next((os.path.join(e, "sonda-shim") for e in entries if os.access(os.path.join(e, "sonda-shim"), os.X_OK)), None)
+put("SHIM_FOUND", "yes" if shim else "no")
+put("SHIM_FIRST_IN_PATH", "yes" if shim and entries and os.path.join(entries[0], "sonda-shim") == shim else "no")
+try:
+    out = subprocess.run(["sonda-shim"], capture_output=True, text=True, timeout=20).stdout.strip()
+    put("SHIM_RUN", "ok" if out == "SONDA-SHIM-OK" else "fail:output")
+except (OSError, subprocess.SubprocessError) as exc:
+    put("SHIM_RUN", "fail:%s" % type(exc).__name__)
+put("PATH_HAS_USR_BIN", "yes" if any(e in ("/usr/bin", "/bin") for e in entries) else "no")
+
+with open(os.path.join(cwd, "esiti.txt"), "w", encoding="utf-8") as fh:
+    fh.write("\n".join(lines) + "\n")
+print("\n".join(lines))

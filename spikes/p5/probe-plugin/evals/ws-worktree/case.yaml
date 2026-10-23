@@ -1,0 +1,48 @@
+schema_version: "1.1"
+name: ws-worktree
+description: Sonda VE12 (il workspace è un worktree git con il gitdir fuori dal workspace), cwd di SessionStart e degli altri eventi.
+tags: [sonda]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 15
+  timeout_seconds: 300
+  allowed_tools: [Read]
+  prompt: |
+    Sei in una cartella di lavoro che è un worktree git. Con lo strumento Bash, uno alla volta e nell'ordine:
+
+    1. Esegui `git status --short --branch`.
+    2. Esegui `git log --oneline -3`.
+    3. Esegui `touch ws-file && git add ws-file && git -c user.name=sonda -c user.email=sonda@example.invalid commit -q -m "sonda: commit dal workspace"`.
+    4. Esegui `git log --oneline -3 && echo SONDA-WS-$((40+2))`.
+
+    Se un comando fallisce, riporta l'errore e passa al successivo. Alla fine scrivi una riga con i passi riusciti e quelli falliti.
+graders:
+  - name: status-e-log-funzionano
+    type: regex
+    target: trace
+    pattern: 'tg/1-sonda'
+  - name: commit-e-log-finale
+    type: regex
+    target: trace
+    pattern: 'SONDA-WS-42'
+  - name: file-del-commit-creato
+    type: file_exists
+    path: ws-file
+    exists: true
+  - name: hook-sessionstart-cwd
+    type: regex
+    target:
+      source: file
+      path: sonda-hooks.jsonl
+    pattern: '"event": "SessionStart"'
+  - name: hook-pretooluse-cwd
+    type: regex
+    target:
+      source: file
+      path: sonda-hooks.jsonl
+    pattern: '"event": "PreToolUse"'
+  - name: bash-usato
+    type: tool_used
+    tool: Bash

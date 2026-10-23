@@ -1,0 +1,74 @@
+schema_version: "1.1"
+name: nl-bash
+description: Sonda VE5, VE7, VE10 (con cd nel worktree). Prompt in linguaggio naturale; comandi Bash; un hook nega touch NEGATO.
+tags: [sonda]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 15
+  timeout_seconds: 300
+  allowed_tools: [Read]
+  prompt: |
+    Sei in una cartella di lavoro che contiene un repo git. Esegui questi passi con lo strumento Bash, uno alla volta e nell'ordine.
+    Se un comando viene rifiutato, non cercare altri modi per ottenere lo stesso effetto e passa al passo successivo.
+
+    1. Esegui `touch NEGATO`.
+    2. Esegui `touch AMMESSO`.
+    3. Il lavoro sta nel worktree `.claude/worktrees/sonda-wt`. Entra in quella cartella con un comando `cd` (da solo, in una chiamata separata).
+    4. Da lì esegui `touch WT-OK`.
+    5. Sempre da lì esegui `sonda-shim`.
+
+    Alla fine scrivi una riga con i passi riusciti e quelli rifiutati.
+graders:
+  - name: motivo-del-veto-nella-trace
+    type: regex
+    target: trace
+    pattern: 'SONDA-MOTIVO-NEGATO-7f3a'
+  - name: negato-non-creato
+    type: file_exists
+    path: NEGATO
+    exists: false
+  - name: ammesso-creato
+    type: file_exists
+    path: AMMESSO
+    exists: true
+  - name: file-nel-worktree-percorso-esatto
+    type: file_exists
+    path: .claude/worktrees/sonda-wt/WT-OK
+    exists: true
+  - name: file-nel-worktree-glob
+    type: file_exists
+    path: '**/WT-OK'
+    exists: true
+  - name: hook-pretooluse-nella-radice
+    type: regex
+    target:
+      source: file
+      path: sonda-hooks.jsonl
+    pattern: '"event": "PreToolUse"'
+  - name: hook-visto-dal-worktree
+    type: regex
+    target:
+      source: file
+      path: .claude/worktrees/sonda-wt/sonda-hooks.jsonl
+    pattern: '"tool_name": "Bash"'
+  - name: shim-eseguito
+    type: regex
+    target: trace
+    pattern: 'SONDA-SHIM-OK'
+  - name: contesto-del-hook-posttooluse-nella-trace
+    type: regex
+    target: trace
+    pattern: 'SONDA-CONTESTO-POST'
+  - name: file-scritto-da-un-hook-esiste
+    type: file_exists
+    path: scritto-da-hook.md
+    exists: true
+  - name: file-scritto-da-un-hook-tra-i-creati
+    type: regex
+    target: files
+    pattern: 'scritto-da-hook\.md'
+  - name: bash-usato
+    type: tool_used
+    tool: Bash

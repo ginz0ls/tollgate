@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""gh finto del modo controlla di run-p5-checks.sh: registra gli argomenti (separati da tab), nessuna rete.
+Ambiente: P5_FAKE_LOG (registro), P5_FAKE_STATE (cartella di stato), P5_GIT_BASE (nudi locali), P4_WAIT_SHA e
+P4_WAIT_BRANCH (impostati da wait_run), P5_FAKE_500_ONCE=1 (la prima lettura `api` risponde 500 a corpo vuoto)."""
+import json
+import os
+import subprocess
+import sys
+
+args = sys.argv[1:]
+state = os.environ.get("P5_FAKE_STATE", "/tmp/p5-fake-state")
+os.makedirs(state, exist_ok=True)
+with open(os.environ["P5_FAKE_LOG"], "a") as fh:
+    fh.write("".join(a + "\t" for a in args) + "\n")
+base = os.environ.get("P5_GIT_BASE", "")
+
+
+def counter(name, start=0):
+    path = os.path.join(state, name)
+    try:
+        n = int(open(path).read())
+    except (OSError, ValueError):
+        n = start
+    n += 1
+    open(path, "w").write(str(n))
+    return n
+
+
+def opt(name):
+    return args[args.index(name) + 1] if name in args and args.index(name) + 1 < len(args) else ""
+
+
+def fail(msg, code=1):
+    sys.stderr.write(msg + "\n")
+    sys.exit(code)
+
+
+def perm_path():
+    return os.path.join(state, "perm.json")
+
+
+def perm():
+    try:
+        return json.load(open(perm_path()))
+    except (OSError, ValueError):
+        return {"enabled": True, "allowed_actions": "all", "sha_pinning_required": False}
+
+
+if not args:
+    fail("gh finto: nessun argomento", 2)
+first, second = args[0], (args[1] if len(args) > 1 else "")
+if first == "--version":
+    print("gh version 2.46.0 (finto)")
+elif first == "auth":
+    print("Logged in to github.com account ginz0ls (finto)")
+elif first == "repo" and second == "create":
+    subprocess.run(["git", "init", "-q", "--bare", os.path.join(base, "ginz0ls", "tollgate.git")], check=True)
+    print("https://github.com/" + args[2])
+elif first == "api":
+    method = opt("--method") or opt("-X") or "GET"
+    ep = [a for a in args[1:] if a.startswith("repos/")][0]
+    if method == "GET":
+        if os.environ.get("P5_FAKE_500_ONCE") == "1" and not os.path.exists(os.path.join(state, "500-done")):
+            open(os.path.join(state, "500-done"), "w").write("1")
+            fail("gh: HTTP 500", 1)
+        if ep == "repos/ginz0ls/tollgate":
+            if not os.path.isdir(os.path.join(base, "ginz0ls", "tollgate.git")):
+                fail("gh: Not Found (HTTP 404)")
+            print(json.dumps({"full_name": "ginz0ls/tollgate", "private": True}))
+        elif "/branches/" in ep:
+            name = ep.split("/branches/", 1)[1]
+            repo = ep.split("/")[2]
+            r = subprocess.run(["git", "--git-dir", os.path.join(base, "ginz0ls", repo + ".git"), "rev-parse", "-q", "--verify",
+                                "refs/heads/" + name], capture_output=True)
+            if r.returncode != 0:
+                fail("gh: Branch not found (HTTP 404)")
+            print(json.dumps({"name": name}))
+        elif ep.endswith("/actions/permissions"):
+            print(json.dumps(perm()))
+        elif ep.endswith("/timing"):
+            print(json.dumps({"billable": {"UBUNTU": {"total_ms": 120000}}, "run_duration_ms": 90000}))
+        else:
+            print("{}")
+    elif method == "PUT" and ep.endswith("/actions/permissions"):
+        fields = {args[i + 1].split("=", 1)[0]: args[i + 1].split("=", 1)[1] for i, a in enumerate(args) if a == "-F"}
+        cur = perm()
+        cur["enabled"] = fields.get("enabled") == "true"
+        cur["sha_pinning_required"] = fields.get("sha_pinning_required") == "true"
+        if "allowed_actions" in fields:
+            cur["allowed_actions"] = fields["allowed_actions"]
+        json.dump(cur, open(perm_path(), "w"))
+    else:
+        fail("gh finto: scrittura non prevista: " + " ".join(args), 2)
+elif first == "pr":
+    if second == "create":
+        n = counter("pr")
+        print("https://github.com/ginz0ls/tollgate-p4-detect/pull/%d" % n)
+    elif second in ("close", "comment", "merge"):
+        pass
+    elif second == "view":
+        print(json.dumps({"state": "OPEN"}))
+    elif second == "list":
+        print("[]")
+    else:
+        fail("gh finto: comando non previsto: " + " ".join(args), 2)
+elif first == "run":
+    if second == "list":
+        open(os.path.join(state, "last-wf"), "w").write(opt("--workflow"))
+        n = counter("run", 100)
+        print(json.dumps([{"databaseId": n, "headSha": os.environ.get("P4_WAIT_SHA", ""), "headBranch": os.environ.get("P4_WAIT_BRANCH", ""),
+                           "event": "push", "status": "completed", "conclusion": "success", "createdAt": "2099-01-01T00:00:00Z"}]))
+    elif second == "watch":
+        print("Run completed (finto)")
+    elif second == "view":
+        last = open(os.path.join(state, "last-wf")).read() if os.path.exists(os.path.join(state, "last-wf")) else ""
+        rejected = last == "p5-probe-pin.yml" and perm().get("sha_pinning_required")
+        if "--log" in args or "--log-failed" in args:
+            if rejected:
+                print("verdict\tSet up job\tThe action actions/checkout@v4 is not allowed because all actions must be pinned to a full-length commit SHA.")
+            else:
+                print("verdict\tCache\tCache mode: read-only (finto)")
+                print("suite\trun\tsonda: rc=0 durata=412s modo-avvisi=error")
+                print("suite\trun\tsonda: righe unclosed database: 0")
+        else:
+            print(json.dumps({"databaseId": int(args[2]), "workflowName": last, "event": "push", "headSha": os.environ.get("P4_WAIT_SHA", ""),
+                              "headBranch": os.environ.get("P4_WAIT_BRANCH", ""), "status": "completed",
+                              "conclusion": "failure" if rejected else "success", "createdAt": "2099-01-01T00:00:00Z",
+                              "updatedAt": "2099-01-01T00:05:00Z", "jobs": [{"name": "verdict"}]}))
+    else:
+        fail("gh finto: comando non previsto: " + " ".join(args), 2)
+else:
+    fail("gh finto: comando non previsto: " + " ".join(args), 2)

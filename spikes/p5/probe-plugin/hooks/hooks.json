@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [{"hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/record.py\" SessionStart", "timeout": 30}]}],
+    "PreToolUse": [
+      {"matcher": "Bash", "hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/guard.py\"", "timeout": 30}]},
+      {"hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/record.py\" PreToolUse", "timeout": 30}]}
+    ],
+    "PostToolUse": [
+      {"matcher": "Bash", "hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/post.py\"", "timeout": 30}]},
+      {"hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/record.py\" PostToolUse", "timeout": 30}]}
+    ],
+    "UserPromptExpansion": [{"hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/record.py\" UserPromptExpansion", "timeout": 30}]}],
+    "SubagentStop": [{"hooks": [{"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/record.py\" SubagentStop", "timeout": 30}]}]
+  }
+}

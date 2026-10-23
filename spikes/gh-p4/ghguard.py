@@ -16,6 +16,15 @@ PUT e DELETE di branches/main/protection solo su protected.
 
 Il profilo `flow` (P4_PROFILE=flow, gh del `claude -p` di run-p4-flow.sh) è lo stesso elenco meno
 `issue create`, `pr merge`, `pr close`, `run download` e ogni scrittura `gh api`.
+
+Il profilo `p5` (P4_PROFILE=p5, decisioni 20-22 di P5: spikes/p5/run-p5-checks.sh) ammette solo
+`ginz0ls/tollgate` e `ginz0ls/tollgate-p4-detect` (mai `tollgate-p4-protected`), con le operazioni per repo di
+`P5_REPO_OPS`. Le scritture `gh api` sono due forme esatte su detect: la PATCH del corpo di una PR aperta dal
+controller nella stessa prova (numeri registrati con `check` di un `pr create` + `register-pr`, file `P5_PR_REGISTRY`)
+e il PUT di `actions/permissions` per `sha_pinning_required`. Per i comandi git con la rete:
+
+  ghguard.py gitcheck [--dir <cartella>] -- <argomenti di git, senza -C>      exit 0 se ammesso (profilo p5)
+  ghguard.py register-pr <numero>                                            registra una PR aperta dal controller
 """
 import os
 import re
@@ -25,17 +34,21 @@ OWNER = "ginz0ls"
 PROT = OWNER + "/tollgate-p4-protected"
 DET = OWNER + "/tollgate-p4-detect"
 REPOS = (PROT, DET)
+TOL = OWNER + "/tollgate"
+P5_REPOS = (TOL, DET)
 FLOW_CLONE = "/tmp/tollgate-p4/flow/protected"      # cartella del clone del flusso (run-p4-flow.sh: $FLOW/protected)
 
 REPO_CREATE_OPTS = {"--public", "--private", "--add-readme"}
 API_FLAGS = {"--include", "--paginate", "--silent"}
 API_VALUED = {"--jq", "-q"}
 
-BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
-FIELDS_RE = re.compile(r"^[A-Za-z][A-Za-z,]*$")
-NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+# tutte le espressioni si usano con fullmatch: `$` accetterebbe un a-capo finale
+BRANCH_RE = re.compile(r"[A-Za-z0-9._/-]+")
+FIELDS_RE = re.compile(r"[A-Za-z][A-Za-z,]*")
+NAME_RE = re.compile(r"[A-Za-z0-9._-]+")
+INT_RE = re.compile(r"[0-9]+")
 STATES = {"open", "closed", "merged", "all"}
-PROFILES = ("script", "flow")
+PROFILES = ("script", "flow", "p5")
 FLOW_FORBIDDEN = {("pr", "edit"), ("issue", "create"), ("issue", "close"), ("issue", "comment"), ("pr", "merge"), ("pr", "close"),
                   ("pr", "comment"), ("run", "download")}
 PROFILE = {"current": "script"}          # il profilo della chiamata in corso (letto da _infile)
@@ -47,7 +60,15 @@ PROTECTION_ENDPOINT = "repos/%s/branches/main/protection"
 
 
 def _ok_branch(v):
-    return bool(BRANCH_RE.match(v)) and not v.startswith("-") and ".." not in v
+    return bool(BRANCH_RE.fullmatch(v)) and not v.startswith("-") and ".." not in v
+
+
+def _is_int(v):
+    return bool(INT_RE.fullmatch(v))     # solo cifre ASCII: str.isdigit() accetta anche quelle Unicode
+
+
+def _repos():
+    return P5_REPOS if PROFILE["current"] == "p5" else REPOS
 
 
 def _under(var, v):
@@ -87,13 +108,13 @@ def _infile(v):
 
 # tipo di valore -> funzione di controllo
 KINDS = {
-    "repo": lambda v: v in REPOS,
-    "int": lambda v: v.isdigit(),
+    "repo": lambda v: v in _repos(),
+    "int": _is_int,
     "branch": _ok_branch,
     "text": lambda v: True,
-    "fields": lambda v: bool(FIELDS_RE.match(v)),
+    "fields": lambda v: bool(FIELDS_RE.fullmatch(v)),
     "state": lambda v: v in STATES,
-    "name": lambda v: bool(NAME_RE.match(v)) and ".." not in v,
+    "name": lambda v: bool(NAME_RE.fullmatch(v)) and ".." not in v,
     "outdir": lambda v: _under("P4_OUT", v),
     "infile": _infile,
 }
@@ -129,9 +150,9 @@ SPECS = {
 }
 
 
-def _parse(cmd, args, lenient):
-    """Controlla opzioni e posizionali di (comando, sottocomando); ValueError con il motivo."""
-    spec = SPECS[cmd]
+def _parse(cmd, args, lenient, spec=None):
+    """Controlla opzioni e posizionali di (comando, sottocomando); ValueError con il motivo. Ritorna il repo."""
+    spec = spec or SPECS[cmd]
     valued, flags = spec["valued"], spec["flags"]
     repos, positionals, seen_flags = [], [], []
     i = 0
@@ -187,21 +208,22 @@ def _parse(cmd, args, lenient):
         if len(positionals) != 1:
             raise ValueError("serve un solo argomento posizionale (trovati %d)" % len(positionals))
         p = positionals[0]
-        if want == "int" and not p.isdigit():
+        if want == "int" and not _is_int(p):
             raise ValueError("serve un numero: %s" % p)
-        if want == "ref" and not (p.isdigit() or _ok_branch(p)):
+        if want == "ref" and not (_is_int(p) or _ok_branch(p)):
             raise ValueError("serve un numero o un nome di ramo semplice: %s" % p)
     if spec["one_of"] and len([f for f in seen_flags if f in spec["one_of"]]) != 1:
         raise ValueError("serve esattamente una tra %s" % ", ".join(sorted(spec["one_of"])))
     if len(seen_flags) != len(set(seen_flags)):
         raise ValueError("opzione ripetuta")
+    return repos[0]
 
 
 def _check_endpoint(ep):
-    m = re.match(r"^repos/([^/?]+)/([^/?]+)", ep)
-    if not m or "%s/%s" % (m[1], m[2]) not in REPOS:
+    m = re.match(r"repos/([^/?]+)/([^/?]+)", ep)
+    if not m or "%s/%s" % (m[1], m[2]) not in _repos():
         raise ValueError("endpoint non ammesso: %s" % ep)
-    if not re.match(r"^[A-Za-z0-9._~/?&=%:,@+-]+$", ep):
+    if not re.fullmatch(r"[A-Za-z0-9._~/?&=%:,@+-]+", ep):
         raise ValueError("endpoint con caratteri non ammessi: %s" % ep)
     if re.search(r"/secrets(/|\?|$)", ep):
         raise ValueError("endpoint dei segreti: vietato (decisione 25): %s" % ep)
@@ -215,13 +237,13 @@ def _check_endpoint(ep):
 
 
 def _repo_of_endpoint(ep):
-    m = re.match(r"^repos/([^/?]+/[^/?]+)/", ep)
+    m = re.match(r"repos/([^/?]+/[^/?]+)/", ep)
     return m.group(1) if m else None
 
 
-def _check_api_write(args, flow=False, lenient=False):
-    """Scrittura `gh api` (argomenti dopo `api`): solo le tre forme esatte della decisione 25, ValueError
-    altrimenti. Nessuna opzione fuori da `--method|-X`, `-f` (una per chiave) e `--input`."""
+def _api_write_parts(args, lenient=False):
+    """Analizza una scrittura `gh api` (argomenti dopo `api`): ritorna (metodo, endpoint, -f, -F, --input) dopo
+    aver controllato l'endpoint. Nessuna opzione fuori da `--method|-X`, `-f`/`-F` (una per chiave) e `--input`."""
     method = endpoint = infile = None
     fields, ffields = {}, {}
     i = 0
@@ -259,11 +281,17 @@ def _check_api_write(args, flow=False, lenient=False):
     if endpoint is None:
         raise ValueError("gh api senza endpoint")
     _check_endpoint(endpoint)
+    return method, endpoint, fields, ffields, infile
+
+
+def _check_api_write(args, flow=False, lenient=False):
+    """Scrittura `gh api` del profilo script/flow: solo le tre forme esatte della decisione 25, ValueError altrimenti."""
+    method, endpoint, fields, ffields, infile = _api_write_parts(args, lenient)
     repo = _repo_of_endpoint(endpoint)
     if method == "PATCH":
         # unica forma: il corpo di una PR di protected da un file (gh pr edit non funziona con gh 2.46)
         body = ffields.get("body", "")
-        if (repo == PROT and re.match(r"^repos/[^/]+/[^/]+/pulls/[0-9]+$", endpoint) and not fields and infile is None
+        if (repo == PROT and re.fullmatch(r"repos/[^/]+/[^/]+/pulls/[0-9]+", endpoint) and not fields and infile is None
                 and set(ffields) == {"body"} and body.startswith("@") and _infile(body[1:])):
             return
         raise ValueError("gh api PATCH: solo repos/%s/pulls/<n> con -F body=@<file> da una cartella ammessa" % PROT)
@@ -272,7 +300,7 @@ def _check_api_write(args, flow=False, lenient=False):
     if ffields:
         raise ValueError("gh api: -F non ammesso in questa forma")
     if method == "POST" and infile is None:
-        ok = (re.match(r"^repos/[^/]+/[^/]+/statuses/[0-9a-f]{40}$", endpoint)
+        ok = (re.fullmatch(r"repos/[^/]+/[^/]+/statuses/[0-9a-f]{40}", endpoint)
               and set(fields) == {"state", "context", "description"}
               and fields["state"] in STATUS_STATES and fields["context"] == STATUS_CONTEXT
               and fields["description"] == STATUS_DESCRIPTION)
@@ -291,6 +319,34 @@ def _check_api_write(args, flow=False, lenient=False):
     raise ValueError("gh api: scrittura non ammessa")
 
 
+def _check_api_read(args, lenient=False):
+    """Lettura `gh api` (argomenti dopo `api`): None se ammessa, altrimenti il motivo."""
+    ep = None
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a in API_FLAGS:
+            i += 1
+        elif a in API_VALUED:
+            if i + 1 >= len(args):
+                return "gh api: %s senza valore" % a
+            i += 2
+            if lenient:     # nel registro gli spazi del filtro jq sono andati persi
+                while i < len(args) and not args[i].startswith(("-", "repos/")):
+                    i += 1
+        elif a.startswith("-"):
+            return "gh api: opzione non ammessa (%s): solo lettura" % a
+        else:
+            if ep is not None:
+                return "gh api: più di un endpoint"
+            ep = a
+            i += 1
+    if ep is None:
+        return "gh api senza endpoint"
+    _check_endpoint(ep)
+    return None
+
+
 _WRITE_OPTS = ("--method", "-X", "-f", "-F", "--input", "--field", "--raw-field")
 
 
@@ -307,6 +363,11 @@ def violation(args, lenient=False, profile="script"):
         return "profilo sconosciuto: %s" % profile
     first, second = args[0], (args[1] if len(args) > 1 else "")
     PROFILE["current"] = profile
+    if profile == "p5":
+        try:
+            return _violation_p5(args, lenient)
+        except ValueError as exc:
+            return str(exc)
     if profile == "flow" and (first == "repo" or (first, second) in FLOW_FORBIDDEN):
         return "gh %s %s non ammesso nel flusso" % (first, second)
     try:
@@ -348,35 +409,194 @@ def violation(args, lenient=False, profile="script"):
             if any(_is_write(a) for a in args[1:]):
                 _check_api_write(args[1:], flow=(profile == "flow"), lenient=lenient)
                 return None
-            ep = None
-            i = 1
-            while i < len(args):
-                a = args[i]
-                if a in API_FLAGS:
-                    i += 1
-                elif a in API_VALUED:
-                    if i + 1 >= len(args):
-                        return "gh api: %s senza valore" % a
-                    i += 2
-                    if lenient:     # nel registro gli spazi del filtro jq sono andati persi
-                        while i < len(args) and not args[i].startswith(("-", "repos/")):
-                            i += 1
-                elif a.startswith("-"):
-                    return "gh api: opzione non ammessa (%s): solo lettura" % a
-                else:
-                    if ep is not None:
-                        return "gh api: più di un endpoint"
-                    ep = a
-                    i += 1
-            if ep is None:
-                return "gh api senza endpoint"
-            _check_endpoint(ep)
-            return None
+            return _check_api_read(args[1:], lenient)
         if first in ("pr", "issue", "run"):
             return "gh %s %s non ammesso" % (first, second)
         return "gh %s non ammesso" % first
     except ValueError as exc:
         return str(exc)
+
+
+# ---------------------------------------------------------------- profilo p5 (decisioni 20-22 di P5)
+
+PR_OPS = {("pr", "create"), ("pr", "close"), ("pr", "merge"), ("pr", "view"), ("pr", "list"), ("pr", "comment"),
+          ("issue", "close"), ("issue", "comment"), ("issue", "view"), ("issue", "list")}
+RUN_OPS = {("run", "list"), ("run", "view"), ("run", "watch"), ("run", "download"), ("run", "rerun")}
+P5_REPO_OPS = {TOL: set(RUN_OPS), DET: PR_OPS | RUN_OPS}      # operazioni per repo (decisioni 20 e 21)
+P5_SPECS = {key: SPECS[key] for key in PR_OPS | (RUN_OPS - {("run", "rerun")})}
+P5_SPECS[("run", "rerun")] = _spec({}, flags=("--failed",), pos="int")
+PERMISSIONS_ENDPOINT = "repos/%s/actions/permissions"
+ALLOWED_ACTIONS = {"all", "local_only", "selected"}
+FOREIGN_RE = re.compile(r"%s/[A-Za-z0-9._-]+" % re.escape(OWNER))
+
+
+def _registry_path():
+    return os.environ.get("P5_PR_REGISTRY", "")
+
+
+def _registry_lines():
+    path = _registry_path()
+    if not path:
+        return []
+    try:
+        with open(path) as fh:
+            return [line.strip() for line in fh if line.strip()]
+    except OSError:
+        return []
+
+
+def registered_prs():
+    """Numeri delle PR registrate dal controller nella prova corrente (file P5_PR_REGISTRY)."""
+    return {int(line[3:]) for line in _registry_lines() if re.fullmatch(r"pr [0-9]+", line)}
+
+
+def note_pr_create():
+    """Un `gh pr create` è passato dalla guardia: annota che una PR sta per essere aperta. Falso senza registro."""
+    path = _registry_path()
+    if not path or not os.path.isabs(path):
+        return False
+    with open(path, "a") as fh:
+        fh.write("create\n")
+    return True
+
+
+def register_pr(number):
+    """Registra il numero di una PR appena aperta: ammesso solo se c'è un `create` annotato non ancora consumato."""
+    if not _is_int(number):
+        raise ValueError("numero di PR non valido: %s" % number)
+    lines = _registry_lines()
+    if lines.count("create") <= len([x for x in lines if x.startswith("pr ")]):
+        raise ValueError("nessun `gh pr create` passato dalla guardia in attesa di registrazione")
+    with open(_registry_path(), "a") as fh:
+        fh.write("pr %d\n" % int(number))
+
+
+def _foreign_repo(args):
+    """Il primo `ginz0ls/<nome>` negli argomenti che non è uno dei due repo ammessi (anche dentro un testo)."""
+    for a in args:
+        for found in FOREIGN_RE.findall(a):
+            found = found.rstrip(".")
+            if found not in P5_REPOS:
+                return found
+    return None
+
+
+def _check_api_write_p5(args, lenient=False):
+    method, endpoint, fields, ffields, infile = _api_write_parts(args, lenient)
+    repo = _repo_of_endpoint(endpoint)
+    if repo != DET:
+        raise ValueError("gh api in scrittura: solo su %s" % DET)
+    if method == "PATCH":
+        m = re.fullmatch(r"repos/[^/]+/[^/]+/pulls/([0-9]+)", endpoint)
+        body = ffields.get("body", "")
+        if not (m and not fields and infile is None and set(ffields) == {"body"} and body.startswith("@")
+                and _infile(body[1:])):
+            raise ValueError("gh api PATCH: solo repos/%s/pulls/<n> con -F body=@<file> da una cartella ammessa" % DET)
+        if int(m.group(1)) not in registered_prs():
+            raise ValueError("gh api PATCH: la PR %s non è stata aperta dal controller in questa prova" % m.group(1))
+        return
+    if method == "PUT" and endpoint == PERMISSIONS_ENDPOINT % DET and not fields and infile is None:
+        keys = set(ffields)
+        if (keys in ({"enabled", "sha_pinning_required"}, {"enabled", "sha_pinning_required", "allowed_actions"})
+                and ffields["enabled"] == "true" and ffields["sha_pinning_required"] in ("true", "false")
+                and ffields.get("allowed_actions", "all") in ALLOWED_ACTIONS):
+            return
+        raise ValueError("gh api PUT: actions/permissions solo con -F enabled=true, -F sha_pinning_required=true|false "
+                         "e al più -F allowed_actions=all|local_only|selected")
+    raise ValueError("gh api: scrittura non ammessa nel profilo p5 (solo PATCH del corpo di una PR registrata e PUT di "
+                     "actions/permissions su detect)")
+
+
+def _violation_p5(args, lenient):
+    first, second = args[0], (args[1] if len(args) > 1 else "")
+    foreign = _foreign_repo(args)
+    if foreign:
+        return "repo non ammesso nel profilo p5: %s" % foreign
+    if first == "--version":
+        return None if len(args) == 1 else "--version con altro"
+    if first == "auth":
+        return None if args == ["auth", "status"] else "solo `gh auth status`"
+    if first == "repo":
+        if args == ["repo", "create", TOL, "--private"]:
+            return None
+        return "gh repo %s non ammesso (solo `repo create %s --private`)" % (second, TOL)
+    if (first, second) in P5_SPECS:
+        repo = _parse((first, second), args[2:], lenient, P5_SPECS[(first, second)])
+        if (first, second) not in P5_REPO_OPS[repo]:
+            return "gh %s %s non ammesso su %s" % (first, second, repo)
+        return None
+    if first == "api":
+        if any(_is_write(a) for a in args[1:]):
+            _check_api_write_p5(args[1:], lenient)
+            return None
+        return _check_api_read(args[1:], lenient)
+    return "gh %s %s non ammesso nel profilo p5" % (first, second)
+
+
+# ---------------------------------------------------------------- comandi git con la rete (profilo p5)
+
+GH_URL = "https://github.com/"
+TOL_URL, DET_URL = "%s%s.git" % (GH_URL, TOL), "%s%s.git" % (GH_URL, DET)
+ACTIONS = ("checkout", "cache", "upload-artifact", "download-artifact", "setup-python")
+ACTION_URLS = tuple("%sactions/%s" % (GH_URL, a) for a in ACTIONS)
+TAG_RE = re.compile(r"v[0-9]+(?:\.[0-9]+){0,2}")
+PINS_DEFAULT = "/tmp/tollgate-p5-pins"
+
+
+def _below(base, path):
+    """`path` è un percorso assoluto normalizzato strettamente sotto `base`."""
+    if not base or not path or not os.path.isabs(path) or os.path.normpath(path) != path:
+        return False
+    base = os.path.normpath(base)
+    return path.startswith(base + os.sep)
+
+
+def git_violation(args, directory=""):
+    """None se il comando git con la rete è ammesso nel profilo p5, altrimenti il motivo. `args` sono gli argomenti
+    dopo `git` (senza -C), `directory` la cartella in cui il comando agisce (per `clone`, la destinazione).
+    Nessuna opzione ammessa fuori da quelle elencate: mai --force, --mirror, --all, --tags, +refspec."""
+    if not args:
+        return "comando git vuoto"
+    verb, rest = args[0], args[1:]
+    if verb == "push":
+        delete = bool(rest) and rest[0] == "--delete"
+        if delete:
+            rest = rest[1:]
+        if len(rest) != 2 or rest[0] not in (TOL_URL, DET_URL):
+            return "push: serve `push [--delete] <url di tollgate o detect> <ramo>`"
+        url, ref = rest
+        if not _ok_branch(ref):
+            return "push: ramo non ammesso: %s" % ref
+        if url == TOL_URL:
+            probe = ref.startswith("p5-probe-") and len(ref) > len("p5-probe-")
+            if delete and not probe:
+                return "push --delete su tollgate: solo rami p5-probe-*"
+            if not (probe or ref in ("main", "p5-eval-ci")):
+                return "push su tollgate: solo main, p5-eval-ci e p5-probe-*"
+            return None
+        if delete:
+            return "push --delete su detect non ammesso"
+        return None
+    if verb == "ls-remote":
+        if len(rest) == 2 and rest[0] == "--tags" and rest[1] in ACTION_URLS:
+            return None
+        return "ls-remote: solo `--tags https://github.com/actions/<azione>`"
+    if verb == "fetch":
+        if len(rest) == 5 and rest[:2] == ["--depth", "1"] and rest[2] in ACTION_URLS and rest[3] == "tag":
+            if not TAG_RE.fullmatch(rest[4]):
+                return "fetch: tag non ammesso: %s" % rest[4]
+            if not _below(os.environ.get("P5_PINS", PINS_DEFAULT), directory):
+                return "fetch: la cartella deve stare sotto P5_PINS"
+            return None
+        return "fetch: solo `--depth 1 https://github.com/actions/<azione> tag <tag>` (sotto P5_PINS)"
+    if verb == "clone":
+        if len(rest) == 3 and rest[0] == "-q" and rest[1] == DET_URL and rest[2] == directory:
+            if not _below(os.environ.get("P4_WORK", ""), directory):
+                return "clone di detect: la destinazione deve stare sotto P4_WORK"
+            return None
+        return "clone: solo `-q <url di detect> <destinazione sotto P4_WORK>`"
+    return "git %s non ammesso con la rete" % verb
+
 
 
 def _report(n, subs, bad, extra=""):
@@ -394,6 +614,8 @@ def _key(args):
 
 def check_log(path):
     n, subs, bad = 0, {}, []
+    profile = os.environ.get("P4_PROFILE", "script")
+    allowed = P5_REPOS if profile == "p5" else REPOS
     for line in open(path):
         args = line.rstrip("\n").split("\t")
         if args and args[-1] == "":
@@ -402,11 +624,11 @@ def check_log(path):
             continue
         n += 1
         subs[_key(args)] = subs.get(_key(args), 0) + 1
-        why = violation(args)
+        why = violation(args, profile=profile)
         if why:
             bad.append((why, " ".join(args)))
         for t in re.findall(r"%s/[\w.-]+" % OWNER, " ".join(args)):
-            if t not in REPOS:
+            if t not in allowed:
                 bad.append(("repo non ammesso", " ".join(args)))
     if n == 0:
         bad.append(("registro vuoto", ""))
@@ -417,11 +639,29 @@ def check_comandi(path):
     """comandi.log: `<ora> gh <argomenti separati da spazi>`; le righe git e quelle annotate «(controller...)»
     (comandi a mano del controller, con annotazione nel testo) non sono comandi dello script e si escludono."""
     n, excluded, subs, bad = 0, 0, {}, []
+    profile = os.environ.get("P4_PROFILE", "script")
     if "P4_OUT" not in os.environ:
         os.environ["P4_OUT"] = os.path.dirname(os.path.abspath(path))
-    os.environ.setdefault("P4_WORK", "/tmp/tollgate-p4/gh")
+    os.environ.setdefault("P4_WORK", "/tmp/tollgate-p5" if profile == "p5" else "/tmp/tollgate-p4/gh")
+    if profile == "p5":
+        os.environ.setdefault("P5_PR_REGISTRY", os.path.join(os.path.dirname(os.path.abspath(path)), "prs-aperte.txt"))
+    here = os.path.dirname(os.path.abspath(path))
+    # le evidenze committate registrano i percorsi del worktree in cui furono prodotte (`…/.claude/worktrees/<nome>/docs/
+    # verifiche/evidenze/<cartella>`): per rigiocarle si riportano alla cartella corrente del registro. Solo prefissi di un
+    # worktree, mai un percorso qualsiasi.
+    moved = re.compile(r"(?<![^\s=@])/(?:(?:(?! -)[^/\n])+/)*?\.claude/worktrees/[^/\n]+/docs/verifiche/evidenze/%s(?=/|\s|$)"
+                       % re.escape(os.path.basename(here)))
     for line in open(path):
-        m = re.match(r"^\S+ gh (.*)$", line.rstrip("\n"))
+        line = moved.sub(lambda _m: here, line.rstrip("\n"))
+        g = re.match(r"^\S+ git-net dir=(\S*) (.*)$", line)
+        if g and profile == "p5":      # `git-net`: i comandi git con la rete dello script (registro di common_p5)
+            n += 1
+            subs["git " + g.group(2).split(" ")[0]] = subs.get("git " + g.group(2).split(" ")[0], 0) + 1
+            why = git_violation(g.group(2).split(" "), g.group(1))
+            if why:
+                bad.append((why, "git " + g.group(2)))
+            continue
+        m = re.match(r"^\S+ gh (.*)$", line)
         if not m:
             continue
         if "(controller" in m.group(1):
@@ -430,7 +670,7 @@ def check_comandi(path):
         args = m.group(1).split(" ")
         n += 1
         subs[_key(args)] = subs.get(_key(args), 0) + 1
-        why = violation(args, lenient=True)
+        why = violation(args, lenient=True, profile=profile)
         if why:
             bad.append((why, m.group(1)))
     if n == 0:
@@ -440,9 +680,32 @@ def check_comandi(path):
 
 def main(argv):
     if len(argv) >= 3 and argv[1] == "check" and argv[2] == "--":
-        why = violation(argv[3:], profile=os.environ.get("P4_PROFILE", "script"))
+        profile = os.environ.get("P4_PROFILE", "script")
+        why = violation(argv[3:], profile=profile)
         if why:
             print(why, file=sys.stderr)
+            return 1
+        if profile == "p5" and argv[3:5] == ["pr", "create"] and not note_pr_create():
+            print("pr create: serve P5_PR_REGISTRY (percorso assoluto) per registrare la PR", file=sys.stderr)
+            return 1
+        return 0
+    if len(argv) >= 3 and argv[1] == "gitcheck":
+        rest, directory = argv[2:], ""
+        if rest[:1] == ["--dir"] and len(rest) >= 2:
+            directory, rest = rest[1], rest[2:]
+        if rest[:1] != ["--"]:
+            print(__doc__, file=sys.stderr)
+            return 2
+        why = git_violation(rest[1:], directory)
+        if why:
+            print(why, file=sys.stderr)
+            return 1
+        return 0
+    if len(argv) == 3 and argv[1] == "register-pr":
+        try:
+            register_pr(argv[2])
+        except (ValueError, OSError) as exc:
+            print(str(exc), file=sys.stderr)
             return 1
         return 0
     if len(argv) == 3 and argv[1] == "log":

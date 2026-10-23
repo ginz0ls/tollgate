@@ -1,0 +1,8 @@
+{
+  "name": "sonda",
+  "version": "0.0.1",
+  "description": "Sonda di tollgate P5 per claude plugin eval (VE1-VE10): non fa parte del prodotto.",
+  "author": {"name": "sAInapse"},
+  "license": "MIT",
+  "experimental": {"evals": "evals"}
+}

@@ -1,0 +1,93 @@
+schema_version: "1.1"
+name: skill
+description: Sonda VE2 (UserPromptExpansion, SubagentStop), VE3 (esiti di bin/sonda), VE6 (/sonda:prova con disable-model-invocation, Agent, Skill), VE9 (subagente).
+tags: [sonda]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 15
+  timeout_seconds: 300
+  allowed_tools: [Read, Skill, Agent]
+  prompt: "/sonda:prova"
+graders:
+  - name: skill-della-sonda-lanciata
+    type: tool_used
+    tool: Skill
+    input_match: 'prova'
+    arm: with-only
+  - name: agente-lanciato
+    type: tool_used
+    tool: Agent
+  - name: comando-del-subagente-nella-trace
+    type: regex
+    target: trace
+    pattern: 'command\W{1,8}echo SONDA-SUB'
+  - name: hook-userpromptexpansion
+    type: regex
+    target:
+      source: file
+      path: sonda-hooks.jsonl
+    pattern: '"event": "UserPromptExpansion"'
+  - name: hook-subagentstop
+    type: regex
+    target:
+      source: file
+      path: sonda-hooks.jsonl
+    pattern: '"event": "SubagentStop"'
+  - name: esiti-python3
+    type: regex
+    target:
+      source: file
+      path: esiti.txt
+    pattern: '^PYTHON3=ok'
+    flags: m
+  - name: esiti-git
+    type: regex
+    target:
+      source: file
+      path: esiti.txt
+    pattern: '^GIT=ok'
+    flags: m
+  - name: esiti-radice-del-plugin-leggibile
+    type: regex
+    target:
+      source: file
+      path: esiti.txt
+    pattern: '^PLUGIN_ROOT_READABLE=yes'
+    flags: m
+  - name: esiti-variabile-radice-esportata
+    type: regex
+    target:
+      source: file
+      path: esiti.txt
+    pattern: '^ENV_CLAUDE_PLUGIN_ROOT=(?!UNSET)'
+    flags: m
+  - name: esiti-stato-scrivibile
+    type: regex
+    target:
+      source: file
+      path: esiti.txt
+    pattern: '^STATE_WRITE=ok'
+    flags: m
+  - name: esiti-registro-non-riscritto
+    type: regex
+    target:
+      source: file
+      path: esiti.txt
+    pattern: '^INSTALLED_PLUGINS_UNCHANGED=yes'
+    flags: m
+  - name: esiti-scrittura-nei-worktree
+    type: regex
+    target:
+      source: file
+      path: esiti.txt
+    pattern: '^WORKTREES_WRITE_EXISTING=ok'
+    flags: m
+  - name: esiti-shim-eseguito
+    type: regex
+    target:
+      source: file
+      path: esiti.txt
+    pattern: '^SHIM_RUN=ok'
+    flags: m

@@ -1,0 +1,26 @@
+schema_version: "1.1"
+name: nl-worktree
+description: Sonda VE6 (EnterWorktree accettato in allowed_tools) e VE10 (EnterWorktree disponibile, cartella vista dagli hook).
+tags: [sonda]
+runs: 1
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 12
+  timeout_seconds: 300
+  allowed_tools: [Read, EnterWorktree]
+  prompt: |
+    Usa lo strumento EnterWorktree per creare ed entrare in un nuovo worktree chiamato `sonda-ew`.
+    Poi, con lo strumento Bash, esegui `touch EW-OK` e `pwd`. Se uno strumento non è disponibile, dillo e fermati.
+    Alla fine scrivi una riga con ciò che è riuscito.
+graders:
+  - name: enterworktree-usato
+    type: tool_used
+    tool: EnterWorktree
+  - name: file-creato-nel-nuovo-worktree
+    type: file_exists
+    path: '**/EW-OK'
+    exists: true
+  - name: bash-usato
+    type: tool_used
+    tool: Bash
