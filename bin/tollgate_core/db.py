@@ -1,6 +1,7 @@
 """DB SQLite nella cartella di stato (spec 12.1, 12.2, 12.4)."""
 from __future__ import annotations
 
+import fcntl
 import os
 import re
 import secrets
@@ -198,6 +199,19 @@ def _version(conn: sqlite3.Connection) -> int:
     return int(row[0]) if row else 0
 
 
+@contextmanager
+def _migration_lock(state: State):
+    """Un passo di schema alla volta, tra processi. La copia non può stare dentro la transazione di
+    scrittura (l'API di backup restituisce BUSY alla connessione che sta scrivendo), quindi il
+    lucchetto del DB non basta a tenere insieme «rileggi la versione, copia, applica»."""
+    fd = os.open(state.root / "migrate.lock", os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(fd)
+
+
 def _migrate(conn: sqlite3.Connection, state: State) -> None:
     current = _version(conn)
     if current > latest_version():
@@ -208,18 +222,20 @@ def _migrate(conn: sqlite3.Connection, state: State) -> None:
     for target, statements in MIGRATIONS:
         if target <= current:
             continue
-        if not fresh:
-            backup(conn, state, f"migrazione-{target}")
-        with tx(conn):
-            # Un altro processo può aver migrato mentre aspettavamo il lucchetto.
+        with _migration_lock(state):
+            # Un altro processo può aver migrato mentre aspettavamo il lucchetto: la versione si
+            # rilegge qui, e la copia (il DB prima del passo) la fa solo chi applica il passo.
             current = _version(conn)
             if current >= target:
                 continue
-            for stmt in statements:
-                conn.execute(stmt)
-            conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
-                         (str(target),))
-        current = target
+            if not fresh:
+                backup(conn, state, f"migrazione-{target}")
+            with tx(conn):
+                for stmt in statements:
+                    conn.execute(stmt)
+                conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
+                             (str(target),))
+            current = target
 
 
 def _set_wal(conn: sqlite3.Connection) -> None:
@@ -287,7 +303,10 @@ def backup(conn: sqlite3.Connection, state: State, reason: str) -> Path:
                 dst_path = state.backup_dir / f"tollgate-{stamp}-{n}-{tag}.db"
     finally:
         tmp_path.unlink(missing_ok=True)
-    for old in sorted(state.backup_dir.glob("tollgate-*.db"))[:-KEEP_BACKUPS]:
+    # Le copie `migrazione-*` (una per passo di schema, mai di più) non si potano: sono i punti di
+    # ritorno prima di una migrazione e, essendo le più vecchie per nome, sarebbero le prime a sparire.
+    prunable = [p for p in sorted(state.backup_dir.glob("tollgate-*.db")) if "-migrazione-" not in p.name]
+    for old in prunable[:-KEEP_BACKUPS]:
         old.unlink(missing_ok=True)
     return dst_path
 
