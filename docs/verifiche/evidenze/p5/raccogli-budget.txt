@@ -1,0 +1,1 @@
+invocazioni: 10, speso: 0.7486 USD, residuo: 79.2514 USD su 80

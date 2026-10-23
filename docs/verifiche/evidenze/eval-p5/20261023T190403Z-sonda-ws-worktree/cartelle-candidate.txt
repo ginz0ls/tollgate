@@ -1,0 +1,7 @@
+/.claude/worktrees/p5/docs/verifiche/evidenze/eval-p5/20261023T190403Z-sonda-ws-worktree/report.html
+/.claude/worktrees/p5/docs/verifiche/evidenze/eval-p5/20261023T190403Z-sonda-ws-worktree/result.json
+/home/crucco/MEGA/BIZ/VIBE/Plugin
+/tmp/claude-eval-IH4GbK
+/tmp/claude-eval-IH4GbK:
+/tmp/claude-eval-IH4GbK/sealed
+/tmp/claude-eval-IH4GbK/sealed`

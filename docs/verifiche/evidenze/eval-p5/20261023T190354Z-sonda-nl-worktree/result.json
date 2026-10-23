@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.309",
+  "startedAt": "2026-10-23T19:03:54.713Z",
+  "durationSeconds": 7,
+  "costUsd": 0.0431606,
+  "partial": false,
+  "suite": {
+    "root": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin",
+    "ablation": "none",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "nl-worktree",
+    "threshold": 0,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "sonda",
+        "version": "0.0.1",
+        "path": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "nl-worktree",
+      "dir": "evals/nl-worktree",
+      "source": "case_yaml",
+      "promptMarkdown": "Usa lo strumento EnterWorktree per creare ed entrare in un nuovo worktree chiamato `sonda-ew`.\nPoi, con lo strumento Bash, esegui `touch EW-OK` e `pwd`. Se uno strumento non è disponibile, dillo e fermati.\nAlla fine scrivi una riga con ciò che è riuscito.\n",
+      "runsPerCase": 1,
+      "timeoutSeconds": 300,
+      "maxTurns": 12,
+      "graders": [
+        {
+          "name": "enterworktree-usato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "EnterWorktree"
+          }
+        },
+        {
+          "name": "file-creato-nel-nuovo-worktree",
+          "type": "file_exists",
+          "weight": 1,
+          "config": {
+            "path": "**/EW-OK",
+            "exists": true
+          }
+        },
+        {
+          "name": "bash-usato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Bash"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 2,
+            "costUsd": 0.0431606,
+            "judgeCostUsd": 0,
+            "durationSeconds": 7,
+            "startedAt": "2026-10-23T19:03:54.730Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-JUnd0s/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "enterworktree-usato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "EnterWorktree called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-creato-nel-nuovo-worktree",
+                "passed": false,
+                "weight": 1,
+                "explanation": "**/EW-OK missing (expected present)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "bash-usato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "advisories": [
+        "grader \"enterworktree-usato\" cannot pass with the granted tools: it needs a EnterWorktree call in the trace, but EnterWorktree is not granted, so the run withholds it from the model and no call (not even a refused one) can occur — EnterWorktree is never available inside an eval run — drop the grader, or invert it (max: 0) if absence is the point"
+      ],
+      "aggregates": {
+        "score": 0,
+        "passRate": 0
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 0,
+    "overallPassRate": 0
+  }
+}

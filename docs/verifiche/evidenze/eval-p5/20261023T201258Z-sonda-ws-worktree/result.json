@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.309",
+  "startedAt": "2026-10-23T20:12:59.291Z",
+  "durationSeconds": 14,
+  "costUsd": 0.06395669999999999,
+  "partial": false,
+  "suite": {
+    "root": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin",
+    "ablation": "none",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "ws-worktree",
+    "threshold": 0,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "sonda",
+        "version": "0.0.1",
+        "path": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "ws-worktree",
+      "dir": "evals/ws-worktree",
+      "source": "case_yaml",
+      "promptMarkdown": "Sei in una cartella di lavoro che è un worktree git. Con lo strumento Bash, uno alla volta e nell'ordine:\n\n1. Esegui `git status --short --branch`.\n2. Esegui `git log --oneline -3`.\n3. Esegui `touch ws-file && git add ws-file && git -c user.name=sonda -c user.email=sonda@example.invalid commit -q -m \"sonda: commit dal workspace\"`.\n4. Esegui `git log --oneline -3 && echo SONDA-WS-$((40+2))`.\n\nSe un comando fallisce, riporta l'errore e passa al successivo. Alla fine scrivi una riga con i passi riusciti e quelli falliti.\n",
+      "runsPerCase": 1,
+      "timeoutSeconds": 300,
+      "maxTurns": 15,
+      "graders": [
+        {
+          "name": "status-e-log-funzionano",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "tg/1-sonda",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "commit-e-log-finale",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "SONDA-WS-42",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "file-del-commit-creato",
+          "type": "file_exists",
+          "weight": 1,
+          "config": {
+            "path": "ws-file",
+            "exists": true
+          }
+        },
+        {
+          "name": "hook-sessionstart-cwd",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "sonda-hooks.jsonl"
+            },
+            "pattern": "\"event\": \"SessionStart\"",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "hook-pretooluse-cwd",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "sonda-hooks.jsonl"
+            },
+            "pattern": "\"event\": \"PreToolUse\"",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "bash-usato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Bash"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 5,
+            "costUsd": 0.06395669999999999,
+            "judgeCostUsd": 0,
+            "durationSeconds": 14,
+            "startedAt": "2026-10-23T20:12:59.310Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-kBNkCv/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "status-e-log-funzionano",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched tg/1-sonda",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "commit-e-log-finale",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched SONDA-WS-42",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-del-commit-creato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "ws-file exists as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "hook-sessionstart-cwd",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched \"event\": \"SessionStart\"",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "hook-pretooluse-cwd",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched \"event\": \"PreToolUse\"",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "bash-usato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 4x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 1,
+    "overallPassRate": 1
+  }
+}

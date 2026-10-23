@@ -1,1 +1,11 @@
 ora	invocazione	costUsd	durationSeconds	casi
+2026-10-23T19:03:52Z	sonda-nl-bash (with-without)	0.12269349999999998	39	nl-bash
+2026-10-23T19:04:01Z	sonda-nl-worktree (none)	0.0431606	7	nl-worktree
+2026-10-23T19:04:20Z	sonda-ws-worktree (none)	0.05778319999999999	16	ws-worktree
+2026-10-23T19:04:42Z	sonda-skill (none)	0.070202	21	skill
+2026-10-23T19:05:03Z	sonda-radice-tmp (none)	0.0611107	18	skill
+2026-10-23T19:05:09Z	sonda-ve1-dependencies (none)	0.0380105	4	skill
+2026-10-23T20:12:58Z	sonda-nl-bash (with-without)	0.1320965	32	nl-bash
+2026-10-23T20:13:13Z	sonda-ws-worktree (none)	0.06395669999999999	14	ws-worktree
+2026-10-23T20:13:25Z	sonda-skill (none)	0.08615500000000001	11	skill
+2026-10-23T20:13:39Z	sonda-radice-tmp (none)	0.0734434	12	skill

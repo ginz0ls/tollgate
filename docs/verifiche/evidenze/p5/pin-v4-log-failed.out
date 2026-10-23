@@ -1,0 +1,31 @@
+probe	Set up job	﻿2026-10-23T20:15:06.4468475Z Current runner version: '2.338.0'
+probe	Set up job	2026-10-23T20:15:06.4548963Z ##[group]Runner Image Provisioner
+probe	Set up job	2026-10-23T20:15:06.4550634Z Hosted Compute Agent
+probe	Set up job	2026-10-23T20:15:06.4551713Z Version: 20261012.601
+probe	Set up job	2026-10-23T20:15:06.4552834Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+probe	Set up job	2026-10-23T20:15:06.4554105Z Build Date: 2026-10-12T17:48:21Z
+probe	Set up job	2026-10-23T20:15:06.4555513Z Worker ID: {0c232bab-df50-4c5c-8f08-c9c5e51aa583}
+probe	Set up job	2026-10-23T20:15:06.4557154Z Region: eastus
+probe	Set up job	2026-10-23T20:15:06.4558249Z Cloud: Azure
+probe	Set up job	2026-10-23T20:15:06.4559185Z ##[endgroup]
+probe	Set up job	2026-10-23T20:15:06.4561741Z ##[group]Operating System
+probe	Set up job	2026-10-23T20:15:06.4563042Z Ubuntu
+probe	Set up job	2026-10-23T20:15:06.4564084Z 24.04.5
+probe	Set up job	2026-10-23T20:15:06.4565056Z LTS
+probe	Set up job	2026-10-23T20:15:06.4586526Z ##[endgroup]
+probe	Set up job	2026-10-23T20:15:06.4587726Z ##[group]Runner Image
+probe	Set up job	2026-10-23T20:15:06.4588998Z Image: ubuntu-24.04
+probe	Set up job	2026-10-23T20:15:06.4590026Z Version: 20261012.334.1
+probe	Set up job	2026-10-23T20:15:06.4592150Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+probe	Set up job	2026-10-23T20:15:06.4595418Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+probe	Set up job	2026-10-23T20:15:06.4598372Z ##[endgroup]
+probe	Set up job	2026-10-23T20:15:06.4600445Z ##[group]GITHUB_TOKEN Permissions
+probe	Set up job	2026-10-23T20:15:06.4603934Z Contents: read
+probe	Set up job	2026-10-23T20:15:06.4605049Z Metadata: read
+probe	Set up job	2026-10-23T20:15:06.4626564Z ##[endgroup]
+probe	Set up job	2026-10-23T20:15:06.4630094Z Secret source: Actions
+probe	Set up job	2026-10-23T20:15:06.4631982Z Cache mode: write
+probe	Set up job	2026-10-23T20:15:06.4633678Z Prepare workflow directory
+probe	Set up job	2026-10-23T20:15:06.5414701Z Prepare all required actions
+probe	Set up job	2026-10-23T20:15:06.5491554Z Getting action download info
+probe	Set up job	2026-10-23T20:15:06.7828728Z ##[error]The action actions/checkout@v4 is not allowed in ginz0ls/tollgate-p4-detect because all actions must be pinned to a full-length commit SHA.

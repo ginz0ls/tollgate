@@ -1,0 +1,10 @@
+checkout	v4.4.0
+checkout	v7.0.1
+cache	v4.3.0
+cache	v6.1.0
+upload-artifact	v4.6.2
+upload-artifact	v7.0.2
+download-artifact	v4.3.0
+download-artifact	v8.0.2
+setup-python	v4.9.1
+setup-python	v7.1.0

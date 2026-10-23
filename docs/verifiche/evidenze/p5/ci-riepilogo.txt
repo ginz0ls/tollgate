@@ -1,0 +1,16 @@
+suite (3.11, off)	suite	2026-10-23T19:06:54.7909092Z [36;1mecho "sonda: rc=$rc durata=$(( $(date +%s) - start ))s modo-avvisi=$WARNINGS_MODE"[0m
+suite (3.11, off)	suite	2026-10-23T19:06:54.7910563Z [36;1mecho "sonda: righe unclosed database: $(grep -c 'unclosed database' "$RUNNER_TEMP/suite.log")"[0m
+suite (3.11, off)	suite	2026-10-23T19:17:49.8560899Z sonda: rc=1 durata=655s modo-avvisi=off
+suite (3.11, off)	suite	2026-10-23T19:17:49.8579534Z sonda: righe unclosed database: 0
+suite (3.13, error)	suite	2026-10-23T19:06:54.8631645Z [36;1mecho "sonda: rc=$rc durata=$(( $(date +%s) - start ))s modo-avvisi=$WARNINGS_MODE"[0m
+suite (3.13, error)	suite	2026-10-23T19:06:54.8632768Z [36;1mecho "sonda: righe unclosed database: $(grep -c 'unclosed database' "$RUNNER_TEMP/suite.log")"[0m
+suite (3.13, error)	suite	2026-10-23T19:18:33.2775874Z sonda: rc=1 durata=699s modo-avvisi=error
+suite (3.13, error)	suite	2026-10-23T19:18:33.2794384Z sonda: righe unclosed database: 0
+suite (3.11, error)	suite	2026-10-23T19:06:57.4475275Z [36;1mecho "sonda: rc=$rc durata=$(( $(date +%s) - start ))s modo-avvisi=$WARNINGS_MODE"[0m
+suite (3.11, error)	suite	2026-10-23T19:06:57.4478820Z [36;1mecho "sonda: righe unclosed database: $(grep -c 'unclosed database' "$RUNNER_TEMP/suite.log")"[0m
+suite (3.11, error)	suite	2026-10-23T19:18:47.4465225Z sonda: rc=1 durata=710s modo-avvisi=error
+suite (3.11, error)	suite	2026-10-23T19:18:47.4485308Z sonda: righe unclosed database: 0
+suite (3.13, off)	suite	2026-10-23T19:06:55.4500551Z [36;1mecho "sonda: rc=$rc durata=$(( $(date +%s) - start ))s modo-avvisi=$WARNINGS_MODE"[0m
+suite (3.13, off)	suite	2026-10-23T19:06:55.4501400Z [36;1mecho "sonda: righe unclosed database: $(grep -c 'unclosed database' "$RUNNER_TEMP/suite.log")"[0m
+suite (3.13, off)	suite	2026-10-23T19:15:46.0161532Z sonda: rc=1 durata=531s modo-avvisi=off
+suite (3.13, off)	suite	2026-10-23T19:15:46.0174315Z sonda: righe unclosed database: 0

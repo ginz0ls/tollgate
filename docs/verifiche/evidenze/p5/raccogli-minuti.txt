@@ -1,0 +1,6 @@
+cache-run	ginz0ls/tollgate-p4-detect	run 40008438821	conclusione success	durata 14000 ms	fatturabile UBUNTU 0 ms
+cache-verdict	ginz0ls/tollgate-p4-detect	run 40008475385	conclusione success	durata 14000 ms	fatturabile UBUNTU 0 ms
+ci	ginz0ls/tollgate	run 40008812552	conclusione failure	durata 722000 ms	fatturabile UBUNTU 0 ms
+pin-v4	ginz0ls/tollgate-p4-detect	run 40017747631	conclusione failure	durata 5000 ms	fatturabile UBUNTU 0 ms
+pin-sha	ginz0ls/tollgate-p4-detect	run 40017747716	conclusione success	durata 9000 ms	fatturabile UBUNTU 0 ms
+totale: 5 run, 0 ms fatturabili (circa 0 minuti)

@@ -1,0 +1,1 @@
+{"version": 2, "plugins": {"superpowers@claude-plugins-official": [{"scope": "user", "installPath": "/tmp/claude-eval-JUnd0s/home/.sonda-eval/superpowers", "version": "7.0.0"}]}}

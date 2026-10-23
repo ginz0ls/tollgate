@@ -1,0 +1,17 @@
+PWD=/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-DGS2rf/home/cwd
+HOME=/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-DGS2rf/home
+CLAUDE_CONFIG_DIR=UNSET
+TMPDIR=/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-DGS2rf/tmp
+BASH_SOURCE_0=/tmp/tollgate-eval-target-sonda/evals/skill/scaffold.sh
+DOLLAR_0=/tmp/tollgate-eval-target-sonda/evals/skill/scaffold.sh
+SCRIPT_DIR=/tmp/tollgate-eval-target-sonda/evals/skill
+ROOT_GUESS=/tmp/tollgate-eval-target-sonda
+ROOT_GUESS_IS_PLUGIN=yes
+ENV_NAMES=GIT_CONFIG_NOSYSTEM,HOME,NODE_ENV,PATH,PWD,SHLVL,TEMP,TERM,TMP,TMPDIR,USERPROFILE,USER_TYPE
+WHICH_PYTHON3=/tmp/tollgate-eval-target-sonda/probe-bin/python3
+WHICH_GIT=/usr/bin/git
+WHICH_SONDA_SHIM=/tmp/tollgate-eval-target-sonda/probe-bin/sonda-shim
+INSTALLED_PLUGINS_SHA256=ca395dd4d3380d74e7d17fd016efba56ec1f0316325725d565830e802127b3ab
+INSTALLED_PLUGINS_MTIME=1792786406
+WORKTREE_LIST=2
+SCAFFOLD_SECONDS=0

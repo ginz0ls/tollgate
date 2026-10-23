@@ -1,0 +1,17 @@
+PWD=/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-3vswfF/home/cwd
+HOME=/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-3vswfF/home
+CLAUDE_CONFIG_DIR=UNSET
+TMPDIR=/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-3vswfF/tmp
+BASH_SOURCE_0=/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin/evals/nl-bash/scaffold.sh
+DOLLAR_0=/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin/evals/nl-bash/scaffold.sh
+SCRIPT_DIR=/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin/evals/nl-bash
+ROOT_GUESS=/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin
+ROOT_GUESS_IS_PLUGIN=yes
+ENV_NAMES=GIT_CONFIG_NOSYSTEM,HOME,NODE_ENV,PATH,PWD,SHLVL,TEMP,TERM,TMP,TMPDIR,USERPROFILE,USER_TYPE
+WHICH_PYTHON3=/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-bin/python3
+WHICH_GIT=/usr/bin/git
+WHICH_SONDA_SHIM=/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-bin/sonda-shim
+INSTALLED_PLUGINS_SHA256=47a3a20580f69707edde783154e90b43679b4c31fa55e28266e8bbe7cb1529e7
+INSTALLED_PLUGINS_MTIME=1792786361
+WORKTREE_LIST=2
+SCAFFOLD_SECONDS=0

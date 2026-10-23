@@ -1,0 +1,17 @@
+PWD=/tmp/claude-eval-6p3nnx/home/cwd
+HOME=/tmp/claude-eval-6p3nnx/home
+CLAUDE_CONFIG_DIR=UNSET
+TMPDIR=/tmp/claude-eval-6p3nnx/tmp
+BASH_SOURCE_0=/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin/evals/nl-bash/scaffold.sh
+DOLLAR_0=/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin/evals/nl-bash/scaffold.sh
+SCRIPT_DIR=/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin/evals/nl-bash
+ROOT_GUESS=/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin
+ROOT_GUESS_IS_PLUGIN=yes
+ENV_NAMES=GIT_CONFIG_NOSYSTEM,HOME,NODE_ENV,PATH,PWD,SHLVL,TEMP,TERM,TMP,TMPDIR,USERPROFILE,USER_TYPE
+WHICH_PYTHON3=/home/crucco/.pyenv/shims/python3
+WHICH_GIT=/usr/bin/git
+WHICH_SONDA_SHIM=/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-bin/sonda-shim
+INSTALLED_PLUGINS_SHA256=6721a566272259f00a928d891770c190f0374034138233e61760128aacb1d8c0
+INSTALLED_PLUGINS_MTIME=1792782193
+WORKTREE_LIST=2
+SCAFFOLD_SECONDS=0

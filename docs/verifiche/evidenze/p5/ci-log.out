@@ -1,0 +1,929 @@
+suite (3.11, off)	Set up job	﻿2026-10-23T19:06:52.7321277Z Current runner version: '2.338.0'
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7399698Z ##[group]Runner Image Provisioner
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7401183Z Hosted Compute Agent
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7402333Z Version: 20261012.601
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7403423Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7404839Z Build Date: 2026-10-12T17:48:21Z
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7406107Z Worker ID: {af3adb62-502d-4a73-ada3-a3398b0d0d6d}
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7407635Z Region: eastus
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7429170Z Cloud: Azure
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7430383Z ##[endgroup]
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7433069Z ##[group]Operating System
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7434242Z Ubuntu
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7435327Z 24.04.5
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7436211Z LTS
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7437667Z ##[endgroup]
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7439110Z ##[group]Runner Image
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7440266Z Image: ubuntu-24.04
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7441481Z Version: 20261012.334.1
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7443375Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7446587Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7468714Z ##[endgroup]
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7470817Z ##[group]GITHUB_TOKEN Permissions
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7473936Z Contents: read
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7474945Z Metadata: read
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7475840Z ##[endgroup]
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7479444Z Secret source: Actions
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7481042Z Cache mode: write
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.7482604Z Prepare workflow directory
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.8096354Z Prepare all required actions
+suite (3.11, off)	Set up job	2026-10-23T19:06:52.8168172Z Getting action download info
+suite (3.11, off)	Set up job	2026-10-23T19:06:53.0807605Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+suite (3.11, off)	Set up job	2026-10-23T19:06:53.1842061Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+suite (3.11, off)	Set up job	2026-10-23T19:06:53.3755998Z Complete job name: suite (3.11, off)
+suite (3.11, off)	Run actions/checkout@v4	﻿2026-10-23T19:06:53.4664837Z ##[group]Run actions/checkout@v4
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4665819Z with:
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4666281Z   path: tollgate src
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4666780Z   persist-credentials: false
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4667305Z   repository: ginz0ls/tollgate
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4672194Z   token: ***
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4672696Z   ssh-strict: true
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4673143Z   ssh-user: git
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4673567Z   clean: true
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4674023Z   sparse-checkout-cone-mode: true
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4674606Z   fetch-depth: 1
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4675041Z   fetch-tags: false
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4675493Z   show-progress: true
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4675941Z   lfs: false
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4676356Z   submodules: false
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4676808Z   set-safe-directory: true
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4677318Z   allow-unsafe-pr-checkout: false
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4678207Z ##[endgroup]
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5785446Z Syncing repository: ginz0ls/tollgate
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5801789Z ##[group]Getting Git version info
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5810039Z Working directory is '/home/runner/work/tollgate/tollgate/tollgate src'
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5849613Z [command]/usr/bin/git version
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6009702Z git version 2.55.0
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6091428Z ##[endgroup]
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6100527Z Temporarily overriding HOME='/home/runner/work/_temp/1d5ae021-0214-4815-ae49-0dafa7d56791' before making global git config changes
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6107569Z Adding repository directory to the temporary git global config as a safe directory
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6110234Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate/tollgate/tollgate src
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6158880Z ##[group]Initializing the repository
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6160571Z [command]/usr/bin/git init /home/runner/work/tollgate/tollgate/tollgate src
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6318199Z hint: Using 'master' as the name for the initial branch. This default branch name
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6342037Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6344200Z hint: to use in all of your new repositories, which will suppress this warning,
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6363786Z hint: call:
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6379287Z hint:
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6380347Z hint: 	git config --global init.defaultBranch <name>
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6381482Z hint:
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6383132Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6384813Z hint: 'development'. The just-created branch can be renamed via this command:
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6387693Z hint:
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6645556Z hint: 	git branch -m <name>
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6646897Z hint:
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6655332Z hint: Disable this message with "git config set advice.defaultBranchName false"
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6658974Z Initialized empty Git repository in /home/runner/work/tollgate/tollgate/tollgate src/.git/
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6663854Z [command]/usr/bin/git remote add origin https://github.com/ginz0ls/tollgate
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6666792Z ##[endgroup]
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6668145Z ##[group]Disabling automatic garbage collection
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6670122Z [command]/usr/bin/git config --local gc.auto 0
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6675304Z ##[endgroup]
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6677695Z ##[group]Setting up auth
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6679818Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6683854Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.7842528Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.7855127Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.7866536Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.7909447Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.8229337Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.8258561Z ##[endgroup]
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.8259693Z ##[group]Fetching the repository
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:53.8271830Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +a746e9d64f41a14e692ef0b92ff1d387bb84ee51:refs/remotes/origin/p5-probe-ci
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.2069113Z From https://github.com/ginz0ls/tollgate
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.2072893Z  * [new ref]         a746e9d64f41a14e692ef0b92ff1d387bb84ee51 -> origin/p5-probe-ci
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.2079707Z ##[endgroup]
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.2082135Z ##[group]Determining the checkout info
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.2084825Z ##[endgroup]
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.2090018Z [command]/usr/bin/git sparse-checkout disable
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.2151000Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.2188786Z ##[group]Checking out the ref
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.2193798Z [command]/usr/bin/git checkout --progress --force -B p5-probe-ci refs/remotes/origin/p5-probe-ci
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.4877043Z Switched to a new branch 'p5-probe-ci'
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.4896613Z branch 'p5-probe-ci' set up to track 'origin/p5-probe-ci'.
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.4899487Z ##[endgroup]
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.4959495Z [command]/usr/bin/git log -1 --format=%H
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.4980026Z a746e9d64f41a14e692ef0b92ff1d387bb84ee51
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.4991844Z ##[group]Removing auth
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.4996310Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.5032404Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.5285334Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.5315306Z http.https://github.com/.extraheader
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.5326592Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.5365683Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.5613987Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.5655791Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+suite (3.11, off)	Run actions/checkout@v4	2026-10-23T19:06:54.5898722Z ##[endgroup]
+suite (3.11, off)	Run actions/setup-python@v5	﻿2026-10-23T19:06:54.6177035Z ##[group]Run actions/setup-python@v5
+suite (3.11, off)	Run actions/setup-python@v5	2026-10-23T19:06:54.6177582Z with:
+suite (3.11, off)	Run actions/setup-python@v5	2026-10-23T19:06:54.6177968Z   python-version: 3.11
+suite (3.11, off)	Run actions/setup-python@v5	2026-10-23T19:06:54.6178608Z   check-latest: false
+suite (3.11, off)	Run actions/setup-python@v5	2026-10-23T19:06:54.6181491Z   token: ***
+suite (3.11, off)	Run actions/setup-python@v5	2026-10-23T19:06:54.6181905Z   update-environment: true
+suite (3.11, off)	Run actions/setup-python@v5	2026-10-23T19:06:54.6182366Z   allow-prereleases: false
+suite (3.11, off)	Run actions/setup-python@v5	2026-10-23T19:06:54.6182791Z   freethreaded: false
+suite (3.11, off)	Run actions/setup-python@v5	2026-10-23T19:06:54.6183175Z ##[endgroup]
+suite (3.11, off)	Run actions/setup-python@v5	2026-10-23T19:06:54.7586626Z ##[group]Installed versions
+suite (3.11, off)	Run actions/setup-python@v5	2026-10-23T19:06:54.7696357Z (node:2142) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+suite (3.11, off)	Run actions/setup-python@v5	2026-10-23T19:06:54.7698727Z Successfully set up CPython (3.11.17)
+suite (3.11, off)	Run actions/setup-python@v5	2026-10-23T19:06:54.7700263Z (Use `node --trace-deprecation ...` to show where the warning was created)
+suite (3.11, off)	Run actions/setup-python@v5	2026-10-23T19:06:54.7726677Z ##[endgroup]
+suite (3.11, off)	suite	﻿2026-10-23T19:06:54.7901637Z ##[group]Run if [ "$WARNINGS_MODE" = error ]; then export PYTHONWARNINGS=error::ResourceWarning; fi
+suite (3.11, off)	suite	2026-10-23T19:06:54.7903272Z [36;1mif [ "$WARNINGS_MODE" = error ]; then export PYTHONWARNINGS=error::ResourceWarning; fi[0m
+suite (3.11, off)	suite	2026-10-23T19:06:54.7904429Z [36;1mpython --version[0m
+suite (3.11, off)	suite	2026-10-23T19:06:54.7905201Z [36;1mstart="$(date +%s)"[0m
+suite (3.11, off)	suite	2026-10-23T19:06:54.7905928Z [36;1mset +e[0m
+suite (3.11, off)	suite	2026-10-23T19:06:54.7906776Z [36;1mPYTHONS=python tests/run 2>&1 | tee "$RUNNER_TEMP/suite.log"[0m
+suite (3.11, off)	suite	2026-10-23T19:06:54.7907764Z [36;1mrc="${PIPESTATUS[0]}"[0m
+suite (3.11, off)	suite	2026-10-23T19:06:54.7909092Z [36;1mecho "sonda: rc=$rc durata=$(( $(date +%s) - start ))s modo-avvisi=$WARNINGS_MODE"[0m
+suite (3.11, off)	suite	2026-10-23T19:06:54.7910563Z [36;1mecho "sonda: righe unclosed database: $(grep -c 'unclosed database' "$RUNNER_TEMP/suite.log")"[0m
+suite (3.11, off)	suite	2026-10-23T19:06:54.7911752Z [36;1mexit "$rc"[0m
+suite (3.11, off)	suite	2026-10-23T19:06:54.8377195Z shell: /usr/bin/bash -e {0}
+suite (3.11, off)	suite	2026-10-23T19:06:54.8377768Z env:
+suite (3.11, off)	suite	2026-10-23T19:06:54.8378597Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.17/x64
+suite (3.11, off)	suite	2026-10-23T19:06:54.8379418Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.17/x64/lib/pkgconfig
+suite (3.11, off)	suite	2026-10-23T19:06:54.8380107Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.17/x64
+suite (3.11, off)	suite	2026-10-23T19:06:54.8380741Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.17/x64
+suite (3.11, off)	suite	2026-10-23T19:06:54.8381375Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.17/x64
+suite (3.11, off)	suite	2026-10-23T19:06:54.8382000Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.17/x64/lib
+suite (3.11, off)	suite	2026-10-23T19:06:54.8382547Z   WARNINGS_MODE: off
+suite (3.11, off)	suite	2026-10-23T19:06:54.8382958Z ##[endgroup]
+suite (3.11, off)	suite	2026-10-23T19:06:54.8630927Z Python 3.11.17
+suite (3.11, off)	suite	2026-10-23T19:06:54.8712115Z == Python 3.11.17
+suite (3.11, off)	suite	2026-10-23T19:13:50.1523690Z ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................F.............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................guard: la PR è avanzata dopo l'evento, nessuna scrittura (la rigiudica l'evento nuovo)
+suite (3.11, off)	suite	2026-10-23T19:17:49.8156818Z .......................................................................................................................................................................................................................................................................................................................................................................................F.................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+suite (3.11, off)	suite	2026-10-23T19:17:49.8161462Z ======================================================================
+suite (3.11, off)	suite	2026-10-23T19:17:49.8162836Z FAIL: test_concurrent_migration_of_v1_db_with_rows (tests.test_db.BackupRaceTest.test_concurrent_migration_of_v1_db_with_rows)
+suite (3.11, off)	suite	2026-10-23T19:17:49.8165454Z ----------------------------------------------------------------------
+suite (3.11, off)	suite	2026-10-23T19:17:49.8166540Z Traceback (most recent call last):
+suite (3.11, off)	suite	2026-10-23T19:17:49.8201667Z   File "/home/runner/work/tollgate/tollgate/tollgate src/tests/test_db.py", line 374, in test_concurrent_migration_of_v1_db_with_rows
+suite (3.11, off)	suite	2026-10-23T19:17:49.8203246Z     self.assertTrue(copies)
+suite (3.11, off)	suite	2026-10-23T19:17:49.8206615Z AssertionError: [] is not true
+suite (3.11, off)	suite	2026-10-23T19:17:49.8207197Z 
+suite (3.11, off)	suite	2026-10-23T19:17:49.8207588Z ======================================================================
+suite (3.11, off)	suite	2026-10-23T19:17:49.8209110Z FAIL: test_task1_script_still_passes_after_the_common_library (tests.test_p4_scripts.ControllaTest.test_task1_script_still_passes_after_the_common_library)
+suite (3.11, off)	suite	2026-10-23T19:17:49.8210418Z ----------------------------------------------------------------------
+suite (3.11, off)	suite	2026-10-23T19:17:49.8211156Z Traceback (most recent call last):
+suite (3.11, off)	suite	2026-10-23T19:17:49.8212424Z   File "/home/runner/work/tollgate/tollgate/tollgate src/tests/test_p4_scripts.py", line 116, in test_task1_script_still_passes_after_the_common_library
+suite (3.11, off)	suite	2026-10-23T19:17:49.8213775Z     out = self.run_controlla(SPIKES / "gh-p4" / "run-p4-checks.sh")
+suite (3.11, off)	suite	2026-10-23T19:17:49.8214526Z           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+suite (3.11, off)	suite	2026-10-23T19:17:49.8215571Z   File "/home/runner/work/tollgate/tollgate/tollgate src/tests/test_p4_scripts.py", line 110, in run_controlla
+suite (3.11, off)	suite	2026-10-23T19:17:49.8216699Z     self.assertEqual(r.returncode, 0, r.stdout[-3000:] + r.stderr[-2000:])
+suite (3.11, off)	suite	2026-10-23T19:17:49.8219945Z AssertionError: 1 != 0 : OLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-tg-95-edit.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/95-edit --title prova P4: verde-edit --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-tg-95-edit.md
+suite (3.11, off)	suite	2026-10-23T19:17:49.8224823Z VIOLAZIONE (gh api PATCH: solo repos/ginz0ls/tollgate-p4-protected/pulls/<n> con -F body=@<file> da una cartella ammessa): api --method PATCH repos/ginz0ls/tollgate-p4-protected/pulls/96 -F body=@/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-edit.md
+suite (3.11, off)	suite	2026-10-23T19:17:49.8229999Z VIOLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-204649-body-tg-97-workflow-ci.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/97-workflow-ci --title prova P4: verde-workflow-ci --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-204649-body-tg-97-workflow-ci.md
+suite (3.11, off)	suite	2026-10-23T19:17:49.8236157Z VIOLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-204821-body-tg-99-deroga-test.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/99-deroga-test --title prova P4: attenzione-deroga-test --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-204821-body-tg-99-deroga-test.md
+suite (3.11, off)	suite	2026-10-23T19:17:49.8242845Z VIOLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-211657-body-tollgate-config-p4-20261022-211657.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tollgate-config/p4-20261022-211657 --title prova P4: verde-config --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-211657-body-tollgate-config-p4-20261022-211657.md
+suite (3.11, off)	suite	2026-10-23T19:17:49.8246743Z COMANDI VERI RIFIUTATI
+suite (3.11, off)	suite	2026-10-23T19:17:49.8247319Z --- remoti dei cloni
+suite (3.11, off)	suite	2026-10-23T19:17:49.8248470Z   protected -> /tmp/tollgate-p4-controlla-80d1c03r/remote/ginz0ls/tollgate-p4-protected.git
+suite (3.11, off)	suite	2026-10-23T19:17:49.8249775Z   detect -> /tmp/tollgate-p4-controlla-80d1c03r/remote/ginz0ls/tollgate-p4-detect.git
+suite (3.11, off)	suite	2026-10-23T19:17:49.8250734Z --- uscite attese
+suite (3.11, off)	suite	2026-10-23T19:17:49.8251499Z   tutte presenti
+suite (3.11, off)	suite	2026-10-23T19:17:49.8252177Z --- nel banco di prova, i rami e i commit
+suite (3.11, off)	suite	2026-10-23T19:17:49.8252957Z b76d559 togli i workflow sonda (tollgate P4)
+suite (3.11, off)	suite	2026-10-23T19:17:49.8253696Z 1ab6dd1 sonda v5 push diretto 20261023-191547
+suite (3.11, off)	suite	2026-10-23T19:17:49.8254377Z 4be9e81 sonda v5-rebase
+suite (3.11, off)	suite	2026-10-23T19:17:49.8254921Z e22235e merge p4-v5-merge-20261023-191547
+suite (3.11, off)	suite	2026-10-23T19:17:49.8255504Z a823c0e sonda v5-merge
+suite (3.11, off)	suite	2026-10-23T19:17:49.8256008Z 473044c sonda 20261023-191546
+suite (3.11, off)	suite	2026-10-23T19:17:49.8256569Z 8e601e3 sonda v4 push 20261023-191545
+suite (3.11, off)	suite	2026-10-23T19:17:49.8257194Z 0c076bc sonde tollgate P4: workflow delle verifiche
+suite (3.11, off)	suite	2026-10-23T19:17:49.8257837Z 3f92e81 init
+suite (3.11, off)	suite	2026-10-23T19:17:49.8258544Z CONTROLLA: FALLITO
+suite (3.11, off)	suite	2026-10-23T19:17:49.8259085Z 
+suite (3.11, off)	suite	2026-10-23T19:17:49.8259311Z 
+suite (3.11, off)	suite	2026-10-23T19:17:49.8259730Z ----------------------------------------------------------------------
+suite (3.11, off)	suite	2026-10-23T19:17:49.8260472Z Ran 2465 tests in 653.746s
+suite (3.11, off)	suite	2026-10-23T19:17:49.8260923Z 
+suite (3.11, off)	suite	2026-10-23T19:17:49.8261350Z FAILED (failures=2)
+suite (3.11, off)	suite	2026-10-23T19:17:49.8560899Z sonda: rc=1 durata=655s modo-avvisi=off
+suite (3.11, off)	suite	2026-10-23T19:17:49.8579534Z sonda: righe unclosed database: 0
+suite (3.11, off)	suite	2026-10-23T19:17:49.8594163Z ##[error]Process completed with exit code 1.
+suite (3.11, off)	Post Run actions/checkout@v4	﻿2026-10-23T19:17:49.8753817Z Post job cleanup.
+suite (3.11, off)	Post Run actions/checkout@v4	2026-10-23T19:17:49.9746269Z [command]/usr/bin/git version
+suite (3.11, off)	Post Run actions/checkout@v4	2026-10-23T19:17:49.9803001Z git version 2.55.0
+suite (3.11, off)	Post Run actions/checkout@v4	2026-10-23T19:17:49.9904289Z Temporarily overriding HOME='/home/runner/work/_temp/07b59248-ada4-4f04-b86e-edadef5a33e2' before making global git config changes
+suite (3.11, off)	Post Run actions/checkout@v4	2026-10-23T19:17:49.9929212Z Adding repository directory to the temporary git global config as a safe directory
+suite (3.11, off)	Post Run actions/checkout@v4	2026-10-23T19:17:49.9930437Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate/tollgate/tollgate src
+suite (3.11, off)	Post Run actions/checkout@v4	2026-10-23T19:17:49.9932017Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+suite (3.11, off)	Post Run actions/checkout@v4	2026-10-23T19:17:50.0020153Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+suite (3.11, off)	Post Run actions/checkout@v4	2026-10-23T19:17:50.0579363Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+suite (3.11, off)	Post Run actions/checkout@v4	2026-10-23T19:17:50.0680063Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+suite (3.11, off)	Post Run actions/checkout@v4	2026-10-23T19:17:50.1426744Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+suite (3.11, off)	Post Run actions/checkout@v4	2026-10-23T19:17:50.1534973Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+suite (3.11, off)	Complete job	﻿2026-10-23T19:17:50.2360476Z Cleaning up orphan processes
+suite (3.11, off)	Complete job	2026-10-23T19:17:50.2680193Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-python@v5. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+suite (3.13, error)	Set up job	﻿2026-10-23T19:06:52.8521712Z Current runner version: '2.338.0'
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8601658Z ##[group]Runner Image Provisioner
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8603067Z Hosted Compute Agent
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8604073Z Version: 20261012.601
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8605358Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8606669Z Build Date: 2026-10-12T17:48:21Z
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8607995Z Worker ID: {87a67df2-f592-4638-94b6-37864ed8bc02}
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8609423Z Region: eastus
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8610842Z Cloud: Azure
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8611929Z ##[endgroup]
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8614596Z ##[group]Operating System
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8615736Z Ubuntu
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8616778Z 24.04.5
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8617675Z LTS
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8619165Z ##[endgroup]
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8640566Z ##[group]Runner Image
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8641645Z Image: ubuntu-24.04
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8646725Z Version: 20261012.334.1
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8648783Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8652016Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8653642Z ##[endgroup]
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8655377Z ##[group]GITHUB_TOKEN Permissions
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8685982Z Contents: read
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8686920Z Metadata: read
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8688022Z ##[endgroup]
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8691607Z Secret source: Actions
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8693122Z Cache mode: write
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.8694680Z Prepare workflow directory
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.9335321Z Prepare all required actions
+suite (3.13, error)	Set up job	2026-10-23T19:06:52.9406746Z Getting action download info
+suite (3.13, error)	Set up job	2026-10-23T19:06:53.1340972Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+suite (3.13, error)	Set up job	2026-10-23T19:06:53.2501838Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+suite (3.13, error)	Set up job	2026-10-23T19:06:53.4512067Z Complete job name: suite (3.13, error)
+suite (3.13, error)	Run actions/checkout@v4	﻿2026-10-23T19:06:53.5404576Z ##[group]Run actions/checkout@v4
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5405530Z with:
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5405965Z   path: tollgate src
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5406453Z   persist-credentials: false
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5406974Z   repository: ginz0ls/tollgate
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5411224Z   token: ***
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5411677Z   ssh-strict: true
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5412121Z   ssh-user: git
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5412556Z   clean: true
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5413003Z   sparse-checkout-cone-mode: true
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5413529Z   fetch-depth: 1
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5413959Z   fetch-tags: false
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5414406Z   show-progress: true
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5414850Z   lfs: false
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5415269Z   submodules: false
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5415723Z   set-safe-directory: true
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5416224Z   allow-unsafe-pr-checkout: false
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.5417005Z ##[endgroup]
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.6578316Z Syncing repository: ginz0ls/tollgate
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.6602354Z ##[group]Getting Git version info
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.6610896Z Working directory is '/home/runner/work/tollgate/tollgate/tollgate src'
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.6613036Z [command]/usr/bin/git version
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.6741173Z git version 2.55.0
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.6836349Z ##[endgroup]
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.6845467Z Temporarily overriding HOME='/home/runner/work/_temp/21c4a7a2-39bf-4ad3-9435-c981080bb938' before making global git config changes
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.6848435Z Adding repository directory to the temporary git global config as a safe directory
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.6869947Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate/tollgate/tollgate src
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.6883811Z ##[group]Initializing the repository
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.6885323Z [command]/usr/bin/git init /home/runner/work/tollgate/tollgate/tollgate src
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7034981Z hint: Using 'master' as the name for the initial branch. This default branch name
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7051139Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7053411Z hint: to use in all of your new repositories, which will suppress this warning,
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7054853Z hint: call:
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7055664Z hint:
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7056628Z hint: 	git config --global init.defaultBranch <name>
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7057888Z hint:
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7063694Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7065486Z hint: 'development'. The just-created branch can be renamed via this command:
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7066876Z hint:
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7067652Z hint: 	git branch -m <name>
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7068537Z hint:
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7070038Z hint: Disable this message with "git config set advice.defaultBranchName false"
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7072220Z Initialized empty Git repository in /home/runner/work/tollgate/tollgate/tollgate src/.git/
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7075363Z [command]/usr/bin/git remote add origin https://github.com/ginz0ls/tollgate
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7136224Z ##[endgroup]
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7137670Z ##[group]Disabling automatic garbage collection
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7138867Z [command]/usr/bin/git config --local gc.auto 0
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7200157Z ##[endgroup]
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7201521Z ##[group]Setting up auth
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7202892Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.7252466Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.8947528Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.8954037Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.8957251Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.8961552Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.8968118Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.8972312Z ##[endgroup]
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.8973863Z ##[group]Fetching the repository
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:53.8976551Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +a746e9d64f41a14e692ef0b92ff1d387bb84ee51:refs/remotes/origin/p5-probe-ci
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.2469012Z From https://github.com/ginz0ls/tollgate
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.2503843Z  * [new ref]         a746e9d64f41a14e692ef0b92ff1d387bb84ee51 -> origin/p5-probe-ci
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.2523843Z ##[endgroup]
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.2525743Z ##[group]Determining the checkout info
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.2527760Z ##[endgroup]
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.2529100Z [command]/usr/bin/git sparse-checkout disable
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.2581981Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.2641908Z ##[group]Checking out the ref
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.2666018Z [command]/usr/bin/git checkout --progress --force -B p5-probe-ci refs/remotes/origin/p5-probe-ci
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.5254371Z Switched to a new branch 'p5-probe-ci'
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.5267240Z branch 'p5-probe-ci' set up to track 'origin/p5-probe-ci'.
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.5279230Z ##[endgroup]
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.5325628Z [command]/usr/bin/git log -1 --format=%H
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.5357843Z a746e9d64f41a14e692ef0b92ff1d387bb84ee51
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.5367290Z ##[group]Removing auth
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.5372413Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.5412506Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.5668169Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.5702916Z http.https://github.com/.extraheader
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.5711177Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.5754217Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.6007081Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.6048819Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+suite (3.13, error)	Run actions/checkout@v4	2026-10-23T19:06:54.6295630Z ##[endgroup]
+suite (3.13, error)	Run actions/setup-python@v5	﻿2026-10-23T19:06:54.6684478Z ##[group]Run actions/setup-python@v5
+suite (3.13, error)	Run actions/setup-python@v5	2026-10-23T19:06:54.6685764Z with:
+suite (3.13, error)	Run actions/setup-python@v5	2026-10-23T19:06:54.6686674Z   python-version: 3.13
+suite (3.13, error)	Run actions/setup-python@v5	2026-10-23T19:06:54.6687716Z   check-latest: false
+suite (3.13, error)	Run actions/setup-python@v5	2026-10-23T19:06:54.6697886Z   token: ***
+suite (3.13, error)	Run actions/setup-python@v5	2026-10-23T19:06:54.6698915Z   update-environment: true
+suite (3.13, error)	Run actions/setup-python@v5	2026-10-23T19:06:54.6700234Z   allow-prereleases: false
+suite (3.13, error)	Run actions/setup-python@v5	2026-10-23T19:06:54.6701279Z   freethreaded: false
+suite (3.13, error)	Run actions/setup-python@v5	2026-10-23T19:06:54.6702227Z ##[endgroup]
+suite (3.13, error)	Run actions/setup-python@v5	2026-10-23T19:06:54.8278057Z ##[group]Installed versions
+suite (3.13, error)	Run actions/setup-python@v5	2026-10-23T19:06:54.8387611Z (node:2136) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+suite (3.13, error)	Run actions/setup-python@v5	2026-10-23T19:06:54.8388782Z Successfully set up CPython (3.13.16)
+suite (3.13, error)	Run actions/setup-python@v5	2026-10-23T19:06:54.8389990Z ##[endgroup]
+suite (3.13, error)	Run actions/setup-python@v5	2026-10-23T19:06:54.8416396Z (Use `node --trace-deprecation ...` to show where the warning was created)
+suite (3.13, error)	suite	﻿2026-10-23T19:06:54.8626160Z ##[group]Run if [ "$WARNINGS_MODE" = error ]; then export PYTHONWARNINGS=error::ResourceWarning; fi
+suite (3.13, error)	suite	2026-10-23T19:06:54.8627471Z [36;1mif [ "$WARNINGS_MODE" = error ]; then export PYTHONWARNINGS=error::ResourceWarning; fi[0m
+suite (3.13, error)	suite	2026-10-23T19:06:54.8628325Z [36;1mpython --version[0m
+suite (3.13, error)	suite	2026-10-23T19:06:54.8628818Z [36;1mstart="$(date +%s)"[0m
+suite (3.13, error)	suite	2026-10-23T19:06:54.8629265Z [36;1mset +e[0m
+suite (3.13, error)	suite	2026-10-23T19:06:54.8630204Z [36;1mPYTHONS=python tests/run 2>&1 | tee "$RUNNER_TEMP/suite.log"[0m
+suite (3.13, error)	suite	2026-10-23T19:06:54.8630924Z [36;1mrc="${PIPESTATUS[0]}"[0m
+suite (3.13, error)	suite	2026-10-23T19:06:54.8631645Z [36;1mecho "sonda: rc=$rc durata=$(( $(date +%s) - start ))s modo-avvisi=$WARNINGS_MODE"[0m
+suite (3.13, error)	suite	2026-10-23T19:06:54.8632768Z [36;1mecho "sonda: righe unclosed database: $(grep -c 'unclosed database' "$RUNNER_TEMP/suite.log")"[0m
+suite (3.13, error)	suite	2026-10-23T19:06:54.8633661Z [36;1mexit "$rc"[0m
+suite (3.13, error)	suite	2026-10-23T19:06:54.9000891Z shell: /usr/bin/bash -e {0}
+suite (3.13, error)	suite	2026-10-23T19:06:54.9001290Z env:
+suite (3.13, error)	suite	2026-10-23T19:06:54.9001639Z   pythonLocation: /opt/hostedtoolcache/Python/3.13.16/x64
+suite (3.13, error)	suite	2026-10-23T19:06:54.9002219Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.13.16/x64/lib/pkgconfig
+suite (3.13, error)	suite	2026-10-23T19:06:54.9069665Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.13.16/x64
+suite (3.13, error)	suite	2026-10-23T19:06:54.9070561Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.13.16/x64
+suite (3.13, error)	suite	2026-10-23T19:06:54.9071510Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.13.16/x64
+suite (3.13, error)	suite	2026-10-23T19:06:54.9072376Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.13.16/x64/lib
+suite (3.13, error)	suite	2026-10-23T19:06:54.9073014Z   WARNINGS_MODE: error
+suite (3.13, error)	suite	2026-10-23T19:06:54.9073433Z ##[endgroup]
+suite (3.13, error)	suite	2026-10-23T19:06:54.9290862Z Python 3.13.16
+suite (3.13, error)	suite	2026-10-23T19:06:54.9364662Z == Python 3.13.16
+suite (3.13, error)	suite	2026-10-23T19:14:20.8583360Z ........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................guard: la PR è avanzata dopo l'evento, nessuna scrittura (la rigiudica l'evento nuovo)
+suite (3.13, error)	suite	2026-10-23T19:18:33.2302305Z .......................................................................................................................................................................................................................................................................................................................................................................................F.................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+suite (3.13, error)	suite	2026-10-23T19:18:33.2306943Z ======================================================================
+suite (3.13, error)	suite	2026-10-23T19:18:33.2310494Z FAIL: test_task1_script_still_passes_after_the_common_library (tests.test_p4_scripts.ControllaTest.test_task1_script_still_passes_after_the_common_library)
+suite (3.13, error)	suite	2026-10-23T19:18:33.2312250Z ----------------------------------------------------------------------
+suite (3.13, error)	suite	2026-10-23T19:18:33.2317594Z Traceback (most recent call last):
+suite (3.13, error)	suite	2026-10-23T19:18:33.2325753Z   File "/home/runner/work/tollgate/tollgate/tollgate src/tests/test_p4_scripts.py", line 116, in test_task1_script_still_passes_after_the_common_library
+suite (3.13, error)	suite	2026-10-23T19:18:33.2327474Z     out = self.run_controlla(SPIKES / "gh-p4" / "run-p4-checks.sh")
+suite (3.13, error)	suite	2026-10-23T19:18:33.2328722Z   File "/home/runner/work/tollgate/tollgate/tollgate src/tests/test_p4_scripts.py", line 110, in run_controlla
+suite (3.13, error)	suite	2026-10-23T19:18:33.2330363Z     self.assertEqual(r.returncode, 0, r.stdout[-3000:] + r.stderr[-2000:])
+suite (3.13, error)	suite	2026-10-23T19:18:33.2331235Z     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+suite (3.13, error)	suite	2026-10-23T19:18:33.2334292Z AssertionError: 1 != 0 : OLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-tg-95-edit.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/95-edit --title prova P4: verde-edit --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-tg-95-edit.md
+suite (3.13, error)	suite	2026-10-23T19:18:33.2338943Z VIOLAZIONE (gh api PATCH: solo repos/ginz0ls/tollgate-p4-protected/pulls/<n> con -F body=@<file> da una cartella ammessa): api --method PATCH repos/ginz0ls/tollgate-p4-protected/pulls/96 -F body=@/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-edit.md
+suite (3.13, error)	suite	2026-10-23T19:18:33.2344145Z VIOLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-204649-body-tg-97-workflow-ci.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/97-workflow-ci --title prova P4: verde-workflow-ci --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-204649-body-tg-97-workflow-ci.md
+suite (3.13, error)	suite	2026-10-23T19:18:33.2350665Z VIOLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-204821-body-tg-99-deroga-test.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/99-deroga-test --title prova P4: attenzione-deroga-test --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-204821-body-tg-99-deroga-test.md
+suite (3.13, error)	suite	2026-10-23T19:18:33.2356887Z VIOLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-211657-body-tollgate-config-p4-20261022-211657.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tollgate-config/p4-20261022-211657 --title prova P4: verde-config --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-211657-body-tollgate-config-p4-20261022-211657.md
+suite (3.13, error)	suite	2026-10-23T19:18:33.2360579Z COMANDI VERI RIFIUTATI
+suite (3.13, error)	suite	2026-10-23T19:18:33.2361132Z --- remoti dei cloni
+suite (3.13, error)	suite	2026-10-23T19:18:33.2361942Z   protected -> /tmp/tollgate-p4-controlla-f3akk9w5/remote/ginz0ls/tollgate-p4-protected.git
+suite (3.13, error)	suite	2026-10-23T19:18:33.2363090Z   detect -> /tmp/tollgate-p4-controlla-f3akk9w5/remote/ginz0ls/tollgate-p4-detect.git
+suite (3.13, error)	suite	2026-10-23T19:18:33.2364212Z --- uscite attese
+suite (3.13, error)	suite	2026-10-23T19:18:33.2364722Z   tutte presenti
+suite (3.13, error)	suite	2026-10-23T19:18:33.2365248Z --- nel banco di prova, i rami e i commit
+suite (3.13, error)	suite	2026-10-23T19:18:33.2365885Z 9197529 togli i workflow sonda (tollgate P4)
+suite (3.13, error)	suite	2026-10-23T19:18:33.2366555Z 709ff62 sonda v5 push diretto 20261023-191624
+suite (3.13, error)	suite	2026-10-23T19:18:33.2367171Z 2be3e2b sonda v5-rebase
+suite (3.13, error)	suite	2026-10-23T19:18:33.2367778Z 3e7e43d merge p4-v5-merge-20261023-191624
+suite (3.13, error)	suite	2026-10-23T19:18:33.2368424Z 4b95ed3 sonda v5-merge
+suite (3.13, error)	suite	2026-10-23T19:18:33.2369014Z f0ed577 sonda 20261023-191623
+suite (3.13, error)	suite	2026-10-23T19:18:33.2370184Z 4664c6d sonda v4 push 20261023-191622
+suite (3.13, error)	suite	2026-10-23T19:18:33.2370995Z f041004 sonde tollgate P4: workflow delle verifiche
+suite (3.13, error)	suite	2026-10-23T19:18:33.2371672Z 7c43176 init
+suite (3.13, error)	suite	2026-10-23T19:18:33.2372156Z CONTROLLA: FALLITO
+suite (3.13, error)	suite	2026-10-23T19:18:33.2372536Z 
+suite (3.13, error)	suite	2026-10-23T19:18:33.2372724Z 
+suite (3.13, error)	suite	2026-10-23T19:18:33.2373130Z ----------------------------------------------------------------------
+suite (3.13, error)	suite	2026-10-23T19:18:33.2373841Z Ran 2465 tests in 696.825s
+suite (3.13, error)	suite	2026-10-23T19:18:33.2374241Z 
+suite (3.13, error)	suite	2026-10-23T19:18:33.2374547Z FAILED (failures=1)
+suite (3.13, error)	suite	2026-10-23T19:18:33.2775874Z sonda: rc=1 durata=699s modo-avvisi=error
+suite (3.13, error)	suite	2026-10-23T19:18:33.2794384Z sonda: righe unclosed database: 0
+suite (3.13, error)	suite	2026-10-23T19:18:33.2809141Z ##[error]Process completed with exit code 1.
+suite (3.13, error)	Post Run actions/checkout@v4	﻿2026-10-23T19:18:33.2972235Z Post job cleanup.
+suite (3.13, error)	Post Run actions/checkout@v4	2026-10-23T19:18:33.3925147Z [command]/usr/bin/git version
+suite (3.13, error)	Post Run actions/checkout@v4	2026-10-23T19:18:33.4000731Z git version 2.55.0
+suite (3.13, error)	Post Run actions/checkout@v4	2026-10-23T19:18:33.4100762Z Temporarily overriding HOME='/home/runner/work/_temp/dd5b2a49-323f-46f5-87da-5ebaa954e992' before making global git config changes
+suite (3.13, error)	Post Run actions/checkout@v4	2026-10-23T19:18:33.4106635Z Adding repository directory to the temporary git global config as a safe directory
+suite (3.13, error)	Post Run actions/checkout@v4	2026-10-23T19:18:33.4133716Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate/tollgate/tollgate src
+suite (3.13, error)	Post Run actions/checkout@v4	2026-10-23T19:18:33.4537295Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+suite (3.13, error)	Post Run actions/checkout@v4	2026-10-23T19:18:33.6323421Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+suite (3.13, error)	Post Run actions/checkout@v4	2026-10-23T19:18:33.6326292Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+suite (3.13, error)	Post Run actions/checkout@v4	2026-10-23T19:18:33.6330009Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+suite (3.13, error)	Post Run actions/checkout@v4	2026-10-23T19:18:33.6333130Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+suite (3.13, error)	Post Run actions/checkout@v4	2026-10-23T19:18:33.6335265Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+suite (3.13, error)	Complete job	﻿2026-10-23T19:18:33.6454125Z Cleaning up orphan processes
+suite (3.13, error)	Complete job	2026-10-23T19:18:33.7045222Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-python@v5. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+suite (3.11, error)	Set up job	﻿2026-10-23T19:06:54.1852155Z Current runner version: '2.338.0'
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1892064Z ##[group]Runner Image Provisioner
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1893511Z Hosted Compute Agent
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1894451Z Version: 20261012.601
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1895568Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1896840Z Build Date: 2026-10-12T17:48:21Z
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1898193Z Worker ID: {7290d679-db31-4f1a-92cc-6998d6f5d129}
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1899395Z Region: westus
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1900278Z Cloud: Azure
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1901174Z ##[endgroup]
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1903446Z ##[group]Operating System
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1904451Z Ubuntu
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1905243Z 24.04.5
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1906182Z LTS
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1907420Z ##[endgroup]
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1908391Z ##[group]Runner Image
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1909366Z Image: ubuntu-24.04
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1910250Z Version: 20261012.334.1
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1912103Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1915217Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1916818Z ##[endgroup]
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1919530Z ##[group]GITHUB_TOKEN Permissions
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1922774Z Contents: read
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1923677Z Metadata: read
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1924666Z ##[endgroup]
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1928557Z Secret source: Actions
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1930230Z Cache mode: write
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.1931300Z Prepare workflow directory
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.2475832Z Prepare all required actions
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.2548250Z Getting action download info
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.6432089Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.7290218Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+suite (3.11, error)	Set up job	2026-10-23T19:06:54.9278141Z Complete job name: suite (3.11, error)
+suite (3.11, error)	Run actions/checkout@v4	﻿2026-10-23T19:06:55.0148412Z ##[group]Run actions/checkout@v4
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0149465Z with:
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0149947Z   path: tollgate src
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0150459Z   persist-credentials: false
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0151022Z   repository: ginz0ls/tollgate
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0155195Z   token: ***
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0155670Z   ssh-strict: true
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0156153Z   ssh-user: git
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0156623Z   clean: true
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0157458Z   sparse-checkout-cone-mode: true
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0158046Z   fetch-depth: 1
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0158512Z   fetch-tags: false
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0158993Z   show-progress: true
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0159477Z   lfs: false
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0159929Z   submodules: false
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0160413Z   set-safe-directory: true
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0160952Z   allow-unsafe-pr-checkout: false
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.0161773Z ##[endgroup]
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1756424Z Syncing repository: ginz0ls/tollgate
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1763469Z ##[group]Getting Git version info
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1769045Z Working directory is '/home/runner/work/tollgate/tollgate/tollgate src'
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1782601Z [command]/usr/bin/git version
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1783476Z git version 2.55.0
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1797550Z ##[endgroup]
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1829867Z Temporarily overriding HOME='/home/runner/work/_temp/57f2713c-77eb-4c0b-b769-8d7d04fd454c' before making global git config changes
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1832108Z Adding repository directory to the temporary git global config as a safe directory
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1834026Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate/tollgate/tollgate src
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1838557Z ##[group]Initializing the repository
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1839814Z [command]/usr/bin/git init /home/runner/work/tollgate/tollgate/tollgate src
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1841339Z hint: Using 'master' as the name for the initial branch. This default branch name
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1842833Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1844672Z hint: to use in all of your new repositories, which will suppress this warning,
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1845835Z hint: call:
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1846452Z hint:
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1857660Z hint: 	git config --global init.defaultBranch <name>
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1858717Z hint:
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1859621Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1861070Z hint: 'development'. The just-created branch can be renamed via this command:
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1862447Z hint:
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1863095Z hint: 	git branch -m <name>
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1863825Z hint:
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1864806Z hint: Disable this message with "git config set advice.defaultBranchName false"
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1866834Z Initialized empty Git repository in /home/runner/work/tollgate/tollgate/tollgate src/.git/
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1948998Z [command]/usr/bin/git remote add origin https://github.com/ginz0ls/tollgate
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1978971Z ##[endgroup]
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1980457Z ##[group]Disabling automatic garbage collection
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.1981860Z [command]/usr/bin/git config --local gc.auto 0
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.2028835Z ##[endgroup]
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.2030333Z ##[group]Setting up auth
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.2039476Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.2084379Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.2756091Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.2859471Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.3862067Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.3866299Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.3869735Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.3886629Z ##[endgroup]
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.3888535Z ##[group]Fetching the repository
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:55.3899108Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +a746e9d64f41a14e692ef0b92ff1d387bb84ee51:refs/remotes/origin/p5-probe-ci
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:56.8207480Z From https://github.com/ginz0ls/tollgate
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:56.8218494Z  * [new ref]         a746e9d64f41a14e692ef0b92ff1d387bb84ee51 -> origin/p5-probe-ci
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:56.8234269Z ##[endgroup]
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:56.8236510Z ##[group]Determining the checkout info
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:56.8238603Z ##[endgroup]
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:56.8239727Z [command]/usr/bin/git sparse-checkout disable
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:56.8310162Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:56.8372101Z ##[group]Checking out the ref
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:56.8380256Z [command]/usr/bin/git checkout --progress --force -B p5-probe-ci refs/remotes/origin/p5-probe-ci
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.1000808Z Switched to a new branch 'p5-probe-ci'
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.1007581Z branch 'p5-probe-ci' set up to track 'origin/p5-probe-ci'.
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.1021890Z ##[endgroup]
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.1091275Z [command]/usr/bin/git log -1 --format=%H
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.1122218Z a746e9d64f41a14e692ef0b92ff1d387bb84ee51
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.1147544Z ##[group]Removing auth
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.1149131Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.1190616Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.1455219Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.1491407Z http.https://github.com/.extraheader
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.1500704Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.1545206Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.1812851Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.1858090Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+suite (3.11, error)	Run actions/checkout@v4	2026-10-23T19:06:57.2125811Z ##[endgroup]
+suite (3.11, error)	Run actions/setup-python@v5	﻿2026-10-23T19:06:57.2524952Z ##[group]Run actions/setup-python@v5
+suite (3.11, error)	Run actions/setup-python@v5	2026-10-23T19:06:57.2526325Z with:
+suite (3.11, error)	Run actions/setup-python@v5	2026-10-23T19:06:57.2527678Z   python-version: 3.11
+suite (3.11, error)	Run actions/setup-python@v5	2026-10-23T19:06:57.2528812Z   check-latest: false
+suite (3.11, error)	Run actions/setup-python@v5	2026-10-23T19:06:57.2538892Z   token: ***
+suite (3.11, error)	Run actions/setup-python@v5	2026-10-23T19:06:57.2539965Z   update-environment: true
+suite (3.11, error)	Run actions/setup-python@v5	2026-10-23T19:06:57.2541150Z   allow-prereleases: false
+suite (3.11, error)	Run actions/setup-python@v5	2026-10-23T19:06:57.2542290Z   freethreaded: false
+suite (3.11, error)	Run actions/setup-python@v5	2026-10-23T19:06:57.2543339Z ##[endgroup]
+suite (3.11, error)	Run actions/setup-python@v5	2026-10-23T19:06:57.4001925Z ##[group]Installed versions
+suite (3.11, error)	Run actions/setup-python@v5	2026-10-23T19:06:57.4115881Z (node:2165) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+suite (3.11, error)	Run actions/setup-python@v5	2026-10-23T19:06:57.4119911Z (Use `node --trace-deprecation ...` to show where the warning was created)
+suite (3.11, error)	Run actions/setup-python@v5	2026-10-23T19:06:57.4148091Z Successfully set up CPython (3.11.17)
+suite (3.11, error)	Run actions/setup-python@v5	2026-10-23T19:06:57.4150939Z ##[endgroup]
+suite (3.11, error)	suite	﻿2026-10-23T19:06:57.4460009Z ##[group]Run if [ "$WARNINGS_MODE" = error ]; then export PYTHONWARNINGS=error::ResourceWarning; fi
+suite (3.11, error)	suite	2026-10-23T19:06:57.4463599Z [36;1mif [ "$WARNINGS_MODE" = error ]; then export PYTHONWARNINGS=error::ResourceWarning; fi[0m
+suite (3.11, error)	suite	2026-10-23T19:06:57.4466130Z [36;1mpython --version[0m
+suite (3.11, error)	suite	2026-10-23T19:06:57.4467790Z [36;1mstart="$(date +%s)"[0m
+suite (3.11, error)	suite	2026-10-23T19:06:57.4469242Z [36;1mset +e[0m
+suite (3.11, error)	suite	2026-10-23T19:06:57.4470990Z [36;1mPYTHONS=python tests/run 2>&1 | tee "$RUNNER_TEMP/suite.log"[0m
+suite (3.11, error)	suite	2026-10-23T19:06:57.4473125Z [36;1mrc="${PIPESTATUS[0]}"[0m
+suite (3.11, error)	suite	2026-10-23T19:06:57.4475275Z [36;1mecho "sonda: rc=$rc durata=$(( $(date +%s) - start ))s modo-avvisi=$WARNINGS_MODE"[0m
+suite (3.11, error)	suite	2026-10-23T19:06:57.4478820Z [36;1mecho "sonda: righe unclosed database: $(grep -c 'unclosed database' "$RUNNER_TEMP/suite.log")"[0m
+suite (3.11, error)	suite	2026-10-23T19:06:57.4481467Z [36;1mexit "$rc"[0m
+suite (3.11, error)	suite	2026-10-23T19:06:57.4804619Z shell: /usr/bin/bash -e {0}
+suite (3.11, error)	suite	2026-10-23T19:06:57.4805869Z env:
+suite (3.11, error)	suite	2026-10-23T19:06:57.4807229Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.17/x64
+suite (3.11, error)	suite	2026-10-23T19:06:57.4809122Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.17/x64/lib/pkgconfig
+suite (3.11, error)	suite	2026-10-23T19:06:57.4887473Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.17/x64
+suite (3.11, error)	suite	2026-10-23T19:06:57.4890073Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.17/x64
+suite (3.11, error)	suite	2026-10-23T19:06:57.4892151Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.17/x64
+suite (3.11, error)	suite	2026-10-23T19:06:57.4894124Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.17/x64/lib
+suite (3.11, error)	suite	2026-10-23T19:06:57.4895939Z   WARNINGS_MODE: error
+suite (3.11, error)	suite	2026-10-23T19:06:57.4897425Z ##[endgroup]
+suite (3.11, error)	suite	2026-10-23T19:06:57.5144450Z Python 3.11.17
+suite (3.11, error)	suite	2026-10-23T19:06:57.5230454Z == Python 3.11.17
+suite (3.11, error)	suite	2026-10-23T19:14:32.1885109Z ........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................guard: la PR è avanzata dopo l'evento, nessuna scrittura (la rigiudica l'evento nuovo)
+suite (3.11, error)	suite	2026-10-23T19:18:47.4007659Z .......................................................................................................................................................................................................................................................................................................................................................................................F.................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+suite (3.11, error)	suite	2026-10-23T19:18:47.4011828Z ======================================================================
+suite (3.11, error)	suite	2026-10-23T19:18:47.4024260Z FAIL: test_task1_script_still_passes_after_the_common_library (tests.test_p4_scripts.ControllaTest.test_task1_script_still_passes_after_the_common_library)
+suite (3.11, error)	suite	2026-10-23T19:18:47.4025779Z ----------------------------------------------------------------------
+suite (3.11, error)	suite	2026-10-23T19:18:47.4026586Z Traceback (most recent call last):
+suite (3.11, error)	suite	2026-10-23T19:18:47.4053968Z   File "/home/runner/work/tollgate/tollgate/tollgate src/tests/test_p4_scripts.py", line 116, in test_task1_script_still_passes_after_the_common_library
+suite (3.11, error)	suite	2026-10-23T19:18:47.4059145Z     out = self.run_controlla(SPIKES / "gh-p4" / "run-p4-checks.sh")
+suite (3.11, error)	suite	2026-10-23T19:18:47.4060074Z           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+suite (3.11, error)	suite	2026-10-23T19:18:47.4061147Z   File "/home/runner/work/tollgate/tollgate/tollgate src/tests/test_p4_scripts.py", line 110, in run_controlla
+suite (3.11, error)	suite	2026-10-23T19:18:47.4062220Z     self.assertEqual(r.returncode, 0, r.stdout[-3000:] + r.stderr[-2000:])
+suite (3.11, error)	suite	2026-10-23T19:18:47.4065067Z AssertionError: 1 != 0 : OLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-tg-95-edit.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/95-edit --title prova P4: verde-edit --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-tg-95-edit.md
+suite (3.11, error)	suite	2026-10-23T19:18:47.4069493Z VIOLAZIONE (gh api PATCH: solo repos/ginz0ls/tollgate-p4-protected/pulls/<n> con -F body=@<file> da una cartella ammessa): api --method PATCH repos/ginz0ls/tollgate-p4-protected/pulls/96 -F body=@/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-edit.md
+suite (3.11, error)	suite	2026-10-23T19:18:47.4073778Z VIOLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-204649-body-tg-97-workflow-ci.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/97-workflow-ci --title prova P4: verde-workflow-ci --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-204649-body-tg-97-workflow-ci.md
+suite (3.11, error)	suite	2026-10-23T19:18:47.4079760Z VIOLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-204821-body-tg-99-deroga-test.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/99-deroga-test --title prova P4: attenzione-deroga-test --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-204821-body-tg-99-deroga-test.md
+suite (3.11, error)	suite	2026-10-23T19:18:47.4085612Z VIOLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-211657-body-tollgate-config-p4-20261022-211657.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tollgate-config/p4-20261022-211657 --title prova P4: verde-config --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-211657-body-tollgate-config-p4-20261022-211657.md
+suite (3.11, error)	suite	2026-10-23T19:18:47.4088996Z COMANDI VERI RIFIUTATI
+suite (3.11, error)	suite	2026-10-23T19:18:47.4089517Z --- remoti dei cloni
+suite (3.11, error)	suite	2026-10-23T19:18:47.4090323Z   protected -> /tmp/tollgate-p4-controlla-e_jjwhqe/remote/ginz0ls/tollgate-p4-protected.git
+suite (3.11, error)	suite	2026-10-23T19:18:47.4091424Z   detect -> /tmp/tollgate-p4-controlla-e_jjwhqe/remote/ginz0ls/tollgate-p4-detect.git
+suite (3.11, error)	suite	2026-10-23T19:18:47.4092487Z --- uscite attese
+suite (3.11, error)	suite	2026-10-23T19:18:47.4092993Z   tutte presenti
+suite (3.11, error)	suite	2026-10-23T19:18:47.4093509Z --- nel banco di prova, i rami e i commit
+suite (3.11, error)	suite	2026-10-23T19:18:47.4094138Z 7e0d3d7 togli i workflow sonda (tollgate P4)
+suite (3.11, error)	suite	2026-10-23T19:18:47.4094776Z 0238115 sonda v5 push diretto 20261023-191639
+suite (3.11, error)	suite	2026-10-23T19:18:47.4095370Z de07602 sonda v5-rebase
+suite (3.11, error)	suite	2026-10-23T19:18:47.4095970Z 8e4516d merge p4-v5-merge-20261023-191639
+suite (3.11, error)	suite	2026-10-23T19:18:47.4096564Z bb192a4 sonda v5-merge
+suite (3.11, error)	suite	2026-10-23T19:18:47.4097254Z fe2b05f sonda 20261023-191638
+suite (3.11, error)	suite	2026-10-23T19:18:47.4098051Z 7b9285a sonda v4 push 20261023-191637
+suite (3.11, error)	suite	2026-10-23T19:18:47.4098813Z 18c76fa sonde tollgate P4: workflow delle verifiche
+suite (3.11, error)	suite	2026-10-23T19:18:47.4099437Z a9f6704 init
+suite (3.11, error)	suite	2026-10-23T19:18:47.4099910Z CONTROLLA: FALLITO
+suite (3.11, error)	suite	2026-10-23T19:18:47.4100279Z 
+suite (3.11, error)	suite	2026-10-23T19:18:47.4100481Z 
+suite (3.11, error)	suite	2026-10-23T19:18:47.4100885Z ----------------------------------------------------------------------
+suite (3.11, error)	suite	2026-10-23T19:18:47.4101578Z Ran 2465 tests in 708.208s
+suite (3.11, error)	suite	2026-10-23T19:18:47.4101977Z 
+suite (3.11, error)	suite	2026-10-23T19:18:47.4102277Z FAILED (failures=1)
+suite (3.11, error)	suite	2026-10-23T19:18:47.4465225Z sonda: rc=1 durata=710s modo-avvisi=error
+suite (3.11, error)	suite	2026-10-23T19:18:47.4485308Z sonda: righe unclosed database: 0
+suite (3.11, error)	suite	2026-10-23T19:18:47.4501171Z ##[error]Process completed with exit code 1.
+suite (3.11, error)	Post Run actions/checkout@v4	﻿2026-10-23T19:18:47.4662868Z Post job cleanup.
+suite (3.11, error)	Post Run actions/checkout@v4	2026-10-23T19:18:47.5657848Z [command]/usr/bin/git version
+suite (3.11, error)	Post Run actions/checkout@v4	2026-10-23T19:18:47.5717513Z git version 2.55.0
+suite (3.11, error)	Post Run actions/checkout@v4	2026-10-23T19:18:47.5768074Z Temporarily overriding HOME='/home/runner/work/_temp/a140de2d-fbb0-40d8-92e7-f68fd8074686' before making global git config changes
+suite (3.11, error)	Post Run actions/checkout@v4	2026-10-23T19:18:47.5782628Z Adding repository directory to the temporary git global config as a safe directory
+suite (3.11, error)	Post Run actions/checkout@v4	2026-10-23T19:18:47.5791382Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate/tollgate/tollgate src
+suite (3.11, error)	Post Run actions/checkout@v4	2026-10-23T19:18:47.5848138Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+suite (3.11, error)	Post Run actions/checkout@v4	2026-10-23T19:18:47.5945399Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+suite (3.11, error)	Post Run actions/checkout@v4	2026-10-23T19:18:47.6388718Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+suite (3.11, error)	Post Run actions/checkout@v4	2026-10-23T19:18:47.6449563Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+suite (3.11, error)	Post Run actions/checkout@v4	2026-10-23T19:18:47.7184820Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+suite (3.11, error)	Post Run actions/checkout@v4	2026-10-23T19:18:47.7307986Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+suite (3.11, error)	Complete job	﻿2026-10-23T19:18:47.8283174Z Cleaning up orphan processes
+suite (3.11, error)	Complete job	2026-10-23T19:18:47.8619349Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-python@v5. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+suite (3.13, off)	Set up job	﻿2026-10-23T19:06:52.6552212Z Current runner version: '2.338.0'
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6621971Z ##[group]Runner Image Provisioner
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6622810Z Hosted Compute Agent
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6623647Z Version: 20261012.601
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6624212Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6624892Z Build Date: 2026-10-12T17:48:21Z
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6625572Z Worker ID: {aa0b5aa8-2adb-428a-a006-9eff21001a4c}
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6626204Z Region: centralus
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6626751Z Cloud: Azure
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6627244Z ##[endgroup]
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6628696Z ##[group]Operating System
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6629372Z Ubuntu
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6629823Z 24.04.5
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6630310Z LTS
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6630771Z ##[endgroup]
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6631296Z ##[group]Runner Image
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6631893Z Image: ubuntu-24.04
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6632398Z Version: 20261012.334.1
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6653844Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6655688Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6657156Z ##[endgroup]
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6658180Z ##[group]GITHUB_TOKEN Permissions
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6660581Z Contents: read
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6661198Z Metadata: read
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6661798Z ##[endgroup]
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6664414Z Secret source: Actions
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6665442Z Cache mode: write
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.6666572Z Prepare workflow directory
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.7024163Z Prepare all required actions
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.7069879Z Getting action download info
+suite (3.13, off)	Set up job	2026-10-23T19:06:52.9992225Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+suite (3.13, off)	Set up job	2026-10-23T19:06:53.0995494Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+suite (3.13, off)	Set up job	2026-10-23T19:06:53.3075901Z Complete job name: suite (3.13, off)
+suite (3.13, off)	Run actions/checkout@v4	﻿2026-10-23T19:06:53.3702204Z ##[group]Run actions/checkout@v4
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3702681Z with:
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3702925Z   path: tollgate src
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3703196Z   persist-credentials: false
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3703757Z   repository: ginz0ls/tollgate
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3705833Z   token: ***
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3706075Z   ssh-strict: true
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3706322Z   ssh-user: git
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3706560Z   clean: true
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3706813Z   sparse-checkout-cone-mode: true
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3707108Z   fetch-depth: 1
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3707351Z   fetch-tags: false
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3707600Z   show-progress: true
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3707853Z   lfs: false
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3708088Z   submodules: false
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3708345Z   set-safe-directory: true
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3708628Z   allow-unsafe-pr-checkout: false
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.3709008Z ##[endgroup]
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4682483Z Syncing repository: ginz0ls/tollgate
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4685011Z ##[group]Getting Git version info
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4685918Z Working directory is '/home/runner/work/tollgate/tollgate/tollgate src'
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4686996Z [command]/usr/bin/git version
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4744308Z git version 2.55.0
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4764582Z ##[endgroup]
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4776862Z Temporarily overriding HOME='/home/runner/work/_temp/425aec5b-0472-49f1-a766-5db781cf7f99' before making global git config changes
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4778323Z Adding repository directory to the temporary git global config as a safe directory
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.4786014Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate/tollgate/tollgate src
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5034396Z ##[group]Initializing the repository
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5035367Z [command]/usr/bin/git init /home/runner/work/tollgate/tollgate/tollgate src
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5430656Z hint: Using 'master' as the name for the initial branch. This default branch name
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5431887Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5433194Z hint: to use in all of your new repositories, which will suppress this warning,
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5434064Z hint: call:
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5434488Z hint:
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5435020Z hint: 	git config --global init.defaultBranch <name>
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5435633Z hint:
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5436195Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5437079Z hint: 'development'. The just-created branch can be renamed via this command:
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5437836Z hint:
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5438286Z hint: 	git branch -m <name>
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5438766Z hint:
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5439385Z hint: Disable this message with "git config set advice.defaultBranchName false"
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5440514Z Initialized empty Git repository in /home/runner/work/tollgate/tollgate/tollgate src/.git/
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.5448452Z [command]/usr/bin/git remote add origin https://github.com/ginz0ls/tollgate
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6015558Z ##[endgroup]
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6017832Z ##[group]Disabling automatic garbage collection
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6019214Z [command]/usr/bin/git config --local gc.auto 0
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6612252Z ##[endgroup]
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6612893Z ##[group]Setting up auth
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6613559Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6614791Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6888394Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.6919770Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.7773989Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.7776919Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.7779086Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.8605684Z ##[endgroup]
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.8606717Z ##[group]Fetching the repository
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:53.8609325Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +a746e9d64f41a14e692ef0b92ff1d387bb84ee51:refs/remotes/origin/p5-probe-ci
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:54.8067533Z From https://github.com/ginz0ls/tollgate
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:54.8078243Z  * [new ref]         a746e9d64f41a14e692ef0b92ff1d387bb84ee51 -> origin/p5-probe-ci
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:54.8084054Z ##[endgroup]
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:54.8104030Z ##[group]Determining the checkout info
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:54.8105363Z ##[endgroup]
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:54.8106055Z [command]/usr/bin/git sparse-checkout disable
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:54.8918007Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:54.9010590Z ##[group]Checking out the ref
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:54.9014046Z [command]/usr/bin/git checkout --progress --force -B p5-probe-ci refs/remotes/origin/p5-probe-ci
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.1126468Z Switched to a new branch 'p5-probe-ci'
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.1128873Z branch 'p5-probe-ci' set up to track 'origin/p5-probe-ci'.
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.1149270Z ##[endgroup]
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.1426314Z [command]/usr/bin/git log -1 --format=%H
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.1456236Z a746e9d64f41a14e692ef0b92ff1d387bb84ee51
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.1464289Z ##[group]Removing auth
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.1467649Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.1500816Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.1696337Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.1737515Z http.https://github.com/.extraheader
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.1742387Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.2092343Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.2330225Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.2362722Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+suite (3.13, off)	Run actions/checkout@v4	2026-10-23T19:06:55.2560772Z ##[endgroup]
+suite (3.13, off)	Run actions/setup-python@v5	﻿2026-10-23T19:06:55.2933025Z ##[group]Run actions/setup-python@v5
+suite (3.13, off)	Run actions/setup-python@v5	2026-10-23T19:06:55.2933624Z with:
+suite (3.13, off)	Run actions/setup-python@v5	2026-10-23T19:06:55.2933875Z   python-version: 3.13
+suite (3.13, off)	Run actions/setup-python@v5	2026-10-23T19:06:55.2934167Z   check-latest: false
+suite (3.13, off)	Run actions/setup-python@v5	2026-10-23T19:06:55.2935796Z   token: ***
+suite (3.13, off)	Run actions/setup-python@v5	2026-10-23T19:06:55.2936076Z   update-environment: true
+suite (3.13, off)	Run actions/setup-python@v5	2026-10-23T19:06:55.2936384Z   allow-prereleases: false
+suite (3.13, off)	Run actions/setup-python@v5	2026-10-23T19:06:55.2936655Z   freethreaded: false
+suite (3.13, off)	Run actions/setup-python@v5	2026-10-23T19:06:55.2936910Z ##[endgroup]
+suite (3.13, off)	Run actions/setup-python@v5	2026-10-23T19:06:55.3912887Z ##[group]Installed versions
+suite (3.13, off)	Run actions/setup-python@v5	2026-10-23T19:06:55.4029790Z (node:2051) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+suite (3.13, off)	Run actions/setup-python@v5	2026-10-23T19:06:55.4031189Z (Use `node --trace-deprecation ...` to show where the warning was created)
+suite (3.13, off)	Run actions/setup-python@v5	2026-10-23T19:06:55.4050496Z Successfully set up CPython (3.13.16)
+suite (3.13, off)	Run actions/setup-python@v5	2026-10-23T19:06:55.4051225Z ##[endgroup]
+suite (3.13, off)	suite	﻿2026-10-23T19:06:55.4436909Z ##[group]Run if [ "$WARNINGS_MODE" = error ]; then export PYTHONWARNINGS=error::ResourceWarning; fi
+suite (3.13, off)	suite	2026-10-23T19:06:55.4437662Z [36;1mif [ "$WARNINGS_MODE" = error ]; then export PYTHONWARNINGS=error::ResourceWarning; fi[0m
+suite (3.13, off)	suite	2026-10-23T19:06:55.4438098Z [36;1mpython --version[0m
+suite (3.13, off)	suite	2026-10-23T19:06:55.4438425Z [36;1mstart="$(date +%s)"[0m
+suite (3.13, off)	suite	2026-10-23T19:06:55.4438705Z [36;1mset +e[0m
+suite (3.13, off)	suite	2026-10-23T19:06:55.4439025Z [36;1mPYTHONS=python tests/run 2>&1 | tee "$RUNNER_TEMP/suite.log"[0m
+suite (3.13, off)	suite	2026-10-23T19:06:55.4499688Z [36;1mrc="${PIPESTATUS[0]}"[0m
+suite (3.13, off)	suite	2026-10-23T19:06:55.4500551Z [36;1mecho "sonda: rc=$rc durata=$(( $(date +%s) - start ))s modo-avvisi=$WARNINGS_MODE"[0m
+suite (3.13, off)	suite	2026-10-23T19:06:55.4501400Z [36;1mecho "sonda: righe unclosed database: $(grep -c 'unclosed database' "$RUNNER_TEMP/suite.log")"[0m
+suite (3.13, off)	suite	2026-10-23T19:06:55.4502108Z [36;1mexit "$rc"[0m
+suite (3.13, off)	suite	2026-10-23T19:06:55.4754495Z shell: /usr/bin/bash -e {0}
+suite (3.13, off)	suite	2026-10-23T19:06:55.4754933Z env:
+suite (3.13, off)	suite	2026-10-23T19:06:55.4755280Z   pythonLocation: /opt/hostedtoolcache/Python/3.13.16/x64
+suite (3.13, off)	suite	2026-10-23T19:06:55.4755782Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.13.16/x64/lib/pkgconfig
+suite (3.13, off)	suite	2026-10-23T19:06:55.4756193Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.13.16/x64
+suite (3.13, off)	suite	2026-10-23T19:06:55.4756575Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.13.16/x64
+suite (3.13, off)	suite	2026-10-23T19:06:55.4756968Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.13.16/x64
+suite (3.13, off)	suite	2026-10-23T19:06:55.4757351Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.13.16/x64/lib
+suite (3.13, off)	suite	2026-10-23T19:06:55.4757693Z   WARNINGS_MODE: off
+suite (3.13, off)	suite	2026-10-23T19:06:55.4757966Z ##[endgroup]
+suite (3.13, off)	suite	2026-10-23T19:06:55.5128325Z Python 3.13.16
+suite (3.13, off)	suite	2026-10-23T19:06:55.5192134Z == Python 3.13.16
+suite (3.13, off)	suite	2026-10-23T19:12:36.4229340Z ........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................guard: la PR è avanzata dopo l'evento, nessuna scrittura (la rigiudica l'evento nuovo)
+suite (3.13, off)	suite	2026-10-23T19:15:45.9710534Z ......................................................................................................................................................................................................................................................................................................................................................................................FF.................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+suite (3.13, off)	suite	2026-10-23T19:15:45.9714563Z ======================================================================
+suite (3.13, off)	suite	2026-10-23T19:15:45.9715619Z FAIL: test_gate_script_controlla (tests.test_p4_scripts.ControllaTest.test_gate_script_controlla)
+suite (3.13, off)	suite	2026-10-23T19:15:45.9720925Z ----------------------------------------------------------------------
+suite (3.13, off)	suite	2026-10-23T19:15:45.9724324Z Traceback (most recent call last):
+suite (3.13, off)	suite	2026-10-23T19:15:45.9729363Z   File "/home/runner/work/tollgate/tollgate/tollgate src/tests/test_p4_scripts.py", line 120, in test_gate_script_controlla
+suite (3.13, off)	suite	2026-10-23T19:15:45.9730366Z     out = self.run_controlla(SPIKES / "run-p4-gate.sh", P4_CHECK_CASES=GATE_CASES)
+suite (3.13, off)	suite	2026-10-23T19:15:45.9731135Z   File "/home/runner/work/tollgate/tollgate/tollgate src/tests/test_p4_scripts.py", line 110, in run_controlla
+suite (3.13, off)	suite	2026-10-23T19:15:45.9731838Z     self.assertEqual(r.returncode, 0, r.stdout[-3000:] + r.stderr[-2000:])
+suite (3.13, off)	suite	2026-10-23T19:15:45.9732361Z     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+suite (3.13, off)	suite	2026-10-23T19:15:45.9732989Z AssertionError: 1 != 0 : verde-workflow-ci	protected	guard=success, verdict=success, attention=failure
+suite (3.13, off)	suite	2026-10-23T19:15:45.9733899Z   attenzione-deroga-test	protected	guard=success, verdict=success, attention=failure
+suite (3.13, off)	suite	2026-10-23T19:15:45.9734539Z   attenzione-piano-testo	protected	guard=success, verdict=success, attention=failure
+suite (3.13, off)	suite	2026-10-23T19:15:45.9735204Z   attenzione-tetto-livello	protected	guard=success, verdict=success, attention=failure
+suite (3.13, off)	suite	2026-10-23T19:15:45.9735879Z   attenzione-zero-test	detect	guard=success, verdict=success, attention=failure
+suite (3.13, off)	suite	2026-10-23T19:15:45.9736437Z   error-dotdot	protected	guard=failure, verdict=error, attention=error
+suite (3.13, off)	suite	2026-10-23T19:15:45.9736980Z   error-entita	protected	guard=failure, verdict=error, attention=error
+suite (3.13, off)	suite	2026-10-23T19:15:45.9737552Z   rosso-entita-tools	protected	guard=success, verdict=failure, attention=success
+suite (3.13, off)	suite	2026-10-23T19:15:45.9738161Z   error-sha-superato	protected	guard=success, verdict=success, attention=success
+suite (3.13, off)	suite	2026-10-23T19:15:45.9738724Z   error-due-pr	protected	guard=error, verdict=error, attention=error
+suite (3.13, off)	suite	2026-10-23T19:15:45.9739489Z   non-applicabile	protected	guard=none, verdict=none, attention=none
+suite (3.13, off)	suite	2026-10-23T19:15:45.9740047Z   token-personale	protected	guard=success, verdict=success, attention=success
+suite (3.13, off)	suite	2026-10-23T19:15:45.9740614Z   detect-pulita	detect	guard=success, verdict=success, attention=success
+suite (3.13, off)	suite	2026-10-23T19:15:45.9741168Z   detect-closes	detect	guard=success, verdict=failure, attention=success
+suite (3.13, off)	suite	2026-10-23T19:15:45.9741653Z   detect-push-diretto	detect	sentinel=failure
+suite (3.13, off)	suite	2026-10-23T19:15:45.9742127Z   detect-merge-rosso	detect	sentinel=failure
+suite (3.13, off)	suite	2026-10-23T19:15:45.9742503Z --- modi
+suite (3.13, off)	suite	2026-10-23T19:15:45.9742835Z modo installa-protected: ok
+suite (3.13, off)	suite	2026-10-23T19:15:45.9743550Z modo installa-detect: ok
+suite (3.13, off)	suite	2026-10-23T19:15:45.9744034Z modo protezione: ok
+suite (3.13, off)	suite	2026-10-23T19:15:45.9744378Z modo caso-verde-pulita: ok
+suite (3.13, off)	suite	2026-10-23T19:15:45.9744720Z modo caso-verde-edit: ok
+suite (3.13, off)	suite	2026-10-23T19:15:45.9745064Z modo caso-error-sha-superato: ok
+suite (3.13, off)	suite	2026-10-23T19:15:45.9745421Z modo caso-error-due-pr: ok
+suite (3.13, off)	suite	2026-10-23T19:15:45.9745770Z modo caso-non-applicabile: ok
+suite (3.13, off)	suite	2026-10-23T19:15:45.9746131Z modo caso-token-personale: ok
+suite (3.13, off)	suite	2026-10-23T19:15:45.9746491Z modo caso-detect-push-diretto: ok
+suite (3.13, off)	suite	2026-10-23T19:15:45.9747088Z modo caso-detect-merge-rosso: FALLITO (vedi /tmp/tollgate-p4-controlla-76wcdg61/modo-caso-detect-merge-rosso.log)
+suite (3.13, off)	suite	2026-10-23T19:15:45.9747678Z HEAD detached at origin/main
+suite (3.13, off)	suite	2026-10-23T19:15:45.9748022Z nothing to commit, working tree clean
+suite (3.13, off)	suite	2026-10-23T19:15:45.9748393Z errore: commit del push diretto fallito
+suite (3.13, off)	suite	2026-10-23T19:15:45.9748749Z modo raccogli: ok
+suite (3.13, off)	suite	2026-10-23T19:15:45.9749144Z --- attese andate a tetto nei modi (nel banco di prova non devono esserci)
+suite (3.13, off)	suite	2026-10-23T19:15:45.9749583Z   nessuna
+suite (3.13, off)	suite	2026-10-23T19:15:45.9749885Z --- registro dei comandi gh
+suite (3.13, off)	suite	2026-10-23T19:15:45.9750222Z comandi gh controllati: 252
+suite (3.13, off)	suite	2026-10-23T19:15:45.9750713Z      1  gh --version
+suite (3.13, off)	suite	2026-10-23T19:15:45.9751018Z    113  gh api
+suite (3.13, off)	suite	2026-10-23T19:15:45.9751316Z     10  gh issue close
+suite (3.13, off)	suite	2026-10-23T19:15:45.9751633Z      8  gh issue create
+suite (3.13, off)	suite	2026-10-23T19:15:45.9751947Z      7  gh issue list
+suite (3.13, off)	suite	2026-10-23T19:15:45.9752259Z      5  gh issue view
+suite (3.13, off)	suite	2026-10-23T19:15:45.9752567Z      7  gh pr close
+suite (3.13, off)	suite	2026-10-23T19:15:45.9752868Z      8  gh pr create
+suite (3.13, off)	suite	2026-10-23T19:15:45.9753171Z      2  gh pr list
+suite (3.13, off)	suite	2026-10-23T19:15:45.9753611Z      1  gh pr merge
+suite (3.13, off)	suite	2026-10-23T19:15:45.9753910Z     13  gh pr view
+suite (3.13, off)	suite	2026-10-23T19:15:45.9754214Z      2  gh repo clone
+suite (3.13, off)	suite	2026-10-23T19:15:45.9754519Z     39  gh run list
+suite (3.13, off)	suite	2026-10-23T19:15:45.9754814Z      8  gh run view
+suite (3.13, off)	suite	2026-10-23T19:15:45.9755114Z     28  gh run watch
+suite (3.13, off)	suite	2026-10-23T19:15:45.9755478Z --- comandi.log delle uscite (ogni gh passa da ghguard.py)
+suite (3.13, off)	suite	2026-10-23T19:15:45.9756272Z   comandi gh controllati: 183 (escluse 0 righe annotate «(controller...)»)
+suite (3.13, off)	suite	2026-10-23T19:15:45.9756715Z        1  gh --version
+suite (3.13, off)	suite	2026-10-23T19:15:45.9757030Z       75  gh api
+suite (3.13, off)	suite	2026-10-23T19:15:45.9757375Z       10  gh issue close
+suite (3.13, off)	suite	2026-10-23T19:15:45.9757762Z        8  gh issue create
+suite (3.13, off)	suite	2026-10-23T19:15:45.9758085Z        6  gh issue list
+suite (3.13, off)	suite	2026-10-23T19:15:45.9758500Z        4  gh issue view
+suite (3.13, off)	suite	2026-10-23T19:15:45.9758860Z        7  gh pr close
+suite (3.13, off)	suite	2026-10-23T19:15:45.9759207Z        8  gh pr create
+suite (3.13, off)	suite	2026-10-23T19:15:45.9759514Z        2  gh pr list
+suite (3.13, off)	suite	2026-10-23T19:15:45.9759809Z        1  gh pr merge
+suite (3.13, off)	suite	2026-10-23T19:15:45.9760115Z       13  gh pr view
+suite (3.13, off)	suite	2026-10-23T19:15:45.9760417Z        2  gh repo clone
+suite (3.13, off)	suite	2026-10-23T19:15:45.9760727Z       10  gh run list
+suite (3.13, off)	suite	2026-10-23T19:15:45.9761030Z        8  gh run view
+suite (3.13, off)	suite	2026-10-23T19:15:45.9761332Z       28  gh run watch
+suite (3.13, off)	suite	2026-10-23T19:15:45.9761653Z   righe RIFIUTATO nel registro: 0
+suite (3.13, off)	suite	2026-10-23T19:15:45.9762010Z --- protect.sh: corpo della PUT
+suite (3.13, off)	suite	2026-10-23T19:15:45.9762366Z   {"app_ids":[15368,15368],"strict":true}
+suite (3.13, off)	suite	2026-10-23T19:15:45.9762720Z --- remoti dei cloni
+suite (3.13, off)	suite	2026-10-23T19:15:45.9763188Z   protected -> /tmp/tollgate-p4-controlla-76wcdg61/remote/ginz0ls/tollgate-p4-protected.git
+suite (3.13, off)	suite	2026-10-23T19:15:45.9764035Z   detect -> /tmp/tollgate-p4-controlla-76wcdg61/remote/ginz0ls/tollgate-p4-detect.git
+suite (3.13, off)	suite	2026-10-23T19:15:45.9764576Z --- righe del rapporto
+suite (3.13, off)	suite	2026-10-23T19:15:45.9764883Z   righe: 8
+suite (3.13, off)	suite	2026-10-23T19:15:45.9765175Z   non riuscite: 0
+suite (3.13, off)	suite	2026-10-23T19:15:45.9765623Z CONTROLLA: FALLITO
+suite (3.13, off)	suite	2026-10-23T19:15:45.9765861Z 
+suite (3.13, off)	suite	2026-10-23T19:15:45.9765996Z 
+suite (3.13, off)	suite	2026-10-23T19:15:45.9766227Z ======================================================================
+suite (3.13, off)	suite	2026-10-23T19:15:45.9766928Z FAIL: test_task1_script_still_passes_after_the_common_library (tests.test_p4_scripts.ControllaTest.test_task1_script_still_passes_after_the_common_library)
+suite (3.13, off)	suite	2026-10-23T19:15:45.9767654Z ----------------------------------------------------------------------
+suite (3.13, off)	suite	2026-10-23T19:15:45.9768068Z Traceback (most recent call last):
+suite (3.13, off)	suite	2026-10-23T19:15:45.9768847Z   File "/home/runner/work/tollgate/tollgate/tollgate src/tests/test_p4_scripts.py", line 116, in test_task1_script_still_passes_after_the_common_library
+suite (3.13, off)	suite	2026-10-23T19:15:45.9769585Z     out = self.run_controlla(SPIKES / "gh-p4" / "run-p4-checks.sh")
+suite (3.13, off)	suite	2026-10-23T19:15:45.9770219Z   File "/home/runner/work/tollgate/tollgate/tollgate src/tests/test_p4_scripts.py", line 110, in run_controlla
+suite (3.13, off)	suite	2026-10-23T19:15:45.9770845Z     self.assertEqual(r.returncode, 0, r.stdout[-3000:] + r.stderr[-2000:])
+suite (3.13, off)	suite	2026-10-23T19:15:45.9771316Z     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+suite (3.13, off)	suite	2026-10-23T19:15:45.9772965Z AssertionError: 1 != 0 : OLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-tg-95-edit.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/95-edit --title prova P4: verde-edit --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-tg-95-edit.md
+suite (3.13, off)	suite	2026-10-23T19:15:45.9775586Z VIOLAZIONE (gh api PATCH: solo repos/ginz0ls/tollgate-p4-protected/pulls/<n> con -F body=@<file> da una cartella ammessa): api --method PATCH repos/ginz0ls/tollgate-p4-protected/pulls/96 -F body=@/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-edit.md
+suite (3.13, off)	suite	2026-10-23T19:15:45.9778351Z VIOLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-204649-body-tg-97-workflow-ci.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/97-workflow-ci --title prova P4: verde-workflow-ci --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-204649-body-tg-97-workflow-ci.md
+suite (3.13, off)	suite	2026-10-23T19:15:45.9781451Z VIOLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-204821-body-tg-99-deroga-test.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/99-deroga-test --title prova P4: attenzione-deroga-test --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-204821-body-tg-99-deroga-test.md
+suite (3.13, off)	suite	2026-10-23T19:15:45.9784796Z VIOLAZIONE (valore non ammesso per --body-file: /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-211657-body-tollgate-config-p4-20261022-211657.md): pr create --repo ginz0ls/tollgate-p4-protected --base main --head tollgate-config/p4-20261022-211657 --title prova P4: verde-config --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-211657-body-tollgate-config-p4-20261022-211657.md
+suite (3.13, off)	suite	2026-10-23T19:15:45.9786629Z COMANDI VERI RIFIUTATI
+suite (3.13, off)	suite	2026-10-23T19:15:45.9786952Z --- remoti dei cloni
+suite (3.13, off)	suite	2026-10-23T19:15:45.9787406Z   protected -> /tmp/tollgate-p4-controlla-gtlk_0rd/remote/ginz0ls/tollgate-p4-protected.git
+suite (3.13, off)	suite	2026-10-23T19:15:45.9788033Z   detect -> /tmp/tollgate-p4-controlla-gtlk_0rd/remote/ginz0ls/tollgate-p4-detect.git
+suite (3.13, off)	suite	2026-10-23T19:15:45.9788639Z --- uscite attese
+suite (3.13, off)	suite	2026-10-23T19:15:45.9788938Z   tutte presenti
+suite (3.13, off)	suite	2026-10-23T19:15:45.9789256Z --- nel banco di prova, i rami e i commit
+suite (3.13, off)	suite	2026-10-23T19:15:45.9789636Z e9458fb togli i workflow sonda (tollgate P4)
+suite (3.13, off)	suite	2026-10-23T19:15:45.9790022Z d87d13d sonda v5 push diretto 20261023-191407
+suite (3.13, off)	suite	2026-10-23T19:15:45.9790394Z b824eee sonda v5-rebase
+suite (3.13, off)	suite	2026-10-23T19:15:45.9790748Z d453f32 merge p4-v5-merge-20261023-191407
+suite (3.13, off)	suite	2026-10-23T19:15:45.9791099Z 9ec04ad sonda v5-merge
+suite (3.13, off)	suite	2026-10-23T19:15:45.9791418Z 28f11cf sonda 20261023-191406
+suite (3.13, off)	suite	2026-10-23T19:15:45.9791752Z 275dccb sonda v4 push 20261023-191405
+suite (3.13, off)	suite	2026-10-23T19:15:45.9792128Z 34fe808 sonde tollgate P4: workflow delle verifiche
+suite (3.13, off)	suite	2026-10-23T19:15:45.9792503Z f35b319 init
+suite (3.13, off)	suite	2026-10-23T19:15:45.9792802Z CONTROLLA: FALLITO
+suite (3.13, off)	suite	2026-10-23T19:15:45.9793040Z 
+suite (3.13, off)	suite	2026-10-23T19:15:45.9793180Z 
+suite (3.13, off)	suite	2026-10-23T19:15:45.9793578Z ----------------------------------------------------------------------
+suite (3.13, off)	suite	2026-10-23T19:15:45.9793984Z Ran 2465 tests in 529.533s
+suite (3.13, off)	suite	2026-10-23T19:15:45.9794238Z 
+suite (3.13, off)	suite	2026-10-23T19:15:45.9794444Z FAILED (failures=2)
+suite (3.13, off)	suite	2026-10-23T19:15:46.0161532Z sonda: rc=1 durata=531s modo-avvisi=off
+suite (3.13, off)	suite	2026-10-23T19:15:46.0174315Z sonda: righe unclosed database: 0
+suite (3.13, off)	suite	2026-10-23T19:15:46.0188018Z ##[error]Process completed with exit code 1.
+suite (3.13, off)	Post Run actions/checkout@v4	﻿2026-10-23T19:15:46.0287594Z Post job cleanup.
+suite (3.13, off)	Post Run actions/checkout@v4	2026-10-23T19:15:46.0936566Z [command]/usr/bin/git version
+suite (3.13, off)	Post Run actions/checkout@v4	2026-10-23T19:15:46.1015461Z git version 2.55.0
+suite (3.13, off)	Post Run actions/checkout@v4	2026-10-23T19:15:46.1032989Z Temporarily overriding HOME='/home/runner/work/_temp/24c4bdaa-8d15-4fd0-9bff-746068fe0ec5' before making global git config changes
+suite (3.13, off)	Post Run actions/checkout@v4	2026-10-23T19:15:46.1049641Z Adding repository directory to the temporary git global config as a safe directory
+suite (3.13, off)	Post Run actions/checkout@v4	2026-10-23T19:15:46.1054902Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate/tollgate/tollgate src
+suite (3.13, off)	Post Run actions/checkout@v4	2026-10-23T19:15:46.1129311Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+suite (3.13, off)	Post Run actions/checkout@v4	2026-10-23T19:15:46.1177507Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+suite (3.13, off)	Post Run actions/checkout@v4	2026-10-23T19:15:46.1478195Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+suite (3.13, off)	Post Run actions/checkout@v4	2026-10-23T19:15:46.1525173Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+suite (3.13, off)	Post Run actions/checkout@v4	2026-10-23T19:15:46.1836915Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+suite (3.13, off)	Post Run actions/checkout@v4	2026-10-23T19:15:46.1910929Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+suite (3.13, off)	Complete job	﻿2026-10-23T19:15:46.2349809Z Cleaning up orphan processes
+suite (3.13, off)	Complete job	2026-10-23T19:15:46.2635536Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-python@v5. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

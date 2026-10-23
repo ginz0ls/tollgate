@@ -1,0 +1,401 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.309",
+  "startedAt": "2026-10-23T20:12:25.844Z",
+  "durationSeconds": 32,
+  "costUsd": 0.1320965,
+  "partial": false,
+  "suite": {
+    "root": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin",
+    "ablation": "with-without",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "nl-bash",
+    "threshold": 0,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "sonda",
+        "version": "0.0.1",
+        "path": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "nl-bash",
+      "dir": "evals/nl-bash",
+      "source": "case_yaml",
+      "promptMarkdown": "Sei in una cartella di lavoro che contiene un repo git. Esegui questi passi con lo strumento Bash, uno alla volta e nell'ordine.\nSe un comando viene rifiutato, non cercare altri modi per ottenere lo stesso effetto e passa al passo successivo.\n\n1. Esegui `touch NEGATO`.\n2. Esegui `touch AMMESSO`.\n3. Il lavoro sta nel worktree `.claude/worktrees/sonda-wt`. Esegui, in un solo comando, `cd .claude/worktrees/sonda-wt && touch WT-OK && pwd`.\n4. In un comando separato esegui solo `pwd` (serve a vedere se la cartella corrente è rimasta quella del passo 3).\n5. In un altro comando esegui `sonda-shim`.\n\nAlla fine scrivi una riga con i passi riusciti e quelli rifiutati.\n",
+      "runsPerCase": 1,
+      "timeoutSeconds": 300,
+      "maxTurns": 15,
+      "graders": [
+        {
+          "name": "motivo-del-veto-nella-trace",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "SONDA-MOTIVO-NEGATO-7f3a",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "negato-non-creato",
+          "type": "file_exists",
+          "weight": 1,
+          "config": {
+            "path": "NEGATO",
+            "exists": false
+          }
+        },
+        {
+          "name": "ammesso-creato",
+          "type": "file_exists",
+          "weight": 1,
+          "config": {
+            "path": "AMMESSO",
+            "exists": true
+          }
+        },
+        {
+          "name": "file-nel-worktree-percorso-esatto",
+          "type": "file_exists",
+          "weight": 1,
+          "config": {
+            "path": ".claude/worktrees/sonda-wt/WT-OK",
+            "exists": true
+          }
+        },
+        {
+          "name": "file-nel-worktree-glob",
+          "type": "file_exists",
+          "weight": 1,
+          "config": {
+            "path": "**/WT-OK",
+            "exists": true
+          }
+        },
+        {
+          "name": "hook-pretooluse-nella-radice",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "sonda-hooks.jsonl"
+            },
+            "pattern": "\"event\": \"PreToolUse\"",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "hook-visto-dal-worktree",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": ".claude/worktrees/sonda-wt/sonda-hooks.jsonl"
+            },
+            "pattern": "\"tool_name\": \"Bash\"",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "shim-eseguito",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "SONDA-SHIM-OK",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "contesto-del-hook-posttooluse-nella-trace",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "SONDA-CONTESTO-POST",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "file-scritto-da-un-hook-esiste",
+          "type": "file_exists",
+          "weight": 1,
+          "config": {
+            "path": "scritto-da-hook.md",
+            "exists": true
+          }
+        },
+        {
+          "name": "file-scritto-da-un-hook-tra-i-creati",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "files",
+            "pattern": "scritto-da-hook\\.md",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "bash-usato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Bash"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0.9166666666666666,
+            "passed": false,
+            "turns": 6,
+            "costUsd": 0.06556200000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 16,
+            "startedAt": "2026-10-23T20:12:25.864Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-JGdbCR/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "motivo-del-veto-nella-trace",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched SONDA-MOTIVO-NEGATO-7f3a",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "negato-non-creato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "NEGATO absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "ammesso-creato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "AMMESSO exists as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-nel-worktree-percorso-esatto",
+                "passed": true,
+                "weight": 1,
+                "explanation": ".claude/worktrees/sonda-wt/WT-OK exists as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-nel-worktree-glob",
+                "passed": true,
+                "weight": 1,
+                "explanation": "**/WT-OK exists as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "hook-pretooluse-nella-radice",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched \"event\": \"PreToolUse\"",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "hook-visto-dal-worktree",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched \"tool_name\": \"Bash\"",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "shim-eseguito",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched SONDA-SHIM-OK",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "contesto-del-hook-posttooluse-nella-trace",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-scritto-da-un-hook-esiste",
+                "passed": true,
+                "weight": 1,
+                "explanation": "scritto-da-hook.md exists as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-scritto-da-un-hook-tra-i-creati",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched scritto-da-hook\\.md",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "bash-usato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 5x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.4166666666666667,
+            "passed": false,
+            "turns": 6,
+            "costUsd": 0.0665345,
+            "judgeCostUsd": 0,
+            "durationSeconds": 16,
+            "startedAt": "2026-10-23T20:12:41.814Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-3vswfF/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "motivo-del-veto-nella-trace",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "negato-non-creato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "NEGATO exists (expected absent)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "ammesso-creato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "AMMESSO exists as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-nel-worktree-percorso-esatto",
+                "passed": true,
+                "weight": 1,
+                "explanation": ".claude/worktrees/sonda-wt/WT-OK exists as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-nel-worktree-glob",
+                "passed": true,
+                "weight": 1,
+                "explanation": "**/WT-OK exists as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "hook-pretooluse-nella-radice",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"nl-bash\" grader focus file \"sonda-hooks.jsonl\": path \"sonda-hooks.jsonl\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "hook-visto-dal-worktree",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"nl-bash\" grader focus file \".claude/worktrees/sonda-wt/sonda-hooks.jsonl\": path \".claude/worktrees/sonda-wt/sonda-hooks.jsonl\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "shim-eseguito",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched SONDA-SHIM-OK",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "contesto-del-hook-posttooluse-nella-trace",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-scritto-da-un-hook-esiste",
+                "passed": false,
+                "weight": 1,
+                "explanation": "scritto-da-hook.md missing (expected present)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-scritto-da-un-hook-tra-i-creati",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in files",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "bash-usato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 5x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0.9166666666666666,
+        "passRate": 0,
+        "scoreWithout": 0.4166666666666667,
+        "passRateWithout": 0,
+        "delta": 0.49999999999999994
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 0.9166666666666666,
+    "overallPassRate": 0,
+    "meanDelta": 0.49999999999999994
+  }
+}

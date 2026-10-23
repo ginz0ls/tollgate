@@ -1,0 +1,337 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.309",
+  "startedAt": "2026-10-23T19:05:04.986Z",
+  "durationSeconds": 4,
+  "costUsd": 0.0380105,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-p5/sonda-dep",
+    "ablation": "none",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "skill",
+    "threshold": 0,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "sonda",
+        "version": "0.0.1",
+        "path": "/tmp/tollgate-p5/sonda-dep"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "skill",
+      "dir": "evals/skill",
+      "source": "case_yaml",
+      "promptMarkdown": "/sonda:prova",
+      "runsPerCase": 1,
+      "timeoutSeconds": 300,
+      "maxTurns": 15,
+      "graders": [
+        {
+          "name": "skill-della-sonda-lanciata",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "prova",
+            "arm": "with-only"
+          }
+        },
+        {
+          "name": "agente-lanciato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Agent"
+          }
+        },
+        {
+          "name": "comando-del-subagente-nella-trace",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "command\\W{1,8}echo SONDA-SUB",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "hook-userpromptexpansion",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "sonda-hooks.jsonl"
+            },
+            "pattern": "\"event\": \"UserPromptExpansion\"",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "hook-subagentstop",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "sonda-hooks.jsonl"
+            },
+            "pattern": "\"event\": \"SubagentStop\"",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-python3",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^PYTHON3=ok",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-git",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^GIT=ok",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-radice-del-plugin-leggibile",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^PLUGIN_ROOT_READABLE=yes",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-variabile-radice-esportata",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^ENV_CLAUDE_PLUGIN_ROOT=(?!UNSET)",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-stato-scrivibile",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^STATE_WRITE=ok",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-registro-non-riscritto",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^INSTALLED_PLUGINS_UNCHANGED=yes",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-scrittura-nei-worktree",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^WORKTREES_WRITE_EXISTING=ok",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-shim-eseguito",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^SHIM_RUN=ok",
+            "flags": "m",
+            "match": "contains"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 1,
+            "costUsd": 0.0380105,
+            "judgeCostUsd": 0,
+            "durationSeconds": 4,
+            "startedAt": "2026-10-23T19:05:05.001Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-xUpQvI/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill-della-sonda-lanciata",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "agente-lanciato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Agent called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "comando-del-subagente-nella-trace",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "hook-userpromptexpansion",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"skill\" grader focus file \"sonda-hooks.jsonl\": path \"sonda-hooks.jsonl\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "hook-subagentstop",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"skill\" grader focus file \"sonda-hooks.jsonl\": path \"sonda-hooks.jsonl\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-python3",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"skill\" grader focus file \"esiti.txt\": path \"esiti.txt\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-git",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"skill\" grader focus file \"esiti.txt\": path \"esiti.txt\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-radice-del-plugin-leggibile",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"skill\" grader focus file \"esiti.txt\": path \"esiti.txt\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-variabile-radice-esportata",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"skill\" grader focus file \"esiti.txt\": path \"esiti.txt\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-stato-scrivibile",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"skill\" grader focus file \"esiti.txt\": path \"esiti.txt\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-registro-non-riscritto",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"skill\" grader focus file \"esiti.txt\": path \"esiti.txt\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-scrittura-nei-worktree",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"skill\" grader focus file \"esiti.txt\": path \"esiti.txt\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-shim-eseguito",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"skill\" grader focus file \"esiti.txt\": path \"esiti.txt\" does not exist",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0,
+        "passRate": 0
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 0,
+    "overallPassRate": 0
+  }
+}

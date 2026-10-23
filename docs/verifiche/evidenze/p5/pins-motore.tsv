@@ -1,0 +1,11 @@
+azione	tag	using
+checkout	v4.4.0	node20
+checkout	v7.0.1	node24
+cache	v4.3.0	node20
+cache	v6.1.0	node24
+upload-artifact	v4.6.2	node20
+upload-artifact	v7.0.2	node24
+download-artifact	v4.3.0	node20
+download-artifact	v8.0.2	node24
+setup-python	v4.9.1	node16
+setup-python	v7.1.0	node24

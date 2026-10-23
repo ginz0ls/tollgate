@@ -1,0 +1,17 @@
+PWD=/tmp/claude-eval-xUpQvI/home/cwd
+HOME=/tmp/claude-eval-xUpQvI/home
+CLAUDE_CONFIG_DIR=UNSET
+TMPDIR=/tmp/claude-eval-xUpQvI/tmp
+BASH_SOURCE_0=/tmp/tollgate-p5/sonda-dep/evals/skill/scaffold.sh
+DOLLAR_0=/tmp/tollgate-p5/sonda-dep/evals/skill/scaffold.sh
+SCRIPT_DIR=/tmp/tollgate-p5/sonda-dep/evals/skill
+ROOT_GUESS=/tmp/tollgate-p5/sonda-dep
+ROOT_GUESS_IS_PLUGIN=yes
+ENV_NAMES=GIT_CONFIG_NOSYSTEM,HOME,NODE_ENV,PATH,PWD,SHLVL,TEMP,TERM,TMP,TMPDIR,USERPROFILE,USER_TYPE
+WHICH_PYTHON3=/home/crucco/.pyenv/shims/python3
+WHICH_GIT=/usr/bin/git
+WHICH_SONDA_SHIM=/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-bin/sonda-shim
+INSTALLED_PLUGINS_SHA256=eac69a2545cab2777cfef6eaf2ea530fd6ef76d79f1851cdb7dfb45814b15c3f
+INSTALLED_PLUGINS_MTIME=1792782305
+WORKTREE_LIST=2
+SCAFFOLD_SECONDS=0

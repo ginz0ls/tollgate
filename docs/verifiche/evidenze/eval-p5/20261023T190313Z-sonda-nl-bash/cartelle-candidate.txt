@@ -1,0 +1,11 @@
+/.claude/worktrees/p5/docs/verifiche/evidenze/eval-p5/20261023T190313Z-sonda-nl-bash/report.html
+/.claude/worktrees/p5/docs/verifiche/evidenze/eval-p5/20261023T190313Z-sonda-nl-bash/result.json
+/home/crucco/MEGA/BIZ/VIBE/Plugin
+/tmp/claude-eval-6p3nnx
+/tmp/claude-eval-6p3nnx:
+/tmp/claude-eval-6p3nnx/sealed
+/tmp/claude-eval-6p3nnx/sealed`
+/tmp/claude-eval-ALyAef
+/tmp/claude-eval-ALyAef:
+/tmp/claude-eval-ALyAef/sealed
+/tmp/claude-eval-ALyAef/sealed`

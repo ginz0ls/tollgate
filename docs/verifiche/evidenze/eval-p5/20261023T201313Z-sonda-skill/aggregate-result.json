@@ -1,0 +1,337 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.309",
+  "startedAt": "2026-10-23T20:13:14.109Z",
+  "durationSeconds": 11,
+  "costUsd": 0.08615500000000001,
+  "partial": false,
+  "suite": {
+    "root": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin",
+    "ablation": "none",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "skill",
+    "threshold": 0,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "sonda",
+        "version": "0.0.1",
+        "path": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "skill",
+      "dir": "evals/skill",
+      "source": "case_yaml",
+      "promptMarkdown": "/sonda:prova",
+      "runsPerCase": 1,
+      "timeoutSeconds": 300,
+      "maxTurns": 15,
+      "graders": [
+        {
+          "name": "skill-della-sonda-lanciata",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "prova",
+            "arm": "with-only"
+          }
+        },
+        {
+          "name": "agente-lanciato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Agent"
+          }
+        },
+        {
+          "name": "comando-del-subagente-nella-trace",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "command\\W{1,8}echo SONDA-SUB",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "hook-userpromptexpansion",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "sonda-hooks.jsonl"
+            },
+            "pattern": "\"event\": \"UserPromptExpansion\"",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "hook-subagentstop",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "sonda-hooks.jsonl"
+            },
+            "pattern": "\"event\": \"SubagentStop\"",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-python3",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^PYTHON3=ok",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-git",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^GIT=ok",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-radice-del-plugin-leggibile",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^PLUGIN_ROOT_READABLE=yes",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-variabile-radice-esportata",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^ENV_CLAUDE_PLUGIN_ROOT=(?!UNSET)",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-stato-scrivibile",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^STATE_WRITE=ok",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-registro-non-riscritto",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^INSTALLED_PLUGINS_UNCHANGED=yes",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-scrittura-nei-worktree",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^WORKTREES_WRITE_EXISTING=ok",
+            "flags": "m",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "esiti-shim-eseguito",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": "esiti.txt"
+            },
+            "pattern": "^SHIM_RUN=ok",
+            "flags": "m",
+            "match": "contains"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0.8461538461538461,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.08615500000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 11,
+            "startedAt": "2026-10-23T20:13:14.129Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-K9ttzs/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "skill-della-sonda-lanciata",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "agente-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "comando-del-subagente-nella-trace",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched command\\W{1,8}echo SONDA-SUB",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "hook-userpromptexpansion",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched \"event\": \"UserPromptExpansion\"",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "hook-subagentstop",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched \"event\": \"SubagentStop\"",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-python3",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^PYTHON3=ok",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-git",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^GIT=ok",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-radice-del-plugin-leggibile",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^PLUGIN_ROOT_READABLE=yes",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-variabile-radice-esportata",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in file esiti.txt",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-stato-scrivibile",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^STATE_WRITE=ok",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-registro-non-riscritto",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^INSTALLED_PLUGINS_UNCHANGED=yes",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-scrittura-nei-worktree",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^WORKTREES_WRITE_EXISTING=ok",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "esiti-shim-eseguito",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^SHIM_RUN=ok",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0.8461538461538461,
+        "passRate": 0
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 0.8461538461538461,
+    "overallPassRate": 0
+  }
+}
