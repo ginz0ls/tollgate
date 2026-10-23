@@ -101,6 +101,8 @@ def _infile(v):
     dell'ambiente (P4_OUT, P4_WORK, P4_TMP) o sotto i file temporanei."""
     if PROFILE["current"] == "flow":
         return _under("P4_TMP", v)
+    if PROFILE["current"] == "p5":      # solo le cartelle dell'ambiente della prova: niente /tmp né $TMPDIR
+        return _under("P4_OUT", v) or _under("P4_WORK", v)
     if _under("P4_OUT", v) or _under("P4_WORK", v) or _under("P4_TMP", v):
         return True
     return os.path.isabs(v) and os.path.normpath(v) == v and any(v.startswith(r + os.sep) for r in _temp_roots())
@@ -330,6 +332,8 @@ def _check_api_read(args, lenient=False):
         elif a in API_VALUED:
             if i + 1 >= len(args):
                 return "gh api: %s senza valore" % a
+            if PROFILE["current"] == "p5" and JQ_FORBIDDEN.search(args[i + 1]):
+                return "gh api: filtro jq non ammesso nel profilo p5 (env, $ENV, input, input_filename, $__loc__)"
             i += 2
             if lenient:     # nel registro gli spazi del filtro jq sono andati persi
                 while i < len(args) and not args[i].startswith(("-", "repos/")):
@@ -427,6 +431,7 @@ P5_SPECS = {key: SPECS[key] for key in PR_OPS | (RUN_OPS - {("run", "rerun")})}
 P5_SPECS[("run", "rerun")] = _spec({}, flags=("--failed",), pos="int")
 PERMISSIONS_ENDPOINT = "repos/%s/actions/permissions"
 ALLOWED_ACTIONS = {"all", "local_only", "selected"}
+JQ_FORBIDDEN = re.compile(r"(?<![A-Za-z0-9_])(?:env|input|inputs|input_filename|debug|stderr)(?![A-Za-z0-9_])|\$ENV|\$__|\$__prog_args")
 FOREIGN_RE = re.compile(r"%s/[A-Za-z0-9._-]+" % re.escape(OWNER))
 
 
@@ -475,7 +480,7 @@ def _foreign_repo(args):
     """Il primo `ginz0ls/<nome>` negli argomenti che non è uno dei due repo ammessi (anche dentro un testo)."""
     for a in args:
         for found in FOREIGN_RE.findall(a):
-            found = found.rstrip(".")
+            found = re.sub(r"\.git$", "", found.rstrip("."))
             if found not in P5_REPOS:
                 return found
     return None
@@ -652,7 +657,12 @@ def check_comandi(path):
     moved = re.compile(r"(?<![^\s=@])/(?:(?:(?! -)[^/\n])+/)*?\.claude/worktrees/[^/\n]+/docs/verifiche/evidenze/%s(?=/|\s|$)"
                        % re.escape(os.path.basename(here)))
     for line in open(path):
-        line = moved.sub(lambda _m: here, line.rstrip("\n"))
+        raw = line.rstrip("\n")
+        if profile == "p5" and _foreign_repo([raw]):      # il riferimento a un repo estraneo si vede prima della riscrittura
+            n += 1
+            bad.append(("repo non ammesso nel profilo p5: %s" % _foreign_repo([raw]), raw))
+            continue
+        line = moved.sub(lambda _m: here, raw)
         g = re.match(r"^\S+ git-net dir=(\S*) (.*)$", line)
         if g and profile == "p5":      # `git-net`: i comandi git con la rete dello script (registro di common_p5)
             n += 1

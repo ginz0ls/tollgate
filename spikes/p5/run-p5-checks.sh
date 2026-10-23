@@ -31,11 +31,13 @@ CHECK="${P5_CHECK:-0}"                               # 1 solo dentro il modo con
 BUDGET_TOTAL=80                                      # USD complessivi di costUsd (decisione 8)
 CAP_MAX=3                                            # USD per invocazione delle sonde
 MODEL=claude-sonnet-5-5
-unset GH_REPO GH_HOST GIT_DIR GIT_WORK_TREE GIT_CONFIG_COUNT GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM
+unset GH_REPO GH_HOST GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN GIT_DIR GIT_WORK_TREE GIT_CONFIG_COUNT GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM
 # ghguard.py li legge: -D e i cloni devono stare qui sotto; il registro delle PR aperte è per questa prova
 export P4_OUT="$OUT" P4_WORK="$WORK" P5_PINS="$PINS" P4_PROFILE=p5 P5_PR_REGISTRY="$OUT/prs-aperte.txt"
 
 . "$GH4/common.sh"          # die, rot, log_cmd, gh_call, gh_q, save_text, wait_run (guard_args chiama ghguard.py col profilo p5)
+# anche i sondaggi (gh_q) restano in comandi.log: ogni gh eseguito dallo script è registrato
+gh_q() { guard_args "$@"; log_cmd "gh $*"; gh "$@" 2>/dev/null </dev/null; }
 for _dir in "$OUT" "$EOUT" "$WORK" "$PINS"; do
   case "$_dir" in /*) ;; *) die "i percorsi P5_OUT, P5_EVAL_OUT, P5_WORK e P5_PINS devono essere assoluti: $_dir" ;; esac
 done
@@ -64,7 +66,7 @@ git_net() {
   no_rewrite_rules "$dir"
   rot "$OUT/$label".out "$OUT/$label".err "$OUT/$label".rc
   log_cmd "git-net dir=$dir $*"
-  local -a genv=(env)
+  local -a genv=(env GIT_TERMINAL_PROMPT=0)      # senza credenziali git fallisce, non chiede su /dev/tty
   if [ "$CHECK" = 1 ] && [ -n "${P5_GIT_BASE:-}" ]; then
     genv+=(GIT_CONFIG_COUNT=2
            "GIT_CONFIG_KEY_0=url.$P5_GIT_BASE/$OWNER/.insteadOf" "GIT_CONFIG_VALUE_0=https://github.com/$OWNER/"
@@ -206,6 +208,9 @@ copy_run_files() {
 # con tutte le cautele. Lo shim (predefinito probe-bin accanto allo script) va in testa al PATH di chi lancia l'eval.
 eval_run() {
   local label="$1" abl="$2" target="$3" case_name="$4" shim_dir="${5:-$here/probe-bin}" cap stamp dir rc cost dur casi src shown
+  if [ -n "${P5_ONLY:-}" ]; then
+    case ",$P5_ONLY," in *",$label,"*) ;; *) echo "== $label: saltata (P5_ONLY)"; return 0 ;; esac
+  fi
   [ ! -e "$EOUT/COSTO-IGNOTO.txt" ] || die "costo ignoto di un'invocazione precedente: controlla a mano prima di continuare (vedi COSTO-IGNOTO.txt)"
   ensure_budget
   cap="$(budget_cap)" || die "tetto di $BUDGET_TOTAL USD esaurito (o budget.tsv illeggibile): non lancio niente"
@@ -229,6 +234,8 @@ eval_run() {
   dur="$(jq -r '.durationSeconds | select(type == "number")' "$src" 2>/dev/null)"
   if [ -z "$cost" ] || [ -z "$dur" ]; then
     printf '%s %s: nessun costUsd/durationSeconds leggibile (uscita %s)\n' "$(date -u +%FT%TZ)" "$label" "$rc" >> "$EOUT/COSTO-IGNOTO.txt"
+    # la riga c'è comunque: costUsd «?» fa rifiutare budget_cap (fail-closed) finché non la si corregge a mano
+    printf '%s\t%s\t?\t?\t%s\n' "$(date -u +%FT%TZ)" "$label ($abl)" "$case_name" >> "$BUDGET"
     die "costo ignoto: controlla a mano prima di continuare ($dir)"
   fi
   casi="$(jq -r '[.cases[]?.name] | join(",")' "$src" 2>/dev/null)"
@@ -239,9 +246,14 @@ eval_run() {
   return 0
 }
 
+EVAL_LABELS="sonda-nl-bash sonda-nl-worktree sonda-ws-worktree sonda-skill sonda-radice-tmp sonda-ve1-dependencies"
 modo_eval_sonda() {
   local plugin="$here/probe-plugin" dep="$WORK/sonda-dep" tmp_target="${P5_TMP_TARGET:-/tmp/tollgate-eval-target-sonda}"
   command -v claude >/dev/null 2>&1 || die "claude non trovato nel PATH"
+  local want
+  for want in $(tr ',' ' ' <<<"${P5_ONLY:-}"); do
+    case " $EVAL_LABELS " in *" $want "*) ;; *) die "P5_ONLY: etichetta sconosciuta $want (valide: $EVAL_LABELS)" ;; esac
+  done
   command -v jq >/dev/null 2>&1 || die "jq non trovato nel PATH"
   mkdir -p "$EOUT" "$WORK"
   ensure_budget
@@ -300,6 +312,7 @@ open_pr_detect() {
   url="$(tail -n 1 "$OUT/$label-pr-create.out")"
   PR_NUM="${url##*/}"
   case "$PR_NUM" in ''|*[!0-9]*) die "numero della PR non leggibile da: $url" ;; esac
+  CACHE_PR="$PR_NUM"      # subito: se un passo dopo fallisce, il trap di chi chiama chiude la PR
   python3 -B -I "$GH4/ghguard.py" register-pr "$PR_NUM" || die "la guardia non registra la PR $PR_NUM"
   save_text "$OUT/$label-pr.env" "PR=$PR_NUM" "SHA=$PR_SHA" "BRANCH=$BR"
 }
@@ -427,7 +440,7 @@ PY
 }
 
 # VG1: cache in sola lettura dei job workflow_run sul privato (log del job verdict: «Cache mode:»)
-CACHE_PR=""
+CACHE_PR=""      # la PR aperta da open_pr_detect, assegnata là dentro appena il numero è noto
 close_cache_pr() {
   [ -n "$CACHE_PR" ] || return 0
   gh_call cache-pr-close pr close "$CACHE_PR" --repo "$DET"
@@ -441,7 +454,6 @@ modo_detect_cache() {
   ts="$(date +%Y%m%d-%H%M%S)"
   trap close_cache_pr EXIT
   open_pr_detect cache p5-probe-cache "sonde/p5-cache-$ts.txt"
-  CACHE_PR="$PR_NUM"
   if wait_run cache-run "$DET" tollgate-run.yml "$PR_SHA" "$BR" 0; then add_run cache-run "$DET" "$RUN_ID" "$RUN_CONC"; fi
   rot "$OUT/cache-mode.txt"
   if wait_run cache-verdict "$DET" tollgate-verdict.yml "$PR_SHA" "$BR" 1; then
@@ -790,6 +802,10 @@ modo_controlla() {
   if grep -q $'^repo\tcreate' "$P5_FAKE_LOG"; then echo "ci-sonda: HA CREATO IL REPO CON TOKEN NELLA STORIA"; rc=1; else echo "ci-sonda: nessun repo creato con token nella storia"; fi
   run_mode ci-sonda ci-sonda
   run_mode pins pins
+  # M4: se dopo l'apertura della PR un passo fallisce (qui: la registrazione), il trap chiude la PR
+  closes="$(grep -c $'^pr\tclose' "$P5_FAKE_LOG")"
+  run_fails detect-cache-registro-bloccato detect-cache P5_FAKE_LOCK_REGISTRY=1
+  if [ "$(grep -c $'^pr\tclose' "$P5_FAKE_LOG")" -gt "$closes" ]; then echo "detect-cache: PR chiusa dal trap dopo un errore"; else echo "PR ORFANA DOPO UN ERRORE"; rc=1; fi
   run_mode detect-cache detect-cache P5_FAKE_500_ONCE=1
   run_mode detect-pin detect-pin
   [ "$(jq -r '.sha_pinning_required' "$T/fake/perm.json")" = false ] && echo "detect-pin: valore iniziale rimesso (false)" || { echo "DETECT-PIN: VALORE NON RIMESSO"; rc=1; }
@@ -805,7 +821,7 @@ modo_controlla() {
   echo "--- eval-sonda"
   run_mode eval-sonda eval-sonda
   echo "--- tetto di spesa e costo ignoto"
-  mkdir -p "$T/eval-b1" "$T/eval-b2" "$T/eval-b3"
+  mkdir -p "$T/eval-b1" "$T/eval-b2" "$T/eval-b3" "$T/eval-b4"
   printf '%s\n%s\t%s\t%s\t%s\t%s\n' "$BUDGET_HEADER" "2026-10-23T00:00:00Z" "prima" "78.5" "100" "x" > "$T/eval-b1/budget.tsv"
   run_mode eval-tetto-residuo eval-sonda P5_EVAL_OUT="$T/eval-b1"
   printf '%s\n%s\t%s\t%s\t%s\t%s\n' "$BUDGET_HEADER" "2026-10-23T00:00:00Z" "prima" "80" "100" "x" > "$T/eval-b2/budget.tsv"
@@ -817,6 +833,22 @@ modo_controlla() {
   n="$(grep -c 'plugin' "$P5_FAKE_CLAUDE_LOG")"
   run_fails eval-dopo-costo-ignoto eval-sonda P5_EVAL_OUT="$T/eval-b3"
   [ "$(grep -c 'plugin' "$P5_FAKE_CLAUDE_LOG")" = "$n" ] && echo "eval-sonda: dopo un costo ignoto non parte altro" || { echo "PARTITO ALTRO DOPO IL COSTO IGNOTO"; rc=1; }
+  grep -qP '\t\?\t\?\t' "$T/eval-b3/budget.tsv" && echo "eval-sonda: riga con costUsd ? in budget.tsv" || { echo "RIGA DEL COSTO IGNOTO ASSENTE"; rc=1; }
+  rm -f "$T/eval-b3/COSTO-IGNOTO.txt"
+  n="$(grep -c 'plugin' "$P5_FAKE_CLAUDE_LOG")"
+  run_fails eval-riga-con-punto-interrogativo eval-sonda P5_EVAL_OUT="$T/eval-b3"
+  [ "$(grep -c 'plugin' "$P5_FAKE_CLAUDE_LOG")" = "$n" ] && echo "eval-sonda: con una riga costUsd ? budget_cap rifiuta (fail-closed)" || { echo "PARTITO CON UNA RIGA ILLEGGIBILE"; rc=1; }
+  echo "--- P5_ONLY"
+  run_fails eval-solo-etichetta-sbagliata eval-sonda P5_EVAL_OUT="$T/eval-b4" P5_ONLY=sonda-skill,sonda-sbagliata
+  run_mode eval-solo eval-sonda P5_EVAL_OUT="$T/eval-b4" P5_ONLY=sonda-skill,sonda-ve1-dependencies
+  echo "eval-sonda con P5_ONLY: $(($(wc -l < "$T/eval-b4/budget.tsv") - 1)) invocazioni registrate"
+  echo "--- ambiente dei gh finti e di git"
+  if awk -F'\t' 'BEGIN { bad = 0 } { for (i = 1; i < NF; i++) { split($i, kv, "="); if (kv[2] != "") bad++ } } END { exit bad > 0 }' "$P5_FAKE_LOG.env"; then
+    echo "gh finti: GH_HOST, GH_REPO e i token enterprise non arrivano mai"
+  else
+    echo "VARIABILI DI GH ARRIVATE AI GH FINTI"; rc=1
+  fi
+  [ "$(cat "$T/fake/terminal-prompt" 2>/dev/null)" = 0 ] && echo "git di rete: GIT_TERMINAL_PROMPT=0" || { echo "GIT_TERMINAL_PROMPT NON IMPOSTATO"; rc=1; }
   echo "--- registro dei comandi gh (profilo p5)"
   python3 -B -I "$GH4/ghguard.py" log "$P5_FAKE_LOG" || rc=1
   echo "--- registro dei comandi claude"

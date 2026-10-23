@@ -57,7 +57,7 @@ class ScriptShapeTest(unittest.TestCase):
 
     def test_gh_is_only_called_through_the_guarded_helpers(self):
         for number, line in enumerate(SCRIPT.read_text().splitlines(), 1):
-            code = line.split("#", 1)[0] if not line.lstrip().startswith(("echo", "printf")) else ""
+            code = line.split("#", 1)[0] if not line.lstrip().startswith(("echo", "printf", "gh_q()")) else ""
             with self.subTest(number):
                 self.assertNotRegex(code, r"(?:^|[;&|(`]\s*|\$\(\s*|\bthen\s+|\bdo\s+)gh\s+\S",
                                     f"riga {number}: gh fuori da gh_call/gh_read/gh_q")
@@ -111,7 +111,8 @@ class ControllaTest(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = Path(tempfile.mkdtemp(prefix="tollgate-p5-controlla-"))
         r = subprocess.run(["bash", str(SCRIPT), "controlla"], capture_output=True, text=True,
-                           env=clean_env(P5_CHECK_DIR=str(cls.tmp)), timeout=900)
+                           env=clean_env(P5_CHECK_DIR=str(cls.tmp), GH_HOST="altro.example", GH_REPO="x/y",
+                                         GH_ENTERPRISE_TOKEN="a", GITHUB_ENTERPRISE_TOKEN="b"), timeout=900)
         cls.out, cls.err, cls.rc = r.stdout, r.stderr, r.returncode
 
     @classmethod
@@ -145,7 +146,7 @@ class ControllaTest(unittest.TestCase):
         self.assertEqual(log.count("repo\tcreate\t"), 1)
         self.assertIn("repo\tcreate\tginz0ls/tollgate\t--private\t", log)
         self.assertRegex(self.out, r"ginz0ls/tollgate: main,p5-probe-ci")
-        self.assertRegex(self.out, r"ginz0ls/tollgate-p4-detect: main,p5-probe-cache,p5-probe-pin")
+        self.assertRegex(self.out, r"ginz0ls/tollgate-p4-detect: main,p5-probe-cache,p5-probe-cache-[0-9-]+,p5-probe-pin")
 
     def test_pin_restore_happens_even_when_a_step_fails(self):
         self.assertIn("detect-pin: valore iniziale rimesso (false)", self.out)
@@ -174,7 +175,7 @@ class ControllaTest(unittest.TestCase):
     def test_unknown_cost_stops_everything_that_follows(self):
         self.assertIn("eval-sonda: costo ignoto segnalato", self.out)
         self.assertIn("eval-sonda: dopo un costo ignoto non parte altro", self.out)
-        self.assertTrue((self.tmp / "eval-b3" / "COSTO-IGNOTO.txt").exists())
+        self.assertIn("costo ignoto: controlla a mano prima di continuare", (self.tmp / "modo-eval-costo-ignoto.log").read_text())
 
     def test_every_budget_row_is_written_whatever_the_exit(self):
         rows = (self.tmp / "eval" / "budget.tsv").read_text().splitlines()
@@ -219,7 +220,40 @@ class ControllaTest(unittest.TestCase):
     def test_cache_mode_and_ci_summaries_are_saved(self):
         self.assertIn("Cache mode:", (self.tmp / "out" / "cache-mode.txt").read_text())
         self.assertIn("sonda: rc=", (self.tmp / "out" / "ci-riepilogo.txt").read_text())
-        self.assertEqual((self.tmp / "out" / "prs-aperte.txt").read_text(), "create\npr 1\n")
+        self.assertRegex((self.tmp / "out" / "prs-aperte.txt").read_text(), r"\Acreate\npr [0-9]+\n\Z")
+
+    def test_gh_host_repo_and_enterprise_tokens_never_reach_the_gh_calls(self):
+        self.assertIn("gh finti: GH_HOST, GH_REPO e i token enterprise non arrivano mai", self.out)
+        seen = (self.tmp / "gh.log.env").read_text().splitlines()
+        self.assertTrue(seen)
+        for line in seen:
+            self.assertTrue(all(f.endswith("=") for f in line.split("\t") if f), line)
+
+    def test_an_orphan_pr_is_closed_by_the_trap_when_a_later_step_fails(self):
+        self.assertIn("modo detect-cache-registro-bloccato: fermato come previsto", self.out)
+        self.assertIn("detect-cache: PR chiusa dal trap dopo un errore", self.out)
+
+    def test_unknown_cost_writes_a_question_mark_row_that_blocks_the_cap(self):
+        row = [l for l in (self.tmp / "eval-b3" / "budget.tsv").read_text().splitlines() if "\t?\t?\t" in l]
+        self.assertEqual(len(row), 1)
+        self.assertIn("eval-sonda: con una riga costUsd ? budget_cap rifiuta (fail-closed)", self.out)
+
+    def test_p5_only_runs_just_the_named_invocations_and_rejects_typos(self):
+        self.assertIn("modo eval-solo: ok", self.out)
+        self.assertIn("modo eval-solo-etichetta-sbagliata: fermato come previsto", self.out)
+        self.assertIn("eval-sonda con P5_ONLY: 2 invocazioni registrate", self.out)
+        rows = (self.tmp / "eval-b4" / "budget.tsv").read_text().splitlines()[1:]
+        self.assertEqual([r.split("\t")[1] for r in rows], ["sonda-skill (none)", "sonda-ve1-dependencies (none)"])
+        self.assertIn("sonda-nl-bash: saltata (P5_ONLY)", (self.tmp / "modo-eval-solo.log").read_text())
+
+    def test_network_git_never_prompts_for_credentials(self):
+        self.assertIn("git di rete: GIT_TERMINAL_PROMPT=0", self.out)
+        self.assertIn("env GIT_TERMINAL_PROMPT=0", SCRIPT.read_text())
+
+    def test_polling_calls_are_recorded_too(self):
+        log = (self.tmp / "out" / "comandi.log").read_text()
+        self.assertGreater(len(re.findall(r"gh run list --repo ginz0ls/tollgate --workflow ci-probe\.yml", log)), 0)
+        self.assertEqual(log.count(" gh run list --repo"), (self.tmp / "gh.log").read_text().count("run\tlist\t"))
 
 
 class ProbePluginTest(unittest.TestCase):

@@ -727,6 +727,44 @@ class ReplayOfCommittedEvidenceTest(GuardBase):
         self.assertEqual(r.returncode, 1)
 
 
+class P5Round1Test(GuardBase):
+    """Giro 1 del Task 1: file di ingresso solo da P4_OUT/P4_WORK, filtri jq senza env, rigioco con repo estranei."""
+
+    def test_p5_body_files_only_from_out_and_work_never_tmp(self):
+        for path in ("/tmp/b.md", "/tmp/tollgate-body/b.md", f"{self.tmp}/flow/b.md", "/etc/passwd", f"{self.tmp}/out/../x"):
+            self.no("pr", "create", "--repo", DET, "--base", "main", "--head", "x", "--title", "t", "--body-file", path, profile="p5")
+            self.no("pr", "comment", "1", "--repo", DET, "--body-file", path, profile="p5")
+        with mock.patch.dict(os.environ, {"TMPDIR": str(self.tmp / "grande")}):
+            self.no("pr", "comment", "1", "--repo", DET, "--body-file", f"{self.tmp}/grande/b.md", profile="p5")
+        for path in (f"{self.tmp}/out/b.md", f"{self.tmp}/work/b.md"):
+            self.ok("pr", "comment", "1", "--repo", DET, "--body-file", path, profile="p5")
+        self.ok("pr", "comment", "1", "--repo", DET, "--body-file", "/tmp/b.md", profile="script")      # P4 invariato
+
+    def test_p5_jq_filters_cannot_read_the_environment_or_other_input(self):
+        base = ["api", f"repos/{DET}/actions/runs"]
+        for flt in ("env", "$ENV", "$ENV.PATH", "env.HOME", ".[] | env", "input", "inputs", "input_filename", "debug",
+                    "stderr", "$__loc__", ".a|env", "[.[]|input]"):
+            for opt in ("--jq", "-q"):
+                self.no(*base, opt, flt, profile="p5")
+        for flt in (".total_count", ".[] | {context, state, creator: .creator.login}", ".workflow_runs[] | [.status] | @tsv",
+                    ".environment_name", ".inputs_count", ".reinput"):
+            self.ok(*base, "--jq", flt, profile="p5")
+        self.ok(*base, "--jq", "env", profile="script")                                              # P4 invariato
+
+    def test_comandi_replay_does_not_hide_a_foreign_repo_behind_the_rewrite(self):
+        evid = self.tmp / "r" / "docs" / "verifiche" / "evidenze" / "p5"
+        evid.mkdir(parents=True)
+        log = evid / "comandi.log"
+        hidden = f"/a {ghguard.OWNER}/tollgate-p4-protected/.claude/worktrees/q/docs/verifiche/evidenze/p5/x.md"
+        log.write_text(f"2026-10-23T00:00:00Z gh pr comment 1 --repo {DET} --body-file {hidden}\n")
+        env = {k: v for k, v in os.environ.items() if k not in ("P4_OUT", "P4_WORK")}
+        env["P4_PROFILE"] = "p5"
+        r = subprocess.run([sys.executable, "-B", "-I", str(GH4 / "ghguard.py"), "comandi", str(log)], capture_output=True,
+                           text=True, env=env)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("repo non ammesso", r.stdout)
+
+
 class WrapperTest(unittest.TestCase):
     """`ghwrap.py`: espande i segnaposto, aggiunge --repo, controlla, registra e passa al gh vero."""
 

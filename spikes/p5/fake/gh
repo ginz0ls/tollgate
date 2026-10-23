@@ -13,6 +13,8 @@ os.makedirs(state, exist_ok=True)
 with open(os.environ["P5_FAKE_LOG"], "a") as fh:
     fh.write("".join(a + "\t" for a in args) + "\n")
 base = os.environ.get("P5_GIT_BASE", "")
+with open(os.environ["P5_FAKE_LOG"] + ".env", "a") as fh:      # le variabili che lo script deve togliere
+    fh.write("".join("%s=%s\t" % (k, os.environ.get(k, "")) for k in ("GH_HOST", "GH_REPO", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN")) + "\n")
 
 
 def counter(name, start=0):
@@ -54,7 +56,12 @@ if first == "--version":
 elif first == "auth":
     print("Logged in to github.com account ginz0ls (finto)")
 elif first == "repo" and second == "create":
-    subprocess.run(["git", "init", "-q", "--bare", os.path.join(base, "ginz0ls", "tollgate.git")], check=True)
+    bare = os.path.join(base, "ginz0ls", "tollgate.git")
+    subprocess.run(["git", "init", "-q", "--bare", bare], check=True)
+    hook = os.path.join(bare, "hooks", "pre-receive")       # registra l'ambiente con cui git ha spinto (GIT_TERMINAL_PROMPT)
+    with open(hook, "w") as fh:
+        fh.write('#!/bin/sh\nprintf "%%s" "${GIT_TERMINAL_PROMPT:-unset}" > "%s"\n' % os.path.join(state, "terminal-prompt"))
+    os.chmod(hook, 0o755)
     print("https://github.com/" + args[2])
 elif first == "api":
     method = opt("--method") or opt("-X") or "GET"
@@ -94,6 +101,8 @@ elif first == "api":
 elif first == "pr":
     if second == "create":
         n = counter("pr")
+        if os.environ.get("P5_FAKE_LOCK_REGISTRY") == "1" and os.environ.get("P5_PR_REGISTRY"):
+            os.chmod(os.environ["P5_PR_REGISTRY"], 0o444)      # la registrazione della PR fallirà dopo l'apertura
         print("https://github.com/ginz0ls/tollgate-p4-detect/pull/%d" % n)
     elif second in ("close", "comment", "merge"):
         pass
