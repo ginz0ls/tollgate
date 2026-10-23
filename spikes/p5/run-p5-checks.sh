@@ -185,14 +185,39 @@ budget_cap() {
 # i file della sonda del workspace (sealed/home/cwd), lo stato della sonda e il registro dei plugin scritto dallo scaffold.
 SONDA_FILES=(-name 'sonda-*' -o -name esiti.txt -o -name scritto-da-hook.md -o -name ws-file -o -name NEGATO -o -name AMMESSO
              -o -name WT-OK -o -name EW-OK -o -name SONDA-WRITE)
+# run_dir_ok <cartella>: stampa il percorso risolto (realpath) se il basename è claude-eval-* ed è figlio diretto di /tmp o della
+# cartella temporanea dell'eval (P5_EVAL_TMPDIR o quella predefinita); altrimenti niente e codice 1. Prima di ogni chmod e copia.
+run_dir_ok() {
+  local r parent base ok=1 allowed
+  r="$(realpath -e -- "$1" 2>/dev/null)" || return 1
+  base="$(basename "$r")"; parent="$(dirname "$r")"
+  case "$base" in claude-eval-?*) ;; *) return 1 ;; esac
+  for allowed in /tmp "${P5_EVAL_TMPDIR:-$HOME/.cache/tollgate-p5-eval-tmp}"; do
+    allowed="$(realpath -m -- "$allowed" 2>/dev/null)" || continue
+    [ "$parent" = "$allowed" ] && ok=0
+  done
+  [ "$ok" = 0 ] || return 1
+  printf '%s\n' "$r"
+}
+
+# cp_checked <origine> <destinazione> <cartella della corsa copiata>: non copia un file che contiene forme di token e lo registra
+cp_checked() {
+  local src="$1" dst="$2" note="$3"
+  if grep -aqE "$TOKEN_PATTERN" "$src"; then
+    printf '%s: forme di credenziali, non copiato\n' "${dst#"$note/"}" >> "$note/file-non-copiati.txt"
+    return 1
+  fi
+  cp -n -- "$src" "$dst"
+}
+
 copy_one_run() {
-  local run="$1" evid="$2" dest f n=0 name
+  local run f n=0 name dest evid="$2"
+  run="$(run_dir_ok "$1")" || { echo "cartella rifiutata (non è claude-eval-* figlia diretta di /tmp o della cartella temporanea dell'eval): $1"; return 1; }
   name="$(basename "$run")"
   dest="$evid/corse/$name"
-  [ -d "$run" ] || { echo "corsa non trovata: $run"; return 1; }
   chmod 700 "$run" 2>/dev/null; [ -d "$run/sealed" ] && chmod 700 "$run/sealed" 2>/dev/null
   mkdir -p "$dest"
-  if [ -f "$run/out/trace.jsonl" ]; then cp -n -- "$run/out/trace.jsonl" "$dest/trace.jsonl" && n=$((n + 1)); fi
+  if [ -f "$run/out/trace.jsonl" ]; then cp_checked "$run/out/trace.jsonl" "$dest/trace.jsonl" "$dest" && n=$((n + 1)); fi
   if [ -f "$run/config/settings.json" ]; then
     if grep -qiE "$TOKEN_PATTERN|\"[A-Za-z_]*(token|api_?key|secret|password)[A-Za-z_]*\"[[:space:]]*:[[:space:]]*\"[^\"]+\"" "$run/config/settings.json"; then
       echo "settings.json contiene forme di credenziali: non copiato" > "$dest/settings-non-copiato.txt"
@@ -203,13 +228,13 @@ copy_one_run() {
   if [ -d "$run/sealed/home/cwd" ]; then
     while IFS= read -r f; do
       mkdir -p "$dest/cwd/$(dirname "${f#"$run/sealed/home/cwd/"}")"
-      cp -n -- "$f" "$dest/cwd/${f#"$run/sealed/home/cwd/"}" && n=$((n + 1))
+      cp_checked "$f" "$dest/cwd/${f#"$run/sealed/home/cwd/"}" "$dest" && n=$((n + 1))
     done < <(find "$run/sealed/home/cwd" -maxdepth 6 -type f -size -300k \( "${SONDA_FILES[@]}" \) 2>/dev/null)
   fi
   for f in .local/state/sonda/hooks.jsonl .local/state/sonda/bin-sonda.txt .claude/plugins/installed_plugins.json; do
     if [ -f "$run/sealed/home/$f" ]; then
       mkdir -p "$dest/home/$(dirname "$f")"
-      cp -n -- "$run/sealed/home/$f" "$dest/home/$f" && n=$((n + 1))
+      cp_checked "$run/sealed/home/$f" "$dest/home/$f" "$dest" && n=$((n + 1))
     fi
   done
   echo "corsa $name: $n file copiati in ${dest#"$root/"}"
@@ -220,7 +245,7 @@ copy_run_files() {
   local dir="$1" run
   grep -ahoE "kept (/[^[:space:]:]+)" "$dir/stdout.txt" "$dir/stderr.txt" 2>/dev/null | sed 's/^kept //' | sort -u > "$dir/cartelle-tenute.txt"
   while IFS= read -r run; do
-    case "$run" in */claude-eval-*) copy_one_run "$run" "$dir" ;; *) echo "cartella tenuta ignorata (fuori dallo schema claude-eval-*): $run" ;; esac
+    copy_one_run "$run" "$dir" || echo "cartella tenuta ignorata: $run"
   done < "$dir/cartelle-tenute.txt"
 }
 
@@ -232,6 +257,7 @@ modo_raccogli_corse() {
   mkdir -p "$EOUT"
   for run in "$@"; do
     run="${run%/}"
+    run_dir_ok "$run" >/dev/null || { echo "cartella rifiutata (non è claude-eval-* figlia diretta di /tmp o della cartella temporanea dell'eval): $run"; continue; }
     evid=""
     for r in "$EOUT"/*/result.json; do
       [ -e "$r" ] || continue
@@ -247,13 +273,18 @@ modo_raccogli_corse() {
 # eval_tmpdir: la cartella dei file temporanei di claude plugin eval, fuori da /tmp, /var/tmp e /dev/shm (la sandbox li ha in
 # denyWrite e quel divieto prevale sulle cartelle della corsa); predefinita $HOME/.cache/tollgate-p5-eval-tmp, modo 700
 eval_tmpdir() {
-  local d="${P5_EVAL_TMPDIR:-$HOME/.cache/tollgate-p5-eval-tmp}"
+  local d="${P5_EVAL_TMPDIR:-$HOME/.cache/tollgate-p5-eval-tmp}" r
   case "$d" in /*) ;; *) die "P5_EVAL_TMPDIR deve essere un percorso assoluto: $d" ;; esac
+  r="$(realpath -m -- "$d")" || die "P5_EVAL_TMPDIR non risolvibile: $d"      # `..` e collegamenti simbolici non aggirano il rifiuto
   if [ "$CHECK" != 1 ]; then
-    case "$d" in /tmp|/tmp/*|/var/tmp|/var/tmp/*|/dev/shm|/dev/shm/*) die "P5_EVAL_TMPDIR non può stare sotto /tmp, /var/tmp o /dev/shm: $d" ;; esac
+    case "$r" in /tmp|/tmp/*|/var/tmp|/var/tmp/*|/dev/shm|/dev/shm/*) die "P5_EVAL_TMPDIR non può stare sotto /tmp, /var/tmp o /dev/shm: $d -> $r" ;; esac
   fi
-  mkdir -p "$d" && chmod 700 "$d" || die "cartella temporanea $d non creabile"
-  printf '%s\n' "$d"
+  mkdir -p "$r" && chmod 700 "$r" || die "cartella temporanea $r non creabile"
+  r="$(realpath -e -- "$r")"
+  if [ "$CHECK" != 1 ]; then
+    case "$r" in /tmp|/tmp/*|/var/tmp|/var/tmp/*|/dev/shm|/dev/shm/*) die "P5_EVAL_TMPDIR risolve sotto /tmp, /var/tmp o /dev/shm: $d -> $r" ;; esac
+  fi
+  printf '%s\n' "$r"
 }
 
 # eval_run <etichetta> <ablation> <cartella del plugin> <caso> [cartella dello shim]: UNA invocazione di `claude plugin eval`
@@ -909,6 +940,32 @@ modo_controlla() {
   run_mode eval-settings-con-credenziali eval-sonda P5_EVAL_OUT="$T/eval-b5" P5_ONLY=sonda-skill P5_FAKE_SETTINGS_TOKEN=1
   hit5="$(ls -d "$T"/eval-b5/*-sonda-skill | head -n 1)"
   if [ -f "$hit5/corse/$(basename "$(head -n 1 "$hit5/cartelle-tenute.txt")")/settings-non-copiato.txt" ] && [ -z "$(find "$hit5/corse" -name settings.json)" ]; then echo "settings.json con credenziali: non copiato e registrato"; else echo "SETTINGS CON CREDENZIALI COPIATO"; rc=1; fi
+  echo "--- cartelle rifiutate da raccogli-corse"
+  mkdir -p "$T/altro/claude-eval-zzz/sealed" "$T/evtmp/non-una-corsa/sealed" "$T/evtmp/$(basename "$kept")/nested/claude-eval-qqq"
+  chmod 500 "$T/altro/claude-eval-zzz" "$T/evtmp/non-una-corsa"; chmod 000 "$T/altro/claude-eval-zzz/sealed"
+  before="$(stat -c %a "$T/altro/claude-eval-zzz") $(stat -c %a "$T/altro/claude-eval-zzz/sealed") $(stat -c %a "$T/evtmp/non-una-corsa")"
+  ln -sfn "$T/altro/claude-eval-zzz" "$T/evtmp/claude-eval-link"
+  bash "$here/run-p5-checks.sh" raccogli-corse "$T/altro/claude-eval-zzz" "$T/evtmp/non-una-corsa" "$T/evtmp/$(basename "$kept")/nested/claude-eval-qqq" \
+    "$T/evtmp/$(basename "$kept")/sealed" "$T/evtmp/claude-eval-link" /tmp "$T/evtmp" > "$T/modo-raccogli-corse-rifiutate.log" 2>&1
+  [ "$(grep -c 'cartella rifiutata' "$T/modo-raccogli-corse-rifiutate.log")" = 7 ] && echo "raccogli-corse: 7 cartelle non valide rifiutate" || { echo "CARTELLE NON VALIDE ACCETTATE"; rc=1; }
+  after="$(stat -c %a "$T/altro/claude-eval-zzz") $(stat -c %a "$T/altro/claude-eval-zzz/sealed") $(stat -c %a "$T/evtmp/non-una-corsa")"
+  [ "$before" = "$after" ] && echo "raccogli-corse: nessun chmod sulle cartelle rifiutate ($after)" || { echo "CHMOD SU CARTELLE RIFIUTATE ($before -> $after)"; rc=1; }
+  [ ! -e "$T/eval/corse" ] && [ -z "$(find "$T/eval" -path '*corse/claude-eval-zzz*' 2>/dev/null)" ] && echo "raccogli-corse: niente copiato dalle rifiutate" || { echo "COPIATO DA UNA RIFIUTATA"; rc=1; }
+  chmod 700 "$T/altro/claude-eval-zzz" "$T/evtmp/non-una-corsa"; chmod 700 "$T/altro/claude-eval-zzz/sealed"
+  echo "--- token nella trace"
+  mkdir -p "$T/eval-b6"
+  run_mode eval-trace-con-token eval-sonda P5_EVAL_OUT="$T/eval-b6" P5_ONLY=sonda-skill P5_FAKE_TRACE_TOKEN=1
+  hit6="$(ls -d "$T"/eval-b6/*-sonda-skill | head -n 1)"
+  run6="$hit6/corse/$(basename "$(head -n 1 "$hit6/cartelle-tenute.txt")")"
+  if [ ! -e "$run6/trace.jsonl" ] && grep -q 'trace.jsonl: forme di credenziali' "$run6/file-non-copiati.txt" && [ -f "$run6/cwd/esiti.txt" ]; then echo "trace con un token: non copiata e registrata, il resto sì"; else echo "TRACE CON TOKEN COPIATA"; rc=1; fi
+  if grep -raq "gh""p_bbbb" "$hit6"; then echo "TOKEN NELLE EVIDENZE"; rc=1; else echo "nessun token nelle evidenze"; fi
+  echo "--- P5_EVAL_TMPDIR e percorsi risolti"
+  mkdir -p "$T/eval-b7"; ln -sfn /tmp "$T/lnk-tmp"; n="$(grep -c 'plugin' "$P5_FAKE_CLAUDE_LOG")"
+  for bad in "/tmp/x" "/var/tmp/../tmp/y" "/dev/shm/../shm/z" "$T/lnk-tmp/sotto" "/tmp/../tmp/w"; do
+    run_fails "eval-tmpdir-rifiutato" eval-sonda P5_CHECK=0 P5_EVAL_OUT="$T/eval-b7" P5_ONLY=sonda-skill P5_EVAL_TMPDIR="$bad"
+    grep -q 'non può stare sotto /tmp' "$T/modo-eval-tmpdir-rifiutato.log" || { echo "MOTIVO ASSENTE PER $bad"; rc=1; }
+  done
+  [ "$(grep -c 'plugin' "$P5_FAKE_CLAUDE_LOG")" = "$n" ] && echo "P5_EVAL_TMPDIR sotto /tmp (anche via .. o collegamento) rifiutato prima di lanciare" || { echo "CLAUDE LANCIATO CON UN TMPDIR VIETATO"; rc=1; }
   echo "TMPDIR dell'eval: $(cat "$hit/tmpdir.txt")"
   [ -d "$T/evtmp" ] && echo "P5_EVAL_TMPDIR usato per le corse" || { echo "P5_EVAL_TMPDIR NON USATO"; rc=1; }
   echo "--- ambiente dei gh finti e di git"

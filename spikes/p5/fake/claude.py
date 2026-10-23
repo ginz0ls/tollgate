@@ -49,6 +49,8 @@ for rel, text in ((".local/state/sonda/hooks.jsonl", '{"event": "PreToolUse"}\n'
         fh.write(text)
 with open(os.path.join(run_dir, "out", "trace.jsonl"), "w") as fh:
     fh.write('{"type": "system", "subtype": "init"}\n')
+    if os.environ.get("P5_FAKE_TRACE_TOKEN") == "1":          # una forma di token costruita a runtime
+        fh.write('{"testo": "gh' + 'p_' + 'b' * 24 + '"}\n')
 settings = {"sandbox": {"enabled": True}}
 if os.environ.get("P5_FAKE_SETTINGS_TOKEN") == "1":
     settings["apiKeyHelper"] = {"token": "valore-finto"}

@@ -209,6 +209,23 @@ class ControllaTest(unittest.TestCase):
         self.assertIn("modo raccogli-corse: ok", self.out)
         self.assertIn("raccogli-corse: corsa riassegnata alla sua evidenza dalla tracePath", self.out)
 
+    def test_raccogli_corse_refuses_anything_that_is_not_a_claude_eval_run_before_any_chmod(self):
+        for line in ("raccogli-corse: 7 cartelle non valide rifiutate", "raccogli-corse: nessun chmod sulle cartelle rifiutate (500 0 500)",
+                     "raccogli-corse: niente copiato dalle rifiutate"):
+            self.assertIn(line, self.out)
+        log = (self.tmp / "modo-raccogli-corse-rifiutate.log").read_text()
+        for refused in ("altro/claude-eval-zzz", "non-una-corsa", "nested/claude-eval-qqq", "/sealed", "claude-eval-link", " /tmp", "evtmp"):
+            self.assertIn(refused, log)
+
+    def test_a_token_in_the_trace_or_a_probe_file_blocks_that_copy_only(self):
+        self.assertIn("trace con un token: non copiata e registrata, il resto sì", self.out)
+        self.assertIn("nessun token nelle evidenze", self.out)
+
+    def test_eval_tmpdir_is_compared_after_realpath(self):
+        self.assertIn("P5_EVAL_TMPDIR sotto /tmp (anche via .. o collegamento) rifiutato prima di lanciare", self.out)
+        self.assertEqual(self.out.count("modo eval-tmpdir-rifiutato: fermato come previsto"), 5)
+        self.assertIn("realpath -m", SCRIPT.read_text())
+
     def test_settings_with_credentials_are_not_copied_and_the_fact_is_recorded(self):
         self.assertIn("settings.json con credenziali: non copiato e registrato", self.out)
 
