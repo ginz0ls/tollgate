@@ -95,6 +95,20 @@ class CasesBuildTest(unittest.TestCase):
                     if op["op"] == "pr":
                         self.assertGreater(ops.index("pr"), ops.index("push"))
 
+    def test_direct_push_files_differ_between_cases_built_in_the_same_second(self):
+        """Il modo `controlla` costruisce i casi uno dopo l'altro nello stesso secondo (stesso `ts`)
+        sulla stessa base: se due casi scrivessero lo stesso file con lo stesso testo, il secondo non
+        avrebbe nulla da committare («nothing to commit»)."""
+        files = {}
+        for name in ("detect-push-diretto", "detect-merge-rosso"):
+            clone = self.lab.clones[make_case.CASES[name].repo]
+            git(clone, "switch", "-q", "--detach", "origin/main")
+            data = make_case.build_case(name, clone, 1, "20261022-000000", self.lab.tmp / "out-ts", name)
+            files[name] = [o["file"] for o in data["ops"] if o["op"] == "direct"]
+        self.assertEqual(len(files["detect-push-diretto"]), 1)
+        self.assertEqual(len(files["detect-merge-rosso"]), 1)
+        self.assertNotEqual(files["detect-push-diretto"], files["detect-merge-rosso"])
+
     def test_pushed_shas_exist_in_the_clone_and_branches_are_not_main(self):
         for name, data in self.data.items():
             clone = self.lab.clones[data["repo"]]

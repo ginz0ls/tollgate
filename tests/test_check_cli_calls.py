@@ -1,5 +1,8 @@
 import json
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
 
 from tests.helpers import BIN
 from tests.hookkit import SESSION, Lab
@@ -37,15 +40,18 @@ class CliCallsTest(unittest.TestCase):
         self.assertEqual(self.signals()["start"]["argv"], ["start", "7"])
 
     def test_python_form_with_double_quoted_spaced_path(self):
-        """La forma delle skill: python3 "<percorso con spazi>/bin/tollgate" (nel checkout di
-        prova il percorso ha spazi)."""
-        self.assertIn(" ", str(PROGRAM))
-        self.assertEqual(self.lab.bash(f'python3 "{PROGRAM}" start 7').exit, 0)
+        """La forma delle skill: python3 "<percorso con spazi>/bin/tollgate" (lo spazio sta in una
+        cartella temporanea, non dipende dal percorso del checkout)."""
+        spaced = Path(tempfile.mkdtemp(prefix="tollgate sp "))
+        self.addCleanup(shutil.rmtree, spaced, ignore_errors=True)
+        program = spaced / "bin" / "tollgate"
+        self.assertIn(" ", str(program))
+        self.assertEqual(self.lab.bash(f'python3 "{program}" start 7').exit, 0)
         self.assertEqual(self.signals()["start"]["argv"], ["start", "7"])
-        self.assertEqual(self.lab.bash(f'python3 "{PROGRAM}" act apply').exit, 0)
+        self.assertEqual(self.lab.bash(f'python3 "{program}" act apply').exit, 0)
         self.assertEqual(sorted(self.signals()), ["act", "start"])
-        for cmd in (f'python3 "{PROGRAM}" task start 1', f'python3 "{PROGRAM}" start 7',
-                    f'python3 "{PROGRAM}" act apply', f'python3 "{PROGRAM}" status --checkpoint'):
+        for cmd in (f'python3 "{program}" task start 1', f'python3 "{program}" start 7',
+                    f'python3 "{program}" act apply', f'python3 "{program}" status --checkpoint'):
             with self.subTest(cmd=cmd):
                 self.assertEqual(self.lab.bash(cmd, agent_id="ag-1").exit, 2)
 

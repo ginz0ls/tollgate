@@ -3,7 +3,8 @@ import unittest
 from unittest import mock
 
 from tests.flowkit import FlowLab
-from tollgate_core import phases
+from tollgate_core import db, phases
+from tollgate_core.paths import program_command
 from tollgate_flow import finishcheck, prstate
 
 MERGED_AT = "2026-10-19T12:00:00Z"
@@ -66,7 +67,7 @@ class DetectTest(PrStateCase):
         self.assertEqual(fl.events("merge_detected"), [])
         self.assertIn("/tollgate:abandon", prstate.CLOSED_HINT)
         self.assertIn("--confirm", prstate.CLOSED_HINT)
-        self.assertIn('python3 "', prstate.CLOSED_HINT.replace("'", '"'))
+        self.assertIn(program_command(db.BIN_PATH), prstate.CLOSED_HINT)
 
     def test_open_pr(self):
         fl = self.lab(prs=[pr()])

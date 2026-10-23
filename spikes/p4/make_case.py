@@ -786,7 +786,7 @@ def _detect_closes(ctx):
 @case("detect-push-diretto", "detect", "push diretto su main: tollgate/sentinel rosso e issue",
       expect=[Expect(push="p1", states={"tollgate/sentinel": FAILURE}, sentinel_issue=True)], oracle=False)
 def _detect_push_diretto(ctx):
-    ctx.direct(f"notes/diretto-{ctx.ts}.md", "push diretto di prova")
+    ctx.direct(f"notes/diretto-{ctx.name}-{ctx.ts}.md", "push diretto di prova")
 
 
 @case("detect-merge-rosso", "detect",
@@ -800,7 +800,7 @@ def _detect_merge_rosso(ctx):
     work(ctx, "detect-merge-rosso", changes=feature_files(sottrai=False))
     ctx.wait("p1")
     ctx.merge(ctx.branch)
-    ctx.direct(f"notes/diretto-{ctx.ts}.md", "push diretto di prova")
+    ctx.direct(f"notes/diretto-{ctx.name}-{ctx.ts}.md", "push diretto di prova")
 
 
 # ---------------------------------------------------------------- uso

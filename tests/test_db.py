@@ -339,7 +339,9 @@ class BackupRaceTest(unittest.TestCase):
             self.assertEqual(p.returncode, 0, err)
         self.assertEqual(list(self.t.state.backup_dir.glob(".tmp-*")), [])
 
-    def test_concurrent_migration_of_v1_db_with_rows(self):
+    def migrate_v1_db_with_rows_concurrently(self, *, newer_copies=0):
+        """Migra un DB v1 con una riga da 4 processi; `newer_copies` copie valide, con nomi
+        che ordinano dopo ogni copia reale, sono già nella cartella dei backup."""
         self.conn.close()
         self.t.cleanup()
         self.t = TempState()
@@ -351,6 +353,10 @@ class BackupRaceTest(unittest.TestCase):
         finally:
             db.MIGRATIONS[:] = saved
         insert_work(conn)
+        for n in range(newer_copies):
+            dst = sqlite3.connect(self.t.state.backup_dir / f"tollgate-99990101T0000{n:02d}-x.db")
+            conn.backup(dst)
+            dst.close()
         conn.close()
         self.conn = sqlite3.connect(":memory:")
         code = textwrap.dedent(f"""
@@ -370,8 +376,24 @@ class BackupRaceTest(unittest.TestCase):
         self.assertEqual(conn.execute("SELECT value FROM meta WHERE key='schema_version'")
                          .fetchone()[0], str(db.latest_version()))
         self.assertEqual(conn.execute("SELECT count(*) FROM work_items").fetchone()[0], 1)
-        copies = list(self.t.state.backup_dir.glob("tollgate-*-migrazione-2.db"))
+        return sorted(self.t.state.backup_dir.glob("tollgate-*.db"))
+
+    def test_concurrent_migration_of_v1_db_with_rows(self):
+        # Ogni processo copia prima di ogni passo che vede da fare: con 4 processi in fila le copie
+        # possono superare KEEP_BACKUPS e la pulizia toglie le più vecchie, anche tutte quelle di
+        # `migrazione-2`. Si controlla che ci siano copie, intere e non oltre il limite.
+        copies = self.migrate_v1_db_with_rows_concurrently()
         self.assertTrue(copies)
+        self.assertLessEqual(len(copies), db.KEEP_BACKUPS)
+        for c in copies:
+            self.assertTrue(db.integrity_ok(c))
+
+    def test_migration_copies_older_than_the_retention_window_are_pruned(self):
+        """Causa del fallimento visto sui runner (2 core): con KEEP_BACKUPS copie più recenti la
+        pulizia toglie ogni copia di `migrazione-2`, e il DB migrato è comunque intero."""
+        copies = self.migrate_v1_db_with_rows_concurrently(newer_copies=db.KEEP_BACKUPS)
+        self.assertEqual(len(copies), db.KEEP_BACKUPS)
+        self.assertEqual([c for c in copies if c.name.endswith("-migrazione-2.db")], [])
         for c in copies:
             self.assertTrue(db.integrity_ok(c))
 
