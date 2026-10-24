@@ -192,9 +192,28 @@ def _status(conn, key: str | None) -> list[dict]:
     return out
 
 
-def _print_status(items: list[dict]) -> None:
+PLUGIN_ROOT = Path(__file__).resolve().parents[2]
+DETECT_SENTENCE = "in modalità detect il merge non è impedito, solo rilevato"
+
+
+def _print_limits() -> None:
+    """Una riga sola, col percorso assoluto: in un progetto dell'utente uno relativo non porterebbe a niente."""
+    print(f"limiti della garanzia: {PLUGIN_ROOT / 'docs' / 'uso' / 'limiti.md'}")
+
+
+def _detect_active(conn, key: str | None) -> bool:
+    """Legge `gate_mode` solo per la stampa: c'è un lavoro attivo in modalità detect?"""
+    sql, params = "SELECT 1 FROM work_items WHERE phase <> 'closed' AND gate_mode = 'detect'", []
+    if key:
+        sql += " AND repo_key = ?"
+        params.append(key)
+    return conn.execute(sql + " LIMIT 1", params).fetchone() is not None
+
+
+def _print_status(items: list[dict], detect: bool = False) -> None:
     if not items:
         print("nessun lavoro attivo")
+        _print_limits()
         return
     for it in items:
         phase = it["phase"]
@@ -207,6 +226,9 @@ def _print_status(items: list[dict]) -> None:
             print(f"  blocco {b['id']} ({b['type']}): {b['reason']}")
         for s in it["stopped_by"]:
             print(f"  {s}")
+    if detect:
+        print(DETECT_SENTENCE)
+    _print_limits()
 
 
 def _restore(state) -> int:
@@ -413,7 +435,10 @@ def main(argv: list[str]) -> int:
                     print("tollgate: nessun lavoro attivo per questa cartella: lancia il "
                           "comando dal worktree del lavoro", file=sys.stderr)
                     return 1
-                print("[]" if args.json else "nessun lavoro attivo")
+                if args.json:
+                    print("[]")
+                else:
+                    _print_status([])
                 return 0
             if args.checkpoint:
                 from tollgate_flow import checkpoint
@@ -427,11 +452,12 @@ def main(argv: list[str]) -> int:
         conn = db.open_db(state)
         try:
             if args.cmd == "status":
-                items = _status(conn, current_repo_key(Path.cwd()))
+                key = current_repo_key(Path.cwd())
+                items = _status(conn, key)
                 if args.json:
                     print(json.dumps(items, ensure_ascii=False, indent=2))
                 else:
-                    _print_status(items)
+                    _print_status(items, _detect_active(conn, key))
                 return 0
             if args.cmd == "stats":
                 return _stats(conn, args)

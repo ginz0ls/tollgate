@@ -80,6 +80,48 @@ class CliTest(CliBase):
                          (5, "blocked", "plan"))
         self.assertEqual(item["blocks"][0]["type"], "needs_you")
 
+    def test_status_points_to_limits(self):
+        limits = ROOT / "docs" / "uso" / "limiti.md"
+        self.assertTrue(limits.is_file())
+        line = f"limiti della garanzia: {limits}"
+        self.seed()
+        for cwd in (self.repo, self.outside):
+            with self.subTest(cwd=cwd.name):
+                r = self.run_cli("status", cwd=cwd)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(r.stdout.splitlines()[-1], line)
+                self.assertTrue(Path(line.split(": ", 1)[1]).is_absolute())
+        # mai nell'uscita strutturata
+        self.assertNotIn("limiti della garanzia", self.run_cli("status", "--json").stdout)
+
+    def test_status_without_db_points_to_limits(self):
+        line = f"limiti della garanzia: {ROOT / 'docs' / 'uso' / 'limiti.md'}"
+        self.assertFalse(self.t.state.db_path.exists())
+        r = self.run_cli("status")
+        self.assertEqual(r.stdout.splitlines(), ["nessun lavoro attivo", line])
+        r = self.run_cli("status", "--json")
+        self.assertEqual(r.stdout.strip(), "[]")
+        self.assertFalse(self.t.state.db_path.exists())
+
+    def test_status_detect_sentence(self):
+        sentence = "in modalità detect il merge non è impedito, solo rilevato"
+        conn = db.open_db(self.t.state)
+        w = phases.create_work(conn, repo_key="github.com/o/r", issue=5, level="L1", now=T0,
+                               gate_mode="detect")
+        phases.create_work(conn, repo_key="github.com/o/p", issue=7, level="L1", now=T0,
+                           gate_mode="protected")
+        conn.close()
+        r = self.run_cli("status", cwd=self.repo)
+        self.assertEqual(r.stdout.count(sentence), 1)
+        self.assertNotIn(sentence, self.run_cli("status", "--json", cwd=self.repo).stdout)
+        # nessun lavoro in detect nel repo corrente: la frase non c'è
+        protected = make_repo(Path(tempfile.mkdtemp()) / "p")
+        git(protected, "remote", "add", "origin", "git@github.com:O/P.git")
+        self.assertNotIn(sentence, self.run_cli("status", cwd=protected).stdout)
+        # fuori da un repo si guardano tutti i lavori attivi
+        self.assertIn(sentence, self.run_cli("status").stdout)
+        self.assertIsNotNone(w)
+
     def test_events_after_seq(self):
         conn = db.open_db(self.t.state)
         for i in range(3):

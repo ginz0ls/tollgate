@@ -1095,7 +1095,7 @@ class S6DryRun(DryRunCase):
         self.assertRegex(out[0]["text"], r"\ntask 2: tollgate:implementer name=tg-1-t2 launch")
         done = next(o for o in out if o["do"] == "bash" and o["text"] == "task 2: done")   # l'esito, scritto dal programma
         self.assertEqual(done["rc"], 0)
-        self.assertTrue(any(re.search(r"task: 2 done$", o["text"]) for o in out))
+        self.assertTrue(any(re.search(r"task: 2 done$", o["text"], re.M) for o in out))
         self.assertIn("prossimo passo: /tollgate:finish\n", out[-1]["texts"][self.CHECKPOINT])
         self.assertCorrectPath(out, {"finish-indicato", "task-2-chiuso", "comando-task-done"})
 
