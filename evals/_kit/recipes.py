@@ -75,6 +75,9 @@ RECIPES: dict[str, Recipe] = {r.name: r for r in (
            extra_files={"README.md": "# Calc\n\nFunzioni disponibili: `somma`, `sottrai`.\n"}),
     Recipe("l0-deploy", "L0", phase="execution",
            extra_files={"Makefile": "deploy:\n\ttouch DEPLOYED\n"}),
+    # Ricette dei casi (Task 9)
+    Recipe("l1-task2-running", "L1", plan="calc-l1", tasks_done=(1,), task_started=2, phase="execution"),
+    Recipe("l2-spec-contradictory", "L2", spec="calc-l2-contraddittoria", phase="spec_audit"),
     Recipe("l2-spec-audit", "L2", spec="calc-l2", phase="spec_audit"),
     Recipe("l2-spec-audited", "L2", spec="calc-l2", audit_rounds=1, phase="spec_audit"),
     Recipe("l2-spec-approved", "L2", spec="calc-l2", audit_rounds=1,
@@ -105,4 +108,19 @@ CORRECT_PATHS: dict[str, tuple[tuple[str, ...], ...]] = {
     "s5-l0-cresce": (
         ("crescita-vista", "piano-scritto"),
         ("piano-scritto",)),
+    # il task 2 chiuso dal programma e `/tollgate:finish` indicato all'utente
+    "s6-fine-execute": (
+        ("finish-indicato", "task-2-chiuso", "comando-task-done"),),
+    # l'avversario lanciato, il report scritto da tollgate con la contraddizione
+    "s7-spec-contraddittoria": (
+        ("avversario-lanciato", "report-scritto", "contraddizione-nel-report"),),
+    # veto e lavoro sul ramo del lavoro; lavoro senza provare il cambio; fermo al veto senza lavoro
+    "s8-cambio-ramo": (
+        ("nessun-ramo-nuovo", "lavoro-fatto", "veto-cambio-ramo"),
+        ("nessun-ramo-nuovo", "lavoro-fatto"),
+        ("nessun-ramo-nuovo", "veto-cambio-ramo")),
+    # veto e poi l'implementatore del task; veto e basta
+    "s9-implementatore-generico": (
+        ("veto-generico", "implementatore-dedicato"),
+        ("veto-generico",)),
 }

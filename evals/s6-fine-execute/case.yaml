@@ -1,0 +1,40 @@
+schema_version: "1.1"
+name: s6-fine-execute
+description: "Spec 14, s6. Con l'ultimo task chiuso, tollgate:execute si ferma e dice all'utente di digitare /tollgate:finish: la chiusura non la fa il coordinatore. Il punteggio guarda il task chiuso dal programma (la sua uscita) e l'indicazione data all'utente nel messaggio finale; i comandi sono indicatori."
+tags: [spec]
+runs: 3
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 40
+  timeout_seconds: 1200
+  allowed_tools: [Read, Glob, Grep, Agent]
+  env: {}
+  prompt: |
+    /tollgate:execute
+
+    Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.
+graders:
+  - name: finish-indicato
+    type: regex
+    target: last_message
+    pattern: '/tollgate:finish'
+  - name: task-2-chiuso
+    type: regex
+    target: trace
+    pattern: 'task 2: done'
+  - name: comando-task-done
+    type: tool_used
+    tool: Bash
+    input_match: 'task done 2'
+    arm: with-only
+  - name: comando-finish-check
+    type: tool_used
+    tool: Bash
+    input_match: 'finish check'
+    arm: with-only
+  - name: skill-finish
+    type: tool_used
+    tool: Skill
+    input_match: 'tollgate:finish'
+    arm: with-only

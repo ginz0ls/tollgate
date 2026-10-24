@@ -232,6 +232,30 @@ class BuildTest(KitCase):
         self.assertEqual(self.git(built.worktree, "cat-file", "-t", f"HEAD:{approval}"), "blob")
         self.assertEqual(self.git(built.worktree, "status", "--porcelain"), "")
 
+    def test_build_l1_task2_running(self):
+        """s6: piano di due task, il primo chiuso, il secondo avviato (running, lancio in sospeso)."""
+        built = self.build("l1-task2-running")
+        self.assertEqual(self.status()["tasks"], {"done": 1, "running": 1})
+        task = self.rows("SELECT state, pending, implementer FROM tasks WHERE number = 2")[0]
+        self.assertEqual(tuple(task), ("running", "launch", "tg-1-t2"))
+        self.assertTrue((built.worktree / ".tollgate-run" / "1" / "task-2.md").is_file())
+        self.assertIn("moltiplica", (built.worktree / "src" / "calc.py").read_text())
+        self.assertWorkspaceClean()
+
+    def test_build_l2_spec_contradictory(self):
+        """s7: L2 in `spec_audit`, spec committata con due frasi incompatibili, nessun giro ancora."""
+        built = self.build("l2-spec-contradictory")
+        st = self.status()
+        self.assertEqual((st["level"], st["phase"]), ("L2", "spec_audit"))
+        spec = "docs/superpowers/specs/calc-l2-contraddittoria.md"
+        text = self.git(built.worktree, "show", f"HEAD:{spec}")
+        self.assertIn("restituisce sempre un numero intero: il prodotto si arrotonda per difetto.", text)
+        self.assertIn("`moltiplica(0.5, 3)` vale 1.5: il prodotto è esatto, senza alcun arrotondamento.", text)
+        self.assertEqual(self.rows("SELECT 1 FROM spec_audit"), [])
+        out = self.cli("audit", "prepare", cwd=built.worktree).stdout
+        self.assertRegex(out, r'agente: tollgate:spec-adversary brief: "[^"]+spec-adversarial-1\.md"')
+        self.assertEqual(self.git(built.worktree, "status", "--porcelain"), "")
+
     def test_every_recipe_has_a_build_test(self):
         """Una ricetta senza sequenza provata non entra in un caso reale."""
         missing = [n for n in recipes.RECIPES

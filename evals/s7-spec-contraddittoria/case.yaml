@@ -1,0 +1,33 @@
+schema_version: "1.1"
+name: s7-spec-contraddittoria
+description: "Spec 14, s7. La spec dice due cose incompatibili (un prodotto sempre intero e arrotondato, un prodotto esatto 1.5): l'audit lancia l'avversario della spec e il suo report, scritto da tollgate, riporta la contraddizione. Il punteggio guarda il contenuto del report."
+tags: [spec]
+runs: 3
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 40
+  timeout_seconds: 1200
+  allowed_tools: [Read, Glob, Grep, Agent]
+  env: {}
+  prompt: |
+    /tollgate:spec-audit
+
+    Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.
+graders:
+  - name: avversario-lanciato
+    type: tool_used
+    tool: Agent
+    input_match: 'tollgate:spec-adversary'
+  - name: report-scritto
+    type: file_exists
+    path: '**/docs/superpowers/reviews/1/spec-adversarial-*.md'
+    exists: true
+  - name: contraddizione-nel-report
+    type: regex
+    target:
+      source: file
+      path: ".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/docs/superpowers/reviews/1/spec-adversarial-1.md"
+    flags: i
+    pattern: '(?=[\s\S]*(?:arrotond|per difetto))(?=[\s\S]*(?:1[.,]5|esatt))(?=[\s\S]*(?:contradd|incompatib|inconsisten|incoerent|conflitt|contrast|non (?:può|possono)))'
+    weight: 2

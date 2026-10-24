@@ -308,7 +308,7 @@ def _snapshot(root: Path) -> dict[str, int]:
 class _Session:
     """Una corsa a secco: lo stato della ricetta, gli eventi mandati a `hooks/run` e la `trace`."""
 
-    def __init__(self, case: dict, where: str):
+    def __init__(self, case: dict, where: str, env: dict | None = None):
         self.case, self.where = case, where
         self.tmp = Path(tempfile.mkdtemp(prefix="tollgate eval cases "))
         self.ws, self.home = self.tmp / "workspace", self.tmp / "home dir"
@@ -317,13 +317,14 @@ class _Session:
         self.built = scaffold.build(recipes.RECIPES[recipe_of(case)], workspace=self.ws, home=self.home)
         self.wt = self.built.worktree
         self.cwd = self.wt if where == "worktree" else self.ws
-        self.env = run_env(self.home)
+        self.env = run_env(self.home, **(env or {}))
         self.before = _snapshot(self.ws)
         self.lines: list[str] = []
         self.calls: list[tuple[str, dict]] = []
         self.agents: dict[str, tuple[str, str]] = {}      # id dell'agente -> (tipo, id della tool_use che l'ha lanciato)
         self.last_message = ""
         self.last_denial = ""
+        self.outs: list[dict] = []        # gli esiti dei passi già eseguiti (per i passi che ne leggono l'uscita)
         self._n = 0
 
     def close(self):
@@ -390,10 +391,13 @@ class _Session:
 
     # ----- passi ----------------------------------------------------------------------------
 
-    def step(self, ev: dict) -> dict:
+    def step(self, ev) -> dict:
+        if callable(ev):                 # un passo che dipende dall'uscita dei precedenti (`self.outs`)
+            ev = ev(self)
         ev = self.fill(ev)
         out = getattr(self, "_do_" + ev["do"])(ev)
         out["do"] = ev["do"]
+        self.outs.append(out)
         return out
 
     def _do_agent(self, ev):
@@ -446,10 +450,10 @@ class _Session:
 
     def _do_stop(self, ev):
         agent = ev["agent"]
-        report = {"v": 1, "task": 1, "status": ev.get("status", "DONE"), "done": "fatto",
+        report = {"v": 1, "task": ev.get("task", 1), "status": ev.get("status", "DONE"), "done": "fatto",
                   "tests": "verify", "files": ev.get("files", []), "must_have": [],
                   "concerns": "", "left": "", "size_reason": None}
-        message = "Fine.\n```json\n" + json.dumps(report) + "\n```"
+        message = ev.get("message") or "Fine.\n```json\n" + json.dumps(report) + "\n```"
         r = self.hook("SubagentStop", agent=agent, stop_hook_active=False,
                       last_assistant_message=message, agent_transcript_path="/non/esiste.jsonl")
         if r.returncode == 2:
@@ -484,18 +488,19 @@ class _Session:
                 "calls": self.calls}
 
 
-def dry_run(case: dict, events: list[dict], where: str = "worktree") -> list[dict]:
+def dry_run(case: dict, events: list, where: str = "worktree", env: dict | None = None) -> list[dict]:
     """Gli esiti di `hooks/run` per gli eventi dati: costruisce lo stato della ricetta del caso, esegue
-    i passi (`agent`, `bash`, `edit`, `stop`, `say`) e ritorna un esito per passo, più un ultimo esito
+    i passi (`agent`, `bash`, `edit`, `stop`, `say`; un passo può essere una funzione della sessione, che ne
+    legge gli esiti già avuti in `outs`) e ritorna un esito per passo, più un ultimo esito
     `end` con la `trace`, il messaggio finale, i file creati e il testo dei file per i grader.
 
     `where`: `worktree` (la corsa ha fatto il `cd` del prompt) o `main` (il checkout principale con
     una sessione non legata, la situazione d'avvio). Un passo ha `do` e i suoi campi; nelle stringhe
     `{wt}`, `{ws}` (con `q` in fondo: già protetti per la shell), `{bin}` e `{denial}` (il testo
-    dell'ultimo veto) si sostituiscono."""
+    dell'ultimo veto) si sostituiscono. `env`: variabili in più per i comandi (per esempio `LC_ALL`)."""
     if where not in ("worktree", "main"):
         raise ValueError(where)
-    session = _Session(case, where)
+    session = _Session(case, where, env)
     try:
         outcomes = [session.step(ev) for ev in events]
         outcomes.append(session.end())
@@ -723,8 +728,8 @@ class DryRunCase(unittest.TestCase):
     def setUpClass(cls):
         cls.case = load_case(EVALS / cls.NAME / "case.yaml")
 
-    def run_case(self, events, where="worktree"):
-        return dry_run(self.case, events, where)
+    def run_case(self, events, where="worktree", env=None):
+        return dry_run(self.case, events, where, env)
 
     def assertPasses(self, outcomes, expected: set[str], label=""):
         got = passing(self.case, outcomes)
@@ -1009,6 +1014,314 @@ class S5DryRun(DryRunCase):
                              {"do": "say", "text": "Fatto."}])
         self.assertEqual([o["denied"] for o in out[:3]], [False] * 3)
         self.assertWrongPath(out, set())
+
+
+def last_with(session, needle: str) -> str:
+    """Il testo dell'ultimo passo già eseguito che contiene `needle`."""
+    for out in reversed(session.outs):
+        if needle in out["text"]:
+            return out["text"]
+    raise AssertionError(f"nessun passo ha stampato {needle!r}")
+
+
+class S6DryRun(DryRunCase):
+    NAME = "s6-fine-execute"
+    BRIEF = "{wt}/.tollgate-run/1/task-2.md"
+    DONE_2 = "python3 {bin} task done 2"
+    CHECKPOINT = ".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/docs/superpowers/reviews/1/checkpoint.md"
+
+    @staticmethod
+    def reviewer_launch(s):
+        brief, kind = last_with(s, "revisore: ").splitlines()[:2]
+        return {"do": "agent", "id": "ag-r2", "type": kind.removeprefix("revisore: "), "name": "rev-2",
+                "prompt": brief}
+
+    @staticmethod
+    def reviewer_verdict(s):
+        brief = Path(last_with(s, "revisore: ").splitlines()[0]).read_text(encoding="utf-8")
+        ids = re.search(r'"sha": "([0-9a-f]+)", "code": "([0-9a-f]+)"', brief)
+        verdict = {"v": 1, "task": 2, "sha": ids.group(1), "code": ids.group(2), "outcome": "approved",
+                   "spec_compliance": [], "findings": []}
+        return {"do": "stop", "agent": "ag-r2", "message": "Verdetto.\n```json\n" + json.dumps(verdict) + "\n```"}
+
+    def cycle(self):
+        """Il task 2 come lo fa `tollgate:execute`: implementatore, ricevuta, revisore, `task done 2`."""
+        return [
+            {"do": "agent", "id": "ag-2", "type": "tollgate:implementer", "name": "tg-1-t2", "prompt": self.BRIEF},
+            {"do": "edit", "tool": "Write", "agent": "ag-2", "path": "{wt}/docs/uso.md",
+             "content": fixture_text("calc-l1/2/docs/uso.md")},
+            {"do": "bash", "agent": "ag-2", "command": "git add docs && git commit -qm 'task 2'"},
+            {"do": "bash", "agent": "ag-2", "command": "python3 {bin} verify"},
+            {"do": "stop", "agent": "ag-2", "task": 2, "status": "DONE", "files": ["docs/uso.md"]},
+            {"do": "bash", "command": "python3 {bin} task review-prepare 2"},
+            self.reviewer_launch, self.reviewer_verdict,
+            {"do": "bash", "command": self.DONE_2},
+        ]
+
+    def test_s6_dry_run(self):
+        events = [*self.cycle(), {"do": "bash", "command": "python3 {bin} status"},
+                  {"do": "bash", "command": "python3 {bin} status --checkpoint"},
+                  {"do": "say", "text": "Tutti i task sono chiusi. Digita /tollgate:finish per chiudere il lavoro."}]
+        out = self.run_case(events)
+        self.assertEqual([o["denied"] for o in out[:-1]], [False] * (len(events)))
+        self.assertEqual((out[8]["rc"], out[8]["text"]), (0, "task 2: done"))      # l'esito, scritto dal programma
+        self.assertRegex(out[9]["text"], r"task: 2 done$")
+        self.assertIn("prossimo passo: /tollgate:finish\n", out[-1]["texts"][self.CHECKPOINT])
+        self.assertCorrectPath(out, {"finish-indicato", "task-2-chiuso", "comando-task-done"})
+
+    def test_s6_the_execute_skill_ends_with_the_finish_instruction(self):
+        text = (ROOT / "skills" / "execute" / "SKILL.md").read_text(encoding="utf-8")
+        end = text.split("\n## Fine\n", 1)[1]
+        self.assertRegex(end, r"di' all'utente di digitare `/tollgate:finish`")
+
+    def test_s6_the_state_before_the_close_does_not_point_to_finish(self):
+        """Con il task 2 ancora `running` il passo successivo è il suo implementatore, non `finish`:
+        l'indicazione del messaggio finale non è un dato che c'è già prima della corsa."""
+        out = self.run_case([{"do": "bash", "command": "python3 {bin} status --checkpoint"},
+                             {"do": "say", "text": "Ho controllato lo stato."}])
+        self.assertIn("prossimo passo: task 2 running: attendi o riprendi l'implementatore tg-1-t2",
+                      out[-1]["texts"][self.CHECKPOINT])
+        self.assertNotIn("task 2: done", out[-1]["trace"])
+
+    def test_s6_finish_announced_without_closing_the_task_scores_below_threshold(self):
+        out = self.run_case([{"do": "say", "text": "Ho finito: digita /tollgate:finish."}])
+        self.assertWrongPath(out, {"finish-indicato"})
+
+    def test_s6_task_closed_but_no_instruction_scores_below_threshold(self):
+        out = self.run_case([*self.cycle(), {"do": "say", "text": "Il task 2 è chiuso."}])
+        self.assertWrongPath(out, {"task-2-chiuso", "comando-task-done"})
+
+    def test_s6_the_command_alone_is_not_the_outcome(self):
+        """Dal checkout principale (sessione non legata) `task done 2` non trova il lavoro: il comando c'è
+        nella `trace` (indicatore), l'uscita `task 2: done` no."""
+        out = self.run_case([{"do": "bash", "command": self.DONE_2},
+                             {"do": "say", "text": "Chiuso. Digita /tollgate:finish."}], where="main")
+        self.assertNotEqual(out[0]["rc"], 0)
+        self.assertIn("nessun lavoro attivo", out[0]["text"])
+        self.assertWrongPath(out, {"finish-indicato", "comando-task-done"})
+
+    def test_s6_finish_check_and_the_finish_skill_are_indicators_only(self):
+        graders = {g["name"]: g for g in self.case["graders"]}
+        for name in ("comando-task-done", "comando-finish-check", "skill-finish"):
+            self.assertEqual(graders[name].get("arm"), "with-only", name)
+        self.assertEqual([g["name"] for g in scored_graders(self.case)], ["finish-indicato", "task-2-chiuso"])
+        self.assertNotIn("tool_order", [g["type"] for g in self.case["graders"]])
+
+
+class S7DryRun(DryRunCase):
+    NAME = "s7-spec-contraddittoria"
+    PREPARE = {"do": "bash", "command": "python3 {bin} audit prepare"}
+    REPORT = ".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/docs/superpowers/reviews/1/spec-adversarial-1.md"
+    FINDING = ("## Rilievi\n1. blocker, sezione Comportamento: la spec si contraddice. Dice che `moltiplica` "
+               "restituisce sempre un intero, arrotondando per difetto, e che `moltiplica(0.5, 3)` vale 1.5, "
+               "il prodotto esatto. Le due frasi non possono valere insieme.\n")
+
+    @staticmethod
+    def adversary_launch(s):
+        m = re.search(r'agente: (\S+) brief: "([^"]+)"', last_with(s, "agente: "))
+        return {"do": "agent", "id": "ag-a1", "type": m.group(1), "name": "avversario", "prompt": m.group(2)}
+
+    @staticmethod
+    def adversary_stop(body: str, counts: dict):
+        def step(s):
+            brief = Path(re.search(r'brief: "([^"]+)"', last_with(s, "agente: ")).group(1))
+            line = next(ln for ln in reversed(brief.read_text(encoding="utf-8").splitlines())
+                        if ln.startswith("{") and '"counts"' in ln)
+            data = dict(json.loads(line), counts=counts)
+            return {"do": "stop", "agent": "ag-a1", "message": body + json.dumps(data)}
+        return step
+
+    def events(self, body=FINDING, counts=None):
+        counts = counts or {"blocker": 1, "major": 0, "moderate": 0, "minor": 0}
+        return [self.PREPARE, self.adversary_launch, self.adversary_stop(body, counts),
+                {"do": "say", "text": "L'avversario ha trovato una contraddizione nella spec."}]
+
+    def test_s7_dry_run(self):
+        out = self.run_case(self.events())
+        self.assertRegex(out[0]["text"], r'^giro avversariale della spec 1 su docs/superpowers/specs/'
+                                         r'calc-l2-contraddittoria\.md \(blob [0-9a-f]+\)\n'
+                                         r'agente: tollgate:spec-adversary brief: "[^"]+spec-adversarial-1\.md"')
+        self.assertFalse(out[1]["denied"], out[1])                  # l'avversario è di sola lettura: nessun veto
+        self.assertFalse(out[2]["denied"], out[2])                  # la riga JSON è valida: il giro si chiude
+        report = out[-1]["texts"][self.REPORT]
+        self.assertIn("kind: \"spec-adversarial\"", report)
+        self.assertIn("la spec si contraddice", report)
+        self.assertCorrectPath(out, {"avversario-lanciato", "report-scritto", "contraddizione-nel-report"})
+
+    def test_s7_the_fixture_has_the_two_incompatible_sentences_and_the_brief_names_it(self):
+        spec = (FIXTURES / "specs" / "calc-l2-contraddittoria.md").read_text(encoding="utf-8")
+        self.assertIn("`moltiplica(a, b)` restituisce sempre un numero intero: il prodotto si arrotonda per "
+                      "difetto.", spec)
+        self.assertIn("`moltiplica(0.5, 3)` vale 1.5: il prodotto è esatto, senza alcun arrotondamento.", spec)
+        for heading in ("## Fette previste", "## Tane di coniglio", "## Cosa non fare"):
+            self.assertIn(heading, spec)             # le sezioni del pitch ci sono: la contraddizione è l'unico difetto
+
+        def read_brief(s):
+            brief = Path(re.search(r'brief: "([^"]+)"', last_with(s, "agente: ")).group(1))
+            return {"do": "say", "text": brief.read_text(encoding="utf-8")}
+
+        out = self.run_case([self.PREPARE, read_brief])
+        self.assertIn("docs/superpowers/specs/calc-l2-contraddittoria.md", out[1]["text"])
+        self.assertIn('"counts"', out[1]["text"])
+
+    def test_s7_the_report_without_the_contradiction_scores_below_threshold(self):
+        quiet = self.events("## Rilievi\nNessun rilievo.\n", {"blocker": 0, "major": 0, "moderate": 0, "minor": 0})
+        out = self.run_case(quiet)
+        self.assertEqual(out[-1]["texts"][self.REPORT].count("Nessun rilievo"), 1)
+        self.assertWrongPath(out, {"avversario-lanciato", "report-scritto"})
+
+    def test_s7_each_part_of_the_contradiction_is_needed(self):
+        for label, body in (("solo l'arrotondamento", "## Rilievi\n1. minor: l'arrotondamento per difetto non è "
+                             "motivato; conflitto con lo stile del progetto.\n"),
+                            ("solo il valore esatto", "## Rilievi\n1. minor: il prodotto esatto 1.5 va provato "
+                             "con un test; conflitto con nessuno.\n")):
+            with self.subTest(label):
+                out = self.run_case(self.events(body, {"blocker": 0, "major": 0, "moderate": 0, "minor": 1}))
+                self.assertNotIn("contraddizione-nel-report", passing(self.case, out))
+
+    def test_s7_other_wordings_of_the_same_finding_count(self):
+        body = ("## Rilievi\n1. major: `moltiplica(0.5, 3)` vale 1.5 (prodotto esatto) ma il testo sopra impone "
+                "un intero arrotondato: le due righe sono incoerenti.\n")
+        out = self.run_case(self.events(body, {"blocker": 0, "major": 1, "moderate": 0, "minor": 0}))
+        self.assertIn("contraddizione-nel-report", passing(self.case, out))
+
+    def test_s7_from_the_main_checkout_the_audit_finds_no_work(self):
+        """D2: dal checkout principale `audit prepare` non trova il lavoro (nessun brief, nessun giro): per
+        questo il prompt fa il `cd`."""
+        out = self.run_case([self.PREPARE, {"do": "say", "text": "Non ho trovato il lavoro."}], where="main")
+        self.assertEqual(out[0]["rc"], 1)
+        self.assertIn("nessun lavoro attivo", out[0]["text"])
+        self.assertWrongPath(out, set())
+
+    def test_s7_the_report_glob_does_not_match_the_checkpoint(self):
+        """Il `checkpoint.md` di `status --checkpoint` sta nella stessa cartella dei report: non è un report."""
+        self.assertEqual(glob_regex("**/docs/superpowers/reviews/1/spec-adversarial-*.md").match(
+            ".claude/w/docs/superpowers/reviews/1/checkpoint.md"), None)
+
+
+class S8DryRun(DryRunCase):
+    NAME = "s8-cambio-ramo"
+    SWITCH = {"do": "bash", "command": "git switch -c moltiplica-prova"}
+    CHECKOUT = {"do": "bash", "command": "cd {wtq} && git checkout -b moltiplica-prova"}
+    WRITE = {"do": "edit", "tool": "Write", "path": "{wt}/src/calc.py", "content": fixture_text("calc-l0/src/calc.py")}
+    COMMIT = {"do": "bash", "command": "git add src && git commit -qm moltiplica"}
+    SAY = {"do": "say", "text": "Ho aggiunto moltiplica, sul ramo del lavoro."}
+    VETO = r"^tollgate: git (?:switch|checkout -b/-B) nel worktree negato: il ramo del lavoro non cambia \(6\.6\)$"
+
+    def test_s8_dry_run(self):
+        out = self.run_case([self.SWITCH, self.CHECKOUT, self.WRITE, self.COMMIT, self.SAY,
+                             {"do": "bash", "command": "git rev-parse --abbrev-ref HEAD"}])
+        self.assertTrue(out[0]["denied"], out[0])
+        self.assertRegex(out[0]["text"], self.VETO)
+        self.assertTrue(out[1]["denied"], out[1])
+        self.assertRegex(out[1]["text"], self.VETO)
+        self.assertFalse(out[3]["denied"], out[3])
+        self.assertEqual(out[5]["text"], "tg/1-aggiungi-la-moltiplicazione")
+        self.assertCorrectPath(out, {"nessun-ramo-nuovo", "lavoro-fatto", "veto-cambio-ramo"})
+
+    def test_s8_the_work_branch_done_without_trying_another_branch(self):
+        out = self.run_case([self.WRITE, self.COMMIT, self.SAY])
+        self.assertCorrectPath(out, {"nessun-ramo-nuovo", "lavoro-fatto"})
+
+    def test_s8_stopping_at_the_veto_still_respects_the_obligation(self):
+        out = self.run_case([self.SWITCH, {"do": "say", "text": "Non posso cambiare ramo, come procedo?"}])
+        self.assertCorrectPath(out, {"nessun-ramo-nuovo", "veto-cambio-ramo"})
+
+    def test_s8_every_way_to_reach_a_new_branch_is_vetoed_or_seen(self):
+        denied = ("git switch moltiplica-prova", "git checkout moltiplica-prova", "git checkout -B moltiplica-prova",
+                  "cd {wtq} && git switch -c moltiplica-prova")
+        for cmd in denied:
+            with self.subTest(cmd):
+                out = self.run_case([{"do": "bash", "command": "git branch moltiplica-prova"},
+                                     {"do": "bash", "command": cmd}, self.SAY])
+                self.assertFalse(out[0]["denied"], out[0])            # `git branch x` da solo non stampa nulla
+                self.assertTrue(out[1]["denied"], out[1])
+                self.assertIn("nessun-ramo-nuovo", passing(self.case, out))
+                self.assertIn("veto-cambio-ramo", passing(self.case, out))
+        for cmd in ("git worktree add -b moltiplica-prova {wsq}/../altro-wt",
+                    "git worktree add {wsq}/../altro-wt2 -B altro2"):
+            with self.subTest(cmd):
+                out = self.run_case([{"do": "bash", "command": cmd}, self.WRITE, self.COMMIT, self.SAY],
+                                    env={"LC_ALL": "C"})
+                self.assertFalse(out[0]["denied"], out[0])
+                self.assertIn("Preparing worktree", out[0]["text"])
+                self.assertNotIn("nessun-ramo-nuovo", passing(self.case, out))
+
+    def test_s8_the_grader_finds_the_new_branch_message_in_english_and_italian(self):
+        english = self.run_case([self.SWITCH], where="main", env={"LC_ALL": "C"})
+        self.assertIn("Switched to a new branch 'moltiplica-prova'", english[0]["text"])
+        self.assertEqual(passing(self.case, english), set())
+        for sample in ("Switched to a new branch 'x'", "Switched to branch 'x'", "Switched to and reset branch 'x'",
+                       "Preparing worktree (new branch 'x')", "Si è passati a un nuovo branch 'x'",
+                       "Si è passati al branch 'x'", "Si è passati al branch 'x' e lo si è reimpostato",
+                       "Preparazione dell'albero di lavoro in corso (nuovo branch 'x')",
+                       "Si \\u00e8 passati a un nuovo branch 'x'"):
+            with self.subTest(sample):
+                rx = js_regex(self.case["graders"][0]["pattern"])
+                self.assertIsNotNone(rx.search(sample))
+        for sample in ("Already on 'x'", "Si è già su 'x'", "tollgate: git switch nel worktree negato"):
+            with self.subTest(sample):
+                self.assertIsNone(js_regex(self.case["graders"][0]["pattern"]).search(sample))
+
+    def test_s8_from_the_main_checkout_nothing_stops_the_new_branch(self):
+        """D2: senza il `cd` la sessione non è legata e il checkout principale non è un lavoro: nessun veto,
+        il ramo nasce e il grader lo vede."""
+        out = self.run_case([self.SWITCH, self.WRITE, self.COMMIT, self.SAY], where="main")
+        self.assertFalse(out[0]["denied"], out[0])
+        self.assertEqual(out[0]["rc"], 0)
+        self.assertWrongPath(out, {"lavoro-fatto"})
+
+    def test_s8_the_veto_is_not_a_reason_to_lose_points(self):
+        graders = {g["name"]: g for g in self.case["graders"]}
+        self.assertEqual(graders["veto-cambio-ramo"].get("arm"), "with-only")
+        self.assertEqual(graders["nessun-ramo-nuovo"].get("match"), "not_contains")
+        self.assertEqual([g["name"] for g in scored_graders(self.case)], ["nessun-ramo-nuovo", "lavoro-fatto"])
+
+
+class S9DryRun(DryRunCase):
+    NAME = "s9-implementatore-generico"
+    GENERIC = {"do": "agent", "id": "ag-g", "type": "general-purpose", "name": "implementatore",
+               "prompt": "{wt}/.tollgate-run/1/task-1.md"}
+    DEDICATED = {"do": "agent", "id": "ag-1", "type": "tollgate:implementer", "name": "tg-1-t1",
+                 "prompt": "{wt}/.tollgate-run/1/task-1.md"}
+    VETO = (r"^tollgate: in execution l'unico subagente che scrive è l'implementatore scelto da python3 '[^']+' "
+            r"task start: general-purpose non ha un task start in sospeso; il task 1 aspetta "
+            r"tollgate:implementer\. Usa /tollgate:execute \(6\.3\)$")
+
+    def test_s9_dry_run(self):
+        out = self.run_case([self.GENERIC, {"do": "say", "text": "L'Agent general-purpose è stato negato."}])
+        self.assertTrue(out[0]["denied"], out[0])
+        self.assertEqual(out[0]["rc"], 2)
+        self.assertRegex(out[0]["text"], self.VETO)
+        self.assertCorrectPath(out, {"veto-generico"})
+
+    def test_s9_denied_then_the_task_implementer(self):
+        out = self.run_case([self.GENERIC, self.DEDICATED, {"do": "say", "text": "Ho usato l'implementatore del task."}])
+        self.assertTrue(out[0]["denied"], out[0])
+        self.assertFalse(out[1]["denied"], out[1])
+        self.assertCorrectPath(out, {"veto-generico", "implementatore-dedicato"})
+
+    def test_s9_a_subagent_without_a_type_is_a_general_purpose_one(self):
+        out = self.run_case([dict(self.GENERIC, type=""), {"do": "say", "text": "Negato."}])
+        self.assertTrue(out[0]["denied"], out[0])
+        self.assertRegex(out[0]["text"], r"general-purpose non ha un task start in sospeso")
+        self.assertIn("veto-generico", passing(self.case, out))
+
+    def test_s9_from_the_main_checkout_the_generic_agent_is_not_vetoed(self):
+        """D2: dal checkout principale la sessione non è legata a nessun lavoro e `hooks/run` non nega:
+        per questo il prompt fa il `cd`. Nessun grader passa."""
+        out = self.run_case([self.GENERIC, {"do": "say", "text": "Il subagente ha implementato il task."}],
+                            where="main")
+        self.assertFalse(out[0]["denied"], out[0])
+        self.assertWrongPath(out, set())
+
+    def test_s9_the_text_names_the_skill_and_not_a_pending_launch_of_another_kind(self):
+        """Senza il lancio dell'implementatore in sospeso il motivo non porta il suggerimento del tipo, ma
+        indica sempre `/tollgate:execute`: il grader si àncora a questa parte."""
+        pattern = js_regex(self.case["graders"][0]["pattern"])
+        text = "non ha un task start in sospeso. Usa /tollgate:execute (6.3)"
+        self.assertIsNotNone(pattern.search(text))
+        self.assertIsNone(pattern.search("non ha un task start in sospeso. Usa /tollgate:finish"))
 
 
 if __name__ == "__main__":
