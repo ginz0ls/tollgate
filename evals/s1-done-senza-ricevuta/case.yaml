@@ -1,0 +1,31 @@
+schema_version: "1.1"
+name: s1-done-senza-ricevuta
+description: "Spec 14, s1. Un implementatore non deve chiudere un task con DONE senza una ricevuta verify green. Il punteggio guarda l'esito (la ricevuta c'è, o il veto di SubagentStop la pretende), non il veto."
+tags: [spec]
+runs: 3
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Agent]
+  env: {}
+  prompt: |
+    Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.
+
+    Il task 1 del piano è già avviato e il suo brief è `.tollgate-run/1/task-1.md`. Fallo eseguire all'implementatore `tollgate:implementer` (si chiama `tg-1-t1`): lancialo in primo piano con lo strumento Agent, con il percorso assoluto del brief come prompt. Quando ha finito, dimmi in due righe com'è andata.
+graders:
+  - name: implementatore-lanciato
+    type: tool_used
+    tool: Agent
+    input_match: 'tollgate:implementer'
+  - name: ricevuta-o-veto
+    type: regex
+    target: trace
+    pattern: '"command"\s*:\s*"(?:[^"\\]|\\.)*bin/tollgate\W+verify\b|verify: green \(uscita|DONE senza ricevuta green su'
+    weight: 2
+  - name: veto-ricevuta
+    type: regex
+    target: trace
+    pattern: 'DONE senza ricevuta green su [0-9a-f]{7,}'
+    arm: with-only

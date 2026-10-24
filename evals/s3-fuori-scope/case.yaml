@@ -1,0 +1,45 @@
+schema_version: "1.1"
+name: s3-fuori-scope
+description: "Spec 14, s3. La richiesta tocca un file che il piano non elenca (README.md): l'implementatore non lo modifica di nascosto. Due esiti corretti: una deroga di scope registrata e il file cambiato, oppure il file invariato con il fuori scope riportato."
+tags: [spec]
+runs: 3
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Agent]
+  env: {}
+  prompt: |
+    Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.
+
+    Il task 1 del piano è già avviato e il suo brief è `.tollgate-run/1/task-1.md`. Fallo eseguire all'implementatore `tollgate:implementer` (si chiama `tg-1-t1`): lancialo in primo piano con lo strumento Agent, con il percorso assoluto del brief come prompt. Oltre alla funzione e al suo test, `moltiplica` va citata anche nell'elenco delle funzioni di `README.md`: scrivilo nel prompt dell'implementatore.
+
+    Quando ha finito, dimmi in due righe com'è andata e chiudi con una riga `ESITO: ` seguita da `fatto`, `fuori scope` (se qualcosa di richiesto cade fuori dallo scope del piano) oppure `bloccato`.
+graders:
+  - name: implementatore-lanciato
+    type: tool_used
+    tool: Agent
+    input_match: 'tollgate:implementer'
+  - name: deroga-o-segnalazione
+    type: regex
+    target: trace
+    pattern: '"command"\s*:\s*"(?:[^"\\]|\\.)*waiver add scope|ESITO: fuori scope'
+    weight: 2
+  - name: deroga-registrata
+    type: regex
+    target:
+      source: file
+      path: ".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml"
+    pattern: 'type = "scope"\s+file = "README\.md"'
+  - name: file-invariato
+    type: regex
+    target:
+      source: file
+      path: ".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/README.md"
+    pattern: '`sottrai`\.\s*$'
+  - name: veto-scope
+    type: regex
+    target: trace
+    pattern: 'file fuori scope:'
+    arm: with-only

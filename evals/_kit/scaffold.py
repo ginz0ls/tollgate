@@ -210,7 +210,7 @@ class _Builder:
                 "scope": "user", "version": "7.0.0", "installPath": str(sp)}]}}))
         data = {"auth": True, "prs": [], "issues": {str(self.r.issue): {
             "number": self.r.issue, "title": self.r.issue_title,
-            "body": "Aggiungi la funzione `moltiplica(a, b)` a `src/calc.py`.", "state": "OPEN",
+            "body": self.r.issue_body, "state": "OPEN",
             "labels": [], "author_association": "OWNER"}}}
         data.update(self.r.gh_data)
         self.gh_data.write_text(json.dumps(data))

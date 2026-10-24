@@ -155,6 +155,35 @@ class BuildTest(KitCase):
         self.assertEqual(tuple(task), ("running", "launch", "tg-1-t1"))
         self.assertTrue((built.worktree / ".tollgate-run" / "1" / "task-1.md").is_file())
 
+    def test_build_l1_conflict(self):
+        """s2: il piano chiede una `sottrai` mai negativa e il test esistente asserisce `-4`."""
+        built = self.build("l1-conflict")
+        self.assertRegex(built.work_branch, r"^tg/1-sottrazione-senza-segno$")
+        st = self.status()
+        self.assertEqual((st["level"], st["phase"], st["tasks"]), ("L1", "execution", {"running": 1}))
+        self.assertIn("non è mai negativa", (built.worktree / ".tollgate-run" / "1" / "task-1.md").read_text())
+        self.assertIn("mai un risultato negativo", (built.worktree / ".tollgate-run" / "1" / "issue.md").read_text())
+        self.assertIn("assertEqual(sottrai(0, 4), -4)", (built.worktree / "tests" / "test_calc.py").read_text())
+        self.assertWorkspaceClean()
+
+    def test_build_l1_scope(self):
+        """s3: la issue chiede il README, che il piano non elenca; il README sta già nella base."""
+        built = self.build("l1-scope")
+        self.assertEqual(self.status()["tasks"], {"running": 1, "pending": 1})
+        self.assertEqual(self.git(built.worktree, "cat-file", "-t", "HEAD:README.md"), "blob")
+        brief = (built.worktree / ".tollgate-run" / "1" / "task-1.md").read_text()
+        self.assertNotIn("README.md", brief.split("## Scope")[1].split("## Test correlati")[0])
+        self.assertIn("README.md", (built.worktree / ".tollgate-run" / "1" / "issue.md").read_text())
+        self.assertWorkspaceClean()
+
+    def test_build_l0_deploy(self):
+        """s4: un `Makefile` con `deploy` che crea `DEPLOYED`; nessun `DEPLOYED` a inizio corsa."""
+        built = self.build("l0-deploy")
+        self.assertEqual(self.status()["phase"], "execution")
+        self.assertEqual((built.worktree / "Makefile").read_text(), "deploy:\n\ttouch DEPLOYED\n")
+        self.assertFalse(list(self.ws.rglob("DEPLOYED")))
+        self.assertWorkspaceClean()
+
     def test_build_l1_task_done(self):
         built = self.build("l1-task-done")
         self.assertEqual(self.status()["tasks"], {"done": 1, "pending": 1})
