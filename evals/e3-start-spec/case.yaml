@@ -1,0 +1,30 @@
+schema_version: "1.1"
+name: e3-start-spec
+description: "Extra, e3. Seconda fetta di una spec già approvata e unita sul predefinito: /tollgate:start #2 --spec avvia il lavoro dal checkout principale e lo porta in fase plan, senza ripassare dall'audit. Il punteggio guarda le righe che start stampa solo a lavoro creato e il worktree della seconda issue."
+tags: [extra]
+runs: 3
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 25
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Agent]
+  env: {}
+  prompt: |
+    /tollgate:start #2 --spec docs/superpowers/specs/calc-l2-tre-fette.md
+
+    Quando tollgate ha creato il lavoro, fermati: il piano si scrive in una sessione pulita.
+graders:
+  - name: lavoro-in-fase-plan
+    type: regex
+    target: trace
+    pattern: 'lavoro #2 avviato: livello L2, fase plan, ramo tg/2-divisione'
+    weight: 2
+  - name: spec-approvata-riconosciuta
+    type: regex
+    target: trace
+    pattern: 'spec approvata: docs/superpowers/specs/calc-l2-tre-fette\.md \(approvazione in docs/superpowers/reviews/1/\)'
+  - name: worktree-creato
+    type: file_exists
+    path: '**/worktrees/tg-2-divisione/src/calc.py'
+    exists: true

@@ -306,6 +306,12 @@ class _Builder:
         self._hook("PostToolUse", payload, what="Write del piano")
         self.commit([rel], "piano")
 
+    def write_plan(self) -> None:
+        """Il piano di L2, scritto e committato dal coordinatore: lo registra `audit prepare`."""
+        rel = f"docs/superpowers/plans/{self.r.plan}.md"
+        self._write(self.wt, rel, (FIXTURES / "plans" / f"{self.r.plan}.md").read_text(encoding="utf-8"))
+        self.commit([rel], "piano")
+
     def task_start(self, number: int) -> tuple[str, str, str]:
         """`task start`: ritorna (nome dell'implementatore, tipo dell'implementatore, tipo del revisore)."""
         out = self._tollgate(["task", "start", str(number)], self.wt).stdout.strip().splitlines()[-1]
@@ -327,7 +333,7 @@ class _Builder:
         self._hook("PreToolUse", launch, what="lancio dell'implementatore")
         impl = (f"ag-impl-{number}", impl_type)
         self._subagent_event("SubagentStart", self.wt, *impl)
-        files = self.overlay(f"{self.r.plan}/{number}")
+        files = self.overlay(f"{recipes.PLAN_CHANGES.get(self.r.plan, self.r.plan)}/{number}")
         self.commit(files, f"task {number}", agent=impl)
         self._tollgate(["verify"], self.wt)
         report = {"v": 1, "task": number, "status": "DONE", "done": "fatto", "tests": "verify green",
@@ -392,13 +398,59 @@ class _Builder:
         if self.r.finish != "open-pr":
             return
         self.user_prompt_finish()
+        if self.r.level != "L0":
+            self.final_review()
         self._tollgate(["finish", "open-pr"], self.wt, signal=True)
+        if self.r.gate_comment:
+            self.gate_comment()
+        if self.r.reopen_execution:
+            self._tollgate(["start", str(self.r.issue), "--reopen-execution", "--confirm"], self.ws,
+                           signal=True)
 
     def user_prompt_finish(self) -> None:
         payload = {"session_id": SESSION, "cwd": str(self.wt), "hook_event_name": "UserPromptExpansion",
                    "expansion_type": "slash_command", "command_name": "tollgate:finish",
                    "command_args": "", "command_source": "plugin", "prompt": "/tollgate:finish"}
         self._hook("UserPromptExpansion", payload, what="atto finish")
+
+    def final_review(self) -> None:
+        """Il ciclo di revisione finale `ok` (L1 e L2): `review prepare` lancia il revisore, che riporta
+        il verdetto senza rilievi (sha e codice letti dal brief), e si ripete finché non resta un agente."""
+        for _ in range(4):
+            out = self._tollgate(["review", "prepare"], self.wt).stdout
+            launches = re.findall(r'agente: (\S+) brief: "([^"]+)"', out)
+            if not launches:
+                return
+            for agent_type, brief in launches:
+                text = Path(brief).read_text(encoding="utf-8")
+                ids = re.search(r'"sha": "([0-9a-f]+)", "code": "([0-9a-f]+)"', text)
+                if not ids:
+                    raise ScaffoldError(f"il brief {brief} non riporta sha e codice")
+                if agent_type.endswith("finding-verifier"):
+                    raise ScaffoldError("senza rilievi non serve il verificatore: ciclo inatteso")
+                verdict = {"v": 1, "sha": ids.group(1), "code": ids.group(2), "outcome": "ok", "findings": []}
+                agent_id = f"ag-{agent_type.rpartition(':')[2]}"
+                self._subagent_event("SubagentStart", self.wt, agent_id, agent_type)
+                self._subagent_event("SubagentStop", self.wt, agent_id, agent_type,
+                                     message="Verdetto.\n```json\n" + json.dumps(verdict) + "\n```")
+        raise ScaffoldError("la revisione finale non si chiude in quattro passi")
+
+    def gate_comment(self) -> None:
+        """Il commento del bot sulla PR, nei dati del gh finto: lo SHA è la testa del lavoro."""
+        data = json.loads(self.gh_data.read_text(encoding="utf-8"))
+        sha = self._git(self.wt, "rev-parse", "HEAD")
+        if not data["prs"]:
+            raise ScaffoldError("nessuna PR nei dati del gh finto")
+        data["prs"][-1].setdefault("comments", []).append({
+            "id": 1, "author": {"login": "github-actions"},
+            "body": self.r.gate_comment.replace("{sha}", sha)})
+        self.gh_data.write_text(json.dumps(data))
+
+    def merge_default(self) -> None:
+        """La prima fetta è unita sul predefinito: spec e approvazioni (già committate sul ramo del lavoro)
+        entrano su main e main è spinto sull'`origin` nudo."""
+        self._git(self.ws, "merge", "-q", "--ff-only", self.branch)
+        self._git(self.ws, "push", "-q", "origin", "main")
 
     # ----- composizione --------------------------------------------------------------------
 
@@ -416,14 +468,27 @@ class _Builder:
             self.commit([rel], "spec")
         for _ in range(r.audit_rounds):
             self.audit_round()
+        rest = [a for a in r.acts if a[:2] not in (("approve", "spec"), ("approve", "plan"))]
+        for act in [a for a in r.acts if a[:2] == ("approve", "spec")]:
+            self.user_act(act)                      # prima del piano
+        if r.level == "L2" and r.plan:
+            self.write_plan()
+        for _ in range(r.plan_audit_rounds):
+            self.audit_round()
+        if r.plan_audit_rounds:
+            self._tollgate(["audit", "prepare"], self.wt)       # il giro è pulito: il piano passa ad `approval`
+        for act in [a for a in r.acts if a[:2] == ("approve", "plan")]:
+            self.user_act(act)
         if r.level == "L1" and r.plan:
             self.register_plan()
         for number in r.tasks_done:
             self.task_done(number)
         if r.task_started is not None:
             self.task_start(r.task_started)
-        for act in r.acts:
+        for act in rest:
             self.user_act(act)
+        if r.merge_default:
+            self.merge_default()
         if r.finish:
             self.finish()
         self._check_phase()

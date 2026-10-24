@@ -1,0 +1,36 @@
+schema_version: "1.1"
+name: e1-audit-a-lenti
+description: "Extra, e1. Spec L2 con tre fette e avversario già pulito: l'audit a lenti ha un costo, tollgate lo chiede (uscita 3) e solo con la conferma apre il primo ciclo di tollgate:spec-auditor. Il punteggio guarda i testi che il programma stampa solo quando la cosa avviene (la conferma chiesta, il ciclo aperto) e il report del ciclo che scrive il hook."
+tags: [extra]
+runs: 3
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 40
+  timeout_seconds: 1500
+  allowed_tools: [Read, Glob, Grep, Agent]
+  env: {}
+  prompt: |
+    /tollgate:spec-audit
+
+    Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-operazioni-della-calcolatrice`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.
+
+    La spec ha tre fette e l'utente accetta il costo dell'audit a lenti. Fai il primo ciclo a lenti, leggi il suo report e fermati: gli altri cicli non servono.
+graders:
+  - name: conferma-chiesta
+    type: regex
+    target: trace
+    pattern: 'conferma: audit a lenti: da \d+ a \d+ cicli di tollgate:spec-auditor'
+  - name: ciclo-aperto
+    type: regex
+    target: trace
+    pattern: 'ciclo a lenti della spec 1, punto di vista \w+ su docs/superpowers/specs/calc-l2-tre-fette\.md'
+    weight: 2
+  - name: auditor-lanciato
+    type: tool_used
+    tool: Agent
+    input_match: 'tollgate:spec-auditor'
+  - name: report-lenti-scritto
+    type: file_exists
+    path: '**/docs/superpowers/reviews/1/spec-lens-*.md'
+    exists: true

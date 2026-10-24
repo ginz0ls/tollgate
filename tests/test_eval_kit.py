@@ -259,6 +259,88 @@ class BuildTest(KitCase):
         self.assertRegex(out, r'agente: tollgate:spec-adversary brief: "[^"]+spec-adversarial-1\.md"')
         self.assertEqual(self.git(built.worktree, "status", "--porcelain"), "")
 
+    def test_build_l2_spec_three_slices(self):
+        """e1: spec con tre fette e avversario pulito; il passo successivo è la conferma del costo (uscita 3)."""
+        built = self.build("l2-spec-three-slices")
+        st = self.status()
+        self.assertEqual((st["level"], st["phase"], st["branch"]),
+                         ("L2", "spec_audit", "tg/1-operazioni-della-calcolatrice"))
+        rounds = self.rows("SELECT kind, number, outcome FROM spec_audit")
+        self.assertEqual([tuple(r) for r in rounds], [("spec-adversarial", 1, "empty")])
+        self.assertEqual(self.git(built.worktree, "status", "--porcelain"), "")
+        spec = self.git(built.worktree, "show", "HEAD:docs/superpowers/specs/calc-l2-tre-fette.md")
+        self.assertEqual([ln for ln in spec.splitlines() if ln[:2] in ("1.", "2.", "3.")].__len__(), 3)
+        r = self.cli("audit", "prepare", cwd=built.worktree)
+        self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"^conferma: audit a lenti: da \d+ a \d+ cicli di tollgate:spec-auditor, ")
+        r = self.cli("audit", "prepare", "--confirm", cwd=built.worktree)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"^ciclo a lenti della spec 1, punto di vista \w+ su "
+                                   r"docs/superpowers/specs/calc-l2-tre-fette\.md \(blob [0-9a-f]+\)\n"
+                                   r'agente: tollgate:spec-auditor brief: "[^"]+spec-lens-1\.md"')
+
+    def test_build_l2_first_slice_merged(self):
+        """e3: la spec a tre fette e la sua approvazione sono su main e sull'`origin` nudo; la seconda issue
+        è nei dati del gh finto e nessun lavoro è ancora nato per essa."""
+        built = self.build("l2-first-slice-merged")
+        self.assertEqual(self.status()["phase"], "plan")
+        bare = self.ws / scaffold.ORIGIN_DIR
+        for rel in ("docs/superpowers/specs/calc-l2-tre-fette.md", "docs/superpowers/reviews/1/spec-approval.md"):
+            self.assertEqual(self.git(bare, "cat-file", "-t", f"refs/heads/main:{rel}"), "blob", rel)
+        self.assertEqual(self.git(self.ws, "rev-parse", "HEAD"), self.git(bare, "rev-parse", "refs/heads/main"))
+        self.assertEqual(self.git(self.ws, "rev-parse", "origin/main"), self.git(self.ws, "rev-parse", "main"))
+        self.assertEqual([tuple(r) for r in self.rows("SELECT issue FROM work_items")], [(1,)])
+        data = json.loads((self.home / ".tollgate-eval" / "fakegh-data.json").read_text())
+        self.assertEqual({k: v["title"] for k, v in data["issues"].items()}, {"1": "Moltiplicazione", "2": "Divisione"})
+        self.assertIn("spec_audit = false", self.git(bare, "show", "refs/heads/main:tollgate.toml"))
+        self.assertEqual(self.git(self.ws, "status", "--porcelain"), "")
+        self.assertEqual(built.work_branch, "tg/1-moltiplicazione")
+
+    def test_build_l2_plan_approved(self):
+        """Giri sul piano e `approve plan` (primitiva del Task 10): il piano di L2 è registrato e la fase è execution."""
+        built = self.build("l2-plan-approved")
+        st = self.status()
+        self.assertEqual((st["level"], st["phase"]), ("L2", "execution"))
+        self.assertEqual([tuple(r) for r in self.rows("SELECT kind, number, outcome FROM spec_audit ORDER BY kind")],
+                         [("plan-adversarial", 1, "empty"), ("spec-adversarial", 1, "empty")])
+        self.assertEqual([tuple(r) for r in self.rows("SELECT number, state FROM tasks ORDER BY number")],
+                         [(1, "pending"), (2, "pending")])
+        for rel in ("docs/superpowers/reviews/1/spec-approval.md", "docs/superpowers/reviews/1/plan-approval.md",
+                    "docs/superpowers/plans/calc-l2.md"):
+            self.assertEqual(self.git(built.worktree, "cat-file", "-t", f"HEAD:{rel}"), "blob", rel)
+        self.assertEqual(self.git(built.worktree, "status", "--porcelain"), "")
+
+    def test_build_l2_task2_pending(self):
+        """e4: L2, piano approvato, task 1 chiuso con il ciclo vero, task 2 da avviare."""
+        built = self.build("l2-task2-pending")
+        st = self.status()
+        self.assertEqual((st["level"], st["phase"], st["tasks"]), ("L2", "execution", {"done": 1, "pending": 1}))
+        self.assertIn("moltiplica", (built.worktree / "src" / "calc.py").read_text())
+        self.assertFalse((built.worktree / "docs" / "uso.md").exists())
+        self.assertEqual(self.rows("SELECT verdict FROM tasks WHERE number = 1")[0][0], "approved")
+        self.assertEqual(self.git(built.worktree, "status", "--porcelain"), "")
+
+    def test_build_l1_gate_red(self):
+        """e5: L1 con la PR aperta dal programma vero (revisione finale `ok`, push sul nudo, PR nel gh finto), il
+        commento rosso del bot con lo SHA della testa, e il lavoro tornato in `execution` con `--reopen-execution`."""
+        built = self.build("l1-gate-red")
+        st = self.status()
+        self.assertEqual((st["level"], st["phase"], st["tasks"]), ("L1", "execution", {"done": 2}))
+        head = self.git(built.worktree, "rev-parse", "HEAD")
+        work = self.rows("SELECT pr_number FROM work_items")[0]
+        self.assertEqual(work[0], 1)
+        cycle = self.rows("SELECT number, outcome, stage FROM review_cycles")
+        self.assertEqual([tuple(r) for r in cycle], [(1, "ok", "closed")])
+        self.assertEqual(self.git(self.ws / scaffold.ORIGIN_DIR, "rev-parse", f"refs/heads/{BRANCH}"), head)
+        data = json.loads((self.home / ".tollgate-eval" / "fakegh-data.json").read_text())
+        (pr,) = data["prs"]
+        self.assertEqual((pr["headRefName"], pr["state"]), (BRANCH, "OPEN"))
+        (comment,) = pr["comments"]
+        self.assertEqual(comment["author"], {"login": "github-actions"})
+        self.assertTrue(comment["body"].startswith(f"<!-- tollgate-verdict sha={head} -->"))
+        self.assertIn("must-have M2 non coperto", comment["body"])
+        self.assertEqual(self.git(built.worktree, "status", "--porcelain"), "")
+
     def test_every_recipe_has_a_build_test(self):
         """Una ricetta senza sequenza provata non entra in un caso reale."""
         missing = [n for n in recipes.RECIPES
@@ -270,6 +352,19 @@ class BuildTest(KitCase):
         start = time.monotonic()
         self.build("l1-review")
         self.assertLess(time.monotonic() - start, TIME_LIMIT_S)
+
+
+class RecipeTest(unittest.TestCase):
+    def test_incoherent_combinations_are_rejected(self):
+        for kw in ({"level": "L1", "plan_audit_rounds": 1, "plan": "calc-l1"},      # i giri sul piano sono di L2
+                   {"level": "L2", "plan_audit_rounds": 1},                          # e vogliono un piano
+                   {"level": "L1", "merge_default": True},
+                   {"level": "L1", "gate_comment": "x"},                             # senza PR
+                   {"level": "L1", "reopen_execution": True, "finish": "check"}):
+            with self.subTest(kw), self.assertRaises(ValueError):
+                recipes.Recipe("x", **kw)
+        recipes.Recipe("x", "L1", plan="calc-l1", finish="open-pr")        # la PR vale anche in L1 (revisione finale)
+        recipes.Recipe("x", "L2", finish="open-pr")
 
 
 class StateTest(KitCase):

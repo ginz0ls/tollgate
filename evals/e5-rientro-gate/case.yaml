@@ -1,0 +1,34 @@
+schema_version: "1.1"
+name: e5-rientro-gate
+description: "Extra, e5. Lavoro L1 con la PR aperta e il gate rosso sulla PR (commento del bot nei dati del gh finto), tornato in fase execution: il coordinatore avvia il task di correzione dal commento del gate (task start --from-gate) e lancia il suo implementatore. Il punteggio guarda il riepilogo che il programma stampa a task creato e il brief scritto, che porta il commento."
+tags: [extra]
+runs: 3
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 40
+  timeout_seconds: 1200
+  allowed_tools: [Read, Glob, Grep, Agent]
+  env: {}
+  prompt: |
+    /tollgate:execute
+
+    Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.
+
+    Il gate su GitHub ha giudicato rossa la PR di questo lavoro e ha lasciato il suo commento sulla PR. Avvia il task che corregge quanto il gate segnala e lancia il suo implementatore; quando ha finito, fermati.
+graders:
+  - name: task-di-correzione-creato
+    type: regex
+    target: trace
+    pattern: 'task 3: tollgate:implementer name=tg-1-t3 launch'
+    weight: 2
+  - name: brief-con-il-commento-del-gate
+    type: regex
+    target:
+      source: file
+      path: ".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate-run/1/task-3.md"
+    pattern: '(?=[\s\S]*tollgate-verdict sha=[0-9a-f]{40})(?=[\s\S]*must-have M2 non coperto)'
+  - name: implementatore-lanciato
+    type: tool_used
+    tool: Agent
+    input_match: 'tollgate:implementer'

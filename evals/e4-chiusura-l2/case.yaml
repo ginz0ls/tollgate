@@ -1,0 +1,36 @@
+schema_version: "1.1"
+name: e4-chiusura-l2
+description: "Extra, e4. Lavoro L2 con il piano approvato e il primo task chiuso: /tollgate:execute porta il secondo task fino a task done e poi il controllo locale della Definition of Done (finish check) è verde, comprese le approvazioni di spec e piano. Senza PR né revisione finale. Il punteggio guarda le uscite del programma: il task chiuso e le righe del controllo."
+tags: [extra]
+runs: 3
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 50
+  timeout_seconds: 1800
+  allowed_tools: [Read, Glob, Grep, Agent]
+  env: {}
+  prompt: |
+    /tollgate:execute
+
+    Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.
+
+    Quando tutti i task sono chiusi, fai il controllo locale della Definition of Done del lavoro. Non aprire la PR e non lanciare la revisione finale.
+graders:
+  - name: implementatore-lanciato
+    type: tool_used
+    tool: Agent
+    input_match: 'tollgate:implementer'
+  - name: task-2-chiuso
+    type: regex
+    target: trace
+    pattern: 'task 2: done'
+  - name: approvazioni-l2-nel-controllo
+    type: regex
+    target: trace
+    pattern: '\[sì\] Spec e piano approvati, report avversariali presenti'
+  - name: controllo-verde
+    type: regex
+    target: trace
+    pattern: 'prossimo passo: python3 [^\\]*bin/tollgate''? review prepare'
+    weight: 2

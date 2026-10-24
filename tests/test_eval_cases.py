@@ -16,6 +16,7 @@ appoggiano alla loro cornice, solo al testo del programma."""
 from __future__ import annotations
 
 import json
+import os
 import re
 import shlex
 import shutil
@@ -27,7 +28,7 @@ from pathlib import Path
 
 from evals._kit import recipes, scaffold
 from tests.helpers import BIN, ROOT
-from tests.test_eval_kit import run_env
+from tests.test_eval_kit import EVALBIN, run_env
 
 EVALS = ROOT / "evals"
 FIXTURES = EVALS / "_kit" / "fixtures"
@@ -277,7 +278,10 @@ def case_path(case: dict) -> Path:
 
 
 def recipe_of(case: dict) -> str:
-    """La ricetta che `scaffold.sh` del caso chiama."""
+    """La ricetta che `scaffold.sh` del caso chiama (un caso senza cartella, solo prova a secco, la dice
+    nel campo `recipe`)."""
+    if "recipe" in case:
+        return case["recipe"]
     text = (case_path(case) / "scaffold.sh").read_text(encoding="utf-8")
     m = re.search(r'evals/_kit/scaffold\.py"?\s+([\w-]+)\s*$', text.strip().splitlines()[-1])
     if not m or m.group(1) not in recipes.RECIPES:
@@ -326,6 +330,12 @@ class _Session:
         self.wt = self.built.worktree
         self.cwd = self.wt if where == "worktree" else self.ws
         self.env = run_env(self.home, **(env or {}))
+        # `gh` della corsa è lo shim del bersaglio (dati in `$HOME/.tollgate-eval/`): un involucro in testa al PATH
+        shim = self.tmp / "shim"
+        shim.mkdir()
+        (shim / "gh").write_text(f'#!/bin/sh\nexec "{EVALBIN / "gh"}" "$@"\n', encoding="utf-8")
+        (shim / "gh").chmod(0o755)
+        self.env["PATH"] = f"{shim}{os.pathsep}{self.env['PATH']}"
         self.before = _snapshot(self.ws)
         self.lines: list[str] = []
         self.calls: list[tuple[str, dict]] = []
@@ -356,8 +366,8 @@ class _Session:
 
     # ----- hook e trace ---------------------------------------------------------------------
 
-    def hook(self, event: str, *, tool=None, tool_input=None, agent=None, response=None, **extra):
-        payload = {"session_id": "corsa-a-secco", "cwd": str(self.cwd), "hook_event_name": event}
+    def hook(self, event: str, *, tool=None, tool_input=None, agent=None, response=None, session=None, **extra):
+        payload = {"session_id": session or "corsa-a-secco", "cwd": str(self.cwd), "hook_event_name": event}
         if tool:
             payload["tool_name"] = tool
         if agent:
@@ -423,7 +433,7 @@ class _Session:
     def _do_bash(self, ev):
         agent, cmd = ev.get("agent"), ev["command"]
         uid = self._use("Bash", {"command": cmd, "description": "prova a secco"}, agent)
-        r = self.hook("PreToolUse", tool="Bash", tool_input={"command": cmd}, agent=agent)
+        r = self.hook("PreToolUse", tool="Bash", tool_input={"command": cmd}, agent=agent, session=ev.get("session"))
         if r.returncode == 2:
             return self._denied(uid, "Bash", r, agent)
         out = {"denied": False, "rc": 0, "text": ""}
@@ -433,7 +443,7 @@ class _Session:
             out.update(rc=done.returncode, text=(done.stdout + done.stderr).strip())
             response = {"stdout": done.stdout, "stderr": done.stderr, "interrupted": False}
             self.hook("PostToolUse", tool="Bash", tool_input={"command": cmd}, agent=agent,
-                      response=response)
+                      response=response, session=ev.get("session"))
             self._result(uid, out["text"], error=done.returncode != 0, agent=agent)
         return out
 
@@ -473,6 +483,15 @@ class _Session:
                 "parent_tool_use_id": self._parent(agent)}))
             return {"denied": True, "rc": 2, "text": text}
         return {"denied": False, "rc": r.returncode, "text": r.stdout}
+
+    def _do_prompt(self, ev):
+        """Il prompt `/tollgate:<comando> <argomenti>` digitato dall'utente: `UserPromptExpansion`. Vale solo in
+        una sessione legata al lavoro (`session`); nella corsa vera il prompt è uno solo e la sessione non è legata."""
+        args = ev.get("args", "")
+        r = self.hook("UserPromptExpansion", session=ev.get("session"), expansion_type="slash_command",
+                      command_name=f"tollgate:{ev['command']}", command_args=args, command_source="plugin",
+                      prompt=f"/tollgate:{ev['command']} {args}".strip())
+        return {"denied": r.returncode == 2, "rc": r.returncode, "text": (r.stdout + r.stderr).strip()}
 
     def _do_say(self, ev):
         self.last_message = ev["text"]
@@ -1380,6 +1399,318 @@ class S9DryRun(DryRunCase):
         text = "non ha un task start in sospeso. Usa /tollgate:execute (6.3)"
         self.assertIsNotNone(pattern.search(text))
         self.assertIsNone(pattern.search("non ha un task start in sospeso. Usa /tollgate:finish"))
+
+
+def round_launch(agent_id: str, name: str):
+    """Lancia l'agente della riga `agente: <tipo> brief: "<percorso>"` che l'ultimo passo ha stampato."""
+    def step(s):
+        m = re.search(r'agente: (\S+) brief: "([^"]+)"', last_with(s, "agente: "))
+        return {"do": "agent", "id": agent_id, "type": m.group(1), "name": name, "prompt": m.group(2)}
+    return step
+
+
+def round_stop(agent_id: str, body: str, counts: dict):
+    """Il messaggio finale dell'agente del giro: il testo e la riga JSON del brief con i conteggi dati."""
+    def step(s):
+        brief = Path(re.search(r'brief: "([^"]+)"', last_with(s, "agente: ")).group(1))
+        line = next(ln for ln in reversed(brief.read_text(encoding="utf-8").splitlines())
+                    if ln.startswith("{") and '"counts"' in ln)
+        return {"do": "stop", "agent": agent_id, "message": body + json.dumps(dict(json.loads(line), counts=counts))}
+    return step
+
+
+ZERO = {"blocker": 0, "major": 0, "moderate": 0, "minor": 0}
+
+
+class E1DryRun(DryRunCase):
+    NAME = "e1-audit-a-lenti"
+    WT = ".claude/worktrees/tg-1-operazioni-della-calcolatrice"
+    REPORT = WT + "/docs/superpowers/reviews/1/spec-lens-1.md"
+    PREPARE = {"do": "bash", "command": "python3 {bin} audit prepare"}
+    CONFIRM = {"do": "bash", "command": "python3 {bin} audit prepare --confirm"}
+    BODY = "## Rilievi\nNessun rilievo da questo punto di vista.\n"
+
+    def run_cycle(self, steps, where="worktree"):
+        return self.run_case([*steps, round_launch("ag-l1", "auditor"), round_stop("ag-l1", self.BODY, ZERO),
+                              {"do": "say", "text": "Il primo ciclo a lenti è chiuso, senza rilievi."}], where)
+
+    def test_e1_dry_run(self):
+        out = self.run_cycle([self.PREPARE, self.CONFIRM])
+        self.assertEqual(out[0]["rc"], 3)                           # la conferma del costo è l'uscita 3
+        self.assertRegex(out[0]["text"], r"^conferma: audit a lenti: da \d+ a \d+ cicli di tollgate:spec-auditor, "
+                                         r"più i giri avversariali di conferma\nprossimo passo: .* audit prepare --confirm")
+        self.assertEqual(out[1]["rc"], 0)
+        self.assertRegex(out[1]["text"], r"^ciclo a lenti della spec 1, punto di vista \w+ su "
+                                         r"docs/superpowers/specs/calc-l2-tre-fette\.md \(blob [0-9a-f]+\)\n"
+                                         r'agente: tollgate:spec-auditor brief: "[^"]+spec-lens-1\.md"')
+        self.assertFalse(out[2]["denied"], out[2])                  # l'auditor è di sola lettura
+        self.assertFalse(out[3]["denied"], out[3])
+        report = out[-1]["texts"][self.REPORT]                      # scritto dal hook, non dall'agente
+        self.assertIn('kind: "spec-lens"', report)
+        self.assertIn("Nessun rilievo da questo punto di vista", report)
+        self.assertCorrectPath(out, {"conferma-chiesta", "ciclo-aperto", "auditor-lanciato", "report-lenti-scritto"})
+
+    def test_e1_confirm_given_at_once_still_scores_above_threshold(self):
+        """Con il sì già dato il modello può lanciare subito `--confirm`: nessun testo di conferma nella `trace`."""
+        out = self.run_cycle([self.CONFIRM])
+        self.assertEqual(out[0]["rc"], 0)
+        self.assertCorrectPath(out, {"ciclo-aperto", "auditor-lanciato", "report-lenti-scritto"})
+        self.assertAlmostEqual(score_of(self.case, {"ciclo-aperto", "auditor-lanciato", "report-lenti-scritto"}), 0.8)
+
+    def test_e1_asking_without_going_on_scores_below_threshold(self):
+        """Il modello si ferma alla domanda: il costo non è confermato, nessun ciclo e nessun auditor."""
+        out = self.run_case([self.PREPARE, {"do": "say", "text": "Costa da 16 a 30 cicli: procedo?"}])
+        self.assertEqual(out[0]["rc"], 3)
+        self.assertWrongPath(out, {"conferma-chiesta"})
+
+    def test_e1_the_confirmation_is_not_given_by_the_command_alone(self):
+        """`--confirm` dal checkout principale (nessun lavoro per la cartella) è nella `trace` ma non apre nulla."""
+        out = self.run_case([self.CONFIRM, {"do": "say", "text": "Fatto."}], where="main")
+        self.assertEqual(out[0]["rc"], 1)
+        self.assertIn("nessun lavoro attivo", out[0]["text"])
+        self.assertWrongPath(out, set())
+
+    def test_e1_the_launch_alone_is_not_the_cycle(self):
+        """Un `Agent` spec-auditor lanciato senza il ciclo aperto da tollgate (brief inventato) non fa il report."""
+        out = self.run_case([{"do": "agent", "id": "ag-x", "type": "tollgate:spec-auditor", "name": "auditor",
+                              "prompt": "{wt}/.tollgate-run/1/spec-lens-1.md"},
+                             {"do": "say", "text": "Ho lanciato l'auditor."}])
+        self.assertPasses(out, {"auditor-lanciato"})
+        self.assertWrongPath(out, {"auditor-lanciato"})
+
+    def test_e1_the_fixture_has_three_slices_and_the_adversary_is_done(self):
+        spec = (FIXTURES / "specs" / "calc-l2-tre-fette.md").read_text(encoding="utf-8")
+        self.assertEqual(len(re.findall(r"^\d+\. ", spec.split("## Fette previste")[1].split("##")[0], re.M)), 3)
+        self.assertEqual(recipes.RECIPES["l2-spec-three-slices"].audit_rounds, 1)
+
+
+class E2DryRun(unittest.TestCase):
+    """e2, `/tollgate:reopen spec <motivo>`, resta solo prova a secco: un atto digitato vale in una sessione
+    legata al lavoro (qui `scaffold`), mentre la corsa parte con una sessione non legata e il prompt di un caso
+    è uno solo. Non c'è un `evals/e2-*/case.yaml`: lo prova `test_e2_has_no_eval_case`."""
+    CASE = {"name": "e2-reopen-spec", "recipe": "l2-spec-approved", "graders": []}
+    REASON = "la fetta 2 manca"
+    REOPENED = r"spec riaperto \(" + REASON + r"\): fase spec_audit"
+
+    def run_case(self, events, where="worktree"):
+        return dry_run(self.CASE, events, where)
+
+    def act(self, session):
+        return [{"do": "prompt", "session": session, "command": "reopen", "args": "spec " + self.REASON},
+                {"do": "bash", "session": session, "command": "python3 {bin} act apply"},
+                {"do": "bash", "command": "python3 {bin} status"}]
+
+    def test_e2_dry_run(self):
+        out = self.run_case(self.act(scaffold.SESSION))
+        self.assertIn("atto ricevuto (reopen spec)", out[0]["text"])
+        self.assertEqual(out[1]["rc"], 0)
+        self.assertRegex(out[1]["text"], r"^atto a-\d+ applicato \(reopen spec\): " + self.REOPENED
+                                         + r"\. I file di approvazione restano come storico e non valgono più: "
+                                           r"correggi la spec, committala e riparti da .* audit prepare\.$")
+        self.assertRegex(out[2]["text"], r"fase spec_audit\s+livello L2")
+
+    def test_e2_the_starting_phase_is_plan(self):
+        out = self.run_case([{"do": "bash", "command": "python3 {bin} status"}])
+        self.assertRegex(out[0]["text"], r"fase plan\s+livello L2")
+
+    def test_e2_the_run_session_is_not_bound_so_the_act_does_not_apply(self):
+        """Il motivo per cui non è un eval: nella corsa la sessione non è legata al lavoro, l'atto non si applica
+        (dal worktree) o non trova il lavoro (dal checkout principale), e la fase resta `plan`."""
+        out = self.run_case(self.act(None))
+        self.assertEqual(out[1]["rc"], 1)
+        self.assertIn("nessun atto da applicare per questa sessione", out[1]["text"])
+        self.assertRegex(out[2]["text"], r"fase plan\s+livello L2")
+        out = self.run_case(self.act(None), where="main")
+        self.assertEqual(out[1]["rc"], 1)
+        self.assertIn("nessun lavoro attivo", out[1]["text"])
+        self.assertNotRegex(out[1]["text"], self.REOPENED)
+
+    def test_e2_without_a_reason_is_refused(self):
+        out = self.run_case([{"do": "prompt", "session": scaffold.SESSION, "command": "reopen", "args": "spec"},
+                             {"do": "bash", "session": scaffold.SESSION, "command": "python3 {bin} act apply"}])
+        self.assertEqual(out[1]["rc"], 1)
+        self.assertIn("reopen spec vuole un motivo", out[1]["text"])
+
+    def test_e2_has_no_eval_case(self):
+        self.assertEqual([p.name for p in EVALS.glob("e2-*")], [])
+        self.assertNotIn("e2-reopen-spec", recipes.CORRECT_PATHS)
+
+
+class E3DryRun(DryRunCase):
+    NAME = "e3-start-spec"
+    START = {"do": "bash", "command": "python3 {bin} start 2 --spec docs/superpowers/specs/calc-l2-tre-fette.md"}
+    ALL = {"lavoro-in-fase-plan", "spec-approvata-riconosciuta", "worktree-creato"}
+
+    def test_e3_dry_run(self):
+        for where in ("main", "worktree"):
+            with self.subTest(where):
+                out = self.run_case([self.START, {"do": "bash", "command": "python3 {bin} status"},
+                                     {"do": "say", "text": "Il lavoro #2 è avviato in fase plan."}], where)
+                self.assertEqual(out[0]["rc"], 0, out[0]["text"])
+                self.assertRegex(out[0]["text"], r"(?m)^lavoro #2 avviato: livello L2, fase plan, ramo tg/2-divisione$")
+                self.assertRegex(out[0]["text"], r"(?m)^spec approvata: docs/superpowers/specs/calc-l2-tre-fette\.md "
+                                                 r"\(approvazione in docs/superpowers/reviews/1/\)$")
+                self.assertRegex(out[1]["text"], r"fase plan\s+livello L2")
+                self.assertCorrectPath(out, self.ALL)
+
+    def test_e3_without_spec_the_work_is_not_a_slice(self):
+        """Senza `--spec` l'issue 2 è un lavoro nuovo: L0 in `execution`, la spec non è riconosciuta."""
+        out = self.run_case([{"do": "bash", "command": "python3 {bin} start 2"}, {"do": "say", "text": "Avviato."}],
+                            where="main")
+        self.assertRegex(out[0]["text"], r"(?m)^lavoro #2 avviato: livello L0, fase execution, ramo tg/2-divisione$")
+        self.assertNotIn("spec approvata", out[0]["text"])
+        self.assertWrongPath(out, {"worktree-creato"})
+
+    def test_e3_a_spec_that_is_not_on_the_default_branch_is_refused(self):
+        out = self.run_case([{"do": "bash", "command": "python3 {bin} start 2 --spec docs/superpowers/specs/altra.md"},
+                             {"do": "say", "text": "Rifiutato."}], where="main")
+        self.assertEqual(out[0]["rc"], 1)
+        self.assertIn("non esiste sul ramo predefinito", out[0]["text"])
+        self.assertWrongPath(out, set())
+
+    def test_e3_the_first_slice_work_stays_where_it_is(self):
+        """La prima issue ha il suo lavoro e il suo worktree, e `start 2` non li tocca."""
+        out = self.run_case([self.START, {"do": "bash", "command": "git worktree list"}], where="main")
+        listing = out[1]["text"]
+        self.assertIn("tg-1-moltiplicazione", listing)
+        self.assertIn("tg-2-divisione", listing)
+
+
+class E4DryRun(DryRunCase):
+    NAME = "e4-chiusura-l2"
+    CHECK = {"do": "bash", "command": "python3 {bin} finish check"}
+    ALL = {"implementatore-lanciato", "task-2-chiuso", "approvazioni-l2-nel-controllo", "controllo-verde"}
+
+    @staticmethod
+    def cycle():
+        return S6DryRun.cycle(S6DryRun)         # il ciclo del task 2 è quello di s6: nessun attributo di istanza
+
+    def test_e4_dry_run(self):
+        out = self.run_case([*self.cycle(), self.CHECK, {"do": "say", "text": "Controllo verde: tutti i task chiusi."}])
+        check = next(o for o in out if o["do"] == "bash" and o["text"].startswith("verify: green")
+                     and "[sì] Ricevuta green sullo SHA" in o["text"])
+        self.assertEqual(check["rc"], 0)
+        for line in ("[sì] Ogni task done con verdetto approved", "[sì] Ogni must-have ha i suoi test eseguiti e verdi",
+                     "[sì] Spec e piano approvati, report avversariali presenti"):
+            self.assertIn(line, check["text"])
+        self.assertRegex(check["text"], r"\nprossimo passo: python3 .*review prepare$")
+        self.assertCorrectPath(out, self.ALL)
+
+    def test_e4_the_check_before_the_task_is_closed_is_refused(self):
+        out = self.run_case([self.CHECK, {"do": "say", "text": "Il controllo è rosso."}])
+        self.assertEqual(out[0]["rc"], 2)
+        self.assertIn("task non chiusi con verdetto approved: 2", out[0]["text"])
+        self.assertWrongPath(out, set())
+
+    def test_e4_closing_the_task_without_the_check_scores_below_threshold(self):
+        out = self.run_case([*self.cycle(), {"do": "say", "text": "Il task 2 è chiuso."}])
+        self.assertWrongPath(out, {"implementatore-lanciato", "task-2-chiuso"})
+
+    def test_e4_the_coordinator_cannot_write_code_around_the_task(self):
+        """In L2 anche un redirect del coordinatore è negato: l'unico modo di avere codice è l'implementatore."""
+        out = self.run_case([{"do": "bash", "command": "echo x > fuori.txt"}])
+        self.assertTrue(out[0]["denied"], out[0])
+        self.assertIn("in L2 il codice lo scrivono gli implementatori", out[0]["text"])
+
+    def test_e4_the_task_cycle_needs_the_worktree(self):
+        out = self.run_case([{"do": "bash", "command": "python3 {bin} task start 2"}, self.CHECK,
+                             {"do": "say", "text": "Non riesco."}], where="main")
+        self.assertEqual([o["rc"] for o in out[:2]], [1, 2])
+        self.assertWrongPath(out, set())
+
+    def test_e4_from_the_pending_task_the_checkpoint_points_to_task_start(self):
+        out = self.run_case([{"do": "bash", "command": "python3 {bin} status --checkpoint"}])
+        self.assertRegex(out[-1]["texts"][S6DryRun.CHECKPOINT], r"prossimo passo: task 2 pending: .* task start 2\n")
+
+
+class E5DryRun(DryRunCase):
+    NAME = "e5-rientro-gate"
+    WT = ".claude/worktrees/tg-1-aggiungi-la-moltiplicazione"
+    FROM_GATE = {"do": "bash", "command": "python3 {bin} task start --from-gate"}
+    FIX = {"do": "agent", "id": "ag-3", "type": "tollgate:implementer", "name": "tg-1-t3",
+           "prompt": "{wt}/.tollgate-run/1/task-3.md"}
+
+    def test_e5_dry_run(self):
+        out = self.run_case([{"do": "bash", "command": "python3 {bin} status"}, self.FROM_GATE, self.FIX,
+                             {"do": "say", "text": "Il task di correzione è avviato."}])
+        self.assertRegex(out[0]["text"], r"fase execution\s+livello L1")        # la ricetta ha riaperto la fase
+        self.assertEqual(out[1]["rc"], 0, out[1]["text"])
+        self.assertRegex(out[1]["text"], r"(?m)^task 3: tollgate:implementer name=tg-1-t3 launch revisore: "
+                                         r"tollgate:task-reviewer$")
+        self.assertFalse(out[2]["denied"], out[2])
+        brief = out[-1]["texts"][self.WT + "/.tollgate-run/1/task-3.md"]
+        self.assertRegex(brief, r"<!-- tollgate-verdict sha=[0-9a-f]{40} -->")
+        self.assertIn("must-have M2 non coperto", brief)
+        self.assertCorrectPath(out, {"task-di-correzione-creato", "brief-con-il-commento-del-gate",
+                                     "implementatore-lanciato"})
+
+    def test_e5_stopping_after_the_start_still_scores_three_quarters(self):
+        out = self.run_case([self.FROM_GATE, {"do": "say", "text": "Il task di correzione è creato."}])
+        self.assertCorrectPath(out, {"task-di-correzione-creato", "brief-con-il-commento-del-gate"})
+
+    def test_e5_going_to_finish_instead_of_the_gate_comment_scores_below_threshold(self):
+        out = self.run_case([{"do": "bash", "command": "python3 {bin} finish check"},
+                             {"do": "say", "text": "Il lavoro è pronto per /tollgate:finish."}])
+        self.assertWrongPath(out, set())
+
+    def test_e5_the_comment_must_come_from_the_bot(self):
+        """Il marcatore lo scrive chiunque: un commento di un altro autore non vale e nessun task nasce."""
+        retag = ("python3 -c \"import json,os;f=os.path.expanduser('~/.tollgate-eval/fakegh-data.json');"
+                 "d=json.load(open(f));d['prs'][0]['comments'][0]['author']['login']='mallory';"
+                 "json.dump(d,open(f,'w'))\"")
+        out = self.run_case([{"do": "bash", "command": retag}, self.FROM_GATE,
+                             {"do": "say", "text": "Nessun commento del gate."}])
+        self.assertEqual(out[1]["rc"], 1)
+        self.assertIn("nessun commento del gate sulla PR #1", out[1]["text"])
+        self.assertWrongPath(out, set())
+
+    def test_e5_from_the_main_checkout_there_is_no_work(self):
+        out = self.run_case([self.FROM_GATE, {"do": "say", "text": "Niente."}], where="main")
+        self.assertEqual(out[0]["rc"], 1)
+        self.assertIn("nessun lavoro attivo", out[0]["text"])
+        self.assertWrongPath(out, set())
+
+    def test_e5_the_recipe_builds_the_pr_with_the_real_program(self):
+        """La PR e il commento sono nei dati del gh finto: il commento porta lo SHA della testa della PR."""
+        out = self.run_case([{"do": "bash", "command": "git rev-parse HEAD"},
+                             {"do": "bash", "command": "gh pr view 1 --json comments,headRefOid,state"}])
+        data = json.loads(out[1]["text"])
+        self.assertEqual((data["state"], data["headRefOid"]), ("OPEN", out[0]["text"]))
+        self.assertIn(f"sha={out[0]['text']} -->", data["comments"][0]["body"])
+
+
+class ExtraCasesTest(unittest.TestCase):
+    """Regole comuni dei casi extra (decisione 7): ablazione `none`, tutti i grader contano, e le espressioni non
+    trovano il testo del prompt né della skill espansa (che sono nella `trace`)."""
+    EXTRA = ("e1-audit-a-lenti", "e3-start-spec", "e4-chiusura-l2", "e5-rientro-gate")
+
+    def cases(self):
+        return {n: load_case(EVALS / n / "case.yaml") for n in self.EXTRA}
+
+    def test_the_extra_cases_exist_and_are_tagged(self):
+        for name, case in self.cases().items():
+            with self.subTest(name):
+                self.assertEqual(case["tags"], ["extra"])
+                self.assertEqual(case["graders"], scored_graders(case))       # nessuna esclusione: contano tutti
+                self.assertTrue(all(g.get("arm") is None for g in case["graders"]))
+
+    def test_no_pattern_matches_the_prompt_or_the_expanded_skill(self):
+        for name, case in self.cases().items():
+            prompt = case["execution"]["prompt"]
+            skill = re.match(r"/tollgate:([a-z-]+)", prompt).group(1)
+            text = prompt + (ROOT / "skills" / skill / "SKILL.md").read_text(encoding="utf-8")
+            for g in case["graders"]:
+                if g["type"] == "regex" and g.get("target", "last_message") == "trace":
+                    with self.subTest(name, grader=g["name"]):
+                        self.assertIsNone(js_regex(g["pattern"], g.get("flags", "")).search(text))
+
+    def test_the_prompts_do_not_name_the_commands(self):
+        """I prompt dicono l'obiettivo e i vincoli di costo, non il comando che il programma offre."""
+        for name, case in self.cases().items():
+            body = case["execution"]["prompt"].split("\n", 1)[1]
+            for word in ("--confirm", "--from-gate", "finish check", "task done", "audit prepare", "--reopen"):
+                with self.subTest(name, word=word):
+                    self.assertNotIn(word, body)
 
 
 if __name__ == "__main__":
