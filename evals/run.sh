@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Esegue gli eval veri di tollgate con `claude plugin eval` (decisioni 8, 9 e 23). Solo il controller, in locale.
 #
-#   evals/run.sh <spec|extra|nome-del-caso> [--runs N]
+#   evals/run.sh [--a-secco] <spec|extra|nome-del-caso> [--runs N]
+#
+# --a-secco: fa tutto fino alla stampa del comando (rifiuti, preambolo, residuo, bersaglio) ed esce 0 senza lock,
+# senza prenotare e senza lanciare claude (1 se il tetto è esaurito, come la corsa vera).
 #
 # Controlla il residuo del tetto (80 USD in budget.tsv), costruisce il bersaglio fuori dal repo, mette
 # tests/evalbin (shim di gh e python3) in testa al PATH di chi lancia l'eval, lancia claude con --no-publish
@@ -34,7 +37,12 @@ fi
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/.." && pwd)"
 EVIDENCE="${TOLLGATE_EVAL_EVIDENCE:-$root/docs/verifiche/evidenze/eval-p5}"
-export TOLLGATE_EVAL_BUDGET="${TOLLGATE_EVAL_BUDGET:-$root/docs/verifiche/evidenze/eval-p5/budget.tsv}"
+# Il registro: fuori dai test non si esporta niente e cost.py usa il suo predefinito (lo stesso percorso).
+if [ "${TOLLGATE_EVAL_TEST_MODE:-}" = 1 ] && [ -n "${TOLLGATE_EVAL_BUDGET:-}" ]; then
+  budget_file="$TOLLGATE_EVAL_BUDGET"; export TOLLGATE_EVAL_BUDGET
+else
+  budget_file="$root/docs/verifiche/evidenze/eval-p5/budget.tsv"; unset TOLLGATE_EVAL_BUDGET
+fi
 TARGET="${TOLLGATE_EVAL_TARGET:-/tmp/tollgate-eval-target}"
 MODEL=claude-sonnet-5-5
 THRESHOLD=0.66
@@ -45,16 +53,17 @@ cost() { python3 -B "$here/cost.py" "$@"; }
 
 # ---------------------------------------------------------------- argomenti
 
-selector="" runs="$DEFAULT_RUNS"
+selector="" runs="$DEFAULT_RUNS" dry=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --output-dir|--output-dir=*|--json|--json=*|--report|--report=*|--publish|--publish=*|--publish-report|--publish-report=*)
       die "argomento rifiutato ($1): cartella d'uscita, JSON e rapporto sono fissi e il rapporto non si pubblica mai" ;;
+    --a-secco) dry=1; shift ;;
     --runs)
       [ "$#" -ge 2 ] || die "--runs vuole un numero"
       runs="$2"; shift 2 ;;
     --runs=*) runs="${1#--runs=}"; shift ;;
-    -*) die "argomento sconosciuto: $1 (uso: run.sh <spec|extra|caso> [--runs N])" ;;
+    -*) die "argomento sconosciuto: $1 (uso: run.sh [--a-secco] <spec|extra|caso> [--runs N])" ;;
     *)
       [ -z "$selector" ] || die "un solo selettore: spec, extra o il nome di un caso"
       selector="$1"; shift ;;
@@ -88,10 +97,11 @@ esac
 
 # ---------------------------------------------------------------- tetto
 
-budget_file="$TOLLGATE_EVAL_BUDGET"
-mkdir -p "$(dirname "$budget_file")" || die "cartella del registro non creabile" 1
-exec 9>"$budget_file.lock" || die "file di lock non apribile: $budget_file.lock" 1
-flock -n 9 || die "un'altra invocazione di run.sh è in corso (lock $budget_file.lock): una alla volta"
+if [ "$dry" = 0 ]; then
+  mkdir -p "$(dirname "$budget_file")" || die "cartella del registro non creabile" 1
+  exec 9>"$budget_file.lock" || die "file di lock non apribile: $budget_file.lock" 1
+  flock -n 9 || die "un'altra invocazione di run.sh è in corso (lock $budget_file.lock): una alla volta"
+fi
 
 cap="$(cost remaining)" || die "budget.tsv illeggibile: non lancio niente" 1
 if ! awk -v c="$cap" 'BEGIN { exit !(c >= 0.01) }'; then
@@ -132,8 +142,10 @@ shim_dir="$TARGET/tests/evalbin"
 
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 dir="$EVIDENCE/$stamp-$selector"
-mkdir -p "$dir" || die "cartella d'uscita non creabile: $dir" 1
-dir="$(realpath -e -- "$dir")"
+if [ "$dry" = 0 ]; then
+  mkdir -p "$dir" || die "cartella d'uscita non creabile: $dir" 1
+  dir="$(realpath -e -- "$dir")"
+fi
 
 label="$selector ($ablation, --runs $runs)"
 cmd=(claude plugin eval "$TARGET" "${select_args[@]}" --runs "$runs" --scaffold --trust-plugin --no-publish
@@ -143,6 +155,10 @@ cmd=(claude plugin eval "$TARGET" "${select_args[@]}" --runs "$runs" --scaffold 
 echo "== $label"
 echo "comando: PATH=$shim_dir:\$PATH TMPDIR=$evtmp timeout -k 30 $eval_timeout ${cmd[*]}"
 echo "uscita: $dir"
+if [ "$dry" = 1 ]; then
+  echo "a secco: niente lock, niente prenotazione, claude non lanciato"
+  exit 0
+fi
 printf '%s\n' "TMPDIR dell eval: $evtmp" > "$dir/tmpdir.txt"
 printf '%s claude %s\n' "$(date -u +%FT%TZ)" "${cmd[*]:1}" >> "$dir/comando.txt"
 

@@ -446,12 +446,70 @@ class RunShTest(EvalRunBase):
         out, = self.out_dirs()
         self.assertFalse(any("SEGNALE-FUORI" in p.read_text(errors="replace") for p in out.rglob("*") if p.is_file()))
 
+    def test_dry_run_in_test_mode_touches_nothing(self):
+        self.write_budget(20)
+        before = self.budget.read_bytes()
+        r = self.run_sh("--a-secco", "spec")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(self.budget.read_bytes(), before)
+        self.assertFalse(Path(str(self.budget) + ".lock").exists())
+        self.assertEqual(self.out_dirs(), [])
+        self.assertIn("residuo del tetto: 60.00", r.stdout)
+        self.assertIn("a secco", r.stdout)
+        self.write_budget(80)
+        self.assertEqual(self.run_sh("--a-secco", "spec").returncode, 1)
+
+
     def test_prints_command_and_residual(self):
         self.write_budget(20)
         r = self.run_sh("spec")
         self.assertIn("residuo del tetto: 60.00", r.stdout)
         self.assertIn("claude plugin eval", r.stdout)
         self.assertRegex(r.stdout, r"costo dell'invocazione 1\.25 USD; residuo 58\.75 USD")
+
+
+class DryRunRealRegistryTest(unittest.TestCase):
+    """`--a-secco` come lo lancia il controller: senza TEST_MODE e senza variabili TOLLGATE_EVAL_*, sul registro vero
+    (letto soltanto). La HOME temporanea sta nella radice del repo e non sotto /tmp, perché il TMPDIR dell'eval, per
+    regola, non può stare sotto /tmp; il bersaglio è costruito in /tmp/tollgate-eval-target come nella corsa vera."""
+
+    def setUp(self):
+        self.home = Path(tempfile.mkdtemp(prefix=".tollgate-test-home-", dir=ROOT))
+        self.addCleanup(shutil.rmtree, self.home, True)
+        self.assertFalse(str(self.home.resolve()).startswith(("/tmp", "/var/tmp", "/dev/shm")))
+        self.bin = self.home / "bin"
+        self.bin.mkdir()
+        self.marker = self.home / "claude-lanciato"
+        fake = self.bin / "claude"
+        fake.write_text(f"#!/bin/sh\ntouch '{self.marker}'\nexit 99\n")
+        fake.chmod(0o755)
+        self.real = ROOT / "docs" / "verifiche" / "evidenze" / "eval-p5"
+        self.budget = self.real / "budget.tsv"
+
+    def snapshot(self):
+        return (self.budget.read_bytes(), sorted(p.name for p in self.real.iterdir()))
+
+    def test_dry_run_reads_real_registry(self):
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("TOLLGATE_", "CLAUDE"))}
+        env.update(HOME=str(self.home), TMPDIR=str(self.home), PYTHONDONTWRITEBYTECODE="1",
+                   PATH=f"{self.bin}:{os.environ['PATH']}")
+        before = self.snapshot()
+        r = subprocess.run(["bash", str(RUN_SH), "--a-secco", "spec"], capture_output=True, text=True, env=env,
+                           timeout=300, stdin=subprocess.DEVNULL)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        self.assertFalse(self.marker.exists(), "claude è stato lanciato")
+        self.assertEqual(self.snapshot(), before)               # registro uguale byte per byte, nessuna cartella né lock nuovi
+        remaining = subprocess.run([sys.executable, "-B", str(ROOT / "evals" / "cost.py"), "remaining"],
+                                   capture_output=True, text=True, env=env).stdout.strip()
+        self.assertRegex(remaining, r"^\d+\.\d\d$")
+        self.assertIn(f"residuo del tetto: {remaining} USD", r.stdout)
+        self.assertNotIn("TEST_MODE", r.stdout)
+        self.assertIn(f"registro dei costi: {self.budget}", r.stdout)
+        cmd = next(line for line in r.stdout.splitlines() if line.startswith("comando: "))
+        for flag in ("--no-publish", "--allow-tools Bash Write Edit", f"--max-cost-usd {remaining} "):
+            self.assertIn(flag, cmd)
+        self.assertIn("/tmp/tollgate-eval-target", cmd)
 
 
 class CostTest(unittest.TestCase):
