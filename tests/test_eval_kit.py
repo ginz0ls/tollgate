@@ -232,13 +232,16 @@ class BuildTest(KitCase):
         self.assertEqual(self.git(built.worktree, "cat-file", "-t", f"HEAD:{approval}"), "blob")
         self.assertEqual(self.git(built.worktree, "status", "--porcelain"), "")
 
-    def test_build_l1_task2_running(self):
-        """s6: piano di due task, il primo chiuso, il secondo avviato (running, lancio in sospeso)."""
-        built = self.build("l1-task2-running")
-        self.assertEqual(self.status()["tasks"], {"done": 1, "running": 1})
-        task = self.rows("SELECT state, pending, implementer FROM tasks WHERE number = 2")[0]
-        self.assertEqual(tuple(task), ("running", "launch", "tg-1-t2"))
-        self.assertTrue((built.worktree / ".tollgate-run" / "1" / "task-2.md").is_file())
+    def test_build_l1_task2_pending(self):
+        """s6: piano di due task, il primo chiuso, il secondo ancora da avviare (`task start 2` è il passo)."""
+        built = self.build("l1-task2-pending")
+        self.assertEqual(self.status()["tasks"], {"done": 1, "pending": 1})
+        self.assertEqual(self.rows("SELECT state FROM tasks WHERE number = 2")[0][0], "pending")
+        self.assertFalse((built.worktree / ".tollgate-run" / "1" / "task-2.md").exists())
+        out = self.cli("status", "--checkpoint", cwd=built.worktree).stdout
+        self.assertIn("checkpoint scritto", out)
+        self.assertRegex((built.worktree / "docs" / "superpowers" / "reviews" / "1" / "checkpoint.md").read_text(),
+                         r"prossimo passo: task 2 pending: .* task start 2\n")
         self.assertIn("moltiplica", (built.worktree / "src" / "calc.py").read_text())
         self.assertWorkspaceClean()
 

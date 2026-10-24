@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: s7-spec-contraddittoria
-description: "Spec 14, s7. La spec dice due cose incompatibili (un prodotto sempre intero e arrotondato, un prodotto esatto 1.5): l'audit lancia l'avversario della spec e il suo report, scritto da tollgate, riporta la contraddizione. Il punteggio guarda il contenuto del report."
+description: "Spec 14, s7. La spec dice due cose incompatibili (un prodotto sempre intero e arrotondato, un prodotto esatto 1.5): l'audit lancia l'avversario della spec e il suo report, scritto da tollgate, riporta la contraddizione. Il punteggio guarda il report: le parole della contraddizione e, nell'intestazione scritta da tollgate, almeno un rilievo blocker o major."
 tags: [spec]
 runs: 3
 context:
@@ -29,5 +29,5 @@ graders:
       source: file
       path: ".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/docs/superpowers/reviews/1/spec-adversarial-1.md"
     flags: i
-    pattern: '(?=[\s\S]*(?:arrotond|per difetto))(?=[\s\S]*(?:1[.,]5|esatt))(?=[\s\S]*(?:contradd|incompatib|inconsisten|incoerent|conflitt|contrast|non (?:può|possono)))'
+    pattern: '(?=[\s\S]*counts: \{blocker: (?:[1-9]|0, major: [1-9]))(?=[\s\S]*(?:arrotond|per difetto))(?=[\s\S]*(?:1[.,]5|esatt))(?=[\s\S]*(?:contradd|incompatib|inconsisten|incoerent|conflitt|contrast|non (?:può|possono)))'
     weight: 2

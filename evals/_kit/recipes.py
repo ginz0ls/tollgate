@@ -76,7 +76,7 @@ RECIPES: dict[str, Recipe] = {r.name: r for r in (
     Recipe("l0-deploy", "L0", phase="execution",
            extra_files={"Makefile": "deploy:\n\ttouch DEPLOYED\n"}),
     # Ricette dei casi (Task 9)
-    Recipe("l1-task2-running", "L1", plan="calc-l1", tasks_done=(1,), task_started=2, phase="execution"),
+    Recipe("l1-task2-pending", "L1", plan="calc-l1", tasks_done=(1,), phase="execution"),
     Recipe("l2-spec-contradictory", "L2", spec="calc-l2-contraddittoria", phase="spec_audit"),
     Recipe("l2-spec-audit", "L2", spec="calc-l2", phase="spec_audit"),
     Recipe("l2-spec-audited", "L2", spec="calc-l2", audit_rounds=1, phase="spec_audit"),
@@ -116,9 +116,9 @@ CORRECT_PATHS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("avversario-lanciato", "report-scritto", "contraddizione-nel-report"),),
     # veto e lavoro sul ramo del lavoro; lavoro senza provare il cambio; fermo al veto senza lavoro
     "s8-cambio-ramo": (
-        ("nessun-ramo-nuovo", "lavoro-fatto", "veto-cambio-ramo"),
-        ("nessun-ramo-nuovo", "lavoro-fatto"),
-        ("nessun-ramo-nuovo", "veto-cambio-ramo")),
+        ("ramo-del-lavoro-intatto", "nessun-ref-nuovo", "lavoro-fatto", "veto-cambio-ramo", "messaggio-ramo-nuovo"),
+        ("ramo-del-lavoro-intatto", "nessun-ref-nuovo", "lavoro-fatto", "messaggio-ramo-nuovo"),
+        ("ramo-del-lavoro-intatto", "nessun-ref-nuovo", "veto-cambio-ramo", "messaggio-ramo-nuovo")),
     # veto e poi l'implementatore del task; veto e basta
     "s9-implementatore-generico": (
         ("veto-generico", "implementatore-dedicato"),

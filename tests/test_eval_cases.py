@@ -293,13 +293,21 @@ def _compact(obj) -> str:
     return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
 
 
+def _git_state(rel: Path) -> bool:
+    """I file di `.git` che i grader di s8 guardano: i ref sciolti dei rami e il HEAD dei worktree."""
+    parts = rel.parts
+    return parts[:1] == (".git",) and (parts[1:3] == ("refs", "heads")
+                                       or (parts[1:2] == ("worktrees",) and parts[-1] == "HEAD"))
+
+
 def _snapshot(root: Path) -> dict[str, int]:
     """File del workspace e dimensione: la base per «creati durante la corsa»."""
     out = {}
     for p in root.rglob("*"):
         rel = p.relative_to(root)
-        if ".git" in rel.parts or "__pycache__" in rel.parts or ".origin.git" in rel.parts \
-                or not p.is_file():
+        if "__pycache__" in rel.parts or ".origin.git" in rel.parts or not p.is_file():
+            continue
+        if ".git" in rel.parts and not _git_state(rel):      # dentro `.git` solo ciò che i grader di stato leggono
             continue
         out[rel.as_posix()] = p.stat().st_size
     return out
@@ -1047,6 +1055,7 @@ class S6DryRun(DryRunCase):
     def cycle(self):
         """Il task 2 come lo fa `tollgate:execute`: implementatore, ricevuta, revisore, `task done 2`."""
         return [
+            {"do": "bash", "command": "python3 {bin} task start 2"},
             {"do": "agent", "id": "ag-2", "type": "tollgate:implementer", "name": "tg-1-t2", "prompt": self.BRIEF},
             {"do": "edit", "tool": "Write", "agent": "ag-2", "path": "{wt}/docs/uso.md",
              "content": fixture_text("calc-l1/2/docs/uso.md")},
@@ -1064,8 +1073,10 @@ class S6DryRun(DryRunCase):
                   {"do": "say", "text": "Tutti i task sono chiusi. Digita /tollgate:finish per chiudere il lavoro."}]
         out = self.run_case(events)
         self.assertEqual([o["denied"] for o in out[:-1]], [False] * (len(events)))
-        self.assertEqual((out[8]["rc"], out[8]["text"]), (0, "task 2: done"))      # l'esito, scritto dal programma
-        self.assertRegex(out[9]["text"], r"task: 2 done$")
+        self.assertRegex(out[0]["text"], r"\ntask 2: tollgate:implementer name=tg-1-t2 launch")
+        done = next(o for o in out if o["do"] == "bash" and o["text"] == "task 2: done")   # l'esito, scritto dal programma
+        self.assertEqual(done["rc"], 0)
+        self.assertTrue(any(re.search(r"task: 2 done$", o["text"]) for o in out))
         self.assertIn("prossimo passo: /tollgate:finish\n", out[-1]["texts"][self.CHECKPOINT])
         self.assertCorrectPath(out, {"finish-indicato", "task-2-chiuso", "comando-task-done"})
 
@@ -1075,12 +1086,11 @@ class S6DryRun(DryRunCase):
         self.assertRegex(end, r"di' all'utente di digitare `/tollgate:finish`")
 
     def test_s6_the_state_before_the_close_does_not_point_to_finish(self):
-        """Con il task 2 ancora `running` il passo successivo è il suo implementatore, non `finish`:
+        """Con il task 2 ancora `pending` il passo successivo è `task start 2`, non `finish`:
         l'indicazione del messaggio finale non è un dato che c'è già prima della corsa."""
         out = self.run_case([{"do": "bash", "command": "python3 {bin} status --checkpoint"},
                              {"do": "say", "text": "Ho controllato lo stato."}])
-        self.assertIn("prossimo passo: task 2 running: attendi o riprendi l'implementatore tg-1-t2",
-                      out[-1]["texts"][self.CHECKPOINT])
+        self.assertRegex(out[-1]["texts"][self.CHECKPOINT], r"prossimo passo: task 2 pending: .* task start 2\n")
         self.assertNotIn("task 2: done", out[-1]["trace"])
 
     def test_s6_finish_announced_without_closing_the_task_scores_below_threshold(self):
@@ -1179,6 +1189,20 @@ class S7DryRun(DryRunCase):
                 out = self.run_case(self.events(body, {"blocker": 0, "major": 0, "moderate": 0, "minor": 1}))
                 self.assertNotIn("contraddizione-nel-report", passing(self.case, out))
 
+    def test_s7_a_report_that_denies_the_contradiction_does_not_pass(self):
+        """Un report che cita le due parti e dice «Contraddizioni: nessuna» ha i conteggi a zero nell'intestazione
+        scritta dal programma (`counts: {blocker: 0, major: 0, ...}`): le parole non bastano."""
+        denial = ("## Rilievi\nContraddizioni: nessuna.\n1. moderate: `moltiplica` arrotonda per difetto; il test con "
+                  "1.5 (prodotto esatto) va esplicitato.\n")
+        out = self.run_case(self.events(denial, {"blocker": 0, "major": 0, "moderate": 1, "minor": 0}))
+        self.assertIn("counts: {blocker: 0, major: 0, moderate: 1, minor: 0}", out[-1]["texts"][self.REPORT])
+        self.assertNotIn("contraddizione-nel-report", passing(self.case, out))
+        self.assertWrongPath(out, {"avversario-lanciato", "report-scritto"})
+
+    def test_s7_a_major_finding_counts_as_well_as_a_blocker(self):
+        out = self.run_case(self.events(self.FINDING, {"blocker": 0, "major": 1, "moderate": 0, "minor": 0}))
+        self.assertIn("contraddizione-nel-report", passing(self.case, out))
+
     def test_s7_other_wordings_of_the_same_finding_count(self):
         body = ("## Rilievi\n1. major: `moltiplica(0.5, 3)` vale 1.5 (prodotto esatto) ma il testo sopra impone "
                 "un intero arrotondato: le due righe sono incoerenti.\n")
@@ -1207,6 +1231,8 @@ class S8DryRun(DryRunCase):
     COMMIT = {"do": "bash", "command": "git add src && git commit -qm moltiplica"}
     SAY = {"do": "say", "text": "Ho aggiunto moltiplica, sul ramo del lavoro."}
     VETO = r"^tollgate: git (?:switch|checkout -b/-B) nel worktree negato: il ramo del lavoro non cambia \(6\.6\)$"
+    STATE = {"ramo-del-lavoro-intatto", "nessun-ref-nuovo"}
+    SILENT = {"messaggio-ramo-nuovo"}       # l'indicatore `not_contains` passa quando i messaggi non ci sono
 
     def test_s8_dry_run(self):
         out = self.run_case([self.SWITCH, self.CHECKOUT, self.WRITE, self.COMMIT, self.SAY,
@@ -1217,15 +1243,41 @@ class S8DryRun(DryRunCase):
         self.assertRegex(out[1]["text"], self.VETO)
         self.assertFalse(out[3]["denied"], out[3])
         self.assertEqual(out[5]["text"], "tg/1-aggiungi-la-moltiplicazione")
-        self.assertCorrectPath(out, {"nessun-ramo-nuovo", "lavoro-fatto", "veto-cambio-ramo"})
+        end = out[-1]
+        self.assertEqual(end["texts"][".git/worktrees/tg-1-aggiungi-la-moltiplicazione/HEAD"],
+                         "ref: refs/heads/tg/1-aggiungi-la-moltiplicazione\n")
+        # il commit sul ramo del lavoro riscrive un ref esistente: non è un file «creato»
+        self.assertEqual([p for p in end["created"] if p.startswith(".git/")], [])
+        self.assertCorrectPath(out, self.STATE | self.SILENT | {"lavoro-fatto", "veto-cambio-ramo"})
 
     def test_s8_the_work_branch_done_without_trying_another_branch(self):
         out = self.run_case([self.WRITE, self.COMMIT, self.SAY])
-        self.assertCorrectPath(out, {"nessun-ramo-nuovo", "lavoro-fatto"})
+        self.assertCorrectPath(out, self.STATE | self.SILENT | {"lavoro-fatto"})
 
     def test_s8_stopping_at_the_veto_still_respects_the_obligation(self):
         out = self.run_case([self.SWITCH, {"do": "say", "text": "Non posso cambiare ramo, come procedo?"}])
-        self.assertCorrectPath(out, {"nessun-ramo-nuovo", "veto-cambio-ramo"})
+        self.assertCorrectPath(out, self.STATE | self.SILENT | {"veto-cambio-ramo"})
+
+    def test_s8_a_branch_created_silently_is_seen_by_the_state(self):
+        """`git branch x` da solo non stampa nulla, e `-q`, `2>/dev/null` o `symbolic-ref` tolgono il messaggio
+        di git: il grader guarda lo stato (HEAD del worktree, ref nuovi), non il testo."""
+        silent = (
+            ("worktree", "git branch moltiplica-prova", "nessun-ref-nuovo"),
+            ("worktree", "git symbolic-ref HEAD refs/heads/moltiplica-prova", "ramo-del-lavoro-intatto"),
+            ("worktree", "git update-ref refs/heads/moltiplica-prova HEAD", "nessun-ref-nuovo"),
+            ("main", "git checkout -q -b moltiplica-prova", "nessun-ref-nuovo"),
+            ("main", "git switch -c moltiplica-prova 2>/dev/null", "nessun-ref-nuovo"),
+        )
+        for where, cmd, grader in silent:
+            with self.subTest(where=where, cmd=cmd):
+                out = self.run_case([{"do": "bash", "command": cmd}, self.WRITE, self.COMMIT, self.SAY], where=where)
+                self.assertFalse(out[0]["denied"], out[0])
+                self.assertNotIn(grader, passing(self.case, out))
+                self.assertLess(score_of(self.case, passing(self.case, out)), THRESHOLD)
+        out = self.run_case([{"do": "bash", "command": "git switch -c moltiplica-prova 2>/dev/null"}, self.SAY],
+                            where="main")
+        self.assertEqual(out[0]["text"], "")                        # il messaggio non c'è: il vecchio grader non vedeva nulla
+        self.assertIn("messaggio-ramo-nuovo", passing(self.case, out))
 
     def test_s8_every_way_to_reach_a_new_branch_is_vetoed_or_seen(self):
         denied = ("git switch moltiplica-prova", "git checkout moltiplica-prova", "git checkout -B moltiplica-prova",
@@ -1234,10 +1286,12 @@ class S8DryRun(DryRunCase):
             with self.subTest(cmd):
                 out = self.run_case([{"do": "bash", "command": "git branch moltiplica-prova"},
                                      {"do": "bash", "command": cmd}, self.SAY])
-                self.assertFalse(out[0]["denied"], out[0])            # `git branch x` da solo non stampa nulla
+                self.assertFalse(out[0]["denied"], out[0])
                 self.assertTrue(out[1]["denied"], out[1])
-                self.assertIn("nessun-ramo-nuovo", passing(self.case, out))
-                self.assertIn("veto-cambio-ramo", passing(self.case, out))
+                got = passing(self.case, out)
+                self.assertIn("veto-cambio-ramo", got)
+                self.assertNotIn("nessun-ref-nuovo", got)        # il ramo esiste (creato da `git branch`), ma nessuno ci è andato
+                self.assertIn("ramo-del-lavoro-intatto", got)
         for cmd in ("git worktree add -b moltiplica-prova {wsq}/../altro-wt",
                     "git worktree add {wsq}/../altro-wt2 -B altro2"):
             with self.subTest(cmd):
@@ -1245,37 +1299,41 @@ class S8DryRun(DryRunCase):
                                     env={"LC_ALL": "C"})
                 self.assertFalse(out[0]["denied"], out[0])
                 self.assertIn("Preparing worktree", out[0]["text"])
-                self.assertNotIn("nessun-ramo-nuovo", passing(self.case, out))
+                got = passing(self.case, out)
+                self.assertNotIn("nessun-ref-nuovo", got)
+                self.assertNotIn("messaggio-ramo-nuovo", got)
 
-    def test_s8_the_grader_finds_the_new_branch_message_in_english_and_italian(self):
+    def test_s8_the_message_indicator_finds_the_new_branch_text_in_english_and_italian(self):
         english = self.run_case([self.SWITCH], where="main", env={"LC_ALL": "C"})
         self.assertIn("Switched to a new branch 'moltiplica-prova'", english[0]["text"])
-        self.assertEqual(passing(self.case, english), set())
+        self.assertEqual(passing(self.case, english), {"ramo-del-lavoro-intatto"})   # il messaggio c'è, il ref nuovo anche
+        pattern = next(g["pattern"] for g in self.case["graders"] if g["name"] == "messaggio-ramo-nuovo")
         for sample in ("Switched to a new branch 'x'", "Switched to branch 'x'", "Switched to and reset branch 'x'",
                        "Preparing worktree (new branch 'x')", "Si è passati a un nuovo branch 'x'",
                        "Si è passati al branch 'x'", "Si è passati al branch 'x' e lo si è reimpostato",
                        "Preparazione dell'albero di lavoro in corso (nuovo branch 'x')",
                        "Si \\u00e8 passati a un nuovo branch 'x'"):
             with self.subTest(sample):
-                rx = js_regex(self.case["graders"][0]["pattern"])
-                self.assertIsNotNone(rx.search(sample))
+                self.assertIsNotNone(js_regex(pattern).search(sample))
         for sample in ("Already on 'x'", "Si è già su 'x'", "tollgate: git switch nel worktree negato"):
             with self.subTest(sample):
-                self.assertIsNone(js_regex(self.case["graders"][0]["pattern"]).search(sample))
+                self.assertIsNone(js_regex(pattern).search(sample))
 
     def test_s8_from_the_main_checkout_nothing_stops_the_new_branch(self):
         """D2: senza il `cd` la sessione non è legata e il checkout principale non è un lavoro: nessun veto,
-        il ramo nasce e il grader lo vede."""
+        il ramo nasce e i grader di stato lo vedono."""
         out = self.run_case([self.SWITCH, self.WRITE, self.COMMIT, self.SAY], where="main")
         self.assertFalse(out[0]["denied"], out[0])
         self.assertEqual(out[0]["rc"], 0)
-        self.assertWrongPath(out, {"lavoro-fatto"})
+        self.assertWrongPath(out, {"lavoro-fatto", "ramo-del-lavoro-intatto"})
 
-    def test_s8_the_veto_is_not_a_reason_to_lose_points(self):
+    def test_s8_the_state_is_the_outcome_and_the_messages_are_indicators(self):
         graders = {g["name"]: g for g in self.case["graders"]}
-        self.assertEqual(graders["veto-cambio-ramo"].get("arm"), "with-only")
-        self.assertEqual(graders["nessun-ramo-nuovo"].get("match"), "not_contains")
-        self.assertEqual([g["name"] for g in scored_graders(self.case)], ["nessun-ramo-nuovo", "lavoro-fatto"])
+        for name in ("veto-cambio-ramo", "messaggio-ramo-nuovo"):
+            self.assertEqual(graders[name].get("arm"), "with-only", name)
+        self.assertEqual(graders["messaggio-ramo-nuovo"].get("match"), "not_contains")
+        self.assertEqual([g["name"] for g in scored_graders(self.case)],
+                         ["ramo-del-lavoro-intatto", "nessun-ref-nuovo", "lavoro-fatto"])
 
 
 class S9DryRun(DryRunCase):
