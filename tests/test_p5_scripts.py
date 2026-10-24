@@ -649,5 +649,245 @@ class CiProbeWorkflowTest(unittest.TestCase):
         self.assertEqual(doc["permissions"], {"contents": "read"})
 
 
+GATE = ROOT / "spikes" / "run-p5-gate.sh"
+GATE_CASES = ["pulita-fissata", "rifiuto-v4", "rivalutazione", "skip-ci"]
+
+
+def gate_code(text):
+    """Il codice dei modi del gate senza i commenti, il gh finto (heredoc) e il modo controlla con le sue prove negative, che
+    nominano a posto loro i comandi vietati."""
+    text = re.sub(r"(?s)<<'PY'\n.*?\nPY\n", "\n", text)
+    for name in ("check_negativi", "check_git_negativi", "make_remote", "modo_controlla"):
+        text = re.sub(r"(?s)\n%s\(\) \{.*?\n\}\n" % name, "\n", text)
+    text = re.sub(r"(?m)^.*(\bforced=|nel registro|RIFIUTATO).*$", "", text)       # i controlli del registro nominano i comandi vietati
+    return re.sub(r"(?m)^\s*#.*$", "", text)
+
+
+class GateScriptShapeTest(unittest.TestCase):
+    """Il Task 13: lo script della prova reale su detect. Si prova solo `bash -n` e `controlla` (mai gli altri modi)."""
+
+    def setUp(self):
+        self.text = GATE.read_text()
+        self.code = gate_code(self.text)
+
+    def test_syntax(self):
+        r = subprocess.run(["bash", "-n", str(GATE)], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_no_claude_no_destructive_command_no_forbidden_git(self):
+        self.assertNotRegex(self.code, r"\bclaude\b")
+        self.assertNotRegex(self.code, r"\brm\s+-[a-zA-Z]*[rR]")
+        self.assertNotRegex(self.code, r"\b(pkill|killall)\b")
+        self.assertNotRegex(self.code, r"\bkill\s")
+        self.assertNotRegex(self.code, r"--force|push\s+(-f|--force)|--no-verify|reset --hard|git stash|--amend|--delete|--mirror")
+        self.assertNotRegex(self.code, r"add\s+(-A|\.)(\s|$)")                       # mai `git add -A`
+        self.assertNotRegex(self.code, r"\bgh\s+auth\s+(login|refresh|token)")
+
+    def test_gh_is_only_called_through_the_guarded_helpers(self):
+        text = re.sub(r"(?s)<<'PY'\n.*?\nPY\n", "\n", self.text)
+        for number, line in enumerate(text.splitlines(), 1):
+            code = line.split("#", 1)[0] if not line.lstrip().startswith(("echo", "printf", "gh_q()")) else ""
+            with self.subTest(number):
+                self.assertNotRegex(code, r"(?:^|[;&|(`]\s*|\$\(\s*|\bthen\s+|\bdo\s+)gh\s+\S",
+                                    f"riga {number}: gh fuori da gh_call/gh_read/gh_q")
+
+    def test_network_git_goes_only_through_git_net(self):
+        for number, line in enumerate(self.code.splitlines(), 1):
+            if not re.search(r"\bgit\b\s+(-C\s+\S+\s+)?(push|pull|fetch|ls-remote|clone)\b", line.split("#", 1)[0]):
+                continue
+            with self.subTest(number):
+                self.assertIn("git_net", line, f"riga {number}: git con la rete fuori da git_net: {line.strip()}")
+
+    def test_the_only_push_to_main_is_the_skip_ci_case(self):
+        self.assertEqual(self.code.count("ALLOW_MAIN_PUSH=1"), 1)
+        skip = re.search(r"(?s)\ncaso_skip_ci\(\) \{.*?\n\}\n", self.code).group(0)
+        self.assertIn("ALLOW_MAIN_PUSH=1", skip)
+        self.assertEqual(len(re.findall(r"net_push \S+ \"\$d\" main\b", self.code)), 2)
+        self.assertEqual(len(re.findall(r"net_push \S+ \"\$d\" main\b", skip)), 2)
+        self.assertIn('git_net "$1" "$2" push "$DET_URL" "$3"', self.code)         # il solo push: url di detect e ramo
+
+    def test_only_the_allowed_operations_are_emitted(self):
+        # decisione 21: niente `pr edit` (rotto con gh 2.46: PATCH REST), niente `issue create`, `issue close` lo fa il controller
+        self.assertNotRegex(self.code, r"\bpr edit\b")
+        self.assertNotRegex(self.code, r"\bissue (create|close|comment)\b")
+        self.assertNotRegex(self.code, r"\bpr (comment|edit)\b")
+        self.assertNotRegex(self.code, r"tollgate-p4-protected")
+        self.assertEqual(self.code.count("--method PATCH"), 1)
+        self.assertEqual(self.code.count("--method PUT"), 1)
+        self.assertEqual(len(re.findall(r"pr merge", self.code)), 2)                # aggiorna e skip-ci
+        self.assertEqual(len(re.findall(r"pr merge .*--squash", self.code)), 2)
+
+    def test_branch_names_are_new_at_every_attempt(self):
+        for name in re.findall(r'BR="([^"]+)"', self.code):
+            self.assertRegex(name, r"\$TS|\$ISSUE|\$1|\$\(date", name)
+        self.assertIn('fresh_branch "tollgate-config/$version"', self.code)
+        self.assertIn('p5-gate-rifiuto-v4-$TS', self.code)
+        self.assertIn('p5-gate-skip-ci-base-$TS', self.code)
+        self.assertIn('tg/$ISSUE-p5-gate-$2-$TS', self.code)
+
+    def test_exit_codes_and_state_file_rules(self):
+        self.assertRegex(self.text, r"non so quale valore rimettere, mi rifiuto.*\n\s+exit 2|mi rifiuto\" >&2; exit 2")
+        self.assertIn("exit 3", self.code)
+        self.assertIn("exit 4", self.code)
+        self.assertIn('[ ! -e "$STATE_FILE" ]', self.code)                          # pin-on non sovrascrive uno stato esistente
+        self.assertNotIn("$HOME/.local/state", self.text)
+        self.assertNotIn("$HOME/.claude", self.text)
+
+    def test_the_cases_are_the_planned_ones(self):
+        self.assertIn('CASES="pulita-fissata rifiuto-v4 rivalutazione skip-ci"', self.text)
+        for fragment in ("Cache mode: read", "must be pinned to a full-length commit SHA", "pending (guard su edited) poi success", "[skip ci]",
+                         "tollgate/sentinel", "SENTINEL_TITLE='tollgate: merge non verificato'"):
+            self.assertIn(fragment, self.text)
+
+
+class GateControllaTest(unittest.TestCase):
+    """Il modo `controlla` del gate, una volta sola: tutti i modi su un nudo locale con un gh finto."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="tollgate-p5-gate-controlla-"))
+        r = subprocess.run(["bash", str(GATE), "controlla"], capture_output=True, text=True,
+                           env=clean_env(P5_CHECK_DIR=str(cls.tmp), GH_HOST="altro.example", GH_REPO="x/y"), timeout=900)
+        cls.out, cls.err, cls.rc = r.stdout, r.stderr, r.returncode
+        cls.log = (cls.tmp / "out" / "comandi.log").read_text() if (cls.tmp / "out" / "comandi.log").exists() else ""
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def modes(self):
+        """comandi.log diviso per modo: {nome del modo: [righe gh e git-net, senza ora]}."""
+        out, current = {}, None
+        for line in self.log.splitlines():
+            body = line.split(" ", 1)[1] if " " in line else ""
+            m = re.match(r"\(modo (.*)\)$", body)
+            if m:
+                current = m.group(1)
+                out.setdefault(current, [])
+            elif current and (body.startswith("gh ") or body.startswith("git-net ")):
+                out[current].append(body)
+        return out
+
+    def test_it_passes_cleanly(self):
+        self.assertEqual(self.rc, 0, self.out[-3000:] + self.err[-2000:])
+        self.assertIn("CONTROLLA: ok", self.out)
+        for bad in ("VIOLAZIONE", "FALLITO", "DOVEVA FALLIRE", "NON FERMATO", "MA RIFIUTATO", "manca ", "PR APERTE", "INATTES"):
+            self.assertNotIn(bad, self.out)
+        self.assertEqual(self.err, "")
+
+    def test_the_case_list_and_every_mode(self):
+        for name in GATE_CASES:
+            self.assertIn(f"  {name}\tdetect", self.out)
+        for mode in ("aggiorna", "pin-on", "caso-pulita-fissata", "caso-rifiuto-v4", "caso-rivalutazione", "caso-skip-ci", "pin-off", "raccogli"):
+            self.assertIn(f"modo {mode}: ok", self.out)
+
+    def test_refusals(self):
+        self.assertIn("modo pin-off-senza-stato: fermato come previsto", self.out)
+        self.assertIn("pin-off: senza stato si rifiuta", self.out)
+        self.assertIn("pin-off: nessuna PUT senza stato", self.out)
+        self.assertIn("modo caso-sconosciuto: fermato come previsto", self.out)
+        self.assertIn("modo caso-senza-pin-on: fermato come previsto", self.out)
+        self.assertIn("modo pin-on-due-volte: fermato come previsto", self.out)
+        self.assertIn("pin-on: il secondo non sovrascrive il valore iniziale", self.out)
+        self.assertIn("caso: con un'issue di sentinella aperta non parte", self.out)
+
+    def test_pin_is_put_back_to_the_initial_value_and_the_state_is_archived_not_deleted(self):
+        self.assertFalse(json.loads((self.tmp / "fake" / "perm.json").read_text())["sha_pinning_required"])
+        self.assertIn("pin-off: valore iniziale rimesso (false)", self.out)
+        self.assertIn("pin-off: stato archiviato, non cancellato", self.out)
+        self.assertEqual(len(list((self.tmp / "stato").glob("pin-iniziale.env.rimesso-*"))), 1)
+        self.assertFalse((self.tmp / "stato" / "pin-iniziale.env").exists())
+        modes = self.modes()
+        puts = {m: [line for line in modes[m] if "--method PUT" in line] for m in ("pin-on", "pin-off")}
+        self.assertEqual([len(v) for v in puts.values()], [1, 1])      # il secondo pin-on e il pin-off senza stato si rifiutano prima di ogni PUT
+        self.assertIn("sha_pinning_required=true", puts["pin-on"][0])
+        self.assertIn("sha_pinning_required=false", puts["pin-off"][0])
+
+    def test_each_mode_emits_only_its_own_commands(self):
+        modes = self.modes()
+        for name, lines in modes.items():
+            for line in lines:
+                with self.subTest(name, line=line[:90]):
+                    self.assertNotRegex(line, r"^gh (pr edit|issue create|issue close|issue comment|pr comment|repo |auth )|--force|\s-f\s|--delete|--mirror|\s\+\S")
+        # pin-on e pin-off: nessuna PR, nessun git, una sola PUT (true / valore iniziale)
+        for name, want in (("pin-on", "sha_pinning_required=true"), ("pin-off", "sha_pinning_required=false")):
+            lines = modes[name]
+            self.assertTrue(all(l.startswith("gh api") for l in lines), lines)
+            put = [l for l in lines if "--method PUT" in l]
+            self.assertEqual(len(put), 1)
+            self.assertIn(want, put[0])
+            self.assertIn("repos/ginz0ls/tollgate-p4-detect/actions/permissions", put[0])
+        # PATCH del corpo solo in rivalutazione; merge solo in aggiorna e skip-ci, sempre --squash
+        for name, lines in modes.items():
+            patch = [l for l in lines if "--method PATCH" in l]
+            merge = [l for l in lines if l.startswith("gh pr merge")]
+            self.assertEqual(len(patch), 1 if name == "caso rivalutazione" else 0, name)
+            self.assertEqual(len(merge), 1 if name in ("aggiorna", "caso skip-ci") else 0, name)
+            for m in merge:
+                self.assertIn("--squash", m)
+        # i push: solo verso detect, un ramo alla volta; su main solo i due del caso skip-ci
+        pushes = {name: [l for l in lines if l.startswith("git-net") and " push " in l] for name, lines in modes.items()}
+        for name, lines in pushes.items():
+            for l in lines:
+                self.assertRegex(l, r" push https://github\.com/ginz0ls/tollgate-p4-detect\.git [A-Za-z0-9._/-]+$", f"{name}: {l}")
+            to_main = [l for l in lines if l.endswith(" main")]
+            self.assertEqual(len(to_main), 2 if name == "caso skip-ci" else 0, name)
+        self.assertEqual(len(pushes["aggiorna"]), 1)
+        self.assertTrue(pushes["aggiorna"][0].endswith(" tollgate-config/0.2.0"))
+        self.assertEqual(len(pushes["caso rifiuto-v4"]), 1)
+        self.assertRegex(pushes["caso rifiuto-v4"][0], r" p5-gate-rifiuto-v4-[0-9-]+$")
+        for name in ("pin-on", "pin-off", "raccogli"):
+            self.assertEqual(pushes[name], [])
+        # ogni git con la rete è un clone di detect o un push
+        for name, lines in modes.items():
+            for l in (x for x in lines if x.startswith("git-net")):
+                self.assertRegex(l, r"git-net dir=\S+ (clone -q https://github\.com/ginz0ls/tollgate-p4-detect\.git \S+|push )", f"{name}: {l}")
+
+    def test_aggiorna_stages_only_the_proposed_files(self):
+        staging = (self.tmp / "out" / "gate-aggiorna-staging.txt").read_text().splitlines()
+        self.assertGreater(len(staging), 100)
+        files = [line.split("\t", 1)[1] for line in staging]
+        self.assertFalse([f for f in files if f.startswith("docs/")])         # la cartella della proposta non entra mai
+        self.assertTrue(all(f == "tollgate.toml" or f.startswith(".github/") for f in files), [f for f in files if not f.startswith(".github/")][:5])
+        self.assertIn("git -C \"$d\" add -- \"$rel\"", GATE.read_text())
+
+    def test_rows_of_the_report(self):
+        rows = (self.tmp / "out" / "gate-casi-righe.md").read_text().splitlines()
+        self.assertEqual([r.split("|")[1].strip() for r in rows], ["pulita-fissata", "pulita-fissata-cache", "rifiuto-v4", "rivalutazione", "skip-ci"])
+        for row in rows:
+            self.assertEqual(len(row.split("|")), 9, row)           # 7 colonne come il rapporto di P4
+            self.assertIn("| riuscito |", row)
+            self.assertRegex(row, r"\| \d+\.\d \(\d+ run\) \|$")
+        self.assertIn("Cache mode: read", rows[1])
+        self.assertIn("pending -> success", rows[3])
+        self.assertIn("saltato failure, normale failure, partenza success", rows[4])
+
+    def test_every_attempt_is_recorded_with_its_exit_code(self):
+        ledger = [l.split("\t") for l in (self.tmp / "out" / "gate-tentativi.tsv").read_text().splitlines()]
+        by = {}
+        for _, mode, rc in ledger:
+            by.setdefault(mode, []).append(rc)
+        self.assertEqual(by["pin-off"], ["2", "0"])
+        self.assertEqual(by["caso non-esiste"], ["2"])
+        self.assertEqual(by["caso skip-ci"], ["0"])
+        self.assertEqual(by["caso pulita-fissata"], ["1", "0", "6"])
+
+    def test_no_pr_is_left_open_and_the_sentinel_issue_is_left_to_the_controller(self):
+        prs = json.loads((self.tmp / "fake" / "prs.json").read_text())
+        self.assertEqual([p for p in prs if p["state"] == "OPEN"], [])
+        self.assertEqual(sorted(p["state"] for p in prs), ["CLOSED", "CLOSED", "MERGED", "MERGED"])
+        self.assertFalse((self.tmp / "fake" / "closed-90").exists())
+        self.assertIn("issue di sentinella: aperta, come previsto", self.out)
+
+    def test_every_registered_command_passes_the_p5_guard_and_nothing_is_refused(self):
+        self.assertIn("righe RIFIUTATO nel registro: 0", self.out)
+        self.assertIn("push forzati o con --delete nel registro: 0", self.out)
+        self.assertIn("gh pr edit nel registro: 0", self.out)
+        self.assertIn("guard_args: 22 fermati su 22", self.out)
+        self.assertIn("comandi legittimi ammessi: 23 su 23", self.out)
+        self.assertIn("git: 14 fermati su 14", self.out)
+        self.assertNotIn("RIFIUTATO gh", self.log)
+
+
 if __name__ == "__main__":
     unittest.main()
