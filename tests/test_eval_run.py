@@ -3,21 +3,31 @@
 Mai un `claude` vero: nel `PATH` c'è un `claude` finto che registra gli argomenti e scrive un `result.json` nella forma
 reale di `claude plugin eval` (VE8, visto nelle sonde del Task 1). HOME, TMPDIR, registro dei costi, radice delle
 evidenze e bersaglio sono cartelle temporanee: nessun test scrive in `docs/verifiche/evidenze/eval-p5/`."""
+import fcntl
+import io
 import json
 import os
+import signal
 import re
 import shutil
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from evals import cost
 from tests.helpers import ROOT
 
 RUN_SH = ROOT / "evals" / "run.sh"
+def cost_remaining(budget):
+    with mock.patch.dict(os.environ, TOLLGATE_EVAL_BUDGET=str(budget), TOLLGATE_EVAL_TEST_MODE="1"):
+        return cost.remaining()
+
+
 HEADER = "ora\tinvocazione\tcostUsd\tdurationSeconds\tcasi\n"
 
 FAKE_CLAUDE = r'''#!__PY__
@@ -27,9 +37,11 @@ args = sys.argv[1:]
 log = os.environ["FAKE_CLAUDE_LOG"]
 with open(log, "a") as fh:
     fh.write(json.dumps({"args": args, "path": os.environ.get("PATH", ""), "tmpdir": os.environ.get("TMPDIR", ""),
-                         "stdin": sys.stdin.read(), "cwd": os.getcwd()}) + "\n")
+                         "stdin": sys.stdin.read(), "cwd": os.getcwd(), "pid": os.getpid()}) + "\n")
 if os.environ.get("FAKE_SLEEP"):
     time.sleep(float(os.environ["FAKE_SLEEP"]))
+if os.environ.get("FAKE_TOKEN_STDOUT"):
+    sys.stdout.write("ghp_" + "B" * 20 + "\n")
 def opt(name):
     return args[args.index(name) + 1]
 tmp = os.environ["TMPDIR"]
@@ -55,6 +67,9 @@ for arm in ("with", "without"):
                 "cache_creation_input_tokens": 50}}) + "\n")
         with open(os.path.join(run, "config", "settings.json"), "w") as fh:
             fh.write("{}\n")
+        if os.environ.get("FAKE_SYMLINK_SETTINGS"):
+            os.remove(os.path.join(run, "config", "settings.json"))
+            os.symlink(os.environ["FAKE_SYMLINK_SETTINGS"], os.path.join(run, "config", "settings.json"))
         with open(os.path.join(cwd, "ESITO.txt"), "w") as fh:
             fh.write("ok\n")
         with open(os.path.join(cwd, "segreto.txt"), "w") as fh:
@@ -64,7 +79,7 @@ for arm in ("with", "without"):
             fh.write("x\n")
         os.chmod(os.path.join(run, "sealed"), 0)
         os.chmod(run, 0o500)
-        arms[arm].append({"score": 1.0 if arm == "with" else 0.5, "passed": True, "turns": 4, "costUsd": 0.25,
+        arms[arm].append({"score": 1.0 if arm == "with" else 0.5, "passed": True, "turns": 4, "costUsd": 0.01,
                           "judgeCostUsd": 0, "durationSeconds": 10, "startedAt": "2026-10-24T10:00:00.000Z",
                           "error": None, "tracePath": os.path.join(run, "out", "trace.jsonl"), "graders": []})
         sys.stderr.write("\u26a0 kept %s: home/ and tmp/ in it are sealed\n" % run)
@@ -326,6 +341,7 @@ class RunShTest(EvalRunBase):
         self.assertNotIn(r.returncode, (0, 1, 2))
         self.assertIn("plugin tollgate non caricato: controlla prima di continuare", r.stderr)
         self.assertEqual(self.rows()[-1][2], "2.0")          # il costo è entrato comunque
+        self.assertTrue((self.out_dirs()[0] / "tabella.md").is_file())      # la tabella c'è anche così
 
     def test_plugin_loaded_extra_ablation_none(self):
         r = self.run_sh("extra", "--runs", "1")
@@ -340,6 +356,96 @@ class RunShTest(EvalRunBase):
         out, = self.out_dirs()
         self.assertEqual((out / "claude.rc").read_text().strip(), "124")
 
+    def test_interrupt_leaves_reservation(self):
+        """SIGTERM allo script mentre claude gira: la riga «?» è già in budget.tsv e il residuo è 0."""
+        proc = subprocess.Popen(["bash", str(RUN_SH), "spec"], env=self.env(FAKE_SLEEP="30"), stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        fake_pid = None
+        try:
+            for _ in range(200):
+                if self.calls():
+                    fake_pid = self.calls()[0]["pid"]
+                    break
+                time.sleep(0.1)
+            self.assertIsNotNone(fake_pid, "il claude finto non è partito")
+            os.kill(proc.pid, signal.SIGTERM)             # il PID del processo avviato qui, mai per nome
+            proc.wait(timeout=30)
+        finally:
+            if proc.poll() is None:
+                os.kill(proc.pid, signal.SIGKILL)
+                proc.wait()
+            if fake_pid:
+                try:
+                    os.kill(fake_pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        rows = self.rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][2], "?")
+        self.assertIn("spec", rows[0][1])
+        self.assertEqual(cost_remaining(self.budget), 0.0)
+
+    def test_reservation_replaced_by_real_cost(self):
+        self.write_budget(10)
+        self.assertEqual(self.run_sh("spec").returncode, 0)
+        rows = self.rows()
+        self.assertEqual(len(rows), 2)               # la riga prenotata è stata sostituita, non duplicata
+        self.assertEqual(rows[1][2], "1.25")
+
+    def test_env_paths_need_test_mode(self):
+        for var in ("TOLLGATE_EVAL_BUDGET", "TOLLGATE_EVAL_EVIDENCE", "TOLLGATE_EVAL_TARGET"):
+            with self.subTest(var=var):
+                env = {"TOLLGATE_EVAL_TEST_MODE": "", "TOLLGATE_EVAL_BUDGET": "", "TOLLGATE_EVAL_EVIDENCE": "",
+                       "TOLLGATE_EVAL_TARGET": "", var: str(self.tmp / "x")}
+                r = self.run_sh("spec", **env)
+                self.assertEqual(r.returncode, 64)
+                self.assertIn(var, r.stderr)
+                self.assertEqual(self.calls(), [])
+        self.assertFalse((self.tmp / "x").exists())
+
+    def test_preamble_prints_paths_and_test_mode(self):
+        self.write_budget(5)
+        r = self.run_sh("spec")
+        for text in (f"registro dei costi: {self.budget}", f"cartella delle evidenze: {self.evidence}",
+                     f"bersaglio: {self.target}", f"TMPDIR dell'eval: {self.evtmp.resolve()}",
+                     "residuo del tetto: 75.00 USD", "TEST_MODE attivo"):
+            self.assertIn(text, r.stdout)
+
+    def test_timeout_validated(self):
+        for bad in ("abc", "0", "-5", "1.5", "", "007"):
+            with self.subTest(bad=bad):
+                r = self.run_sh("spec", TOLLGATE_EVAL_TIMEOUT=bad) if bad else None
+                if r is None:
+                    continue
+                self.assertEqual(r.returncode, 64)
+                self.assertEqual(self.calls(), [])
+                self.assertFalse(self.budget.exists())          # niente prenotazione
+
+    def test_second_invocation_refused_by_lock(self):
+        self.budget.parent.mkdir(exist_ok=True)
+        with open(str(self.budget) + ".lock", "w") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            r = self.run_sh("spec")
+        self.assertEqual(r.returncode, 64)
+        self.assertIn("un'altra invocazione", r.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_token_in_evidence_stops(self):
+        self.write_budget(10)
+        r = self.run_sh("spec", "--runs", "1", FAKE_TOKEN_STDOUT="1")
+        self.assertEqual(r.returncode, 4)
+        self.assertIn("forma di token nelle evidenze: non committare", r.stderr)
+        self.assertNotIn("ghp_BBBB", r.stdout + r.stderr)
+        self.assertEqual(self.rows()[-1][2], "1.25")                 # il costo è già registrato
+        self.assertIn("stdout.txt", (self.out_dirs()[0] / "file-con-token.txt").read_text())
+
+    def test_symlinked_settings_not_followed(self):
+        outside = self.tmp / "fuori.json"
+        outside.write_text('{"fuori": "SEGNALE-FUORI"}\n')
+        self.assertEqual(self.run_sh("spec", "--runs", "1", FAKE_SYMLINK_SETTINGS=str(outside)).returncode, 0)
+        out, = self.out_dirs()
+        self.assertFalse(any("SEGNALE-FUORI" in p.read_text(errors="replace") for p in out.rglob("*") if p.is_file()))
+
     def test_prints_command_and_residual(self):
         self.write_budget(20)
         r = self.run_sh("spec")
@@ -353,10 +459,9 @@ class CostTest(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp(prefix="tollgate-test-cost-"))
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.budget = self.tmp / "budget.tsv"
-        old = os.environ.get("TOLLGATE_EVAL_BUDGET")
-        os.environ["TOLLGATE_EVAL_BUDGET"] = str(self.budget)
-        self.addCleanup(lambda: os.environ.pop("TOLLGATE_EVAL_BUDGET") if old is None
-                        else os.environ.__setitem__("TOLLGATE_EVAL_BUDGET", old))
+        patcher = mock.patch.dict(os.environ, TOLLGATE_EVAL_BUDGET=str(self.budget), TOLLGATE_EVAL_TEST_MODE="1")
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def result(self, data, name="result.json"):
         p = self.tmp / name
@@ -381,20 +486,20 @@ class CostTest(unittest.TestCase):
     def test_remaining_cli_rounds_down_to_cents(self):
         self.budget.write_text(HEADER + "a\tb\t0.1234\t3\tc\n", encoding="utf-8")
         r = subprocess.run([sys.executable, "-B", str(ROOT / "evals" / "cost.py"), "remaining"], capture_output=True,
-                           text=True, env={**os.environ, "TOLLGATE_EVAL_BUDGET": str(self.budget)})
+                           text=True, env={**os.environ, "TOLLGATE_EVAL_BUDGET": str(self.budget), "TOLLGATE_EVAL_TEST_MODE": "1"})
         self.assertEqual(r.stdout.strip(), "79.87")
 
     def test_add_row(self):
-        res = self.result(make_result([case_entry("s1", [1.0], [0.5])], cost_usd=0.0675, duration=17))
+        res = self.result(make_result([case_entry("s1", [1.0], [0.5])], cost_usd=0.25, duration=17))
         self.assertTrue(cost.add(res, "spec (with-without)"))
         lines = self.budget.read_text().splitlines()
         self.assertEqual(lines[0] + "\n", HEADER)
         cols = lines[1].split("\t")
         self.assertEqual(len(cols), 5)
         self.assertRegex(cols[0], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
-        self.assertEqual(cols[1:], ["spec (with-without)", "0.0675", "17", "s1"])
+        self.assertEqual(cols[1:], ["spec (with-without)", "0.25", "17", "s1"])
         self.assertTrue(cost.add(res, "x"))
-        self.assertAlmostEqual(cost.spent(), 0.135)
+        self.assertAlmostEqual(cost.spent(), 0.5)
 
     def test_add_unknown_cost_writes_question_mark(self):
         for res in (self.tmp / "manca.json", self.result({"cases": []}, "senza-costo.json")):
@@ -435,6 +540,45 @@ class CostTest(unittest.TestCase):
             self.skipTest("evidenza del Task 1 assente")
         row = next(r for r in cost.table([real]).splitlines() if r.startswith("| nl-bash "))
         self.assertRegex(row, r"\| nl-bash \| 0\.92 \| 0\.42 \| \+0\.50 \| 1/1 \| 0\.1321 \| 32 \|")
+
+    def test_reserve_then_add_replaces_row_atomically(self):
+        when = cost.reserve("spec (with-without)")
+        self.assertEqual(cost.remaining(), 0.0)                      # prenotata = tetto chiuso
+        res = self.result(make_result([case_entry("s1", [1.0], None)], cost_usd=2.5, duration=9))
+        self.assertTrue(cost.add(res, "spec (with-without)", reserved=when))
+        lines = self.budget.read_text().splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(lines[1].split("\t")[2:], ["2.5", "9", "s1"])
+        self.assertAlmostEqual(cost.remaining(), 77.5)
+        self.assertEqual([p.name for p in self.tmp.iterdir() if p.name.endswith(".tmp")], [])
+
+    def test_add_unknown_keeps_reserved_question_mark(self):
+        when = cost.reserve("x")
+        self.assertFalse(cost.add(self.tmp / "manca.json", "x", reserved=when))
+        self.assertEqual([r.split("\t")[2] for r in self.budget.read_text().splitlines()[1:]], ["?"])
+        self.assertEqual(cost.remaining(), 0.0)
+
+    def test_recorded_cost_is_max_of_total_and_sum_of_runs(self):
+        entry = case_entry("s1", [1.0, 1.0], [0.0])              # 3 corse da 0.1
+        entry["arms"]["with"][0]["judgeCostUsd"] = 2.0           # giudice non incluso nel totale
+        res = self.result(make_result([entry], cost_usd=0.2))
+        self.assertTrue(cost.add(res, "a"))
+        self.assertAlmostEqual(float(self.budget.read_text().splitlines()[1].split("\t")[2]), 2.3)
+        res = self.result(make_result([case_entry("s1", [1.0], None)], cost_usd=5.0), "b.json")
+        self.assertTrue(cost.add(res, "b"))
+        self.assertEqual(float(self.budget.read_text().splitlines()[2].split("\t")[2]), 5.0)
+
+    def test_plugin_check_without_traces_fails(self):
+        entry = case_entry("s1", [0.0], None)
+        entry["arms"]["with"][0].update(tracePath=None, error="timeout")
+        res = self.result(make_result([entry]))
+        self.assertIn("nessuna corsa", cost.plugin_check(res)[0])
+
+    def test_budget_env_ignored_outside_test_mode(self):
+        with mock.patch.dict(os.environ, {"TOLLGATE_EVAL_TEST_MODE": ""}):
+            with self.assertRaises(SystemExit) as ctx, mock.patch("sys.stderr", new=io.StringIO()):
+                cost.budget_path()
+        self.assertEqual(ctx.exception.code, 64)
 
     def test_plugin_check(self):
         res = self.tmp / "result.json"

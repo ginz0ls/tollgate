@@ -11,14 +11,26 @@
 # Uscite: 0, 1, 2 sono quelle di claude (1 = sotto soglia, 2 = tetto raggiunto) tranne il rifiuto per
 # residuo esaurito (1, claude non parte); 3 = costo ignoto; 4 = plugin non caricato; 64 = uso errato.
 #
-# Variabili (i test le puntano a cartelle temporanee, mai ai percorsi veri):
+# Variabili. BUDGET, EVIDENCE e TARGET valgono SOLO con TOLLGATE_EVAL_TEST_MODE=1 (i test le puntano a cartelle
+# temporanee); senza, se una è impostata, l'uscita è 64 prima di tutto:
 #   TOLLGATE_EVAL_BUDGET    registro dei costi (predefinito docs/verifiche/evidenze/eval-p5/budget.tsv)
 #   TOLLGATE_EVAL_EVIDENCE  radice delle cartelle d'uscita (predefinita docs/verifiche/evidenze/eval-p5)
 #   TOLLGATE_EVAL_TARGET    bersaglio (predefinito /tmp/tollgate-eval-target, decisione 9 (c))
+# Valgono sempre:
 #   TOLLGATE_EVAL_TMPDIR    TMPDIR dell'eval (predefinito $HOME/.cache/tollgate-eval-tmp), mai sotto /tmp, /var/tmp, /dev/shm
-#   TOLLGATE_EVAL_TIMEOUT   secondi per invocazione (predefinito 3600)
-#   TOLLGATE_EVAL_TEST_MODE=1  solo per i test: la cartella temporanea dei test sta in /tmp, quindi salta quel rifiuto
+#   TOLLGATE_EVAL_TIMEOUT   secondi per invocazione, intero positivo (predefinito 3600; dopo 30 s di grazia, SIGKILL)
+#   TOLLGATE_EVAL_TEST_MODE=1  solo per i test: abilita le tre variabili sopra e salta il rifiuto di /tmp per la cartella
+#                           temporanea (i test stanno in /tmp); il preambolo lo stampa
+#
+# Una sola invocazione alla volta (flock su <registro>.lock). Prima del lancio di claude la riga dell'invocazione
+# entra in budget.tsv con costUsd «?»: se lo script muore (anche SIGKILL) il residuo resta 0 finché non la correggi a mano.
 set -u
+die() { echo "$1" >&2; exit "${2:-64}"; }
+if [ "${TOLLGATE_EVAL_TEST_MODE:-}" != 1 ]; then
+  for v in TOLLGATE_EVAL_BUDGET TOLLGATE_EVAL_EVIDENCE TOLLGATE_EVAL_TARGET; do
+    [ -z "${!v:-}" ] || die "$v è impostata ma vale solo con TOLLGATE_EVAL_TEST_MODE=1: la tolgo dall'ambiente e rilancio"
+  done
+fi
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/.." && pwd)"
 EVIDENCE="${TOLLGATE_EVAL_EVIDENCE:-$root/docs/verifiche/evidenze/eval-p5}"
@@ -29,7 +41,6 @@ THRESHOLD=0.66
 DEFAULT_RUNS=3         # decisione 8: tre corse per caso
 TOKEN_PATTERN='gh[pos]_[A-Za-z0-9_]{8,}|github_pat_[A-Za-z0-9_]{8,}|sk-ant-[A-Za-z0-9_-]{8,}|AKIA[0-9A-Z]{16}'
 
-die() { echo "$1" >&2; exit "${2:-64}"; }
 cost() { python3 -B "$here/cost.py" "$@"; }
 
 # ---------------------------------------------------------------- argomenti
@@ -50,6 +61,9 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 [ -n "$selector" ] || die "uso: run.sh <spec|extra|caso> [--runs N]"
+eval_timeout="${TOLLGATE_EVAL_TIMEOUT:-3600}"
+case "$eval_timeout" in ''|*[!0-9]*|0|0[0-9]*) die "TOLLGATE_EVAL_TIMEOUT vuole un intero positivo di secondi: $eval_timeout" ;; esac
+[ "${#eval_timeout}" -le 6 ] || die "TOLLGATE_EVAL_TIMEOUT troppo grande: $eval_timeout"
 case "$runs" in ''|*[!0-9]*|0|0[0-9]*) die "--runs vuole un intero positivo: $runs" ;; esac
 [ "${#runs}" -le 3 ] || die "--runs troppo grande: $runs"
 
@@ -73,6 +87,11 @@ case "$selector" in
 esac
 
 # ---------------------------------------------------------------- tetto
+
+budget_file="$TOLLGATE_EVAL_BUDGET"
+mkdir -p "$(dirname "$budget_file")" || die "cartella del registro non creabile" 1
+exec 9>"$budget_file.lock" || die "file di lock non apribile: $budget_file.lock" 1
+flock -n 9 || die "un'altra invocazione di run.sh è in corso (lock $budget_file.lock): una alla volta"
 
 cap="$(cost remaining)" || die "budget.tsv illeggibile: non lancio niente" 1
 if ! awk -v c="$cap" 'BEGIN { exit !(c >= 0.01) }'; then
@@ -98,6 +117,12 @@ eval_tmpdir() {
   printf '%s\n' "$r"
 }
 evtmp="$(eval_tmpdir)" || exit $?
+echo "registro dei costi: $budget_file"
+echo "cartella delle evidenze: $EVIDENCE"
+echo "bersaglio: $TARGET"
+echo "TMPDIR dell'eval: $evtmp"
+echo "residuo del tetto: $cap USD"
+[ "${TOLLGATE_EVAL_TEST_MODE:-}" != 1 ] || echo "!! TEST_MODE attivo: percorsi di prova, non è una corsa vera"
 
 # ---------------------------------------------------------------- bersaglio e cartella d'uscita
 
@@ -116,29 +141,28 @@ cmd=(claude plugin eval "$TARGET" "${select_args[@]}" --runs "$runs" --scaffold 
      --max-cost-usd "$cap" --keep-temp --output-dir "$dir" --json "$dir/result.json" --report "$dir/report.html")
 
 echo "== $label"
-echo "residuo del tetto: $cap USD"
-echo "comando: PATH=$shim_dir:\$PATH TMPDIR=$evtmp timeout ${TOLLGATE_EVAL_TIMEOUT:-3600} ${cmd[*]}"
+echo "comando: PATH=$shim_dir:\$PATH TMPDIR=$evtmp timeout -k 30 $eval_timeout ${cmd[*]}"
 echo "uscita: $dir"
 printf '%s\n' "TMPDIR dell eval: $evtmp" > "$dir/tmpdir.txt"
 printf '%s claude %s\n' "$(date -u +%FT%TZ)" "${cmd[*]:1}" >> "$dir/comando.txt"
 
-( cd "$TARGET" && PATH="$shim_dir:$PATH" TMPDIR="$evtmp" timeout "${TOLLGATE_EVAL_TIMEOUT:-3600}" "${cmd[@]}" \
-    >"$dir/stdout.txt" 2>"$dir/stderr.txt" </dev/null )
+reserved="$(cost reserve --label "$label")" || die "prenotazione del costo in budget.tsv fallita: non lancio niente" 1
+( cd "$TARGET" && PATH="$shim_dir:$PATH" TMPDIR="$evtmp" timeout -k 30 "$eval_timeout" "${cmd[@]}" \
+    >"$dir/stdout.txt" 2>"$dir/stderr.txt" </dev/null 9>&- )
 rc=$?
 echo "$rc" > "$dir/claude.rc"
 
 # ---------------------------------------------------------------- costo: qualunque sia l'uscita
 
 if [ ! -s "$dir/result.json" ]; then
-  cost add "$dir/result.json" --label "$label" >/dev/null 2>&1      # riga con «?»: il residuo diventa 0
   echo "uscita di claude: $rc" >&2
-  die "costo ignoto: controlla a mano prima di continuare ($dir)" 3
+  die "costo ignoto: controlla a mano prima di continuare ($dir): la riga «?» resta in budget.tsv" 3
 fi
-if ! cost add "$dir/result.json" --label "$label"; then
-  die "costo ignoto: controlla a mano prima di continuare ($dir)" 3
+if ! cost add "$dir/result.json" --label "$label" --reserved "$reserved"; then
+  die "costo ignoto: controlla a mano prima di continuare ($dir): la riga «?» resta in budget.tsv" 3
 fi
 after="$(cost remaining)"
-run_cost="$(python3 -B -c 'import json,sys; print(json.load(open(sys.argv[1]))["costUsd"])' "$dir/result.json")"
+run_cost="$(grep -F "$reserved" "$budget_file" | tail -n 1 | cut -f3)"
 echo "uscita di claude: $rc; costo dell'invocazione $run_cost USD; residuo $after USD"
 
 # ---------------------------------------------------------------- copia delle corse tenute (modello: spikes/p5/run-p5-checks.sh)
@@ -146,6 +170,7 @@ echo "uscita di claude: $rc; costo dell'invocazione $run_cost USD; residuo $afte
 # run_dir_ok <cartella>: stampa il percorso risolto se è claude-eval-* ed è figlia diretta della cartella temporanea dell'eval
 run_dir_ok() {
   local r parent base allowed
+  [ ! -L "$1" ] || return 1                                 # una corsa che è un collegamento simbolico non si segue
   r="$(realpath -e -- "$1" 2>/dev/null)" || return 1
   base="$(basename "$r")"; parent="$(dirname "$r")"
   case "$base" in claude-eval-?*) ;; *) return 1 ;; esac
@@ -153,6 +178,10 @@ run_dir_ok() {
   [ "$parent" = "$allowed" ] || return 1
   printf '%s\n' "$r"
 }
+
+# real_dir / real_file: cartella o file veri, mai collegamenti simbolici (né il percorso finale né la cartella madre indicata)
+real_dir() { [ -d "$1" ] && [ ! -L "$1" ]; }
+real_file() { [ -f "$1" ] && [ ! -L "$1" ]; }
 
 # cp_checked <origine> <destinazione> <cartella della corsa copiata>: non copia un file che contiene forme di token e lo registra
 cp_checked() {
@@ -173,17 +202,18 @@ copy_one_run() {
   run="$(run_dir_ok "$1")" || { echo "cartella rifiutata (non è claude-eval-* figlia diretta della cartella temporanea dell'eval): $1"; return 1; }
   name="$(basename "$run")"
   dest="$dest/$name"
-  chmod 700 "$run" 2>/dev/null; [ -d "$run/sealed" ] && chmod 700 "$run/sealed" 2>/dev/null
+  [ -d "$run" ] && chmod 700 "$run" 2>/dev/null
+  real_dir "$run/sealed" && chmod 700 "$run/sealed" 2>/dev/null
   mkdir -p "$dest"
-  if [ -f "$run/out/trace.jsonl" ]; then cp_checked "$run/out/trace.jsonl" "$dest/trace.jsonl" "$dest" && n=$((n + 1)); fi
-  if [ -f "$run/config/settings.json" ]; then
+  if real_dir "$run/out" && real_file "$run/out/trace.jsonl"; then cp_checked "$run/out/trace.jsonl" "$dest/trace.jsonl" "$dest" && n=$((n + 1)); fi
+  if real_dir "$run/config" && real_file "$run/config/settings.json"; then
     if grep -qiE "$TOKEN_PATTERN|\"[A-Za-z_]*(token|api_?key|secret|password)[A-Za-z_]*\"[[:space:]]*:[[:space:]]*\"[^\"]+\"" "$run/config/settings.json"; then
       echo "settings.json contiene forme di credenziali: non copiato" > "$dest/settings-non-copiato.txt"
     else
       cp -n -- "$run/config/settings.json" "$dest/settings.json" && n=$((n + 1))
     fi
   fi
-  if [ -d "$run/sealed/home/cwd" ]; then
+  if real_dir "$run/sealed/home" && real_dir "$run/sealed/home/cwd"; then
     while IFS= read -r f; do
       mkdir -p "$dest/cwd/$(dirname "${f#"$run/sealed/home/cwd/"}")"
       cp_checked "$f" "$dest/cwd/${f#"$run/sealed/home/cwd/"}" "$dest" && n=$((n + 1))
@@ -191,14 +221,14 @@ copy_one_run() {
                -type f -size -300k -print 2>/dev/null)
   fi
   for d in .local/state/tollgate .tollgate-eval; do
-    [ -d "$run/sealed/home/$d" ] || continue
+    real_dir "$run/sealed/home" && real_dir "$run/sealed/home/$d" || continue
     while IFS= read -r f; do
       mkdir -p "$dest/home/$(dirname "${f#"$run/sealed/home/"}")"
       cp_checked "$f" "$dest/home/${f#"$run/sealed/home/"}" "$dest" && n=$((n + 1))
     done < <(find "$run/sealed/home/$d" -maxdepth 6 -type f -size -300k 2>/dev/null)
   done
   f=.claude/plugins/installed_plugins.json
-  if [ -f "$run/sealed/home/$f" ]; then
+  if real_dir "$run/sealed/home/.claude/plugins" && real_file "$run/sealed/home/$f"; then
     mkdir -p "$dest/home/$(dirname "$f")"
     cp_checked "$run/sealed/home/$f" "$dest/home/$f" "$dest" && n=$((n + 1))
   fi
@@ -213,9 +243,19 @@ done < "$dir/cartelle-tenute.txt"
 
 # ---------------------------------------------------------------- il plugin è caricato?
 
+status=0
+cost table "$dir/result.json" > "$dir/tabella.md" || true
 if ! problems="$(cost plugin-check "$dir/result.json")"; then
   printf '%s\n' "$problems" >&2
-  die "plugin tollgate non caricato: controlla prima di continuare ($dir)" 4
+  echo "plugin tollgate non caricato: controlla prima di continuare ($dir)" >&2
+  status=4
 fi
-cost table "$dir/result.json" > "$dir/tabella.md" || true
+# forme di token nei file d'uscita che finiscono nelle evidenze (mai stampate, solo i nomi)
+leaks="$(cd "$dir" && grep -alE "$TOKEN_PATTERN" stdout.txt stderr.txt result.json report.html 2>/dev/null)"
+if [ -n "$leaks" ]; then
+  printf '%s\n' "$leaks" > "$dir/file-con-token.txt"
+  echo "forma di token nelle evidenze: non committare ($(printf '%s' "$leaks" | tr '\n' ' ')in $dir)" >&2
+  status=4
+fi
+[ "$status" = 0 ] || exit "$status"
 exit "$rc"

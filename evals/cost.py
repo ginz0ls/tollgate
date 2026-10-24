@@ -6,12 +6,15 @@ sommato su tutte le invocazioni del piano nel registro `budget.tsv`. Una riga co
 (`?`) vale tetto esaurito: si corregge a mano.
 
 Uso:
-  cost.py add <result.json> [--label ETICHETTA]   aggiunge una riga a budget.tsv (esce 3 se il costo è ignoto)
+  cost.py reserve --label ETICHETTA               prima di lanciare claude: riga con costUsd «?» (stampa l'ora che la identifica)
+  cost.py add <result.json> [--label E] [--reserved ORA]   mette il costo vero (sostituisce la riga prenotata, scrittura
+                                                  atomica; esce 3 se il costo è ignoto e lascia la riga «?»)
   cost.py remaining                               stampa il residuo in USD, a centesimi per difetto
   cost.py table <result.json>...                  tabella Markdown per caso
   cost.py plugin-check <result.json>              (trace in runs/ accanto) il plugin tollgate è caricato nelle trace del braccio con plugin
 
-`TOLLGATE_EVAL_BUDGET` sposta il registro (i test non toccano mai quello del repo). Solo libreria standard."""
+`TOLLGATE_EVAL_BUDGET` sposta il registro solo con `TOLLGATE_EVAL_TEST_MODE=1` (i test non toccano mai quello del repo);
+senza, se è impostata, `cost.py` esce 64. Solo libreria standard."""
 from __future__ import annotations
 
 import json
@@ -31,7 +34,12 @@ EXIT_UNKNOWN_COST = 3
 
 
 def budget_path() -> Path:
-    return Path(os.environ.get("TOLLGATE_EVAL_BUDGET") or DEFAULT_BUDGET)
+    custom = os.environ.get("TOLLGATE_EVAL_BUDGET")
+    if custom and os.environ.get("TOLLGATE_EVAL_TEST_MODE") != "1":
+        print("TOLLGATE_EVAL_BUDGET vale solo con TOLLGATE_EVAL_TEST_MODE=1: non uso un registro diverso da quello del repo",
+              file=sys.stderr)
+        raise SystemExit(64)
+    return Path(custom) if custom else DEFAULT_BUDGET
 
 
 def _is_number(value) -> bool:
@@ -93,22 +101,77 @@ def case_names(data: dict) -> list[str]:
     return [c["name"] for c in data.get("cases", []) if isinstance(c, dict) and isinstance(c.get("name"), str)]
 
 
-def add(result: Path, label: str | None = None, path: Path | None = None) -> bool:
-    """Aggiunge la riga dell'invocazione. `False` se il JSON manca o non porta costUsd e durationSeconds:
-    la riga entra comunque, con `?`, e il residuo diventa 0."""
+def run_cost(data: dict) -> float | None:
+    """Il massimo tra `costUsd` di alto livello e la somma dei costi per corsa (giudici compresi): se il
+    totale non includesse il giudice, il registro non sottostima. `None` se il costo di alto livello manca."""
+    if not _is_number(data.get("costUsd")) or not _is_number(data.get("durationSeconds")):
+        return None
+    per_run = 0.0
+    for case in data.get("cases", []):
+        if not isinstance(case, dict):
+            continue
+        for arm in (case.get("arms") or {}).values():
+            for run in arm if isinstance(arm, list) else []:
+                if isinstance(run, dict):
+                    per_run += sum(float(run[k]) for k in ("costUsd", "judgeCostUsd") if _is_number(run.get(k)))
+    return max(float(data["costUsd"]), per_run)
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _write_atomic(path: Path, text: str) -> None:
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _clean(field: str) -> str:
+    return field.replace("\t", " ").replace("\n", " ")
+
+
+def reserve(label: str, path: Path | None = None) -> str:
+    """Scrive prima del lancio la riga dell'invocazione con costUsd «?» (residuo 0 se lo script muore) e
+    ritorna l'ora che la identifica insieme all'etichetta."""
+    path = path or budget_path()
+    _ensure_header(path)
+    when = _now()
+    _write_atomic(path, path.read_text(encoding="utf-8") + "\t".join((when, _clean(label), "?", "?", "")) + "\n")
+    return when
+
+
+def add(result: Path, label: str | None = None, path: Path | None = None, reserved: str | None = None) -> bool:
+    """Mette il costo dell'invocazione. Con `reserved` sostituisce la riga prenotata; se il JSON manca o non porta
+    costUsd e durationSeconds ritorna `False` e la riga prenotata resta «?» (senza prenotazione se ne aggiunge una)."""
     path = path or budget_path()
     _ensure_header(path)
     data = _load(result)
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    name = label or Path(result).parent.name
-    known = bool(data) and _is_number(data.get("costUsd")) and _is_number(data.get("durationSeconds"))
-    if known:
-        row = (now, name, repr(float(data["costUsd"])), str(data["durationSeconds"]), ",".join(case_names(data)))
+    name = _clean(label or Path(result).parent.name)
+    cost_usd = run_cost(data) if data else None
+    casi = ",".join(case_names(data)) if data else ""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    index = None
+    if reserved:
+        for i, line in enumerate(lines[1:], 1):
+            cols = line.split("\t")
+            if len(cols) >= 3 and cols[0] == reserved and cols[1] == name and cols[2] == "?":
+                index = i
+    if cost_usd is None:
+        if index is None:
+            lines.append("\t".join((reserved or _now(), name, "?", "?", casi)))
+            _write_atomic(path, "\n".join(lines) + "\n")
+        return False
+    row = "\t".join((reserved or _now(), name, repr(float(cost_usd)), str(data["durationSeconds"]), casi))
+    if index is None:
+        lines.append(row)
     else:
-        row = (now, name, "?", "?", ",".join(case_names(data)) if data else "")
-    with path.open("a", encoding="utf-8") as fh:
-        fh.write("\t".join(row).replace("\n", " ") + "\n")
-    return known
+        lines[index] = row
+    _write_atomic(path, "\n".join(lines) + "\n")
+    return True
 
 
 # ---------------------------------------------------------------- tabella
@@ -221,11 +284,13 @@ def plugin_check(result: Path) -> list[str]:
     if data is None:
         return [f"{result}: JSON illeggibile"]
     problems: list[str] = []
+    checked = 0
     for case in data.get("cases", []):
         for arm, want in (("with", True), ("without", False)):
             for run in _runs(case, arm):
                 if not run.get("tracePath"):
                     continue
+                checked += 1
                 trace = _trace_for(run, result)
                 loaded = plugin_loaded(_read_trace(trace))
                 where = f"{case.get('name', '?')} ({arm}) {Path(run['tracePath']).parts[-3]}"
@@ -233,24 +298,33 @@ def plugin_check(result: Path) -> list[str]:
                     problems.append(f"{where}: trace assente o senza messaggio init")
                 elif loaded != want:
                     problems.append(f"{where}: plugin {PLUGIN_NAME} " + ("non caricato" if want else "caricato nel braccio senza plugin"))
+    if checked == 0:
+        problems.append("nessuna corsa con trace da controllare: il caricamento del plugin non è verificato")
     return problems
 
 
 def main(argv: list[str]) -> int:
     cmd, rest = (argv[0], argv[1:]) if argv else ("", [])
-    if cmd == "add":
-        label = None
-        if "--label" in rest:
-            i = rest.index("--label")
-            if i + 1 >= len(rest):
-                print("--label vuole un valore", file=sys.stderr)
+    if cmd in ("add", "reserve"):
+        values = {}
+        for opt in ("--label", "--reserved"):
+            if opt in rest:
+                i = rest.index(opt)
+                if i + 1 >= len(rest):
+                    print(f"{opt} vuole un valore", file=sys.stderr)
+                    return 2
+                values[opt] = rest[i + 1]
+                rest = rest[:i] + rest[i + 2:]
+        if cmd == "reserve":
+            if rest or "--label" not in values:
+                print("uso: cost.py reserve --label ETICHETTA", file=sys.stderr)
                 return 2
-            label = rest[i + 1]
-            rest = rest[:i] + rest[i + 2:]
+            print(reserve(values["--label"]))
+            return 0
         if len(rest) != 1:
-            print("uso: cost.py add <result.json> [--label ETICHETTA]", file=sys.stderr)
+            print("uso: cost.py add <result.json> [--label ETICHETTA] [--reserved ORA]", file=sys.stderr)
             return 2
-        if add(Path(rest[0]), label):
+        if add(Path(rest[0]), values.get("--label"), reserved=values.get("--reserved")):
             return 0
         print(f"costo ignoto: {rest[0]} non porta costUsd e durationSeconds; riga con «?» in budget.tsv "
               "(residuo 0 finché non la correggi a mano)", file=sys.stderr)
