@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import pwd
 import re
 import shlex
 import shutil
@@ -41,7 +42,10 @@ STEP_TIMEOUT_S = 120
 # partenza (rapporto delle verifiche, I1). `/.claude/*` e non `/.claude/`: i worktree di tollgate
 # stanno in `.claude/worktrees/` (già escluso da `start`) e il progetto di prova non versiona nulla
 # sotto `.claude/`, quindi escludere il contenuto non nasconde niente.
-EXCLUDES = ("/.origin.git/", "/.bash_profile", "/.bashrc", "/.claude/*", "/.eval-artifacts",
+PLACEHOLDERS = frozenset({".bash_profile", ".bashrc", ".claude", ".eval-artifacts", ".gitconfig",
+                          ".gitmodules", ".idea", ".mcp.json", ".profile", ".ripgreprc", ".vscode",
+                          ".zprofile", ".zshrc"})
+EXCLUDES = ("/.origin.git/", "/.claude", "/.bash_profile", "/.bashrc", "/.claude/*", "/.eval-artifacts",
             "/.gitconfig", "/.gitmodules", "/.idea", "/.mcp.json", "/.profile", "/.ripgreprc",
             "/.vscode", "/.zprofile", "/.zshrc")
 # Cartella Superpowers per `installed_plugins.json`: solo SKILL.md vuoti (la sandbox non lo carica).
@@ -105,8 +109,23 @@ class _Builder:
                          cwd, what=f"git {args[0]}", ok=ok).stdout.strip()
 
     def _hook(self, event: str, payload: dict, *, what: str) -> subprocess.CompletedProcess:
-        return self._run([HOOK, event], self.ws, what=f"hook {event} ({what})",
-                         stdin=json.dumps(payload))
+        r = self._run([HOOK, event], self.ws, what=f"hook {event} ({what})",
+                      stdin=json.dumps(payload))
+        if self._denied(r.stdout):
+            raise ScaffoldError(f"hook {event} ({what}) ha negato: {r.stdout.strip()[:300]}")
+        return r
+
+    @staticmethod
+    def _denied(stdout: str) -> bool:
+        """Un `deny` scritto in JSON su stdout con uscita 0 vale come un'uscita 2."""
+        try:
+            data = json.loads(stdout) if stdout.strip().startswith("{") else {}
+        except ValueError:
+            return False
+        out = data.get("hookSpecificOutput")
+        return isinstance(data, dict) and (
+            data.get("decision") in ("block", "deny")
+            or (isinstance(out, dict) and out.get("permissionDecision") in ("deny", "block")))
 
     def _cli(self, argv, cwd, *, ok=(0,)) -> subprocess.CompletedProcess:
         return self._run([sys.executable, "-B", BIN, *argv], cwd,
@@ -144,14 +163,38 @@ class _Builder:
 
     # ----- cartelle, HOME e stato ----------------------------------------------------------
 
+    @staticmethod
+    def _only_placeholders(ws: Path) -> bool:
+        """Il workspace contiene solo i segnaposto noti della sandbox: file vuoti o cartelle vuote."""
+        for entry in ws.iterdir():
+            if entry.name not in PLACEHOLDERS:
+                return False
+            if entry.is_symlink():
+                return False
+            if entry.is_dir():
+                for sub in entry.rglob("*"):
+                    if sub.is_symlink() or (sub.is_file() and sub.stat().st_size):
+                        return False
+            elif entry.stat().st_size:
+                return False
+        return True
+
     def _check_places(self) -> None:
+        real = Path(pwd.getpwuid(os.getuid()).pw_dir).resolve()
+        if self.home == real:
+            raise ScaffoldError(f"{self.home} è la HOME vera dell'utente: lo scaffold scrive solo "
+                                "in una HOME della corsa")
         if (self.home / ".claude" / "settings.json").exists():
             raise ScaffoldError(f"{self.home} sembra una HOME vera (c'è .claude/settings.json): "
                                 "lo scaffold scrive solo in una HOME della corsa")
+        if (self.home / ".claude" / "plugins" / "installed_plugins.json").exists():
+            raise ScaffoldError(f"{self.home} ha già un registro dei plugin: lo scaffold "
+                                "costruisce da zero (HOME vera?)")
         if self.state_root.exists() and any(p.name != SENTINEL for p in self.state_root.iterdir()):
             raise ScaffoldError(f"{self.state_root} non è vuota: lo scaffold costruisce da zero")
-        if self.ws.exists() and any(self.ws.iterdir()):
-            raise ScaffoldError(f"il workspace {self.ws} non è vuoto")
+        if self.ws.exists() and not self._only_placeholders(self.ws):
+            raise ScaffoldError(f"il workspace {self.ws} non è vuoto (a parte i segnaposto "
+                                "della sandbox)")
 
     def _write_home(self) -> None:
         self.state_root.mkdir(parents=True, exist_ok=True)

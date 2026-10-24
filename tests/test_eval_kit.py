@@ -305,6 +305,65 @@ class StateTest(KitCase):
             self.build("l0-execution")
         self.assertFalse((self.home / ".local").exists())
 
+    def test_workspace_with_only_sandbox_placeholders_is_accepted(self):
+        for name in (".bashrc", ".mcp.json", ".gitconfig"):
+            (self.ws / name).write_text("")
+        (self.ws / ".claude" / "agents").mkdir(parents=True)
+        (self.ws / ".claude" / "commands").write_text("")
+        (self.ws / ".vscode").mkdir()
+        built = self.build("l0-execution")
+        self.assertTrue(built.worktree.is_dir())
+        self.assertWorkspaceClean()
+        self.assertEqual(self.git(self.ws, "ls-files", ".claude", ".bashrc", ".vscode"), "")
+
+    def test_workspace_with_anything_else_is_refused(self):
+        cases = {"file": lambda: (self.ws / "gia.txt").write_text(""),
+                 "placeholder pieno": lambda: (self.ws / ".bashrc").write_text("x"),
+                 "dentro .claude": lambda: ((self.ws / ".claude").mkdir(),
+                                            (self.ws / ".claude" / "x.json").write_text("{}")),
+                 "symlink": lambda: (self.ws / ".idea").symlink_to(self.tmp)}
+        for label, make in cases.items():
+            with self.subTest(label):
+                shutil.rmtree(self.ws)
+                self.ws.mkdir()
+                make()
+                with self.assertRaisesRegex(scaffold.ScaffoldError, "non è vuoto"):
+                    self.build("l0-execution")
+        self.assertFalse((self.home / ".local").exists())
+
+    def test_refuses_the_users_real_home_and_an_existing_registry(self):
+        import pwd
+        entry = pwd.getpwuid(os.getuid())
+        with mock.patch.object(scaffold.pwd, "getpwuid", return_value=mock.Mock(pw_dir=str(self.home))):
+            with self.assertRaisesRegex(scaffold.ScaffoldError, "HOME vera"):
+                self.build("l0-execution")
+        self.assertNotEqual(entry.pw_dir, str(self.home))
+        reg = self.home / ".claude" / "plugins"
+        reg.mkdir(parents=True)
+        (reg / "installed_plugins.json").write_text("{}")
+        with self.assertRaisesRegex(scaffold.ScaffoldError, "registro dei plugin"):
+            self.build("l0-execution")
+        self.assertEqual((reg / "installed_plugins.json").read_text(), "{}")
+        self.assertFalse((self.home / ".local").exists())
+
+    def test_hook_denial_stops_the_scaffold(self):
+        fake = self.tmp / "hook"
+        outputs = {"json deny": ('{"hookSpecificOutput": {"hookEventName": "PreToolUse", '
+                                 '"permissionDecision": "deny"}}', 0),
+                   "json block": ('{"decision": "block", "reason": "no"}', 0),
+                   "uscita 2": ("", 2)}
+        builder = scaffold._Builder(recipes.RECIPES["l0-execution"], self.ws, self.home, None)
+        for label, (out, rc) in outputs.items():
+            with self.subTest(label):
+                fake.write_text(f"#!/bin/sh\ncat >/dev/null\nprintf '%s' '{out}'\nexit {rc}\n")
+                fake.chmod(0o755)
+                with mock.patch.object(scaffold, "HOOK", fake):
+                    with self.assertRaises(scaffold.ScaffoldError):
+                        builder._hook("PreToolUse", {"cwd": str(self.ws)}, what="prova")
+        fake.write_text("#!/bin/sh\ncat >/dev/null\necho '{\"hookSpecificOutput\": {\"additionalContext\": \"ok\"}}'\n")
+        with mock.patch.object(scaffold, "HOOK", fake):
+            builder._hook("PreToolUse", {"cwd": str(self.ws)}, what="prova")
+
     def test_main_rejects_unknown_recipe(self):
         err = subprocess.run([sys.executable, "-B", str(KIT / "scaffold.py"), "non-esiste"],
                              cwd=str(self.ws), env=run_env(self.home), capture_output=True,
@@ -412,7 +471,7 @@ class TargetTest(KitCase):
         for rel in ("bin/tollgate", "evals/caso/case.yaml", "tests/evalbin/gh",
                     "tests/fakegh.py", "tests/test_altro.py", "docs/x.md", "bin/__pycache__/a.pyc",
                     "evals/_kit/__pycache__/b.pyc", ".git/HEAD", ".github/workflows/ci.yml",
-                    "spikes/p.sh", "skills/s/SKILL.md"):
+                    "spikes/p.sh", "skills/s/SKILL.md", "docs/uso/limiti.md"):
             (root / rel).parent.mkdir(parents=True, exist_ok=True)
             (root / rel).write_text("x")
         return root
@@ -425,7 +484,8 @@ class TargetTest(KitCase):
         self.assertIn("dependencies", json.loads((root / ".claude-plugin" / "plugin.json").read_text()))
         copied = sorted(p.relative_to(out).as_posix() for p in out.rglob("*") if p.is_file())
         self.assertEqual(copied, [".claude-plugin/plugin.json", ".tollgate-eval-target",
-                                  "bin/tollgate", "evals/caso/case.yaml", "skills/s/SKILL.md",
+                                  "bin/tollgate", "docs/uso/limiti.md", "evals/caso/case.yaml",
+                                  "skills/s/SKILL.md",
                                   "tests/evalbin/gh", "tests/fakegh.py"])
 
     def test_target_rebuilds_its_own_output_only(self):

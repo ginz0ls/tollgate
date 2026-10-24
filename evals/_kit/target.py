@@ -17,6 +17,7 @@ MARKER = ".tollgate-eval-target"
 SKIP_TOP = frozenset({".git", ".github", ".claude", ".superpowers", "docs", "spikes", "tests",
                       "node_modules", "reports"})
 KEEP_TESTS = ("evalbin", "fakegh.py")
+KEEP_DOCS = ("uso",)        # `status` stampa il percorso di docs/uso/limiti.md sotto la radice del programma
 MANIFEST = Path(".claude-plugin") / "plugin.json"
 
 
@@ -52,6 +53,9 @@ def build(plugin_root: Path, out: Path) -> Path:
             shutil.copytree(src, dest, symlinks=True, ignore=_ignore)
         else:
             shutil.copy2(src, dest)
+    for name in KEEP_DOCS:
+        if (root / "docs" / name).is_dir():
+            shutil.copytree(root / "docs" / name, out / "docs" / name, symlinks=True, ignore=_ignore)
     manifest = out / MANIFEST
     data = json.loads(manifest.read_text(encoding="utf-8"))
     data.pop("dependencies", None)
