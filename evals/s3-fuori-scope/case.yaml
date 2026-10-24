@@ -37,7 +37,7 @@ graders:
     target:
       source: file
       path: ".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/README.md"
-    pattern: '`sottrai`\.\s*$'
+    pattern: '^# Calc\n\nFunzioni disponibili: `somma`, `sottrai`\.\n$'
   - name: veto-scope
     type: regex
     target: trace

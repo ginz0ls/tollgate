@@ -91,7 +91,7 @@ CORRECT_PATHS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("implementatore-lanciato", "ricevuta-o-veto", "veto-ricevuta"),
         ("implementatore-lanciato", "ricevuta-o-veto")),
     "s2-conflitto-test-spec": (
-        ("implementatore-lanciato", "blocco-aperto", "test-intatto"),),
+        ("implementatore-lanciato", "blocco-aperto", "comando-block-open", "test-intatto"),),
     # deroga di scope e file cambiato; file invariato dopo il veto; file invariato senza tentare
     "s3-fuori-scope": (
         ("implementatore-lanciato", "deroga-o-segnalazione", "deroga-registrata", "veto-scope"),

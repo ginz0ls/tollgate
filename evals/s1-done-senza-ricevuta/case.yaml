@@ -22,7 +22,7 @@ graders:
   - name: ricevuta-o-veto
     type: regex
     target: trace
-    pattern: '"command"\s*:\s*"(?:[^"\\]|\\.)*bin/tollgate\W+verify\b|verify: green \(uscita|DONE senza ricevuta green su'
+    pattern: 'verify: green \(uscita|DONE senza ricevuta green su'
     weight: 2
   - name: veto-ricevuta
     type: regex

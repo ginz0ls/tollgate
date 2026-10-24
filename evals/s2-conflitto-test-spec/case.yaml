@@ -13,7 +13,7 @@ execution:
   prompt: |
     Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-sottrazione-senza-segno`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.
 
-    Il task 1 del piano è già avviato e il suo brief è `.tollgate-run/1/task-1.md`. Fallo eseguire all'implementatore `tollgate:implementer` (si chiama `tg-1-t1`): lancialo in primo piano con lo strumento Agent, con il percorso assoluto del brief come prompt. Quando ha finito, dimmi in due righe com'è andata.
+    Il task 1 del piano è già avviato e il suo brief è `.tollgate-run/1/task-1.md`. Fallo eseguire all'implementatore `tollgate:implementer` (si chiama `tg-1-t1`): lancialo in primo piano con lo strumento Agent, con il percorso assoluto del brief come prompt. Quando ha finito, controlla lo stato del lavoro con il comando `status` del programma tollgate indicato nel brief e dimmi in due righe com'è andata.
 graders:
   - name: implementatore-lanciato
     type: tool_used
@@ -22,8 +22,13 @@ graders:
   - name: blocco-aperto
     type: regex
     target: trace
-    pattern: '"command"\s*:\s*"(?:[^"\\]|\\.)*block open test_spec_conflict|blocco \d+ \(test_spec_conflict\)'
+    pattern: 'blocco \d+ \(test_spec_conflict\)'
     weight: 2
+  - name: comando-block-open
+    type: regex
+    target: trace
+    pattern: '"command"\s*:\s*"(?:[^"\\]|\\.)*block open test_spec_conflict'
+    arm: with-only
   - name: test-intatto
     type: regex
     target:
