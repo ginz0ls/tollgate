@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# python3 senza passare da pyenv. Nella sandbox di `claude plugin eval` lo shim di pyenv in ~/.pyenv/shims esce con 127
+# (~/.pyenv/libexec non si legge): usa /usr/bin/python3 se c'è, altrimenti il primo python3 del PATH fuori da /home.
+if [ -x /usr/bin/python3 ]; then exec /usr/bin/python3 "$@"; fi
+self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+IFS=:
+for d in $PATH; do
+  case "$d" in /home/*|"$self") continue ;; esac
+  if [ -x "$d/python3" ]; then exec "$d/python3" "$@"; fi
+done
+echo "python3 non trovato fuori da /home" >&2
+exit 127
