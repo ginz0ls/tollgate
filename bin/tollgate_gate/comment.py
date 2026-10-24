@@ -144,6 +144,15 @@ def is_guard_red(body: str) -> bool:
         and lines[2].startswith(GUARD_RED_TITLE)
 
 
+_GUARD_MARKER = re.compile(re.escape(GUARD_PREFIX) + r" sha=([0-9a-f]{40}) -->")
+
+
+def guard_marker_sha(body: str) -> str | None:
+    """Lo SHA nel marcatore della prima riga del commento di guard, `None` se manca."""
+    m = _GUARD_MARKER.match(body.lstrip())
+    return m.group(1) if m else None
+
+
 def render_guard_resolved(sha: str) -> str:
     """Il commento di `tollgate-guard` quando il rosso scritto prima non c'è più."""
     return (f"{GUARD_PREFIX} sha={_check_sha(sha)} -->\n\n"

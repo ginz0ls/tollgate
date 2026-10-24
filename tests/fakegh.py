@@ -46,9 +46,9 @@ scrive su stderr ed esce con 1 senza stdout; finita la lista risponde normalment
 Le PR stanno in `prs`: `pr create` ne aggiunge una (numero successivo al più alto, stato OPEN) e
 `api --method PATCH repos/o/r/pulls/<n> -F body=@<file>` riscrive `body` (come `pr edit`, che con
 gh 2.46 non funziona; `fail` lo chiama "pr edit"); entrambi riscrivono il file dei dati. `fail`
-elenca i comandi (le prime
-due parole, "pr create") che escono con 1 senza fare nulla, per simulare i guasti. Un campo di
-`--json` che `gh` non ha per le PR esce con 1: un nome sbagliato nel codice fa fallire i test.
+elenca i comandi (le prime due parole, "pr create") che escono con 1 senza fare nulla, per
+simulare i guasti. Un campo di `--json` che `gh` non ha per le PR esce con 1: un nome sbagliato
+nel codice fa fallire i test.
 
 Ogni chiamata si registra in $TOLLGATE_FAKEGH_LOG (una riga JSON). Una risposta che manca dai
 dati esce con 1: un test che chiede qualcosa di non previsto fallisce, non passa in silenzio."""

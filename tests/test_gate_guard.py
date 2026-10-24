@@ -17,7 +17,7 @@ from tests.helpers import BIN, TempState, git
 from tests.hookkit import DEFAULT_FILES
 from tollgate_core import ghcli
 from tollgate_core.git import GitError
-from tollgate_gate import comment, github, guard
+from tollgate_gate import cli, comment, github, guard
 from tollgate_gate.model import IssueFacts, PrFacts
 
 SLUG = "o/r"
@@ -395,6 +395,38 @@ class RunTest(GuardBase):
         self.assertNotIn("tollgate.toml", note["body"])
         self.assertNotIn("rosso", note["body"])
         self.assertEqual([s["state"] for s in self.posted_statuses()], ["success", "failure"])
+
+    def test_green_guard_keeps_red_comment_of_another_sha(self):
+        self.lab.commit("tollgate.toml", "schema_version = 1\n")
+        red_sha = self.lab.head
+        self.push_pr_head()
+        self.run_guard()
+        [red] = self.comments()
+        git(self.lab.repo, "push", "-q", "origin", "HEAD:refs/heads/main")
+        other = self.lab.commit("src/new.py", "x = 1\n")       # un altro SHA, verde
+        self.push_pr_head()
+        self.assertEqual(self.run_guard(self.event(sha=other)), 0)
+        self.assertEqual(self.comments(), [red])
+        self.assertTrue(self.comments()[0]["body"].startswith(
+            f"{comment.GUARD_PREFIX} sha={red_sha} -->"))
+        self.assertEqual(self.posted_statuses(other)[0]["state"], "success")
+
+    def test_edit_comment_failure_after_green_status_is_a_message(self):
+        self.lab.commit("tollgate.toml", "schema_version = 1\n")
+        self.push_pr_head()
+        self.run_guard()
+        git(self.lab.repo, "push", "-q", "origin", "HEAD:refs/heads/main")
+        err = io.StringIO()
+        cwd = os.getcwd()
+        os.chdir(self.lab.repo)
+        self.addCleanup(os.chdir, cwd)
+        with mock.patch.object(github, "edit_comment", side_effect=ghcli.GhError("HTTP 502")), \
+                redirect_stderr(err):
+            code = cli.main(["guard", "--event", str(self.event()), "--publish"])
+        self.assertEqual(code, 1)
+        self.assertIn("HTTP 502", err.getvalue())
+        self.assertNotIn("Traceback", err.getvalue())
+        self.assertEqual(self.posted_statuses()[0]["state"], "success")
 
     def test_green_guard_without_comment_creates_none(self):
         self.push_pr_head()

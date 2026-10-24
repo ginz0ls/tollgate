@@ -139,7 +139,9 @@ def run(event_path: Path, *, publish: bool, environ: Mapping[str, str],
         github.set_status(state, repo, slug, head, context=CONTEXT, status="success",
                           description=DESC_OK)
         red = github.bot_comment(state, repo, slug, pr.number, prefix=comment.GUARD_PREFIX)
-        if red is not None and comment.is_guard_red(str(red.get("body", ""))):
+        text = str(red.get("body", "")) if red is not None else ""
+        # solo il rosso di questo SHA: quello di un altro resta com'è (è vero per quello SHA)
+        if comment.is_guard_red(text) and comment.guard_marker_sha(text) == head:
             with tempfile.TemporaryDirectory(prefix="tollgate-guard-") as tmp:
                 body = _write(tmp, "comment.md", comment.render_guard_resolved(head))
                 github.edit_comment(state, repo, slug, red["id"], body_file=body)
