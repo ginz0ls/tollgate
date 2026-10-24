@@ -83,6 +83,18 @@ class WaiversTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             waivers.parse(waivers.dumps(f))
 
+    def test_id_with_trailing_newline_rejected(self):
+        """`$` accetta un `\\n` finale: l'id `w-7-1\\n` non è un id."""
+        head = 'schema_version = 1\nissue = 7\nbranch = "b"\n'
+        for wid in ("w-7-1\\n", "w-7-1\\n\\n"):
+            with self.subTest(wid=wid):
+                with self.assertRaises(ValueError):
+                    waivers.parse(head + f'[[waiver]]\nid = "{wid}"\ntype = "scope"\n'
+                                  'file = "a"\nchoice = "c"\nwhy = "w"\ncost = "k"\n')
+        self.assertEqual(waivers.parse(head + '[[waiver]]\nid = "w-7-1"\ntype = "scope"\n'
+                                       'file = "a"\nchoice = "c"\nwhy = "w"\ncost = "k"\n'
+                                       ).waivers[0].id, "w-7-1")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -31,7 +31,7 @@ RECEIPT_SOURCES = ("finish", "verify")
 MODE_PLACEHOLDER = "__MODE__"
 
 _SECTION = re.compile(r"^\s*\[([^\[\]]*)\]\s*(?:#.*)?$")
-_MODE_LINE = re.compile(r'^(\s*mode\s*=\s*)"[^"\n]*"')
+_MODE_LINE = re.compile(r'^(\s*mode\s*=\s*)(?:"[^"\n]*"|\'[^\'\n]*\')')
 
 
 @dataclass

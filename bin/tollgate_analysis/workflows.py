@@ -12,7 +12,7 @@ _PATH = re.compile(r"^\.github/workflows/[^/]+\.ya?ml$")
 _EVENT = re.compile(r"(?<![\w-])(" + "|".join(FORBIDDEN_EVENTS) + r")(?![\w-])")
 _WRITE_ALL = re.compile(r"(?<![\w-])write-all(?![\w-])")
 _SCOPE = re.compile(r"(?:^|[\s{,\[-])[\"']?(" + "|".join(GUARDED_SCOPES) + r")[\"']?[ \t]*:"
-                    r"(?:[ \t]+|(?=[,}\]]|$))(\"[^\"]*\"|'[^']*'|[^\s,}\]]*)")
+                    r"[ \t]*(\"[^\"]*\"|'[^']*'|[^\s,}\]]*)")
 # àncora, alias o chiave di fusione: a inizio nodo (riga, `- `, dopo `chiave: `, `[`, `{` o `,`)
 _ANCHOR = re.compile(r"(?:^\s*(?:-\s+)*|:\s+|[\[{,]\s*)[&*]\S")
 _MERGE = re.compile(r"^\s*(?:-\s+)?<<\s*:")

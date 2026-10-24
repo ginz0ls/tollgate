@@ -199,6 +199,33 @@ class BaseIdsTest(GateRunBase):
         self.assertEqual(baseids.load(self.out / "ids.json", tree=tree),
                          {"verify": {"t::a", "t::b"}})
 
+    def test_load_full_returns_commands(self):
+        result = baseids.compute(self.lab.repo, config_sha=self.lab.base, sha=self.lab.base,
+                                 out=self.out, environ=os.environ)
+        tree = result["tree"]
+        path = self.out / "ids.json"
+        self.assertEqual(baseids.load_full(path, tree=tree),
+                         baseids.BaseIds({"verify": {"t::a", "t::b"}}, {"verify": "green"}))
+        self.assertEqual(baseids.load_full(path, tree=tree).ids, baseids.load(path, tree=tree))
+        self.assertIsNone(baseids.load_full(path, tree="0" * 40))
+        data = json.loads(path.read_text())
+        for label, commands, want in (
+                ("senza il campo", None, {}),
+                ("stato non valido", {"verify": "bogus"}, "none"),
+                ("non è una mappa", ["verify"], "none"),
+                ("stato non stringa", {"verify": 1}, "none")):
+            with self.subTest(label):
+                broken = {k: v for k, v in data.items() if k != "commands"}
+                if commands is not None:
+                    broken["commands"] = commands
+                path.write_text(json.dumps(broken))
+                got = baseids.load_full(path, tree=tree)
+                if want == "none":
+                    self.assertIsNone(got)
+                else:
+                    self.assertEqual(got.commands, want)
+                    self.assertEqual(got.ids, {"verify": {"t::a", "t::b"}})
+
     def test_load_rejects_other_tree(self):
         baseids.compute(self.lab.repo, config_sha=self.lab.base, sha=self.lab.base, out=self.out,
                         environ=os.environ)

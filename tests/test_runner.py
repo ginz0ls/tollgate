@@ -2,6 +2,7 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tollgate_analysis.junit import Junit
 from tollgate_core import runner, verify
@@ -99,6 +100,26 @@ class RunOneTest(unittest.TestCase):
             runner.report_path("junit:../x.xml")
         self.assertIsNone(runner.report_path(""))
         self.assertEqual(runner.report_path("junit:a/b.xml"), "a/b.xml")
+
+
+    def test_report_error_other_than_junit_is_red_not_traceback(self):
+        """Un report che esiste ma non si legge (permessi, errore di I/O) è un comando rosso con
+        la nota nel log, non un'eccezione che fa cadere il run."""
+        for error in (PermissionError(13, "Permission denied"), OSError(5, "Input/output error")):
+            with self.subTest(error=type(error).__name__), \
+                    tempfile.TemporaryDirectory(prefix="tollgate runner ") as tmp:
+                root, logs = Path(tmp) / "repo", Path(tmp) / "logs"
+                root.mkdir()
+                logs.mkdir()
+                spec = runner.CommandSpec(
+                    "verify", "echo '<testsuite><testcase classname=\"t\" name=\"a\"/></testsuite>'"
+                    " > j.xml", "junit:j.xml")
+                with mock.patch.object(Path, "read_bytes", side_effect=error):
+                    _resolved, code, junit, _dur, state, log = runner.run_one(
+                        spec, root=root, files=[], env={"PATH": "/usr/bin:/bin"}, timeout_s=20,
+                        allow_no_tests=False, log_dir=logs, tag="t")
+                self.assertEqual((code, junit, state), (0, None, "red"))
+                self.assertIn("report non leggibile", log.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

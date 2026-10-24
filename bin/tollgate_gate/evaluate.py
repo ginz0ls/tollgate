@@ -11,6 +11,7 @@ import difflib
 import posixpath
 import re
 import tomllib
+from collections.abc import Callable
 from functools import cached_property
 
 from tollgate_analysis import (approvals, globs, level as levelmod, mustcheck, plan as planmod,
@@ -264,6 +265,8 @@ def commands(ctx: Context, ev: Evaluation) -> None:
                      f"`approve unverified-tests`")
         elif state == "red":
             detail = f" (uscita {r.exit})" if r.exit not in (None, 0) else ""
+            if r.exit is None and r.state == "green":
+                detail = " (dichiarato green ma senza codice di uscita: non si può fidare)"
             if r.junit is not None and r.junit.failed:
                 detail += f", {r.junit.failed} test falliti nel report"
             _red(ev, "command_red", "commands", f"il comando «{spec.name}» è rosso{detail}")
@@ -283,17 +286,39 @@ def commands(ctx: Context, ev: Evaluation) -> None:
 
 # --- identificativi della base --------------------------------------------------------------
 
-def base_path(test_id: str) -> str:
+def base_path(test_id: str, exists: Callable[[str], bool] | None = None) -> str:
     """Il file di un identificativo `classname::name`: il `classname` se contiene `/`; altrimenti
-    il modulo con i punti, come percorso `.py` (senza le classi in coda: i segmenti che
-    cominciano con una maiuscola, come `tests.test_x.TestFoo`)."""
+    il modulo con i punti, come percorso `.py`. I segmenti finali con l'iniziale maiuscola sono
+    classi (`tests.test_x.TestFoo`) o moduli (`pkg.Models`): con `exists` (il file è nella base)
+    vale il primo percorso, dal più lungo, che esiste; senza, o se nessuno esiste, l'euristica
+    toglie tutti i segmenti maiuscoli finali."""
     classname = test_id.partition("::")[0]
     if "/" in classname:
         return classname
-    parts = classname.split(".")
-    while len(parts) > 1 and parts[-1][:1].isupper():
-        parts.pop()
-    return "/".join(parts) + ".py"
+    options = [classname.split(".")]
+    while len(options[-1]) > 1 and options[-1][-1][:1].isupper():
+        options.append(options[-1][:-1])
+    candidates = ["/".join(parts) + ".py" for parts in options]
+    if exists is not None:
+        for path in candidates:
+            if exists(path):
+                return path
+    return candidates[-1]
+
+
+def _base_command_missing(name: str, ids: dict[str, set[str]],
+                          states: dict[str, str] | None) -> bool:
+    """La base non ha identificativi confrontabili per `name` (decisione 14): il comando manca da
+    `ids`, oppure (se gli stati sono noti) è girato `empty`, `uncounted`, `unverified`, non ha
+    uno stato, o è `red` senza identificativi (un `setup` fallito). Un `red` con un JUnit ha
+    identificativi: lo dice già `tollgate/base`."""
+    if name not in ids:
+        return True
+    if states is None:
+        return False
+    state = states.get(name)
+    return state is None or state in ("empty", "uncounted", "unverified") or (
+        state == "red" and not ids[name])
 
 
 def base_ids(ctx: Context, ev: Evaluation) -> None:
@@ -311,6 +336,21 @@ def base_ids(ctx: Context, ev: Evaluation) -> None:
     if i.base_ids_source == BASE_FROM_RUN:
         _attention(ev, "base_ids_from_run", "base_ids",
                    "gli identificativi della base vengono da un run della PR, non dalla cache")
+    gone = [spec.name for spec in ctx.required
+            if spec.report and _base_command_missing(spec.name, i.base_ids, i.base_commands)]
+    if gone:
+        _attention(ev, "base_ids_missing_command", "base_ids",
+                   f"mancano gli identificativi della base per {len(gone)} "
+                   f"{'comando' if len(gone) == 1 else 'comandi'}: la base non li ha eseguiti o "
+                   f"non ha prodotto un report, il confronto con la testa non è possibile",
+                   ", ".join(gone))
+    present: dict[str, bool] = {}
+
+    def in_base(path: str) -> bool:
+        if path not in present:
+            present[path] = git.exists_at(i.repo, i.base_sha, path)
+        return present[path]
+
     missing_by_path: dict[str, set[str]] = {}
     failing: set[str] = set()
     for spec in ctx.required:
@@ -320,7 +360,7 @@ def base_ids(ctx: Context, ev: Evaluation) -> None:
         base = set(i.base_ids.get(spec.name, ()))
         executed = runner.executed_ids(r.junit)
         for tid in base - executed:
-            missing_by_path.setdefault(base_path(tid), set()).add(tid)
+            missing_by_path.setdefault(base_path(tid, in_base), set()).add(tid)
         failing |= base & set(r.junit.ids_failed)
     found = [Violation("base_id_missing", path, "test della base mancanti nella testa", "test",
                        tuple(sorted(ids)))
@@ -875,12 +915,13 @@ FAMILIES = (components_off, commands, base_ids, diff, must_have, level, l2, issu
 
 def evaluate(inputs: GateInputs) -> Evaluation:
     """Il giudizio sul gate: voci rosse, voci di `attenzione`, file osservati ed errori. Un
-    errore di git o di lettura è un `error` con il motivo, mai un traceback."""
+    errore di git o di lettura (`GitError`, `OSError`, `ValueError`) è un `error` con il motivo,
+    mai un traceback."""
     ev = Evaluation()
     ctx = Context(inputs)
     for family in FAMILIES:
         try:
             family(ctx, ev)
-        except git.GitError as e:
+        except (git.GitError, OSError, ValueError) as e:
             ev.errors.append(f"{family.__name__}: {e}")
     return ev

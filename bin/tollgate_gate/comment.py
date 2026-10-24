@@ -19,6 +19,7 @@ GUARD_PREFIX = "<!-- tollgate-guard"
 _SHA = re.compile(r"[0-9a-f]{40}")
 _MARKER = re.compile(re.escape(MARKER_PREFIX) + r" sha=([0-9a-f]{40}) -->")
 _TICKS = re.compile(r"`{3,}")
+_LINK = re.compile(r"\]\(")
 
 
 def _check_sha(sha: str) -> str:
@@ -39,9 +40,11 @@ def marker_sha(body: str) -> str | None:
 
 def _one_line(text: str, cap: int) -> str:
     """`Item.text` lo scrive tollgate, ma può portare un valore letto altrove (difesa in
-    profondità, D19): una riga sola, senza recinti né tag, menzioni e commenti spenti."""
+    profondità, D19): una riga sola, senza recinti né tag, menzioni e commenti spenti, e
+    nessun collegamento né immagine Markdown (`[x](y)`, `![x](y)`)."""
     line = " ".join(text.split()).replace("<", "&lt;")
-    return prbody.defuse(_TICKS.sub(lambda m: "'" * len(m.group()), prbody.cap(line, cap)))
+    line = prbody.defuse(_TICKS.sub(lambda m: "'" * len(m.group()), prbody.cap(line, cap)))
+    return _LINK.sub("]" + prbody.ZWSP + "(", line)
 
 
 def _item(item: Item, cap: int) -> list[str]:

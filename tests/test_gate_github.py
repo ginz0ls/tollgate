@@ -369,6 +369,94 @@ class ArtifactsTest(VerdictBase):
         self.assertEqual(meta, {"sha": self.sha, "config_sha": self.lab.base})
 
 
+class ConfigShaTest(VerdictBase):
+    """Decisione 17 (M-5): la configurazione del run vale finché `tollgate.toml` ha lo stesso
+    blob alla punta del predefinito; `config_sha` deve essere un antenato della punta."""
+
+    def make_commit(self, parent, *, toml=None, drop=False, files=None, merge=None) -> str:
+        """Un commit su `parent` (o il merge di `merge` in `parent`) costruito in un worktree
+        temporaneo; `toml` riscrive `tollgate.toml`, `drop` lo toglie, `files` aggiunge file."""
+        repo, wt = self.lab.repo, self.tmp / f"wt-{len(list(self.tmp.glob('wt-*')))}"
+        git(repo, "worktree", "add", "-q", "--detach", str(wt), parent)
+        try:
+            if toml is not None:
+                (wt / "tollgate.toml").write_text(toml)
+            if drop:
+                git(wt, "rm", "-q", "tollgate.toml")
+            for rel, text in (files or {}).items():
+                (wt / rel).write_text(text)
+            if merge is None:
+                git(wt, "add", "-A")
+                git(wt, "commit", "-qm", "cambio", "--allow-empty")
+            else:
+                git(wt, "merge", "-q", "--no-ff", "-m", "merge", merge)
+            return git(wt, "rev-parse", "HEAD")
+        finally:
+            git(repo, "worktree", "remove", "--force", str(wt))
+
+    def set_tip(self, sha: str) -> None:
+        git(self.lab.repo, "update-ref", "refs/remotes/origin/main", sha)
+
+    def judged(self, config_sha: str) -> dict:
+        self.write_artifacts(config_sha=config_sha)
+        self.set_gh()
+        self.run_verdict()
+        return self.statuses()
+
+    def test_merge_not_touching_toml_is_not_error(self):
+        """Un merge sul predefinito durante il run che non tocca `tollgate.toml` non dà `error`
+        alle PR in volo."""
+        side = self.make_commit(self.lab.base, files={"side.txt": "a\n"})
+        main1 = self.make_commit(self.lab.base, files={"main.txt": "b\n"})
+        tip = self.make_commit(main1, merge=side)
+        self.assertEqual(len(git(self.lab.repo, "rev-list", "--parents", "-n1", tip).split()), 3)
+        self.set_tip(tip)
+        got = self.judged(self.lab.base)
+        self.assertEqual({k: v["state"] for k, v in got.items()},
+                         {"tollgate/verdict": "success", "tollgate/attention": "success"})
+
+    def test_toml_changed_is_error(self):
+        tip = self.make_commit(self.lab.base, toml=GATE_TOML + "[tasks]\ntask_lines_warn = 300\n")
+        self.set_tip(tip)
+        got = self.judged(self.lab.base)
+        self.assertEqual(got["tollgate/verdict"]["state"], "error")
+        self.assertIn("configurazione del gate cambiata", got["tollgate/verdict"]["description"])
+
+    def test_toml_missing_is_error(self):
+        """`tollgate.toml` assente alla `config_sha` (e presente alla punta) vale cambiato."""
+        without = self.make_commit(self.lab.base, drop=True)
+        tip = self.make_commit(without, toml=GATE_TOML)
+        self.set_tip(tip)
+        self.assertEqual(git(self.lab.repo, "rev-parse", f"{tip}:tollgate.toml"),
+                         git(self.lab.repo, "rev-parse", f"{self.lab.base}:tollgate.toml"))
+        got = self.judged(without)
+        self.assertEqual(got["tollgate/verdict"]["state"], "error")
+        self.assertIn("configurazione del gate cambiata", got["tollgate/verdict"]["description"])
+
+    def test_config_sha_not_in_tip_history_is_error(self):
+        """Un commit fuori dalla storia della punta, con lo stesso `tollgate.toml`, non vale."""
+        self.set_tip(self.make_commit(self.lab.base, files={"main.txt": "b\n"}))
+        self.assertEqual(git(self.lab.repo, "rev-parse", f"{self.lab.head}:tollgate.toml"),
+                         git(self.lab.repo, "rev-parse", "origin/main:tollgate.toml"))
+        got = self.judged(self.lab.head)
+        self.assertEqual(got["tollgate/verdict"]["state"], "error")
+        self.assertIn("configurazione del gate cambiata", got["tollgate/verdict"]["description"])
+
+    def test_config_sha_ancestor_is_accepted(self):
+        first = self.make_commit(self.lab.base, files={"one.txt": "1\n"})
+        second = self.make_commit(first, files={"two.txt": "2\n"})
+        self.set_tip(second)
+        got = self.judged(first)
+        self.assertEqual(got["tollgate/verdict"]["state"], "success")
+
+    def test_config_changed_is_a_bool_and_fail_closed(self):
+        repo, base = self.lab.repo, self.lab.base
+        self.assertIs(verdict._config_changed(repo, base, base), False)
+        for sha in (None, "", "-x", "HEAD", "d" * 40, "not a sha", 5):
+            with self.subTest(sha=sha):
+                self.assertIs(verdict._config_changed(repo, sha, base), True)
+
+
 class BaseIdsTest(VerdictBase):
     EXTRA = (*DEFAULT_IDS, "tests.test_app::test_gone")
 
@@ -401,6 +489,25 @@ class BaseIdsTest(VerdictBase):
                          artifact=self.tmp / "nessuno")
         self.assert_error()
         self.assertIn("identificativi della base non disponibili", self.keys_in_comment())
+
+    def test_commands_of_the_base_reach_the_gate(self):
+        """Cache e artefatto portano gli stati dei comandi della base: un comando `empty` nella
+        base dà `base_ids_missing_command` (da leggere) in entrambi i casi."""
+        for label, kwargs in (("cache", "cache"), ("artefatto", "artifact")):
+            with self.subTest(label):
+                self.set_gh()
+                path = self.ids_file(self.tmp / f"c-{label}", ids=())
+                data = json.loads(path.read_text())
+                data["commands"] = {"verify": "empty"}
+                path.write_text(json.dumps(data))
+                if kwargs == "cache":
+                    self.run_verdict(cache=path)
+                else:
+                    self.run_verdict(cache=self.tmp / "nessuna" / "ids.json", artifact=path.parent)
+                body = self.keys_in_comment()
+                self.assertIn("mancano gli identificativi della base per 1 comando", body)
+                self.assertIn("verify", body)
+                self.assertEqual(self.statuses()["tollgate/attention"]["state"], "failure")
 
     def test_artifact_ids_of_another_tree_or_symlink_are_ignored(self):
         artifact = self.ids_file(self.tmp / "artifact", tree="f" * 40).parent

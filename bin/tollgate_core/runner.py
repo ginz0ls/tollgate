@@ -134,6 +134,9 @@ def run_one(spec: CommandSpec, *, root: Path, files: list[str], env: dict, timeo
         except JunitError as e:
             with open(log, "a", encoding="utf-8") as fh:
                 fh.write(f"\n[tollgate] report non valido: {e}\n")
+        except OSError as e:       # esiste ma non si legge: il comando resta rosso, non cade il run
+            with open(log, "a", encoding="utf-8") as fh:
+                fh.write(f"\n[tollgate] report non leggibile: {e}\n")
     state = receipt_state(exit_code=exit_code, report_configured=report is not None,
                           junit=junit, allow_no_tests=allow_no_tests)
     return resolved, exit_code, junit, duration, state, log

@@ -12,7 +12,7 @@ GROUPS: dict[str, str] = {
         "audit_off", "components_off", "findings_overridden", "unverified_tests",
         "manual_must_have", "sentinel_open", "off_periods", "plan_changed", "approval_stale",
         "no_tests_counted", "not_tg_branch", "tollgate_config", "ci_waived_workflow",
-        "base_ids_from_run"), READ),
+        "base_ids_from_run", "base_ids_missing_command"), READ),
     **dict.fromkeys((
         "waiver_scope", "allow_no_tests", "task_over_warn", "task_over_max", "skills_absent",
         "lockfile_without_manifest", "no_issue", "base_failing_on_head",

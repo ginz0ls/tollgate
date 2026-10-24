@@ -9,7 +9,7 @@ from typing import Callable
 from . import globs
 
 TYPES = ("scope", "test", "ci", "threshold", "command")
-_ID = re.compile(r"^w-(\d+)-(\d+)$")
+_ID = re.compile(r"w-([0-9]+)-([0-9]+)\Z")
 IMMEDIATE_SCOPE = 2
 
 

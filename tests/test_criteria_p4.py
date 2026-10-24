@@ -17,12 +17,12 @@ from unittest import mock
 
 from tests import (test_finishcheck, test_gate_evaluate, test_gate_github, test_gate_sentinel,
                    test_openpr)
-from tests.flowkit import PLAN, plan_text
+from tests.flowkit import JUNIT_FILES, PLAN, plan_text
 from tests.gatekit import BRANCH, DEFAULT_IDS, GATE_TOML, GateLab
 from tests.helpers import BIN, git
 from tests.hookkit import DEFAULT_FILES
 from tollgate_analysis import prblock
-from tollgate_core import git as core_git, phases, reviews, tasks
+from tollgate_core import git as core_git, paths, phases, reviews, tasks
 from tollgate_flow import finishcheck
 from tollgate_gate import comment, evaluate, verdict
 from tollgate_gate.model import GITHUB, PrFacts
@@ -83,6 +83,72 @@ class AgreementTest(test_finishcheck.FinishCheckCase):
         self.assertGreater(len(self.keys(gate)), 1)       # anche il test cancellato
         self.assertIn("src/extra.py", real.stdout)
         self.assertEqual({i.key for i in gate.red if i.family == "l2"}, set())
+
+    def gate_side(self):
+        """Gli ingressi veri del gate sugli stessi commit di `local_side`: `GateLab` con la stessa
+        configurazione, `gate run` come processo per gli artefatti, `verdict.inputs_from_github`
+        per la configurazione della punta, il `merge-base`, il blocco del corpo e gli artefatti,
+        e `gate evaluate` come processo per lo stato pubblicato. Dà `(ingressi, esito)`."""
+        gate = ProgramCase()
+        gate.setUp()
+        self.addCleanup(gate.doCleanups)
+        lab = gate.fresh(toml=test_finishcheck.TOML, files={**DEFAULT_FILES, **JUNIT_FILES},
+                         plan=plan_text(tasks=1))
+        lab.commit("tests/ids.txt", test_finishcheck.BOTH_OK, "ids")
+        lab.commit("src/app.py", test_finishcheck.SOMMA, "somma")
+        lab.commit("src/extra.py", "x = 1\n", "fuori scope")
+        lab.delete("tests/test_app.py", "cancella un test")
+        body = f"Closes #7\n{prblock.render(lab.block())}"
+        gate.ready(body=body)
+        shutil.rmtree(gate.art)
+        run_event = gate.tmp / "run-event.json"
+        run_event.write_text(json.dumps({
+            "pull_request": {"base": {"ref": "main"}, "head": {"ref": BRANCH}},
+            "repository": {"full_name": SLUG, "default_branch": "main"}}))
+        ran = gate.program("run", "--event", str(run_event), "--out", str(gate.art))
+        self.assertEqual(ran.returncode, 0, ran.stdout + ran.stderr)
+        event = json.loads(gate.event().read_text())
+        inputs, problems = verdict.inputs_from_github(
+            lab.repo, event, gate.rest_pull(body=body, head={
+                "sha": gate.sha, "ref": BRANCH, "repo": {"full_name": SLUG}}),
+            artifacts=gate.art, base_ids_cache=gate.ids_file(gate.tmp / "cache"),
+            base_ids_artifact=None, state=paths.resolve_state(os.environ), environ=os.environ)
+        self.assertEqual(problems, [])
+        states, _ = gate.evaluate()
+        return inputs, states
+
+    def test_agreement_from_real_gate_inputs(self):
+        """M-9: gli stessi commit su `GateLab` (ingressi raccolti come fa `gate evaluate` su
+        GitHub) e su `FlowLab` (`finish check`) danno le stesse chiavi rosse nelle famiglie
+        condivise; il piano non è cambiato, quindi nemmeno `plan_changed` compare."""
+        inputs, states = self.gate_side()
+        self.assertEqual(inputs.where, GITHUB)
+        self.assertEqual(states[verdict.VERDICT], "failure")
+        gate = evaluate.evaluate(inputs)
+        self.assertEqual(gate.errors, [])
+
+        fl = self.lab()
+        fl.commit("src/extra.py", "x = 1\n", "fuori scope")
+        fl.git("rm", "-q", "tests/test_app.py", repo=fl.wt)
+        fl.git("commit", "-qm", "cancella un test", repo=fl.wt)
+        seen = []
+        original = evaluate.evaluate
+
+        def spy(local_inputs):
+            seen.append(original(local_inputs))
+            return seen[-1]
+
+        with mock.patch.object(evaluate, "evaluate", spy):
+            local = self.check(fl)
+        self.assertEqual(local.code, finishcheck.RED, local.lines)
+        (local_ev,) = seen
+
+        self.assertEqual(self.keys(local_ev), self.keys(gate))
+        self.assertTrue({"out_of_scope", "test_deleted"} <= self.keys(gate), self.keys(gate))
+        for family in COMPARED:
+            self.assertEqual(sorted(i.key for i in local_ev.red if i.family == family),
+                             sorted(i.key for i in gate.red if i.family == family), family)
+        self.assertNotIn("plan_changed", [i.key for i in gate.attention])
 
     def test_plan_change_is_the_only_difference(self):
         """Decisione 9: il piano cambiato dopo la registrazione, senza file nuovi, è una

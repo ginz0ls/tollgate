@@ -1,7 +1,11 @@
 import json
 import unittest
+from datetime import timedelta
 
+from tests.flowkit import FlowLab
 from tollgate_analysis import prblock
+from tollgate_core import config, git as core_git, phases, reviews
+from tollgate_flow import openpr
 
 SPEC_ORDER = [
     "schema_version", "tollgate_version", "issue", "level", "level_minimum", "level_cap",
@@ -60,10 +64,30 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(prblock.parse(prblock.render(block)), block)
 
     def test_findings_carry_blocking_field(self):
-        finding = {"id": "f-1-1", "severity": "major", "confidence": 0.9,
-                   "verification": "confirmed", "user_decision": None, "blocking": False}
-        block = prblock.build(facts(findings=[finding]))
-        self.assertEqual(prblock.parse(prblock.render(block))["findings"], [finding])
+        """I rilievi del blocco li scrive `open-pr` dal DB: `blocking` è un booleano per rilievo
+        (una regola `piano:*` blocca, una nota di regola nota no) e sopravvive a render e parse."""
+        fl = FlowLab(issue=7)
+        self.addCleanup(fl.close)
+        fl.commit("src/app.py", "def somma(a, b):\n    return b + a\n", "somma")
+        head = core_git.head(fl.wt)
+        n = reviews.open_cycle(fl.conn, fl.work, sha=head, patch_id=None, code="c1",
+                               reviewers=["tollgate:final-reviewer"], now=fl.now)
+        reviews.add_report(
+            fl.conn, fl.work, n, source="tollgate:final-reviewer", outcome="ok", findings=[
+                {"severity": "major", "confidence": 0.9, "file": "src/app.py", "line": 2,
+                 "rule": "R-1", "text": "nota"},
+                {"severity": "major", "confidence": 0.9, "file": "src/app.py", "line": 2,
+                 "rule": "piano:task 1", "text": "blocca"}],
+            rejected=[], blocking_rules=set(), known_rules={"R-1"}, now=fl.now)
+        work = phases.get_work(fl.conn, fl.work)
+        cfg = config.load_config(fl.ts.state, fl.wt, work["work_base_sha"])
+        data = openpr.facts(fl.conn, fl.ts.state, work, cfg, fl.wt, head,
+                            now=fl.now + timedelta(hours=1))
+        parsed = prblock.parse(prblock.render(prblock.build(data)))
+        self.assertEqual([f["blocking"] for f in parsed["findings"]], [False, True])
+        for finding in parsed["findings"]:
+            self.assertEqual(sorted(finding), ["blocking", "confidence", "id", "severity",
+                                               "user_decision", "verification"])
 
     def test_missing_field_is_keyerror(self):
         data = facts()

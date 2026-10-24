@@ -2,6 +2,7 @@ import dataclasses
 import io
 import sys
 import unittest
+from unittest import mock
 
 from tests.flowkit import PLAN, plan_text, spec_text
 from tests.gatekit import BRANCH, DEFAULT_IDS, GATE_TOML, ISSUE, GateLab
@@ -28,6 +29,8 @@ gate = ["test"]
 [profiles.web.commands]
 test = "true"
 """
+PROFILE_REPORT_TOML = PROFILE_TOML.replace(
+    '[profiles.web.commands]', 'report = "junit:reports/web.xml"\n[profiles.web.commands]')
 # `unverified` lo scrive il CLI solo per un comando non configurato (`run.py`, `verify.py`)
 UNCONFIGURED_TOML = GATE_TOML.replace('verify = "true"', 'verify = ""')
 SOMMA, ZERO = DEFAULT_IDS
@@ -176,6 +179,17 @@ class CommandsTest(LabCase):
         ev = self.run_gate(commands=[CommandResult("verify", "green", 0, None, None)])
         self.assertEqual(keys(ev.red, "commands"), ["command_red"])   # report assente
 
+    def test_exit_none_declared_green_has_warning(self):
+        """Un risultato dichiarato `green` ma senza codice di uscita vale rosso, e la voce dice
+        perché (non c'è un'uscita da fidarsi: oggi sarebbe un rosso muto)."""
+        junit = self.lab.junit(DEFAULT_IDS)
+        ev = self.run_gate(commands=[CommandResult("verify", "green", None, 2, junit)])
+        self.assertEqual(keys(ev.red, "commands"), ["command_red"])
+        self.assertIn("senza codice di uscita", ev.red[0].text)
+        ev = self.run_gate(commands=[CommandResult("verify", "red", None, 2, junit)])
+        self.assertEqual(keys(ev.red, "commands"), ["command_red"])
+        self.assertNotIn("senza codice di uscita", ev.red[0].text)
+
     def test_setup_red_is_a_red_command(self):
         lab = GateLab(toml=PROFILE_TOML)
         self.addCleanup(lab.close)
@@ -248,6 +262,21 @@ class BaseIdsTest(LabCase):
     def test_all_base_ids_run_is_green(self):
         self.assertEqual(keys(self.run_gate().red, "base_ids"), [])
 
+    def test_base_path_uppercase_segment(self):
+        """Il segmento finale maiuscolo è una classe solo se il file senza di lui esiste; con
+        l'elenco dei file della base `base_path` sceglie, senza, vale l'euristica."""
+        base = {"pkg/Models.py", "tests/test_x.py"}
+        self.assertEqual(base_path("pkg.Models::t", exists=base.__contains__), "pkg/Models.py")
+        self.assertEqual(base_path("tests.test_x.TestFoo::t", exists=base.__contains__),
+                         "tests/test_x.py")
+        self.assertEqual(base_path("pkg.Models.TestModels::t", exists=base.__contains__),
+                         "pkg/Models.py")
+        self.assertEqual(base_path("pkg.Absent::t", exists=base.__contains__), "pkg.py")
+        self.assertEqual(base_path("a.b.C.D::t", exists={"a/b/C.py"}.__contains__), "a/b/C.py")
+        self.assertEqual(base_path("web/Models/a.test.ts::t", exists=base.__contains__),
+                         "web/Models/a.test.ts")
+        self.assertEqual(base_path("pkg.Models::t"), "pkg.py")      # senza elenco: euristica
+
     def test_violations_grouped_by_path(self):
         ids = {"web/a.test.js::uno", "web/a.test.js::due", "tests.test_b.TestB::tre"}
         ev = self.run_gate(base_ids={"verify": set(DEFAULT_IDS) | ids})
@@ -314,6 +343,100 @@ class BaseIdsTest(LabCase):
         ev = self.run_gate(base_ids_source=BASE_FROM_RUN)
         self.assertEqual(keys(ev.attention), ["base_ids_from_run"])
         self.assertEqual(ev.attention_state, "failure")
+
+    # --- comandi della base senza identificativi (M-1, decisione 14) ------------------------
+
+    def test_missing_command_in_ids_is_read_attention(self):
+        for base_commands in (None, {}, {"verify": "green"}):
+            with self.subTest(base_commands=base_commands):
+                ev = self.run_gate(base_ids={}, base_commands=base_commands)
+                self.assertEqual(keys(ev.attention), ["base_ids_missing_command"])
+                self.assertEqual(ev.attention[0].data, "verify")
+                self.assertNotIn("verify", ev.attention[0].text)
+                self.assertEqual(attention.group("base_ids_missing_command"), attention.READ)
+                self.assertEqual((ev.attention_state, ev.verdict_state, ev.errors),
+                                 ("failure", "success", []))
+
+    def test_command_not_green_in_base_is_read_attention(self):
+        for state in ("empty", "uncounted", "unverified"):
+            with self.subTest(state):
+                ev = self.run_gate(base_ids={"verify": set()}, base_commands={"verify": state})
+                self.assertEqual(keys(ev.attention), ["base_ids_missing_command"])
+                self.assertEqual(ev.attention[0].data, "verify")
+        with self.subTest("red senza identificativi (setup fallito)"):
+            ev = self.run_gate(base_ids={"verify": set()}, base_commands={"verify": "red"})
+            self.assertEqual(keys(ev.attention), ["base_ids_missing_command"])
+        with self.subTest("stato assente da commands"):
+            ev = self.run_gate(base_ids={"verify": set(DEFAULT_IDS)}, base_commands={})
+            self.assertEqual(keys(ev.attention), ["base_ids_missing_command"])
+
+    def test_command_red_with_junit_or_green_gives_no_item(self):
+        """Un `red` con un JUnit ha identificativi da confrontare (se i test falliscono nella
+        base lo dice già `tollgate/base`); `green` è il caso normale; in locale e senza
+        `base_commands` conta solo la presenza in `ids`."""
+        for state in ("red", "green"):
+            with self.subTest(state):
+                ev = self.run_gate(base_commands={"verify": state})
+                self.assertEqual(keys(ev.attention), [])
+        self.assertEqual(keys(self.run_gate(base_commands=None).attention), [])
+        ev = self.run_gate(where="local", pr=None, base_ids=None, base_ids_source=None,
+                           base_commands=None)
+        self.assertEqual(keys(ev.attention), [])
+
+    def test_old_config_cache_without_new_command(self):
+        """La cache dell'albero è stata scritta con una configurazione senza il comando di un
+        profilo aggiunto dopo: la base non ha mai eseguito `profile:web:test`."""
+        lab = GateLab(toml=PROFILE_REPORT_TOML)
+        self.addCleanup(lab.close)
+        lab.commit("web/app.js", "x\n", "web")
+        web = CommandResult("profile:web:test", "green", 0, 1, lab.junit(["web.t::uno"]))
+        commands = lab.inputs().commands + [web]
+        ev = evaluate(lab.inputs(commands=commands, base_ids={"verify": set(DEFAULT_IDS)},
+                                 base_commands={"verify": "green"}))
+        self.assertEqual(keys(ev.attention), ["base_ids_missing_command"])
+        self.assertEqual(ev.attention[0].data, "profile:web:test")
+        ev = evaluate(lab.inputs(
+            commands=commands,
+            base_ids={"verify": set(DEFAULT_IDS), "profile:web:test": {"web.t::uno"}},
+            base_commands={"verify": "green", "profile:web:test": "green"}))
+        self.assertEqual(keys(ev.attention), [])
+
+    def test_command_without_report_gives_no_item(self):
+        """Senza `report` non ci sono identificativi da confrontare: il comando non è mai
+        «mancante» dalla base."""
+        lab = GateLab(toml=ALLOW_NO_TESTS_TOML)
+        self.addCleanup(lab.close)
+        commands = [CommandResult("verify", "uncounted", 0, None, None)]
+        for base_commands in (None, {}, {"verify": "uncounted"}):
+            with self.subTest(base_commands=base_commands):
+                ev = evaluate(lab.inputs(commands=commands, base_ids={},
+                                         base_commands=base_commands))
+                self.assertNotIn("base_ids_missing_command", keys(ev.attention))
+                self.assertEqual((keys(ev.red, "base_ids"), ev.errors), ([], []))
+
+    def test_base_ids_from_run_carries_commands(self):
+        """Gli identificativi che vengono dall'artefatto del run seguono la stessa regola."""
+        ev = self.run_gate(base_ids={"verify": set()}, base_commands={"verify": "empty"},
+                           base_ids_source=BASE_FROM_RUN)
+        self.assertEqual(keys(ev.attention), ["base_ids_from_run", "base_ids_missing_command"])
+        ev = self.run_gate(base_ids_source=BASE_FROM_RUN, base_commands={"verify": "green"})
+        self.assertEqual(keys(ev.attention), ["base_ids_from_run"])
+
+    def test_missing_command_data_lists_only_configured_names(self):
+        """I nomi nel campo `data` vengono dalla configurazione, mai da `ids.json`."""
+        ev = self.run_gate(base_ids={"inventato; rm -rf": []},
+                           base_commands={"inventato; rm -rf": "green"})
+        self.assertEqual(ev.attention[0].data, "verify")
+
+    def test_base_path_follows_files_in_base(self):
+        """`pkg.Models` è un modulo (`pkg/Models.py`), non una classe di `pkg.py`, se il file
+        esiste nella base."""
+        lab = GateLab(files={**DEFAULT_FILES, "pkg/Models.py": "x = 1\n"})
+        self.addCleanup(lab.close)
+        ids = {SOMMA, ZERO, "pkg.Models::test_a", "tests.test_app.TestApp::test_b"}
+        ev = evaluate(lab.inputs(base_ids={"verify": ids}))
+        self.assertEqual(sorted(i.data.split(":")[0] for i in ev.red if i.family == "base_ids"),
+                         ["pkg/Models.py", "tests/test_app.py"])
 
     def test_base_failing_on_head_is_info(self):
         junit = self.lab.junit(DEFAULT_IDS, ids_failed=[SOMMA])
@@ -500,6 +623,15 @@ class DiffTest(LabCase):
         ev = self.run_gate(base_sha="0" * 40)
         self.assertEqual(ev.verdict_state, "error")
         self.assertTrue(ev.errors)
+
+    def test_diff_error_other_than_git_is_error_not_traceback(self):
+        for error in (OSError(5, "Input/output error"), ValueError("non valido")):
+            with self.subTest(error=type(error).__name__), mock.patch.object(
+                    evaluate_module.diffcheck, "diff_check", side_effect=error):
+                ev = self.run_gate()
+                self.assertEqual(ev.verdict_state, "error")
+                self.assertEqual(len(ev.errors), 1)
+                self.assertTrue(ev.errors[0].startswith("diff: "), ev.errors)
 
 
 class MustHaveTest(LabCase):
@@ -1155,7 +1287,8 @@ class EvaluationTest(unittest.TestCase):
     def test_groups_follow_decision_7(self):
         self.assertEqual(attention.group("task_over_max"), attention.INFO)
         for key in ("plan_changed", "approval_stale", "components_off", "audit_off",
-                    "base_ids_from_run", "ci_waived_workflow", "no_tests_counted"):
+                    "base_ids_from_run", "base_ids_missing_command", "ci_waived_workflow",
+                    "no_tests_counted"):
             self.assertEqual(attention.group(key), attention.READ, key)
         for key in ("waiver_scope", "allow_no_tests", "no_issue", "existing_workflow_rules"):
             self.assertEqual(attention.group(key), attention.INFO, key)

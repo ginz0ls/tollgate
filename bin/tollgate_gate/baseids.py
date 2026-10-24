@@ -7,6 +7,7 @@ import json
 import sys
 import tempfile
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 from tollgate_core import git, paths, runner
@@ -44,16 +45,32 @@ def compute(repo: Path, *, config_sha: str, sha: str, out: Path, environ: Mappin
     return result
 
 
+@dataclass(frozen=True)
+class BaseIds:
+    """`ids.json` riletto: gli identificativi per comando e lo stato con cui la base ha eseguito
+    ogni comando (`commands`, vuoto se il file non lo porta)."""
+    ids: dict[str, set[str]]
+    commands: dict[str, str]
+
+
 def load(path: Path, *, tree: str) -> dict[str, set[str]] | None:
     """Gli identificativi per comando, `None` se il file è illeggibile, malformato o di un altro
     albero."""
+    full = load_full(path, tree=tree)
+    return None if full is None else full.ids
+
+
+def load_full(path: Path, *, tree: str) -> BaseIds | None:
+    """Come `load`, con anche gli stati dei comandi (decisione 14). `None` se il file è
+    illeggibile, malformato, di un altro albero o con `commands` che non è una mappa di stati
+    noti."""
     try:
         return _load(path, tree)
     except Exception:   # confine fail-closed su dati non fidati: illeggibile = assente
         return None
 
 
-def _load(path: Path, tree: str) -> dict[str, set[str]] | None:
+def _load(path: Path, tree: str) -> BaseIds | None:
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(data, dict) or data.get("v") != IDS_VERSION or data.get("tree") != tree:
         return None
@@ -66,7 +83,12 @@ def _load(path: Path, tree: str) -> dict[str, set[str]] | None:
                 or not all(isinstance(v, str) for v in values)):
             return None
         out[name] = set(values)
-    return out
+    commands = data.get("commands", {})
+    if not isinstance(commands, dict) or not all(
+            isinstance(k, str) and isinstance(v, str) and v in gate_run.STATES
+            for k, v in commands.items()):
+        return None
+    return BaseIds(out, dict(commands))
 
 
 def publish(repo: Path, *, config_sha: str, sha: str, result: dict,

@@ -5,6 +5,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from datetime import timedelta
 from pathlib import Path
@@ -543,6 +544,18 @@ class ModeRewriteTest(unittest.TestCase):
                          'schema_version = 1\n\n[gate]\nmode = "detect"\n')
         self.assertEqual(w("schema_version = 1", "detect"),
                          'schema_version = 1\n\n[gate]\nmode = "detect"\n')
+
+
+    def test_with_mode_single_quoted_value(self):
+        """Un valore tra apici singoli (TOML lo ammette) si sostituisce, non si duplica."""
+        w = init.with_mode
+        self.assertEqual(w("[gate]\nmode = 'protected'\n", "detect"), '[gate]\nmode = "detect"\n')
+        self.assertEqual(w("[gate]\nmode='protected'  # x\n[a]\nmode = 'z'\n", "detect"),
+                         '[gate]\nmode="detect"  # x\n[a]\nmode = \'z\'\n')
+        for text in ("[gate]\nmode = 'protected'\n", "[gate]\nmode = \"protected\"\n"):
+            out = w(text, "detect")
+            self.assertEqual(out.count("mode"), 1, out)
+            self.assertEqual(tomllib.loads(out)["gate"]["mode"], "detect")
 
 
 class ProtectScriptTest(InitCase):

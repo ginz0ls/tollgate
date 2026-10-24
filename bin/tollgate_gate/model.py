@@ -58,7 +58,9 @@ class GateInputs:
     è la base del diff (nel gate il merge-base, in locale la base del lavoro). `block` è il
     blocco 18.1 dichiarato, `None` se manca o non è valido. `commands` e `base_ids` valgono
     `None` quando non sono disponibili: su GitHub è un errore, in locale la famiglia si salta.
-    `base_ids` ha gli identificativi della base per nome di comando. `waiver_text` è il testo di
+    `base_ids` ha gli identificativi della base per nome di comando e `base_commands` lo stato
+    con cui la base ha eseguito ogni comando (`None`: non noto, vale la sola presenza in
+    `base_ids`, decisione 14). `waiver_text` è il testo di
     `.tollgate/waivers/<N>.toml` in testa, se c'è. `sentinel_open` sono i numeri delle issue di
     sentinel aperte."""
     where: str
@@ -74,6 +76,7 @@ class GateInputs:
     base_ids_source: str | None
     waiver_text: str | None
     sentinel_open: list[int] = field(default_factory=list)
+    base_commands: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)

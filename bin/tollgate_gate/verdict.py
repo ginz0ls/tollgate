@@ -6,6 +6,7 @@ lettura: `verdict` non salva mai nulla in cache."""
 from __future__ import annotations
 
 import json
+import re
 import sys
 import tempfile
 from collections.abc import Mapping
@@ -33,6 +34,8 @@ DESC_OK = "nessuna voce rossa"
 DESC_ATTENTION_OK = "nessuna voce da leggere"
 DESC_ATTENTION_ERROR = "non calcolato: vedi tollgate/verdict"
 MAX_IDS_FILE = baseids.MAX_IDS_FILE
+CONFIG_FILE = "tollgate.toml"
+_SHA = re.compile(r"[0-9a-f]{40,64}")
 
 
 def _event_problem(event: dict) -> str | None:
@@ -65,14 +68,29 @@ def prechecks(event: dict, pr: dict | None, *, default_branch: str,
     return "ok", ""
 
 
+def _config_changed(repo: Path, config_sha, tip: str) -> bool:
+    """La configurazione del run non vale più per la punta del predefinito (decisione 17): il blob
+    di `tollgate.toml` a `config_sha` (letto da `results.json`, dato non fidato) è diverso da
+    quello della punta, manca in uno dei due, oppure `config_sha` non è un antenato della punta.
+    Un merge che non tocca `tollgate.toml` non la cambia. Fail-closed: ogni dubbio è `True`."""
+    if not isinstance(config_sha, str) or not _SHA.fullmatch(config_sha):
+        return True
+    if config_sha == tip:
+        return False
+    if not git.ok(repo, "merge-base", "--is-ancestor", config_sha, tip):
+        return True
+    old, new = git.blob_at(repo, config_sha, CONFIG_FILE), git.blob_at(repo, tip, CONFIG_FILE)
+    return old is None or new is None or old != new
+
+
 def _base_ids(repo: Path, base_sha: str, cache: Path | None, artifact: Path | None
-              ) -> tuple[dict[str, set[str]] | None, str | None]:
+              ) -> tuple[baseids.BaseIds | None, str | None]:
     """Gli identificativi della base, nell'ordine della decisione 12: la cache dell'albero di
     `merge-base`, poi l'artefatto di `tollgate-run` (voce `base_ids_from_run`). Un file
     illeggibile, di un altro albero o collegamento simbolico vale come assente."""
     tree = git.run(repo, "rev-parse", f"{base_sha}^{{tree}}").strip()
     if cache is not None and Path(cache).is_file():
-        if (ids := baseids.load(Path(cache), tree=tree)) is not None:
+        if (ids := baseids.load_full(Path(cache), tree=tree)) is not None:
             return ids, BASE_FROM_CACHE
     if artifact is not None:
         path = Path(artifact) / "ids.json"
@@ -81,7 +99,7 @@ def _base_ids(repo: Path, base_sha: str, cache: Path | None, artifact: Path | No
                 and path.stat().st_size <= MAX_IDS_FILE
         except OSError:
             usable = False
-        if usable and (ids := baseids.load(path, tree=tree)) is not None:
+        if usable and (ids := baseids.load_full(path, tree=tree)) is not None:
             return ids, BASE_FROM_RUN
     return None, None
 
@@ -106,7 +124,7 @@ def inputs_from_github(repo: Path, event: dict, pr: dict, *, artifacts: Path,
         if head is None or git.resolve_ref(repo, "FETCH_HEAD") != head:
             return None, ["la testa della PR non è quella giudicata: la PR è cambiata"]
         base_sha = git.run(repo, "merge-base", tip, head).strip()
-        base_ids, source = _base_ids(repo, base_sha, base_ids_cache, base_ids_artifact)
+        base, source = _base_ids(repo, base_sha, base_ids_cache, base_ids_artifact)
         n = evaluate.pr_issue_number(facts)
         waiver_text = git.text_at(repo, head, f".tollgate/waivers/{n}.toml") if n else None
     except (git.GitError, ConfigError) as e:
@@ -118,7 +136,7 @@ def inputs_from_github(repo: Path, event: dict, pr: dict, *, artifacts: Path,
     mismatch = []
     if meta.get("sha") != head:
         mismatch.append(f"{ARTIFACT_PREFIX}results.json non è dello SHA giudicato")
-    if meta.get("config_sha") != tip:
+    if _config_changed(repo, meta.get("config_sha"), tip):
         mismatch.append("configurazione del gate cambiata dopo il run: rilancia i controlli")
     if not applicable:
         mismatch.append(f"{ARTIFACT_PREFIX}results.json dichiara la PR non applicabile")
@@ -131,8 +149,10 @@ def inputs_from_github(repo: Path, event: dict, pr: dict, *, artifacts: Path,
         return None, [f"lettura da GitHub non riuscita: {e}"]
     return GateInputs(
         where=GITHUB, repo=repo, cfg=cfg, base_sha=base_sha, head_sha=head, pr=facts,
-        block=prblock.parse(facts.body), issue=issue, commands=results, base_ids=base_ids,
-        base_ids_source=source, waiver_text=waiver_text, sentinel_open=sentinel_open), []
+        block=prblock.parse(facts.body), issue=issue, commands=results,
+        base_ids=base.ids if base is not None else None, base_ids_source=source,
+        waiver_text=waiver_text, sentinel_open=sentinel_open,
+        base_commands=base.commands if base is not None else None), []
 
 
 def _error_description(errors: list[str]) -> str:

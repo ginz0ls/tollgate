@@ -274,6 +274,32 @@ class WorkflowsTest(unittest.TestCase):
         found = workflows.problems(wf("", on="on: pull_request_target\n"))
         self.assertEqual(found, ["usa pull_request_target (riga 2)"])
 
+    def test_flow_mapping_without_space_is_red(self):
+        """`{statuses:write}` (senza spazio dopo i due punti) non si legge come una chiave con
+        valore: fail-closed, rosso."""
+        for top in ("permissions: {statuses:write}\n",
+                    "permissions: {contents: read, statuses:write}\n",
+                    "permissions: {checks:write}\n",
+                    'permissions: {"statuses":write}\n'):
+            with self.subTest(top=top):
+                self.assert_red(wf("", top=top), "invece di read o none")
+
+    def test_unknown_permission_value_is_red(self):
+        """Un valore diverso da `read` e `none` per `statuses` o `checks` è rosso, qualunque
+        sia la forma in cui si scrive (anche in una collezione a flusso senza spazio)."""
+        for scope in workflows.GUARDED_SCOPES:
+            for value in ("write", "bogus", "Read", "NONE", "admin", "true", "read-all",
+                          "${{ inputs.level }}", "write # read", "'write'"):
+                with self.subTest(scope=scope, value=value):
+                    self.assert_red(wf("", top=f"permissions:\n  {scope}: {value}\n"),
+                                    "invece di read o none")
+                    self.assert_red(wf("", top="permissions: {" + f"{scope}:{value}" + "}\n"),
+                                    "invece di read o none")
+            for value in ("read", "none", "'read'", '"none"'):
+                with self.subTest(scope=scope, ok=value):
+                    self.assertEqual(workflows.problems(
+                        wf("", top=f"permissions:\n  {scope}: {value}\n")), [])
+
 
 if __name__ == "__main__":
     unittest.main()

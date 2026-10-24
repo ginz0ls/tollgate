@@ -149,6 +149,17 @@ class RenderTest(unittest.TestCase):
             self.assertIn("troncato", body)
             self.assertTrue(body.startswith(f"{comment.GUARD_PREFIX} sha={SHA} -->"))
 
+    def test_markdown_links_and_images_inert(self):
+        """`Item.text` è una riga sola e non diventa un collegamento né un'immagine."""
+        for hostile in ("[clic](https://example.org/x)", "![img](https://example.org/p.png)",
+                        "vedi [x](y) e ![z](w) fine"):
+            with self.subTest(hostile=hostile):
+                body = comment.render(SHA, ev(red=[Item("r", "f", hostile)],
+                                              attention=[Item(INFO_KEY, "f", hostile)]))
+                self.assertNotIn("](", body)        # né `[x](y)` né `![x](y)`
+                self.assertIn("(", body)            # il testo c'è ancora, solo spento
+                self.assertEqual(comment.marker_sha(body), SHA)
+
 
 if __name__ == "__main__":
     unittest.main()
