@@ -2,7 +2,11 @@
 commit arrivato venga da una PR unita la cui testa aveva `tollgate/guard` e `tollgate/verdict`
 verdi, scritti dal bot di GitHub Actions. Se no, stato `tollgate/sentinel` rosso sul commit e un
 commento sull'unica issue di sentinel (creata se manca). Nel testo di issue e commenti entrano
-solo SHA, numeri di PR e motivi di tollgate: niente titoli né corpi."""
+solo SHA, numeri di PR e motivi di tollgate: niente titoli né corpi.
+
+Ogni push controllato lascia su `after` lo stato `success` «controllato fino a qui» (se `after`
+non è rosso): il push successivo risale fino a lì, così i commit di un push saltato con
+`[skip ci]` si controllano al push dopo."""
 from __future__ import annotations
 
 import json
@@ -24,22 +28,52 @@ ATTEMPTS = 3        # `commits/<sha>/pulls` può restare vuoto per qualche secon
 WAIT_S = 5.0
 _ZEROS = "0" * 40
 NO_PR = "nessuna PR unita nel ramo predefinito contiene il commit"
+CHECKED_DESCRIPTION = "controllato fino a qui"
+WALK_LIMIT = 200    # commit risaliti in cerca del segnale: oltre, si riparte da `before`
 
 
 FORCED = "push forzato: intervallo non calcolabile"
 
 
-def _commits(repo: Path, before: str, after: str) -> tuple[list[str], bool]:
+def _is_marker(row: dict) -> bool:
+    """Uno stato `tollgate/sentinel` (di qualunque valore) scritto dal bot di GitHub Actions."""
+    return row.get("context") == CONTEXT and \
+        (row.get("creator") or {}).get("login") == ghcli.STATUS_BOT
+
+
+def last_checked(repo: Path, after: str, statuses: Callable[[str], list[dict]], *,
+                 limit: int = WALK_LIMIT) -> str | None:
+    """Il primo commit con uno stato `tollgate/sentinel` del bot, risalendo da `after` (escluso)
+    lungo il primo genitore, di qualunque valore: un `failure` vuol dire che è già stato
+    controllato e segnalato. `None` se non c'è nessuno entro `limit` commit (una GET di stati per
+    commit) o la storia finisce. Gli stati di altri utenti non contano: lo stato è per commit e
+    chiunque con `statuses: write` potrebbe scriverlo."""
+    sha = after
+    for _ in range(limit):
+        parent = git.resolve_ref(repo, f"{sha}^")
+        if parent is None:
+            return None
+        if any(_is_marker(row) for row in statuses(parent)):
+            return parent
+        sha = parent
+    return None
+
+
+def _commits(repo: Path, before: str, after: str, statuses: Callable[[str], list[dict]]
+             ) -> tuple[list[str], bool]:
     """I commit nuovi del push, dal più vecchio, e se il push è forzato. Con `before` tutto zeri
     (ramo nuovo) solo `after`. Un `before` che non si risolve o non è antenato di `after` (storia
     riscritta, ramo tornato indietro) è un push forzato: l'intervallo, se si calcola, vale
-    comunque, ma `after` è non verificato."""
+    comunque, ma `after` è non verificato. Altrimenti l'intervallo parte dall'ultimo commit
+    controllato (`last_checked`), che arriva prima di `before` se un push è stato saltato; senza
+    segnale entro `WALK_LIMIT` commit parte da `before`."""
     if before == _ZEROS:
         return [after], False
     if git.resolve_ref(repo, before) is None:
         return [after], True
-    forced = not git.ok(repo, "merge-base", "--is-ancestor", before, after)
-    return git.rev_list(repo, before, after), forced
+    if not git.ok(repo, "merge-base", "--is-ancestor", before, after):
+        return git.rev_list(repo, before, after), True
+    return git.rev_list(repo, last_checked(repo, after, statuses) or before, after), False
 
 
 def _introduces_workflow(repo: Path, sha: str) -> bool:
@@ -109,11 +143,12 @@ def unverified(repo: Path, *, before: str, after: str,
                sleep: Callable[[float], object] = time.sleep) -> list[tuple[str, str]]:
     """I commit del push non verificati, con il motivo. Le funzioni di lettura sono parametri
     (nei test sono finte); `default_branch` è quello di `git.default_branch` se manca. Un elenco
-    di PR vuoto si rilegge `attempts` volte, con `wait` secondi tra una e l'altra."""
+    di PR vuoto si rilegge `attempts` volte, con `wait` secondi tra una e l'altra. L'intervallo
+    parte dall'ultimo commit controllato (`last_checked`), non da `before`."""
     default = default_branch or git.default_branch(repo)
     if not default:
         raise git.GitError("ramo predefinito non determinabile")
-    commits, forced = _commits(repo, before, after)
+    commits, forced = _commits(repo, before, after, statuses)
     skip = _first_install(repo, commits)
     found: dict[str, str] = {}
     for sha in commits:
@@ -139,8 +174,9 @@ def run(event_path: Path, *, publish: bool, environ: Mapping[str, str], repo: Pa
         wait: float = WAIT_S) -> int:
     """Controlla il push dell'evento. Senza `publish` stampa i commit non verificati (una stringa
     JSON per riga) e risponde 1 se ce ne sono, senza scrivere su GitHub. Con `publish` scrive lo
-    stato rosso sui commit e segnala sull'issue di sentinel, poi risponde 0: il segnale sono lo
-    stato e l'issue. Con `sentinel = false` nel `tollgate.toml` della punta esce subito."""
+    stato rosso sui commit, il `success` «controllato fino a qui» su `after` se non è rosso, e
+    segnala sull'issue di sentinel, poi risponde 0: il segnale sono lo stato e l'issue.
+    Con `sentinel = false` nel `tollgate.toml` della punta esce subito."""
     repo = Path.cwd() if repo is None else repo
     event = github.read_event(event_path)
     ref, before, after = github.push_from_event(event)
@@ -162,15 +198,20 @@ def run(event_path: Path, *, publish: bool, environ: Mapping[str, str], repo: Pa
         attempts=attempts, wait=wait, sleep=sleep)
     if not found:
         print("sentinel: tutti i commit del push vengono da una PR verificata")
-        return 0
     if not publish:
         for sha, reason in found:
             print(json.dumps(f"{sha}: {reason}", ensure_ascii=False))
-        print(f"sentinel: {len(found)} commit non verificati")
-        return 1
+        if found:
+            print(f"sentinel: {len(found)} commit non verificati")
+        return 1 if found else 0
     for sha, reason in found:           # prima gli stati, che sono il segnale; poi l'issue
         github.set_status(state, repo, slug, sha, context=CONTEXT, status="failure",
                           description=f"merge non verificato: {reason}")
+    if after not in dict(found):        # il segnale «controllato fino a qui» per il push dopo
+        github.set_status(state, repo, slug, after, context=CONTEXT, status="success",
+                          description=CHECKED_DESCRIPTION)
+    if not found:
+        return 0
     with tempfile.TemporaryDirectory(prefix="tollgate-sentinel-") as tmp:
         body = Path(tmp) / "body.md"
         body.write_text(_body(found), encoding="utf-8")

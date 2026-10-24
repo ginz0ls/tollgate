@@ -10,6 +10,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
+from tests import test_gate_github
 from tests.flowkit import FAKEGH
 from tests.gatekit import BRANCH, GateLab
 from tests.helpers import BIN, TempState, git
@@ -66,10 +67,10 @@ class GuardBase(unittest.TestCase):
         return self.gh_data()["prs"][0]["comments"]
 
     def event(self, *, head_ref=BRANCH, base="main", head_repo=SLUG, number=1, sha=None,
-              body=HOSTILE_BODY) -> Path:
+              body=HOSTILE_BODY, action="synchronize") -> Path:
         path = self.tmp / "event.json"
         path.write_text(json.dumps({
-            "action": "synchronize", "number": number,
+            "action": action, "number": number,
             "pull_request": {"number": number, "body": body,
                              "head": {"sha": sha or self.lab.head, "ref": head_ref,
                                       "repo": {"full_name": head_repo}},
@@ -378,6 +379,36 @@ class RunTest(GuardBase):
             self.run_guard(self.event(sha="1" * 40))
         self.assertEqual(self.posted_statuses(), [])
 
+    def test_green_guard_updates_previous_red_comment(self):
+        self.lab.commit("tollgate.toml", "schema_version = 1\n")
+        self.push_pr_head()
+        self.run_guard()
+        [red] = self.comments()
+        self.assertIn("rosso", red["body"])
+        # lo stesso SHA diventa verde: il predefinito ha raggiunto la stessa configurazione
+        git(self.lab.repo, "push", "-q", "origin", "HEAD:refs/heads/main")
+        self.assertEqual(self.run_guard(), 0)
+        [note] = self.comments()
+        self.assertEqual(note["id"], red["id"])
+        self.assertTrue(note["body"].startswith(f"{comment.GUARD_PREFIX} sha={self.lab.head} -->"))
+        self.assertIn("risolto", note["body"])
+        self.assertNotIn("tollgate.toml", note["body"])
+        self.assertNotIn("rosso", note["body"])
+        self.assertEqual([s["state"] for s in self.posted_statuses()], ["success", "failure"])
+
+    def test_green_guard_without_comment_creates_none(self):
+        self.push_pr_head()
+        self.run_guard()
+        self.assertEqual(self.comments(), [])
+        self.assertFalse(any("--method" in a and a[-1].endswith("/comments") for a in self.calls()))
+
+    def test_green_guard_leaves_not_applicable_comment_alone(self):
+        self.push_pr_head()
+        self.run_guard(self.event(base="other"))
+        [before] = self.comments()
+        self.run_guard()
+        self.assertEqual(self.comments(), [before])
+
     def test_missing_repository_is_a_value_error(self):
         env = {k: v for k, v in os.environ.items() if k != "GITHUB_REPOSITORY"}
         with self.assertRaises(ValueError):
@@ -398,6 +429,83 @@ class RunTest(GuardBase):
             self.run_guard()
         self.assertEqual(seen, {"ref": "refs/pull/1/head", "token": "tkn-123"})
         self.assertFalse(any("tkn-123" in " ".join(a) for a in self.calls()))
+
+
+class PendingTest(test_gate_github.VerdictBase):
+    """Decisione 15, Review Focus 3: su `opened`, `edited` e `reopened` `guard` scrive
+    `tollgate/verdict` `pending` prima dei controlli; `gate evaluate` lo sostituisce."""
+
+    def guard_event(self, action, *, base="main", sha=None) -> Path:
+        path = self.tmp / "guard event.json"
+        path.write_text(json.dumps({
+            "action": action, "number": 1,
+            "pull_request": {"number": 1, "body": "", "head": {
+                "sha": sha or self.sha, "ref": BRANCH, "repo": {"full_name": SLUG}},
+                "base": {"ref": base}},
+            "repository": {"full_name": SLUG, "default_branch": "main"}}))
+        return path
+
+    def guard(self, action, *, publish=True, **kw) -> int:
+        return guard.run(self.guard_event(action, **kw), publish=publish, environ=os.environ,
+                         repo=self.lab.repo)
+
+    def verdict_states(self, sha=None) -> list[str]:
+        """Gli stati di `tollgate/verdict` del commit, dal più recente."""
+        rows = self.gh_data().get("commit_statuses", {}).get(sha or self.sha, [])
+        return [r["state"] for r in rows if r["context"] == "tollgate/verdict"]
+
+    def test_edited_publishes_pending_then_verdict_replaces(self):
+        self.assertEqual(self.guard("edited"), 0)
+        self.assertEqual(self.verdict_states(), ["pending"])
+        [row] = [r for r in self.gh_data()["commit_statuses"][self.sha]
+                 if r["context"] == "tollgate/verdict"]
+        self.assertEqual(row["description"], guard.PENDING_DESCRIPTION)
+        self.assertEqual(self.statuses()["tollgate/guard"]["state"], "success")
+        self.assertEqual(self.run_verdict(), 0)
+        self.assertEqual(self.verdict_states(), ["success", "pending"])
+        self.assertEqual(self.statuses()["tollgate/verdict"]["state"], "success")
+
+    def test_reopened_publishes_pending(self):
+        self.guard("reopened")
+        self.assertEqual(self.verdict_states(), ["pending"])
+
+    def test_opened_publishes_pending(self):
+        # una PR nuova con la testa di una PR chiusa che aveva `success`: non lo eredita
+        self.assertEqual(self.run_verdict(), 0)
+        self.assertEqual(self.verdict_states(), ["success"])
+        self.guard("opened")
+        self.assertEqual(self.verdict_states(), ["pending", "success"])
+        self.assertEqual(self.statuses()["tollgate/verdict"]["state"], "pending")
+
+    def test_synchronize_no_pending(self):
+        self.guard("synchronize")
+        self.assertEqual(self.verdict_states(), [])
+        self.assertEqual(self.statuses()["tollgate/guard"]["state"], "success")
+
+    def test_no_pending_for_other_base(self):
+        self.guard("edited", base="other")
+        self.assertNotIn("commit_statuses", self.gh_data())
+
+    def test_other_base_keeps_the_previous_verdict(self):
+        self.assertEqual(self.run_verdict(), 0)
+        self.guard("edited", base="other")
+        self.assertEqual(self.verdict_states(), ["success"])
+
+    def test_dry_run_publishes_no_pending(self):
+        with redirect_stdout(io.StringIO()):
+            self.guard("edited", publish=False)
+        self.assertNotIn("commit_statuses", self.gh_data())
+
+    def test_pending_is_written_before_the_checks(self):
+        stale = "1" * 40            # la testa dell'evento non esiste: i controlli falliscono
+        with self.assertRaises(GitError):
+            self.guard("edited", sha=stale)
+        self.assertEqual(self.verdict_states(stale), ["pending"])
+        self.assertEqual([r["context"] for r in self.gh_data()["commit_statuses"][stale]],
+                         ["tollgate/verdict"])
+
+    def test_pending_actions(self):
+        self.assertEqual(guard.PENDING_ACTIONS, ("opened", "edited", "reopened"))
 
 
 class GithubTest(GuardBase):

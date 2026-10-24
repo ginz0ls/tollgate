@@ -1,6 +1,8 @@
 """`gate guard` (spec 9.2, decisione 15): gira in `pull_request_target` sul checkout del ramo
 predefinito, prende gli oggetti della PR con `git fetch` e giudica solo i file di tollgate e i
-workflow del progetto. Pubblica `tollgate/guard` e, se rosso, un commento che spiega perché."""
+workflow del progetto. Pubblica `tollgate/guard` e, se rosso, un commento che spiega perché; se
+torna verde riscrive quel commento in «risolto». Su `opened`, `edited` e `reopened` scrive prima
+`tollgate/verdict` `pending` (decisione 15)."""
 from __future__ import annotations
 
 import json
@@ -14,6 +16,11 @@ from tollgate_core import git, paths
 from . import comment, evaluate, github
 
 CONTEXT = "tollgate/guard"
+VERDICT_CONTEXT = "tollgate/verdict"
+# Le azioni che riscrivono il corpo o riaprono la PR: il verdetto di prima non vale più (decisione
+# 15). Con `synchronize` lo SHA è nuovo e non ha verdetto.
+PENDING_ACTIONS = ("opened", "edited", "reopened")
+PENDING_DESCRIPTION = "rivalutazione in corso"
 MAX_LISTED = 50     # file nominati per voce: oltre, una riga di riepilogo
 DESC_OK = "file di tollgate e workflow del progetto in regola"
 DESC_SHARED = "SHA condiviso da più PR: chiudine una"
@@ -79,9 +86,11 @@ def run(event_path: Path, *, publish: bool, environ: Mapping[str, str],
     e risponde 0: il segnale è lo stato. Una PR verso un altro ramo non riceve nessuno stato (gli
     stati sono per SHA: un `success` sulla stessa testa renderebbe unibile una PR verso il
     predefinito), solo il commento «non applicabile»; uno SHA che è la testa di più PR aperte
-    verso il predefinito riceve `error`."""
+    verso il predefinito riceve `error`. Su `PENDING_ACTIONS` pubblica prima `tollgate/verdict`
+    `pending` (solo con `publish` e solo per le PR verso il predefinito)."""
     repo = Path.cwd() if repo is None else repo
-    pr = github.pr_from_event(github.read_event(event_path))
+    event = github.read_event(event_path)
+    pr = github.pr_from_event(event)
     if pr is None:
         raise ValueError("evento senza pull_request")
     slug = github.repo_slug(environ) if publish else ""
@@ -96,6 +105,11 @@ def run(event_path: Path, *, publish: bool, environ: Mapping[str, str],
     if not applicable:
         print(f"guard: {NOT_APPLICABLE}")
         return 0
+    if publish and event.get("action") in PENDING_ACTIONS:
+        # il `success` precedente, calcolato su un altro corpo, non deve restare valido finché
+        # `gate evaluate` non lo sostituisce; mai per le PR verso altri rami (decisione 5 di P4)
+        github.set_status(state, repo, slug, pr.head_sha, context=VERDICT_CONTEXT,
+                          status="pending", description=PENDING_DESCRIPTION)
     tip = git.resolve_ref(repo, f"origin/{pr.default_branch}")
     if tip is None:
         raise git.GitError(f"origin/{pr.default_branch} non trovato: serve un checkout con il "
@@ -124,6 +138,11 @@ def run(event_path: Path, *, publish: bool, environ: Mapping[str, str],
     if not problems:
         github.set_status(state, repo, slug, head, context=CONTEXT, status="success",
                           description=DESC_OK)
+        red = github.bot_comment(state, repo, slug, pr.number, prefix=comment.GUARD_PREFIX)
+        if red is not None and comment.is_guard_red(str(red.get("body", ""))):
+            with tempfile.TemporaryDirectory(prefix="tollgate-guard-") as tmp:
+                body = _write(tmp, "comment.md", comment.render_guard_resolved(head))
+                github.edit_comment(state, repo, slug, red["id"], body_file=body)
         return 0
     with tempfile.TemporaryDirectory(prefix="tollgate-guard-") as tmp:
         body = _write(tmp, "comment.md", comment.render_guard(head, problems))

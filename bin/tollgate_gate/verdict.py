@@ -19,14 +19,14 @@ from tollgate_core.ghcli import GhError
 
 from . import attention, baseids, comment, evaluate, github
 from .artifacts import read_results
-from .guard import DESC_SHARED, NOT_APPLICABLE
+from .guard import DESC_SHARED, NOT_APPLICABLE, VERDICT_CONTEXT
 from .model import BASE_FROM_CACHE, BASE_FROM_RUN, GITHUB, Evaluation, GateInputs
 
 RUN_WORKFLOW_PATH = ".github/workflows/tollgate-run.yml"
 RUN_EVENT = "pull_request"
 NA_PREFIX = "<!-- tollgate-na"      # non è un verdetto: `task start --from-gate` non lo legge
 ARTIFACT_PREFIX = "artefatti del run: "
-VERDICT = "tollgate/verdict"
+VERDICT = VERDICT_CONTEXT
 ATTENTION = "tollgate/attention"
 DESC_ARTIFACTS = "artefatti del run mancanti o non validi: vedi il commento"
 DESC_ERROR = "errore nel calcolo del gate"
@@ -270,8 +270,13 @@ def _judge(event: dict, repo: Path, state, slug: str, sha: str, *, artifacts: Pa
     here = [p for p in pulls if (p.get("base") or {}).get("ref") == default]
     for other in pulls:
         if other not in here and (other.get("head") or {}).get("sha") == sha:
-            # nessuno stato: sono per SHA e vincerebbe l'ultimo scritto
-            _not_applicable(state, repo, slug, other["number"], sha, publish)
+            # nessuno stato: sono per SHA e vincerebbe l'ultimo scritto, nemmeno `error` se il
+            # commento «non applicabile» non si scrive (basta il messaggio nel log)
+            try:
+                _not_applicable(state, repo, slug, other["number"], sha, publish)
+            except GhError as e:
+                sys.stderr.write(f"gate evaluate: PR #{other['number']}: commento non scritto: "
+                                 f"{json.dumps(str(e), ensure_ascii=False)}\n")
     if not here:
         return 0 if pulls else finish(_error(prechecks(event, None, default_branch=default,
                                                        open_prs_for_sha=shared)[1]))

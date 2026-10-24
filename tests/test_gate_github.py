@@ -807,6 +807,55 @@ class MinorsTest(VerdictBase):
             self.assertEqual(self.run_verdict(), 0)
         self.assertNotIn("commit_statuses", self.gh_data())
 
+    def test_other_base_ghError_writes_no_status(self):
+        """Una PR solo verso un altro ramo non riceve mai stati, nemmeno `error`: se il
+        ricontrollo della testa fallisce resta il messaggio nel log."""
+        real, calls = github.pull, []
+
+        def pull_fails_on_recheck(state, cwd, slug, n):
+            calls.append(n)
+            if len(calls) > 1:
+                raise ghcli.GhError("rate limit\n::error::x")
+            return real(state, cwd, slug, n)
+
+        self.set_gh(pull=self.rest_pull(base={"ref": "other"}))
+        err = io.StringIO()
+        with mock.patch.object(github, "pull", pull_fails_on_recheck), \
+                contextlib.redirect_stderr(err):
+            self.assertEqual(self.run_verdict(), 0)
+        self.assertNotIn("commit_statuses", self.gh_data())
+        self.assertEqual(self.comments(), [])
+        self.assertIn("rate limit", err.getvalue())
+        self.assertFalse(any(line.startswith("::") for line in err.getvalue().splitlines()))
+        self.assertNotIn("Traceback", err.getvalue())
+
+    def test_other_base_comment_write_failure_writes_no_status(self):
+        self.set_gh(pull=self.rest_pull(base={"ref": "other"}))
+        err = io.StringIO()
+        with mock.patch.object(github, "upsert_comment", side_effect=ghcli.GhError("HTTP 502")), \
+                contextlib.redirect_stderr(err):
+            self.assertEqual(self.run_verdict(), 0)
+        self.assertNotIn("commit_statuses", self.gh_data())
+        self.assertIn("HTTP 502", err.getvalue())
+
+    def test_edited_changing_base_reevaluated(self):
+        """`edited` che cambia la base: verso un altro ramo nessuno stato nuovo (resta quello di
+        prima), di nuovo verso il predefinito il verdetto si ricalcola sul corpo di adesso."""
+        self.assertEqual(self.run_verdict(), 0)
+        self.assertEqual(self.statuses()["tollgate/verdict"]["state"], "success")
+        rows = len(self.gh_data()["commit_statuses"][self.sha])
+        data = self.gh_data()
+        data["pulls"]["1"] = self.rest_pull(base={"ref": "other"})
+        self.data.write_text(json.dumps(data))
+        self.assertEqual(self.run_verdict(), 0)
+        self.assertEqual(len(self.gh_data()["commit_statuses"][self.sha]), rows)
+        data = self.gh_data()
+        data["pulls"]["1"] = self.rest_pull(body="")        # di nuovo sul predefinito, senza blocco
+        self.data.write_text(json.dumps(data))
+        self.assertEqual(self.run_verdict(), 0)
+        self.assertEqual(self.statuses()["tollgate/verdict"]["state"], "failure")
+        self.assertGreater(len(self.gh_data()["commit_statuses"][self.sha]), rows)
+
     def test_fork_pr_with_closed_issue_is_red(self):
         pull = self.rest_pull(body=f"Closes #{ISSUE}\n",
                               head={"sha": self.sha, "ref": BRANCH,

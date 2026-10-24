@@ -168,20 +168,34 @@ def pr_comments(state, cwd, slug: str, n: int) -> list[dict]:
                      paginate=True, jq=jq).data
 
 
-def upsert_comment(state, cwd, slug: str, n: int, *, prefix: str, body_file: Path) -> None:
-    """Un solo commento del bot che comincia con `prefix` (decisione 14): se c'è lo riscrive, se
-    no lo crea. Il testo viene dal file; un commento di un utente con lo stesso prefisso non
-    conta."""
+def bot_comment(state, cwd, slug: str, n: int, *, prefix: str) -> dict | None:
+    """Il commento del bot che comincia con `prefix` sulla PR `n`, `None` se non c'è. Un commento
+    di un utente con lo stesso prefisso non conta."""
     for c in pr_comments(state, cwd, slug, n):
         login = (c.get("user") or {}).get("login")
         if login in ghcli.BOT_LOGINS and str(c.get("body", "")).lstrip().startswith(prefix):
             if not isinstance(c.get("id"), int):
                 raise ghcli.GhError("commento senza id")
-            # idempotente: riscrive lo stesso testo; il POST di un commento nuovo no (doppione)
-            ghcli.api(state, cwd, f"repos/{slug}/issues/comments/{c['id']}", method="PATCH",
-                      file_fields={"body": body_file}, retry=True)
-            return
-    comment_issue(state, cwd, slug, n, body_file=body_file)
+            return c
+    return None
+
+
+def edit_comment(state, cwd, slug: str, comment_id: int, *, body_file: Path) -> None:
+    """Riscrive il commento `comment_id` col testo del file."""
+    # idempotente: riscrive lo stesso testo; il POST di un commento nuovo no (doppione)
+    ghcli.api(state, cwd, f"repos/{slug}/issues/comments/{_number(comment_id)}", method="PATCH",
+              file_fields={"body": body_file}, retry=True)
+
+
+def upsert_comment(state, cwd, slug: str, n: int, *, prefix: str, body_file: Path) -> None:
+    """Un solo commento del bot che comincia con `prefix` (decisione 14): se c'è lo riscrive, se
+    no lo crea. Il testo viene dal file; un commento di un utente con lo stesso prefisso non
+    conta."""
+    found = bot_comment(state, cwd, slug, n, prefix=prefix)
+    if found is not None:
+        edit_comment(state, cwd, slug, found["id"], body_file=body_file)
+    else:
+        comment_issue(state, cwd, slug, n, body_file=body_file)
 
 
 def comment_issue(state, cwd, slug: str, n: int, *, body_file: Path) -> None:

@@ -407,6 +407,17 @@ class WorkflowFilesTest(unittest.TestCase):
              "cancel-in-progress": "true"})
         self.assertEqual(mapping(section(text, "permissions"), 2), {"contents": "read"})
 
+    def test_sentinel_concurrency(self):
+        """Due push ravvicinati non si controllano in parallelo e nessuna corsa si annulla: la
+        seconda vede il segnale «controllato fino a qui» scritto dalla prima (decisione 16)."""
+        text = read("sentinel")
+        self.assertEqual(
+            mapping(section(text, "concurrency"), 2),
+            {"group": "tollgate-sentinel", "cancel-in-progress": "false"})
+        self.assertEqual([m.group(1) for line in text.splitlines()
+                          if (m := re.match(r"^([\w-]+):", line))],
+                         ["name", "on", "permissions", "concurrency", "jobs"])
+
     def test_fetch_depth_where_history_is_needed(self):
         for name in ("guard", "verdict", "sentinel", "base"):
             step = checkouts(read(name))[0]       # il primo è il predefinito (`trusted` in base)

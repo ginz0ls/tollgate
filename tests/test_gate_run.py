@@ -11,8 +11,10 @@ from contextlib import redirect_stderr
 from pathlib import Path
 from unittest import mock
 
+from tests.flowkit import FAKEGH
 from tests.gatekit import GateLab
 from tests.helpers import BIN, TempState, git
+from tollgate_core import runner
 from tollgate_core.config import ConfigError
 from tollgate_core.ghcli import GhError
 from tollgate_core.git import GitError
@@ -338,6 +340,94 @@ class BaseIdsComponentOffTest(GateRunBase):
         self.assertEqual(baseids.publish_from(self.lab.repo, config_sha=self.lab.base,
                                               sha=self.lab.base, ids_dir=self.out,
                                               environ=os.environ, publish=True), 0)
+
+
+class FakeGhBase(GateRunBase):
+    """Il `gh` finto dietro `base-publish`: legge gli stati scritti."""
+
+    def setUp(self):
+        super().setUp()
+        self.gh_data = self.out.parent / "gh data.json"
+        self.gh_data.write_text(json.dumps({"open_issues": []}))
+        env = mock.patch.dict(os.environ, {
+            "TOLLGATE_STATE": str(self.ts.dir), "TOLLGATE_GH": str(FAKEGH),
+            "TOLLGATE_FAKEGH_DATA": str(self.gh_data), "GITHUB_REPOSITORY": "o/r",
+            "GITHUB_ACTIONS": "true"})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def base_statuses(self) -> list[dict]:
+        rows = json.loads(self.gh_data.read_text()).get("commit_statuses", {})
+        return [r for r in rows.get(self.lab.base, []) if r["context"] == "tollgate/base"]
+
+    def publish_from(self, *, sha=None) -> int:
+        return baseids.publish_from(self.lab.repo, config_sha=self.lab.base,
+                                    sha=sha or self.lab.base, ids_dir=self.out,
+                                    environ=os.environ, publish=True)
+
+
+class PublishFromErrorsDetectTest(FakeGhBase):
+    toml = TOML.replace("protected", "detect")
+
+    def computed(self):
+        baseids.compute(self.lab.repo, config_sha=self.lab.base, sha=self.lab.base, out=self.out,
+                        environ=os.environ)
+
+    def test_publish_from_config_error_is_error_and_red_job(self):
+        # `ids.json` valido, ma la lettura della configurazione fallisce: stato `error` e job rosso
+        self.computed()
+        err = io.StringIO()
+        error = ConfigError("boom\n::error::x")
+        with mock.patch.object(runner, "ids_commands", side_effect=error), redirect_stderr(err):
+            self.assertEqual(self.publish_from(), 1)
+        [row] = self.base_statuses()
+        self.assertEqual(row["state"], "error")
+        self.assertLessEqual(len(row["description"]), 140)
+        self.assertIn("boom", err.getvalue())
+        self.assertFalse(any(l.startswith("::") for l in err.getvalue().splitlines()))
+        self.assertNotIn("Traceback", err.getvalue())
+
+    def test_publish_from_git_error_is_error_and_red_job(self):
+        self.computed()
+        with redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(self.publish_from(sha="f" * 40), 1)    # l'albero non si risolve
+        [row] = [r for r in json.loads(self.gh_data.read_text())["commit_statuses"]["f" * 40]
+                 if r["context"] == "tollgate/base"]
+        self.assertEqual(row["state"], "error")
+        self.assertIn("git", err.getvalue())
+
+    def test_unreadable_config_at_the_tip_is_still_a_message(self):
+        # la modalità non si conosce: nessuno stato, l'errore arriva al confine del comando
+        with self.assertRaises(ConfigError):
+            baseids.publish_from(self.lab.repo, config_sha="e" * 40, sha=self.lab.base,
+                                 ids_dir=self.out, environ=os.environ, publish=True)
+        self.assertNotIn("commit_statuses", json.loads(self.gh_data.read_text()))
+
+
+class PublishFromErrorsProtectedTest(FakeGhBase):
+    def test_publish_from_config_error_is_red_job_without_status(self):
+        baseids.compute(self.lab.repo, config_sha=self.lab.base, sha=self.lab.base, out=self.out,
+                        environ=os.environ)
+        with mock.patch.object(runner, "ids_commands", side_effect=ConfigError("boom")), \
+                redirect_stderr(io.StringIO()):
+            self.assertEqual(self.publish_from(), 1)
+        with redirect_stderr(io.StringIO()):
+            self.assertEqual(self.publish_from(sha="f" * 40), 1)
+        self.assertNotIn("commit_statuses", json.loads(self.gh_data.read_text()))
+
+
+class ComponentOffDescriptionTest(FakeGhBase):
+    """Residuo della ri-revisione di P4: con `base_test_ids` spento `tollgate/base` lo dice."""
+    toml = TOML.replace("protected", "detect") + "[components]\nbase_test_ids = false\n"
+
+    def test_component_off_description(self):
+        baseids.compute(self.lab.repo, config_sha=self.lab.base, sha=self.lab.base, out=self.out,
+                        environ=os.environ)
+        self.assertEqual(self.publish_from(), 0)
+        [row] = self.base_statuses()
+        self.assertEqual((row["state"], row["description"]),
+                         ("success", "componente base_test_ids spento"))
+        self.assertEqual(json.loads(self.gh_data.read_text())["open_issues"], [])
 
 
 class MainErrorsTest(unittest.TestCase):

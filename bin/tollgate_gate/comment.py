@@ -16,6 +16,7 @@ from .model import Evaluation, Item
 
 MARKER_PREFIX = "<!-- tollgate-verdict"     # uguale a fixtask.GATE_MARKER (lo controlla un test)
 GUARD_PREFIX = "<!-- tollgate-guard"
+GUARD_RED_TITLE = "## tollgate/guard: rosso sullo SHA"
 _SHA = re.compile(r"[0-9a-f]{40}")
 _MARKER = re.compile(re.escape(MARKER_PREFIX) + r" sha=([0-9a-f]{40}) -->")
 _TICKS = re.compile(r"`{3,}")
@@ -127,13 +128,27 @@ def render(sha: str, ev: Evaluation) -> str:
 
 
 def _guard_build(sha: str, problems: list[str], cap: int, keep: int | None) -> str:
-    out = [f"{GUARD_PREFIX} sha={sha} -->", "", f"## tollgate/guard: rosso sullo SHA `{sha}`", ""]
+    out = [f"{GUARD_PREFIX} sha={sha} -->", "", f"{GUARD_RED_TITLE} `{sha}`", ""]
     shown = problems if keep is None else problems[:keep]
     if shown:
         out += _lines(shown, cap)
     if len(shown) < len(problems):
         out += [f"… (troncato: altri {len(problems) - len(shown)} problemi omessi)", ""]
     return "\n".join(out).rstrip() + "\n"
+
+
+def is_guard_red(body: str) -> bool:
+    """Il commento è quello di `tollgate/guard` rosso (non il «non applicabile» né il «risolto»)."""
+    lines = body.lstrip().splitlines()
+    return len(lines) > 2 and lines[0].startswith(GUARD_PREFIX) \
+        and lines[2].startswith(GUARD_RED_TITLE)
+
+
+def render_guard_resolved(sha: str) -> str:
+    """Il commento di `tollgate-guard` quando il rosso scritto prima non c'è più."""
+    return (f"{GUARD_PREFIX} sha={_check_sha(sha)} -->\n\n"
+            f"## tollgate/guard: risolto sullo SHA `{sha}`\n\n"
+            "I problemi segnalati prima non ci sono più: `tollgate/guard` è verde.\n")
 
 
 def render_guard(sha: str, problems: list[str]) -> str:

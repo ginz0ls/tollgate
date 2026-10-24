@@ -9,6 +9,7 @@ from unittest import mock
 
 from tests.flowkit import FAKEGH
 from tests.helpers import TempState
+from tollgate_core import ghcli
 from tollgate_flow import gh
 
 
@@ -203,6 +204,21 @@ class SentinelIssuesTest(FakeGhCase):
         self.assertIn("--paginate", argv)
         self.assertNotIn("--limit", argv)
         self.assertTrue(argv[-1].startswith("repos/{owner}/{repo}/issues?state=open"), argv)
+
+    def test_fake_pages_like_github(self):
+        """Il `gh` finto dà una pagina sola senza `--paginate`: la sentinella oltre la prima
+        pagina si trova solo se il codice pagina davvero."""
+        rows = [{"number": n, "title": f"issue {n}", "url": f"https://x/{n}"}
+                for n in range(1, 111)]
+        self.set(open_issues=rows)
+        path = "repos/{owner}/{repo}/issues?state=open&per_page=100"
+        first = ghcli.run(self.state, self.tmp, ["api", "--jq", ".", path])
+        everything = ghcli.run(self.state, self.tmp, ["api", "--paginate", "--jq", ".", path])
+        self.assertEqual(len(first.stdout.splitlines()), 100)
+        self.assertEqual(len(everything.stdout.splitlines()), 110)
+        short = ghcli.run(self.state, self.tmp, ["api", "--jq", ".",
+                                              "repos/{owner}/{repo}/issues?state=open"])
+        self.assertEqual(len(short.stdout.splitlines()), 30)
 
 
 if __name__ == "__main__":

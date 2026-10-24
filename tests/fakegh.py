@@ -33,7 +33,8 @@ stampa per riga `status<TAB>conclusion<TAB>app.id`. Poi `commits/<sha>/statuses`
 `pulls/<n>` (da `pulls[<n>]`, come la REST: `body`, `head.sha|ref|repo.full_name`, `base.ref`,
 `state`; 404 se manca) e `issues?state=open` (da `open_issues`, senza le righe con
 `pull_request`, che il filtro scarta), un valore per riga; il `--jq` non si valuta: i dati hanno
-già la forma che il filtro produce.
+già la forma che il filtro produce. Le liste paginano come GitHub: senza `--paginate` il finto
+dà solo la prima pagina (`per_page` della query, 30 se manca), con `--paginate` tutte.
 `api_flaky` simula i 5xx transitori di GitHub (prova P4): `{"<percorso senza ?query>": ["<stderr>",
 ...]}`; ogni `gh api` su quel percorso consuma il primo messaggio (riscrive il file dei dati), lo
 scrive su stderr ed esce con 1 senza stdout; finita la lista risponde normalmente. La chiave
@@ -43,7 +44,9 @@ scrive su stderr ed esce con 1 senza stdout; finita la lista risponde normalment
 (`user.login = "github-actions[bot]"`, `user.type = "Bot"`); il `--jq` non si valuta.
 
 Le PR stanno in `prs`: `pr create` ne aggiunge una (numero successivo al più alto, stato OPEN) e
-`api --method PATCH repos/o/r/pulls/<n> -F body=@<file>` riscrive `body` (come `pr edit`, che con gh 2.46 non funziona; `fail` lo chiama "pr edit"); entrambi riscrivono il file dei dati. `fail` elenca i comandi (le prime
+`api --method PATCH repos/o/r/pulls/<n> -F body=@<file>` riscrive `body` (come `pr edit`, che con
+gh 2.46 non funziona; `fail` lo chiama "pr edit"); entrambi riscrivono il file dei dati. `fail`
+elenca i comandi (le prime
 due parole, "pr create") che escono con 1 senza fare nulla, per simulare i guasti. Un campo di
 `--json` che `gh` non ha per le PR esce con 1: un nome sbagliato nel codice fa fallire i test.
 
@@ -75,6 +78,7 @@ PR_FIELDS = frozenset({"number", "state", "url", "headRefName", "headRefOid", "m
                        "title", "body", "comments", "isCrossRepository"})
 PULLS_FIELDS = ("number", "headRefName", "state", "url")
 DEFAULT_LIMIT = 30
+DEFAULT_PER_PAGE = 30
 
 
 def _flag(args, name):
@@ -227,8 +231,10 @@ def _api_write(data, path_data, argv):
         comment["body"] = _file_field(argv, "body")
         _save(path_data, data)
         return _ok(argv, _rest_comment(comment))
-    if method == "PATCH" and (m := next((x for a in argv[1:] if (x := _PULL_PATCH.match(a))), None)):
-        # il corpo di una PR (sostituisce `pr edit`, rotto con gh 2.46): un solo campo, `-F body=@<file>`
+    if method == "PATCH" and (
+            m := next((x for a in argv[1:] if (x := _PULL_PATCH.match(a))), None)):
+        # il corpo di una PR (sostituisce `pr edit`, rotto con gh 2.46): un solo campo,
+        # `-F body=@<file>`
         if "pr edit" in (data.get("fail") or []):
             _fail("pulls PATCH: guasto simulato")
         pr = next((p for p in data.get("prs") or [] if str(p.get("number")) == m.group(1)), None)
@@ -271,7 +277,9 @@ def _check_runs(data, argv, sha):
 
 
 def _api_list(data, argv):
-    """Le letture a più valori del gate, un valore per riga; `None` se il percorso non è noto."""
+    """Le letture a più valori del gate, un valore per riga; `None` se il percorso non è noto.
+    Pagina come GitHub: senza `--paginate` solo la prima pagina (`per_page` della query, 30 se
+    manca), con `--paginate` tutte."""
     path = argv[-1]
     if (m := _STATUS_LIST.match(path)):
         rows = (data.get("commit_statuses") or {}).get(m.group(1), [])
@@ -283,6 +291,9 @@ def _api_list(data, argv):
         rows = [r for r in data["open_issues"] if r.get("pull_request") is None]  # come il jq
     else:
         return None
+    if "--paginate" not in argv:
+        per_page = re.search(r"[?&]per_page=(\d+)", path)
+        rows = rows[:int(per_page.group(1)) if per_page else DEFAULT_PER_PAGE]
     for row in rows:
         print(json.dumps(row, separators=(",", ":")))
     return 0
@@ -397,7 +408,7 @@ def main(argv):
             done = _api_write(data, path, argv)
             if done is not None:
                 return done
-        elif "--paginate" in argv:
+        else:
             done = _api_list(data, argv)
             if done is not None:
                 return done

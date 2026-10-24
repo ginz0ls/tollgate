@@ -174,7 +174,7 @@ class RunTest(SentinelBase):
         with mock.patch.dict(os.environ):
             del os.environ["GITHUB_REPOSITORY"]
             self.assertEqual(self.push(self.start, c, publish=False), 1)
-        self.assertIn(f"repos/{SLUG}/commits/{c}/pulls", self.calls()[0][-1])
+        self.assertTrue(any(f"repos/{SLUG}/commits/{c}/pulls" in a[-1] for a in self.calls()))
 
     def test_merge_of_red_verdict(self):
         c = self.commit()
@@ -228,12 +228,19 @@ class RunTest(SentinelBase):
         self.assertEqual(self.push(self.start, commits[-1]), 0)
         self.assertEqual(self.pulls_calls(), commits)
         self.assertEqual(self.issues(), [])
-        self.assertTrue(all(self.sentinel_statuses(c) == [] for c in commits))
-        # un commit del push che non viene dalla PR è l'unico rosso
+        # nessun rosso: solo l'ultimo commit lascia il segnale «controllato fino a qui»
+        self.assertEqual([c for c in commits if self.sentinel_statuses(c)], [commits[-1]])
+        self.assertEqual([r["state"] for r in self.sentinel_statuses(commits[-1])], ["success"])
+        # un commit del push che non viene dalla PR è l'unico rosso: la risalita si ferma al
+        # segnale e `direct` resta `failure`
         direct = self.commit("d")
-        self.set_gh(pulls={c: [merged()] for c in commits}, statuses={PR_HEAD: GREEN})
+        data = self.gh_data()       # niente `set_gh`: il segnale scritto dal codice deve restare
+        data["commit_pulls"] = {c: [merged()] for c in commits}
+        self.data.write_text(json.dumps(data))
         self.push(self.start, direct)
-        self.assertEqual([c for c in (*commits, direct) if self.sentinel_statuses(c)], [direct])
+        self.assertEqual([c for c in (*commits, direct) if self.sentinel_statuses(c)],
+                         [commits[-1], direct])
+        self.assertEqual([r["state"] for r in self.sentinel_statuses(direct)], ["failure"])
 
     def test_first_install_ignored(self):
         before = self.start
@@ -244,8 +251,11 @@ class RunTest(SentinelBase):
         self.assertEqual(self.pulls_calls(), [])
         later = self.commit("b")           # il commit dopo l'installazione conta
         self.push(before, later)
+        # l'installazione lascia il segnale; `first` resta senza stati
         self.assertEqual([c for c in (first, install, later) if self.sentinel_statuses(c)],
-                         [later])
+                         [install, later])
+        self.assertEqual([r["state"] for r in self.sentinel_statuses(install)], ["success"])
+        self.assertEqual([r["state"] for r in self.sentinel_statuses(later)], ["failure"])
 
     def test_installed_workflow_is_not_a_first_install(self):
         install = self.lab.commit(WORKFLOW, "on: push\n", "installa sentinel")
@@ -318,7 +328,8 @@ class RunTest(SentinelBase):
 
     def test_fast_forward_is_not_forced(self):
         before = self.commit("a")
-        self.assertEqual(self.forced(before, self.commit("b")), [])
+        after = self.commit("b")
+        self.assertEqual([r["state"] for r in self.forced(before, after)], ["success"])
         self.assertEqual(self.issues(), [])
 
     def test_other_branch_push_ignored(self):
@@ -327,6 +338,192 @@ class RunTest(SentinelBase):
         self.assertEqual(sentinel.run(path, publish=True, environ=os.environ,
                                       repo=self.lab.repo, sleep=self.sleeps.append), 0)
         self.assertEqual(self.pulls_calls(), [])
+
+
+class SkipCiTest(SentinelBase):
+    """Decisione 16, Review Focus 4: ogni push controllato lascia il segnale `success`
+    «controllato fino a qui»; il push successivo risale fino a lui, così i commit di un push
+    saltato con `[skip ci]` si controllano comunque."""
+
+    def asked_since(self, n) -> list[str]:
+        """Gli SHA di cui `commits/<sha>/pulls` è stato letto dopo la n-esima chiamata."""
+        return list(dict.fromkeys(a[-1].split("/")[4] for a in self.calls()[n:]
+                                  if "/pulls?" in a[-1]))
+
+    def clean_push(self, before, after, *, head=PR_HEAD):
+        self.set_gh(pulls={after: [merged(head=head)]}, statuses={head: GREEN})
+        self.assertEqual(self.push(before, after), 0)
+
+    def chain(self, count, parent) -> list[str]:
+        """`count` commit vuoti in fila su `parent` (con `commit-tree`, senza muovere rami)."""
+        tree = git(self.lab.repo, "rev-parse", f"{parent}^{{tree}}")
+        out = []
+        for i in range(count):
+            parent = git(self.lab.repo, "commit-tree", tree, "-p", parent, "-m", f"c{i}")
+            out.append(parent)
+        return out
+
+    def test_clean_push_writes_success_marker(self):
+        c = self.commit()
+        self.clean_push(self.start, c)
+        [row] = self.sentinel_statuses(c)
+        self.assertEqual((row["state"], row["description"]),
+                         ("success", sentinel.CHECKED_DESCRIPTION))
+        self.assertEqual(row["creator"]["login"], BOT)
+        self.assertEqual(self.issues(), [])
+
+    def test_dry_run_writes_no_marker(self):
+        c = self.commit()
+        self.set_gh(pulls={c: [merged()]}, statuses={PR_HEAD: GREEN})
+        self.assertEqual(self.push(self.start, c, publish=False), 0)
+        self.assertEqual(self.sentinel_statuses(c), [])
+
+    def test_red_after_gets_failure_not_success(self):
+        c = self.commit()
+        self.push(self.start, c)
+        self.assertEqual([r["state"] for r in self.sentinel_statuses(c)], ["failure"])
+
+    def test_success_marker_on_after_even_if_an_earlier_commit_is_red(self):
+        direct, via_pr = self.commit("d"), self.commit("p")
+        self.set_gh(pulls={via_pr: [merged()]}, statuses={PR_HEAD: GREEN})
+        self.push(self.start, via_pr)
+        self.assertEqual([r["state"] for r in self.sentinel_statuses(direct)], ["failure"])
+        self.assertEqual([r["state"] for r in self.sentinel_statuses(via_pr)], ["success"])
+        self.assertEqual(len(self.issues()), 1)
+
+    def test_skipped_push_checked_next_time(self):
+        p0 = self.commit("p0")
+        self.clean_push(self.start, p0)             # il codice scrive il segnale su p0
+        skipped = self.commit("a")                  # push con `[skip ci]`: nessuna corsa
+        after = self.commit("b")
+        n = len(self.calls())
+        self.assertEqual(self.push(skipped, after), 0)      # `before` del push B è `skipped`
+        self.assertEqual(self.asked_since(n), [skipped, after])     # si ferma al segnale di p0
+        self.assertEqual([r["state"] for r in self.sentinel_statuses(skipped)], ["failure"])
+        self.assertEqual([r["state"] for r in self.sentinel_statuses(after)], ["failure"])
+        self.assertEqual([r["state"] for r in self.sentinel_statuses(p0)], ["success"])
+        [issue] = self.issues()
+        self.assertIn(skipped, issue["body"])
+
+    def test_walk_stops_at_a_failure_marker_too(self):
+        direct = self.commit("d")
+        self.push(self.start, direct)               # `failure` sul commit: è comunque controllato
+        after = self.commit("e")
+        n = len(self.calls())
+        self.push(direct, after)
+        self.assertEqual(self.asked_since(n), [after])
+        self.assertEqual(len(self.sentinel_statuses(direct)), 1)
+
+    def test_user_written_sentinel_status_ignored(self):
+        p0, mid, after = self.commit("p0"), self.commit("m"), self.commit("z")
+        self.clean_push(self.start, p0)
+        data = self.gh_data()
+        data["commit_statuses"].setdefault(mid, []).insert(0, {
+            "context": "tollgate/sentinel", "state": "success", "description": "mio",
+            "creator": {"login": "mario"}})
+        self.data.write_text(json.dumps(data))
+        n = len(self.calls())
+        self.push(p0, after)
+        self.assertEqual(self.asked_since(n), [mid, after])  # il segnale di `mid` non salta niente
+
+    def test_user_marker_on_after_parent_does_not_skip_commits(self):
+        """Lo stesso, con `github-actions` senza `[bot]` (un nome utente qualunque)."""
+        p0, mid, after = self.commit("p0"), self.commit("m"), self.commit("z")
+        self.clean_push(self.start, p0)
+        data = self.gh_data()
+        data["commit_statuses"].setdefault(mid, []).insert(0, {
+            "context": "tollgate/sentinel", "state": "success",
+            "creator": {"login": "github-actions"}})
+        self.data.write_text(json.dumps(data))
+        n = len(self.calls())
+        self.push(p0, after)
+        self.assertEqual(self.asked_since(n), [mid, after])
+
+    def test_other_context_marker_does_not_stop_the_walk(self):
+        after = self.commit("z")
+        data = self.gh_data()
+        data["commit_statuses"][self.start] = [
+            {"context": "tollgate/verdict", "state": "success", "creator": {"login": BOT}}]
+        self.data.write_text(json.dumps(data))
+        self.assertIsNone(sentinel.last_checked(
+            self.lab.repo, after, lambda sha: self.gh_data()["commit_statuses"].get(sha, [])))
+
+    def test_last_checked_returns_the_first_marker_going_up(self):
+        a, b, c = self.commit("a"), self.commit("b"), self.commit("c")
+        rows = {a: [status("tollgate/sentinel", "failure")],
+                b: [status("tollgate/sentinel", "success")]}
+        got = sentinel.last_checked(self.lab.repo, c, lambda sha: rows.get(sha, []))
+        self.assertEqual(got, b)
+        self.assertIsNone(sentinel.last_checked(self.lab.repo, a, lambda sha: []))
+
+    def test_last_checked_follows_first_parent_only(self):
+        side_base = self.commit("s0")
+        git(self.lab.repo, "checkout", "-q", "-b", "side", self.start)
+        side = self.commit("s1")
+        git(self.lab.repo, "checkout", "-q", "-")
+        git(self.lab.repo, "merge", "-q", "--no-ff", "-m", "merge", "side")
+        merge = git(self.lab.repo, "rev-parse", "HEAD")
+        rows = {side: [status("tollgate/sentinel", "success")],
+                self.start: [status("tollgate/sentinel", "success")]}
+        asked = []
+        got = sentinel.last_checked(self.lab.repo, merge,
+                                    lambda sha: asked.append(sha) or rows.get(sha, []))
+        self.assertEqual(got, self.start)           # `side` ha il segnale ma non è sul filo
+        self.assertEqual(asked, [side_base, self.start])
+
+    def test_no_marker_walk_bounded(self):
+        commits = self.chain(sentinel.WALK_LIMIT + 10, self.start)
+        before, after = commits[-5], commits[-1]
+        asked = []
+        got = sentinel.unverified(
+            self.lab.repo, before=before, after=after, default_branch="main",
+            prs_for_commit=lambda sha: [], statuses=lambda sha: asked.append(sha) or [],
+            attempts=1, sleep=self.sleeps.append)
+        self.assertEqual(sentinel.WALK_LIMIT, 200)
+        self.assertEqual(len(asked), 200)                   # al più 200 GET, poi `before`
+        self.assertEqual([sha for sha, _ in got], commits[-4:])
+
+    def test_forced_push_still_uses_before(self):
+        old = self.commit("old")
+        git(self.lab.repo, "checkout", "-q", "-b", "alt", self.start)
+        mid, new = self.commit("mid"), self.commit("new")
+        data = self.gh_data()
+        data["commit_statuses"][mid] = [status("tollgate/sentinel", "success")]
+        data["commit_pulls"] = {new: [merged()]}
+        data["commit_statuses"][PR_HEAD] = GREEN
+        self.data.write_text(json.dumps(data))
+        self.push(old, new)                         # un segnale su `mid` non accorcia l'intervallo
+        self.assertEqual(self.pulls_calls(), [mid, new])
+        self.assertIn("push forzato", self.sentinel_statuses(new)[0]["description"])
+
+    def test_before_all_zeros_checks_only_after(self):
+        c = self.commit()
+        self.push(ZEROS, c)
+        self.assertEqual(self.pulls_calls(), [c])
+        self.assertFalse(any("/commits/" in a[-1] and "/statuses" in a[-1]
+                             for a in self.calls()))
+
+    def test_first_install_still_ignored(self):
+        p0 = self.commit("p0")
+        self.clean_push(self.start, p0)
+        first = self.commit("a")
+        install = self.lab.commit(WORKFLOW, "on: push\n", "installa sentinel")
+        n = len(self.calls())
+        self.assertEqual(self.push(p0, install), 0)
+        self.assertEqual(self.asked_since(n), [])
+        self.assertEqual(self.issues(), [])
+        self.assertEqual([c for c in (first, install) if self.sentinel_statuses(c)], [install])
+
+    def test_single_issue(self):
+        skipped, b = self.commit("a"), self.commit("b")
+        self.push(self.start, b)                    # a e b rossi: un'issue
+        c = self.commit("c")
+        self.push(b, c)                             # la risalita parte da `b`: solo `c`
+        [issue] = self.issues()
+        [note] = issue["comments"]
+        self.assertIn(c, note["body"])
+        self.assertNotIn(b, note["body"])
+        self.assertIn(skipped, issue["body"])
 
 
 class CrossCommandTest(test_gate_github.VerdictBase):
@@ -351,8 +548,9 @@ class CrossCommandTest(test_gate_github.VerdictBase):
                                       repo=self.lab.repo, sleep=lambda s: None), 0)
         got = self.gh_data()
         self.assertEqual(got["open_issues"], [])
-        self.assertNotIn("tollgate/sentinel",
-                         [r["context"] for r in got["commit_statuses"].get(merge, [])])
+        # il commit di merge è verificato: riceve il segnale «controllato fino a qui», non un rosso
+        self.assertEqual([r["state"] for r in got["commit_statuses"].get(merge, [])
+                          if r["context"] == "tollgate/sentinel"], ["success"])
 
     def test_user_status_after_evaluate_is_not_trusted(self):
         self.enterContext(contextlib.redirect_stdout(io.StringIO()))

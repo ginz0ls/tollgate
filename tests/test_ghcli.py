@@ -238,6 +238,28 @@ class RetryTest(unittest.TestCase):
         self.assertEqual(self.sleeps, [2, 4])
         self.assertIn(ghcli.RETRY_DELAYS_ENV, paths.TEST_ENVS)
 
+    def test_bad_retry_delays_is_config_error(self):
+        # il valore viene dall'ambiente di prova: un testo malformato è un errore con il nome
+        # della variabile, mai un `ValueError` nudo; `gh` non parte
+        for value in ("abc", "1,,2", "0,x", "-1", "nan", "inf", "1;2"):
+            with self.subTest(value=value):
+                os.environ[ghcli.RETRY_DELAYS_ENV] = value
+                run = self.answers(_done(stdout="{}"))
+                with self.assertRaises(ghcli.GhError) as e:
+                    ghcli.api(self.state, ".", "p/x")
+                self.assertIn(ghcli.RETRY_DELAYS_ENV, str(e.exception))
+                self.assertEqual((run.call_count, self.sleeps), (0, []))
+
+    def test_paginate_non_object_values(self):
+        for out in ("1\n2\n", '"testo"\n', "[1]\n", "null\n", '{"n":1}\n5\n'):
+            with self.subTest(out=out):
+                self.answers(_done(stdout=out))
+                with self.assertRaises(ghcli.GhError) as e:
+                    ghcli.api(self.state, ".", "p/x", paginate=True, jq=".[]")
+                self.assertIn("non è un oggetto", str(e.exception))
+                self.assertTrue(str(e.exception).startswith("gh api --paginate:"),
+                                str(e.exception))
+
     def test_write_declared_idempotent_is_retried(self):
         run = self.answers(EMPTY_500, _done(stdout='{"a": 1}'))
         got = ghcli.api(self.state, ".", "p/x", method="POST", input_file="in.json", retry=True)

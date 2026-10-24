@@ -46,6 +46,22 @@ class MarkerTest(unittest.TestCase):
         self.assertNotIn("@team", body)
         self.assertEqual(body.count("-->"), 1)
 
+    def test_guard_red_is_told_from_resolved_and_not_applicable(self):
+        many = [f"problema {i}" for i in range(2000)]
+        for problems in (["un problema"], many):        # anche il commento ridotto al minimo
+            self.assertTrue(comment.is_guard_red(comment.render_guard(SHA, problems)))
+        resolved = comment.render_guard_resolved(SHA)
+        self.assertFalse(comment.is_guard_red(resolved))
+        self.assertTrue(resolved.startswith(f"{comment.GUARD_PREFIX} sha={SHA} -->"))
+        self.assertIn("risolto", resolved)
+        self.assertIsNone(comment.marker_sha(resolved))
+        self.assertFalse(comment.is_guard_red(f"{comment.GUARD_PREFIX} sha={SHA} -->\n\n"
+                                              "## tollgate: guard non applicabile\n"))
+        self.assertFalse(comment.is_guard_red("testo di un utente\n\n"
+                                              f"{comment.GUARD_RED_TITLE} x"))
+        with self.assertRaises(ValueError):
+            comment.render_guard_resolved("abc")
+
     def test_bad_sha_refused(self):
         with self.assertRaises(ValueError):
             comment.render("abc", ev())

@@ -9,6 +9,7 @@ prova P4 `commits/<sha>/pulls` ha risposto a volte 500 a corpo vuoto. Le scrittu
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import subprocess
@@ -85,7 +86,16 @@ def _transient(r, include: bool) -> bool:
 
 def _retry_delays(state) -> tuple[float, ...]:
     override = paths.test_env(state, RETRY_DELAYS_ENV)
-    return tuple(float(x) for x in override.split(",")) if override else RETRY_DELAYS_S
+    if not override:
+        return RETRY_DELAYS_S
+    try:
+        delays = tuple(float(x) for x in override.split(","))
+    except ValueError:
+        delays = (-1.0,)
+    if not all(math.isfinite(d) and d >= 0 for d in delays):
+        raise GhError(f"{RETRY_DELAYS_ENV}: valore non valido ({override!r}): servono attese in "
+                      "secondi, non negative, separate da virgole")
+    return delays
 
 
 def _run_retrying(state, repo, args, *, idempotent: bool = False) -> subprocess.CompletedProcess:

@@ -11,13 +11,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from tollgate_core import git, paths, runner
-from tollgate_core.config import load_config_at
+from tollgate_core.config import ConfigError, load_config_at
 
 from . import github
 from . import run as gate_run
 
 IDS_VERSION = 1
 MAX_IDS_FILE = 50 * 2**20
+CONTEXT = "tollgate/base"
+DESC_INVALID = "identificativi della base assenti o non validi"
+DESC_ERROR = "errore nella lettura della configurazione o dell'albero della base"
+DESC_COMPONENT_OFF = "componente base_test_ids spento"
 
 
 def compute(repo: Path, *, config_sha: str, sha: str, out: Path, environ: Mapping[str, str],
@@ -110,13 +114,17 @@ def _publish(repo: Path, cfg, *, sha: str, result: dict, environ: Mapping[str, s
     if cfg.get("gate.mode") != "detect":
         return 1 if red else 0
     state, slug = paths.resolve_state(environ), github.repo_slug(environ)
+    if not cfg.get("components.base_test_ids"):    # `ids.json` è vuoto: non c'è una suite da dire
+        github.set_status(state, repo, slug, sha, context=CONTEXT, status="success",
+                          description=DESC_COMPONENT_OFF)
+        return 0
     open_ = sorted(name for name, st in result["commands"].items() if st == "unverified")
     extra = f"; non verificati: {', '.join(open_)}" if open_ else ""
     if not red:
-        github.set_status(state, repo, slug, sha, context="tollgate/base", status="success",
+        github.set_status(state, repo, slug, sha, context=CONTEXT, status="success",
                           description=f"suite della base verde{extra}")
         return 0
-    github.set_status(state, repo, slug, sha, context="tollgate/base", status="failure",
+    github.set_status(state, repo, slug, sha, context=CONTEXT, status="failure",
                       description=f"suite della base rossa: {len(red)} comandi{extra}")
     with tempfile.TemporaryDirectory(prefix="tollgate-base-") as tmp:
         body = Path(tmp) / "body.md"
@@ -155,19 +163,31 @@ def publish_from(repo: Path, *, config_sha: str, sha: str, ids_dir: Path,
     """Pubblica da `ids_dir/ids.json` (l'artefatto di `ids`, dati non fidati) come `publish`.
     Il file deve essere dell'albero di `sha` (su un cache hit il suo `sha` è un altro commit con
     lo stesso albero). Se non è valido: in `detect` stato `error` con il motivo, e codice 1 in
-    ogni modalità, così il job è rosso; lo stesso codice 1 se la suite della base è rossa. Senza
-    `publish` legge e basta."""
+    ogni modalità, così il job è rosso; lo stesso codice 1 se la suite della base è rossa. Lo stesso
+    se la lettura dell'albero o dei comandi dà `ConfigError` o `GitError` (la configurazione della
+    punta, invece, deve leggersi: senza non si conosce la modalità). Senza `publish` legge e
+    basta."""
     cfg = load_config_at(repo, config_sha)
-    tree = git.run(repo, "rev-parse", f"{sha}^{{tree}}").strip()
-    names = {spec.name for spec in runner.ids_commands(cfg)}
+    try:
+        tree = git.run(repo, "rev-parse", f"{sha}^{{tree}}").strip()
+        names = {spec.name for spec in runner.ids_commands(cfg)}
+    except (ConfigError, git.GitError) as e:
+        return _invalid(cfg, repo, sha, environ, publish, DESC_ERROR,
+                        log=json.dumps(str(e), ensure_ascii=False))
     result = read_result(Path(ids_dir) / "ids.json", tree=tree, names=names)
     if result is None:
-        sys.stderr.write("base-publish: identificativi della base assenti o non validi\n")
-        if publish and cfg.get("gate.mode") == "detect":
-            github.set_status(paths.resolve_state(environ), repo, github.repo_slug(environ), sha,
-                              context="tollgate/base", status="error",
-                              description="identificativi della base assenti o non validi")
-        return 1
+        return _invalid(cfg, repo, sha, environ, publish, DESC_INVALID)
     if publish:
         return _publish(repo, cfg, sha=sha, result=result, environ=environ)
     return 1 if _red(result) else 0
+
+
+def _invalid(cfg, repo: Path, sha: str, environ: Mapping[str, str], publish: bool,
+             description: str, *, log: str | None = None) -> int:
+    """Gli identificativi non si possono usare: in `detect` stato `error`, in ogni modalità
+    uscita 1, così il job `tollgate-base` è rosso (in `protected` il segnale è il job)."""
+    sys.stderr.write(f"base-publish: {description if log is None else log}\n")
+    if publish and cfg.get("gate.mode") == "detect":
+        github.set_status(paths.resolve_state(environ), repo, github.repo_slug(environ), sha,
+                          context=CONTEXT, status="error", description=description)
+    return 1

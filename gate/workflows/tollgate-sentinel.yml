@@ -8,6 +8,9 @@ permissions:
   statuses: write
   issues: write
   pull-requests: read
+concurrency:
+  group: tollgate-sentinel
+  cancel-in-progress: false
 jobs:
   tollgate-sentinel:
     runs-on: ubuntu-latest
