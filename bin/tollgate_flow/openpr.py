@@ -7,7 +7,6 @@ e URL, evento, fase `pr_open`, intento eseguito e, per ultimo, l'atto consumato:
 lascia l'atto valido e la ripetizione aggiorna la stessa PR."""
 from __future__ import annotations
 
-import json
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -83,8 +82,8 @@ def review_state(conn, work, cfg, wt, base, head, comps) -> Review:
     on_head = same and last["stage"] == "closed"
     ok = bool(work["review_unverified"]) or (on_head and last["outcome"] == "ok")
     # anche con la revisione non verificata la DoD guarda l'ultimo ciclo chiuso su HEAD (8.7)
-    specialists = ([r for r in json.loads(last["reviewers"]) if r != REVIEWER]
-                   if on_head else [])
+    specialists = ([r for r in db.load_json(last["reviewers"], "review_cycles.reviewers", list)
+                    if r != REVIEWER] if on_head else [])
     return Review(True, ok, last if same else None, last["number"] if on_head else 0, specialists)
 
 
@@ -308,7 +307,7 @@ def _waiting(conn, work, cfg) -> list[str]:
                 for w in wf.waivers if status.get(w.id) == "pending"]
     for r in conn.execute("SELECT data FROM intents WHERE work = ? AND action = 'effect' "
                           "AND state = 'requested' ORDER BY id", (work["id"],)):
-        eid = json.loads(r["data"] or "{}").get("id", "?")
+        eid = db.load_json(r["data"], "intents.data", dict).get("id", "?")
         out.append(f"effetto {eid} in attesa: serve /tollgate:approve effect {eid}")
     return out
 
@@ -320,7 +319,8 @@ def _compute_dod(conn, work, cfg, wt, base, head, review, problems):
     if not work["finish_report"]:
         problems.append("manca l'esito di `finish check`: rilancia finish check")
         return [], {}
-    reported = json.loads(work["finish_report"])["items"]
+    reported = finishcheck.report_items(
+        db.load_json(work["finish_report"], "work_items.finish_report", dict))
     external = {k: reported.get(k) for k in ("guard_scope", "must_have", "approvals")}
     files = [c.path for c in git.changes(wt, base, head=head) if c.status != "D"]
     extra = verify.dod_commands(cfg, files)
@@ -473,7 +473,8 @@ def facts(conn, state, work, cfg, wt: Path, head: str, *, now, dod=None, labels=
             "ORDER BY number", (wid,))},
         "subagents": {"count": agents[0], "tokens": agents[1]},
         "effects": [{"command_hash": r["idempotency_key"].removeprefix("effect:"),
-                     "at": json.loads(r["data"] or "{}").get("executed_at") or r["at"]}
+                     "at": db.load_json(r["data"], "intents.data", dict).get("executed_at")
+                     or r["at"]}
                     for r in conn.execute("SELECT * FROM intents WHERE work = ? AND action = "
                                           "'effect' AND state = 'executed' ORDER BY id",
                                           (wid,))],
@@ -490,7 +491,7 @@ def _size_reasons(conn, wid: int) -> dict[int, str]:
     out: dict[int, str] = {}
     for r in conn.execute("SELECT data FROM events WHERE work = ? AND type = 'subagent_stop' "
                           "ORDER BY seq", (wid,)):
-        data = json.loads(r["data"])
+        data = db.load_json(r["data"], "events.data", dict)
         if isinstance(data.get("task"), int) and data.get("size_reason"):
             out[data["task"]] = data["size_reason"]
     return out
@@ -506,7 +507,7 @@ def _tasks_over(conn, wt: Path, work, cfg) -> list[dict]:
     out = []
     for t in conn.execute("SELECT number, commits FROM tasks WHERE work = ? ORDER BY number",
                           (work["id"],)):
-        commits = json.loads(t["commits"])
+        commits = db.load_json(t["commits"], "tasks.commits", list)
         if not commits:
             continue
         try:
@@ -526,6 +527,6 @@ def _skills_absent(conn, wid: int) -> list[dict]:
     latest: dict[int, list] = {}
     for r in conn.execute("SELECT data FROM events WHERE work = ? AND type = 'skills_absent' "
                           "ORDER BY seq", (wid,)):
-        data = json.loads(r["data"])
+        data = db.load_json(r["data"], "events.data", dict)
         latest[data["task"]] = data["skills"]
     return [{"task": t, "skills": latest[t]} for t in sorted(latest)]

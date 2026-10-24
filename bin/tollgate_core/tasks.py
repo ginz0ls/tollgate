@@ -138,7 +138,8 @@ def assign(conn, work: int, number: int, *, implementer: str, agent_type: str, p
                      "reviewer_type = coalesce(?, reviewer_type), "
                      "pending = ? WHERE work = ? AND number = ?",
                      (implementer, agent_type, reviewer_type, pending, work, number))
-        _log(conn, get_task(conn, work, number), now=now, session=session)
+        _log(conn, get_task(conn, work, number), now=now, session=session,
+             implementer=implementer, pending=pending)
 
 
 def take_pending(conn, work: int, *, agent_type: str, resume: bool,

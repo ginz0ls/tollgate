@@ -285,6 +285,28 @@ class GateFamiliesTest(FinishCheckCase):
         self.assertFalse(any(x.startswith("rosso:") for x in r.lines), r.lines)
 
 
+class CorruptReportTest(FinishCheckCase):
+    def test_corrupt_finish_report_is_message(self):
+        """Il report salvato è una cache: se non si legge, `finish check` lo ricalcola e lo dice."""
+        for name, raw in (("non JSON", "{non json"), ("non un oggetto", "[]"),
+                          ("senza items", '{"manual": []}'), ("items non un oggetto", '{"items": 3}'),
+                          ("valore di una voce non valido", '{"items": {"receipt": "boh"}}')):
+            with self.subTest(name):
+                fl = self.lab()
+                self.assertEqual(self.check(fl).code, finishcheck.OK)
+                fl.conn.execute("UPDATE work_items SET finish_report = ? WHERE id = ?",
+                                (raw, fl.work))
+                fl.conn.commit()
+                r = self.check(fl)
+                self.assertEqual(r.code, finishcheck.OK, r.lines)
+                self.assertTrue(any(x.startswith("avviso:") and "work_items.finish_report" in x
+                                    for x in r.lines), r.lines)
+                self.assertFalse(any("già verde" in x for x in r.lines))
+                self.assertEqual(len(item_lines(r)), len(dod.ITEMS_BY_LEVEL["L1"]))
+                report = json.loads(phases.get_work(fl.conn, fl.work)["finish_report"])
+                self.assertEqual(sorted(report["items"]), sorted(dod.ITEMS_BY_LEVEL["L1"]))
+
+
 class RerunTest(FinishCheckCase):
     def test_rerun_in_review_same_sha_is_idempotent(self):
         fl = self.lab()

@@ -114,6 +114,17 @@ class AssignTest(unittest.TestCase):
                                             resume=False), 1)
         self.assertIsNone(tasks.get_task(self.conn, self.w, 1)["pending"])
 
+    def test_assign_event_carries_implementer_and_pending(self):
+        tasks.assign(self.conn, self.w, 1, implementer="tg-7-t1", agent_type="tollgate:implementer",
+                     pending="resume", now=T0)
+        last = [e for e in events.export_events(self.conn, 0) if e["type"] == "task_change"][-1]
+        self.assertEqual((last["data"]["implementer"], last["data"]["pending"]),
+                         ("tg-7-t1", "resume"))
+        tasks.task_event(self.conn, self.w, 1, "start", now=T0)       # gli altri eventi: senza
+        last = [e for e in events.export_events(self.conn, 0) if e["type"] == "task_change"][-1]
+        self.assertNotIn("implementer", last["data"])
+        self.assertNotIn("pending", last["data"])
+
     def test_assign_rejects_unknown_pending(self):
         with self.assertRaises(ValueError):
             tasks.assign(self.conn, self.w, 1, implementer="x", agent_type="y", pending="boh",

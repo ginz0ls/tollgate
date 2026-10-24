@@ -136,7 +136,8 @@ def _approve_finding(conn, state, work, act, args, now, session) -> str:
                             "<id> <gravità|dismiss> <motivo>")
     decision = "dismissed" if choice == "dismiss" else f"downgraded:{choice}"
     try:
-        reviews.set_decision(conn, work["id"], fid, decision, now=now, session=session)
+        reviews.set_decision(conn, work["id"], fid, decision, now=now, session=session,
+                              reason=reason)
     except ValueError as e:
         raise ActApplyError(str(e)) from e
     cycle = conn.execute("SELECT cycle FROM findings WHERE work = ? AND id = ?",

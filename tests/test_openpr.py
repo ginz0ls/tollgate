@@ -470,6 +470,42 @@ class OpenRefusalTest(OpenCase):
         self.assertIsNone(gitw.remote_sha(fl.wt, BRANCH))
 
 
+class OpenCorruptTest(OpenCase):
+    EFFECT = ("INSERT INTO intents (work, action, idempotency_key, data, state, at) "
+              "VALUES (?, 'effect', 'effect:abc', '{guasto', 'requested', ?)")
+    EVENT = "INSERT INTO events (v, at, host, work, type, data) VALUES (1, ?, 'h', ?, ?, '{guasto')"
+
+    def test_corrupt_json_fields_are_messages(self):
+        """Un campo JSON guasto nel DB dà un `rifiuto:` che lo nomina, mai un traceback, e non
+        lascia nulla a metà (nessuna PR, nessun push, fase invariata)."""
+        cases = [
+            ("work_items.finish_report", "UPDATE work_items SET finish_report = '{guasto' "
+             "WHERE id = ?", lambda fl: (fl.work,)),
+            ("work_items.finish_report", "UPDATE work_items SET finish_report = '[]' "
+             "WHERE id = ?", lambda fl: (fl.work,)),
+            ("work_items.finish_report", "UPDATE work_items SET finish_report = '{\"items\": 3}' "
+             "WHERE id = ?", lambda fl: (fl.work,)),
+            ("review_cycles.reviewers", "UPDATE review_cycles SET reviewers = '{guasto' "
+             "WHERE work = ?", lambda fl: (fl.work,)),
+            ("tasks.commits", "UPDATE tasks SET commits = '{guasto' WHERE work = ?",
+             lambda fl: (fl.work,)),
+            ("intents.data", self.EFFECT, lambda fl: (fl.work, clock.fmt(fl.now))),
+            ("events.data", self.EVENT, lambda fl: (clock.fmt(fl.now), fl.work, "subagent_stop")),
+            ("events.data", self.EVENT, lambda fl: (clock.fmt(fl.now), fl.work, "skills_absent")),
+        ]
+        for i, (field, statement, params) in enumerate(cases):
+            with self.subTest(i=i, field=field):
+                fl = self.lab()
+                fl.conn.execute(statement, params(fl))
+                fl.conn.commit()
+                r = self.go(fl)
+                self.assertEqual(r.code, 1, r.lines)
+                self.assertTrue(any(field in x for x in self.refusals(r)), r.lines)
+                self.assertEqual(self.prs(fl), [])
+                self.assertIsNone(gitw.remote_sha(fl.wt, BRANCH))
+                self.assertEqual(work(fl)["phase"], "review")
+
+
 class OpenUnverifiedTest(OpenCase):
     def test_unverified_review_still_stops_on_confirmed_blocker(self):
         fl = self.lab(cycle=None)

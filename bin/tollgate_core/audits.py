@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 import sqlite3
 
+from tollgate_analysis.auditrules import SEVERITIES
+
 from . import clock, db, phases
 from .events import record_event
 
@@ -19,6 +21,7 @@ COMPONENTS = {"spec-adversarial": "spec_adversary", "spec-lens": "spec_audit",
 CAP_REASONS = {"spec-adversarial": "giri avversariali della spec esauriti",
                "spec-lens": "audit a lenti: tetto di cicli raggiunto",
                "plan-adversarial": "giri avversariali del piano esauriti"}
+OUTCOMES = ("empty", "findings")     # gli esiti di un giro chiuso da un report (`superseded` no)
 DECLINE_REASON = "audit a lenti rifiutato dall'utente"
 SUSPENDED_LABELS = {"spec-adversarial": "avversariale sospeso",
                     "spec-lens": "audit a lenti sospeso",
@@ -66,6 +69,13 @@ def supersede(conn, work: int, number_kind: tuple[str, int], *, now) -> None:
 
 def close_round(conn, work: int, *, kind: str, number: int, counts: dict, outcome: str,
                 report_path: str, now) -> None:
+    if outcome not in OUTCOMES:
+        raise ValueError(f"esito del giro sconosciuto: {outcome}")
+    if not (isinstance(counts, dict)
+            and all(isinstance(counts.get(k), int) and not isinstance(counts.get(k), bool)
+                    and counts[k] >= 0 for k in SEVERITIES)):
+        raise ValueError(f"conteggi del giro non validi: servono {', '.join(SEVERITIES)} "
+                         "interi non negativi")
     with db.tx(conn):
         row = conn.execute("SELECT * FROM spec_audit WHERE work = ? AND kind = ? AND number = ? "
                            "AND stage = 'open'", (work, kind, number)).fetchone()

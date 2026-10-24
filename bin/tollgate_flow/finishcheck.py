@@ -7,7 +7,6 @@ gate (livello, file di tollgate) fermano il lavoro, quelle di `attenzione` si st
 `review`. Rosso: la fase resta com'è."""
 from __future__ import annotations
 
-import json
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -67,7 +66,7 @@ def check(state, cwd, *, now=None, environ=None) -> CheckResult:
     try:
         return _check(state, conn, Path(cwd), now, environ)
     except (sqlite3.Error, phases.TransitionError, config.ConfigError, git.GitError,
-            OSError) as e:
+            db.DbError, OSError) as e:
         return _refuse(str(e))
     finally:
         conn.close()
@@ -90,13 +89,16 @@ def _check(state, conn, cwd: Path, now, environ) -> CheckResult:
     sha = git.head(wt)
     if sha is None:
         return _refuse("nessun commit da verificare")
-    if work["phase"] == "review" and work["finish_sha"] == sha and work["finish_report"]:
-        saved = _saved(work, sha)
-        if seen.error:
-            saved.lines.insert(0, f"avviso: {seen.error}")
-        return saved
-
     lines: list[str] = [f"avviso: {seen.error}"] if seen.error else []
+    if work["phase"] == "review" and work["finish_sha"] == sha and work["finish_report"]:
+        try:
+            saved = _saved(work, sha)
+        except db.DbError as e:       # l'esito salvato è una cache: illeggibile, si ricalcola
+            lines.append(f"avviso: esito salvato illeggibile, si ricalcola ({e})")
+        else:
+            if seen.error:
+                saved.lines.insert(0, f"avviso: {seen.error}")
+            return saved
     if not gitw.fetch(wt):
         lines.append("avviso: git fetch origin non riuscito (senza rete?): si prosegue con i "
                      "riferimenti locali")
@@ -262,16 +264,30 @@ def _attention_lines(items: list[Item]) -> list[str]:
     return out
 
 
+def report_items(report: dict) -> dict[str, bool | None]:
+    """Le voci della DoD di un `finish_report`; `DbError` se non hanno la forma attesa."""
+    items = report.get("items")
+    if not isinstance(items, dict) or not all(
+            isinstance(k, str) and (v is None or isinstance(v, bool)) for k, v in items.items()):
+        raise db.DbError("il campo work_items.finish_report del DB ha una forma inattesa "
+                         "(items: voce -> sì, no o n/d)")
+    return items
+
+
 def _saved(work, sha: str) -> CheckResult:
     """Lo stesso SHA in `review`: l'esito salvato, senza rieseguire il gate (criterio 28)."""
-    report = json.loads(work["finish_report"])
+    report = db.load_json(work["finish_report"], "work_items.finish_report", dict)
+    reported = report_items(report)
     items = [dod.DodItem(k, _label(k), ok, dod.SKIPPED_DETAIL if ok is None else "")
-             for k, ok in report["items"].items()]
+             for k, ok in reported.items()]
     lines = [f"finish check già verde su {sha[:7]}: esito salvato"]
     lines += [_line(i, {}) for i in items]
-    if report.get("manual"):
-        lines.append("da leggere: must-have con test manuale: " + ", ".join(report["manual"]))
-    keys = [k for k in report.get("gate", {}).get("attention", []) if k != MANUAL]
+    manual = report.get("manual")
+    if isinstance(manual, list) and manual:
+        lines.append("da leggere: must-have con test manuale: " + ", ".join(map(str, manual)))
+    gate = report.get("gate")
+    attention_keys = gate.get("attention") if isinstance(gate, dict) else None
+    keys = [k for k in attention_keys if k != MANUAL] if isinstance(attention_keys, list) else []
     for label, group in (("da leggere", attention.READ), ("informative", attention.INFO)):
         listed = [k for k in keys if attention.GROUPS.get(k) == group]
         if listed:

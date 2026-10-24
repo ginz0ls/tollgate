@@ -23,8 +23,12 @@ def request(conn, *, work: int, action: str, key: str, data: dict, now) -> int:
         raise ValueError(f"azione sconosciuta: {action}")
     payload = json.dumps(data, ensure_ascii=False, sort_keys=True)
     with db.tx(conn):
-        row = conn.execute("SELECT id FROM intents WHERE idempotency_key = ?", (key,)).fetchone()
+        row = conn.execute("SELECT id, work, action FROM intents WHERE idempotency_key = ?",
+                           (key,)).fetchone()
         if row is not None:
+            if (row["work"], row["action"]) != (work, action):
+                raise ValueError(f"l'intento {key} esiste già per un altro lavoro o un'altra "
+                                 "azione")
             conn.execute("UPDATE intents SET state = 'requested', data = ?, outcome = NULL "
                          "WHERE id = ?", (payload, row["id"]))
             return row["id"]

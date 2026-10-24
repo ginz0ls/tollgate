@@ -50,24 +50,34 @@ ROUNDS_ASK = ("serve una decisione dell'utente: /tollgate:approve rounds <n>, "
 
 
 def _cap_step(conn, work: int, issue: int) -> str | None:
-    """Tetto dei giri di correzione, dei cicli di revisione (m12, decisione 13) o dell'audit."""
+    """Tetto dei giri di correzione, dei cicli di revisione (m12, decisione 13) o dell'audit:
+    il passo di ogni blocco di tetto aperto, uno dopo l'altro."""
+    steps = []
     for b in conn.execute("SELECT id, reason FROM blocks WHERE work = ? AND closed IS NULL "
                           "ORDER BY id", (work,)):
         if audits.cap_kind(b["reason"]) is not None:
-            return audit.STEPS["resolve"].replace("<id>", str(b["id"]))
-        if b["reason"].startswith(CAP_PREFIXES):
-            return f"{b['reason']}: " + ROUNDS_ASK.format(block=b["id"], issue=issue)
-    return None
+            steps.append(audit.STEPS["resolve"].replace("<id>", str(b["id"])))
+        elif b["reason"].startswith(CAP_PREFIXES):
+            steps.append(f"{b['reason']}: " + ROUNDS_ASK.format(block=b["id"], issue=issue))
+    return " | ".join(steps) or None
 
 
-def _review_brief(worktree: str, issue: int) -> str | None:
-    """L'ultimo brief del revisore di task scritto da `review-prepare` (`review-<k>.md`)."""
+def _review_brief(worktree: str, issue: int, code: str) -> str | None:
+    """Il brief del revisore scritto da `review-prepare` per questo task. Il nome
+    `review-<k>.md` ha un contatore del lavoro, non il numero del task: il brief del task è quello
+    che porta il suo `review_code`, il più recente se ce n'è più d'uno."""
     run_dir = Path(worktree) / ".tollgate-run" / str(issue)
     if not run_dir.is_dir():
         return None
-    found = [(int(p.stem.split("-")[1]), p) for p in run_dir.glob("review-*.md")
-             if p.stem.split("-")[1].isdigit()]
-    return str(max(found)[1]) if found else None
+    found = sorted(((int(p.stem.split("-")[1]), p) for p in run_dir.glob("review-*.md")
+                    if p.stem.split("-")[1].isdigit()), reverse=True)
+    for _, path in found:
+        try:
+            if code in path.read_text(encoding="utf-8", errors="replace"):
+                return str(path)
+        except OSError:
+            continue
+    return None
 
 
 def _closing_step(conn, item, prog: str) -> str:
@@ -137,7 +147,7 @@ def next_step(conn, work: int) -> str:
         return f"task {k} in review, da correggere: {prog} task start {k} --fix"
     if (row["verdict"] is None and row["review_sha"] is not None
             and row["review_code"] is not None):
-        brief = _review_brief(item["worktree"], item["issue"])
+        brief = _review_brief(item["worktree"], item["issue"], row["review_code"])
         if brief is not None:
             who = row["reviewer_type"] or prof.DEFAULT_REVIEWER
             return (f"task {k} in review, revisione preparata: lancia il revisore {who} "

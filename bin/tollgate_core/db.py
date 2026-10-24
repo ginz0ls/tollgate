@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import fcntl
+import json
 import os
 import re
 import secrets
@@ -34,6 +35,19 @@ class DbTooNew(DbError):
 
 def restore_hint() -> str:
     return f"{BIN_PATH} db restore"
+
+
+def load_json(raw: str | None, what: str, kind: type | None = None):
+    """Un campo JSON del DB (`what` è `tabella.campo`). Un valore guasto, o di un'altra forma
+    di `kind`, è un `DbError` con un messaggio, mai un traceback in un sottocomando."""
+    try:
+        value = json.loads(raw if raw else ("{}" if kind is dict else "[]"))
+    except ValueError as e:
+        raise DbError(f"il campo {what} del DB non è un JSON leggibile: {e}") from e
+    if kind is not None and not isinstance(value, kind):
+        raise DbError(f"il campo {what} del DB ha una forma inattesa "
+                      f"(serve {'un oggetto' if kind is dict else 'un elenco'})")
+    return value
 
 
 # Le istruzioni non contengono ';' al loro interno: la lista è divisa a mano.

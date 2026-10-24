@@ -219,6 +219,39 @@ class CloseTest(ReviewsCase):
         self.assertEqual(self.phase(), "execution")
         self.assertEqual(reviews.counted(self.conn, self.w), 1)
 
+    def test_close_cycle_requires_verify_stage(self):
+        c = self.open()
+        before = len(events.export_events(self.conn, 0))
+        with self.assertRaisesRegex(reviews.ReviewError, "verify"):
+            reviews.close_cycle(self.conn, self.t.state, self.w, c, now=T0)
+        row = reviews.latest(self.conn, self.w)
+        self.assertEqual((row["stage"], row["outcome"]), ("review", None))
+        self.assertEqual((self.phase(), len(events.export_events(self.conn, 0))),
+                         ("review", before))
+        self.report(c, [finding()], outcome="needs_fix")        # stadio verify, rilievo senza esito
+        with self.assertRaisesRegex(reviews.ReviewError, "senza esito"):
+            reviews.close_cycle(self.conn, self.t.state, self.w, c, now=T0)
+        self.assertEqual(reviews.latest(self.conn, self.w)["stage"], "verify")
+        self.confirm_all(c)
+        self.assertEqual(reviews.close_cycle(self.conn, self.t.state, self.w, c, now=T0),
+                         "needs_fix")
+
+    def test_close_cycle_twice_is_idempotent(self):
+        for n in (1, 2, 3):
+            self.counted_cycle(n)
+            self.goto("review")
+        self.counted_cycle(4)
+        (block,) = self.open_blocks()
+        phases.close_block(self.conn, self.t.state, block["id"], "approve rounds", now=T0)
+        self.goto("review")
+        events_before = len(events.export_events(self.conn, 0))
+        self.assertEqual(reviews.close_cycle(self.conn, self.t.state, self.w, 4, now=T0),
+                         "needs_fix")
+        self.assertEqual(self.phase(), "review")                  # la fase non si tocca
+        self.assertEqual(self.open_blocks(), [])                  # il blocco del tetto non si riapre
+        self.assertEqual(reviews.counted(self.conn, self.w), 4)
+        self.assertEqual(len(events.export_events(self.conn, 0)), events_before)
+
     def test_fourth_counted_cycle_opens_needs_you(self):
         for n in (1, 2, 3):
             self.assertEqual(self.counted_cycle(n), "needs_fix")
@@ -370,6 +403,19 @@ class DecisionTest(ReviewsCase):
               and e["data"]["user_decision"]]
         self.assertEqual([(d["id"], d["user_decision"]) for d in ev],
                          [("f-1-1", "downgraded:minor"), ("f-1-2", "dismissed")])
+
+    def test_approve_finding_reason_in_event(self):
+        self.confirmed()
+        reviews.set_decision(self.conn, self.w, "f-1-1", "dismissed", reason="falso positivo",
+                             now=T0)
+        ev = [e["data"] for e in events.export_events(self.conn, 0) if e["type"] == "finding"
+              and e["data"]["user_decision"]]
+        self.assertEqual([(d["id"], d["user_decision"], d["reason"]) for d in ev],
+                         [("f-1-1", "dismissed", "falso positivo")])
+        earlier = [e["data"] for e in events.export_events(self.conn, 0) if e["type"] == "finding"
+                   and not e["data"]["user_decision"]]
+        self.assertTrue(earlier)
+        self.assertTrue(all("reason" not in d for d in earlier))
 
     def test_blocking_open_filters_by_cycle(self):
         self.confirmed()

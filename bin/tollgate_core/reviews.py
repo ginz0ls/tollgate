@@ -32,6 +32,10 @@ SUPERSEDED_REASON = "ciclo superato"
 UNVERIFIED_REVIEW_REASON = "revisione non verificata"
 
 
+class ReviewError(ValueError):
+    """Un ciclo in uno stadio che non ammette l'operazione richiesta."""
+
+
 def latest(conn, work: int) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM review_cycles WHERE work = ? ORDER BY number DESC "
                         "LIMIT 1", (work,)).fetchone()
@@ -62,12 +66,13 @@ def _finding(conn, work: int, finding_id: str) -> sqlite3.Row | None:
                         (work, finding_id)).fetchone()
 
 
-def _log_finding(conn, row, *, now, session=None) -> None:
-    record_event(conn, "finding",
-                 {"id": row["id"], "cycle": row["cycle"], "severity": row["severity"],
-                  "confidence": row["confidence"], "verification": row["verification"],
-                  "user_decision": row["user_decision"]},
-                 now=now, session=session, work=row["work"])
+def _log_finding(conn, row, *, now, session=None, reason: str | None = None) -> None:
+    data = {"id": row["id"], "cycle": row["cycle"], "severity": row["severity"],
+            "confidence": row["confidence"], "verification": row["verification"],
+            "user_decision": row["user_decision"]}
+    if reason:
+        data["reason"] = reason
+    record_event(conn, "finding", data, now=now, session=session, work=row["work"])
 
 
 def open_cycle(conn, work: int, *, sha: str, patch_id: str | None, code: str,
@@ -261,8 +266,10 @@ def blocking_open(conn, work: int, cycle: int | None = None) -> list[sqlite3.Row
     return [r for r in rows if effective_severity(r) in BLOCKING_SEVERITIES]
 
 
-def set_decision(conn, work: int, finding_id: str, decision: str, *, now, session=None) -> None:
-    """`approve finding`: `downgraded:<gravità>` o `dismissed`, solo su un rilievo confermato."""
+def set_decision(conn, work: int, finding_id: str, decision: str, *, now, session=None,
+                 reason: str | None = None) -> None:
+    """`approve finding`: `downgraded:<gravità>` o `dismissed`, solo su un rilievo confermato.
+    Il motivo dell'utente, se c'è, entra nell'evento del rilievo."""
     if decision != "dismissed" and not (decision.startswith("downgraded:")
                                         and decision.split(":", 1)[1] in SEVERITY_ORDER):
         raise ValueError(f"decisione non valida: {decision}")
@@ -275,7 +282,8 @@ def set_decision(conn, work: int, finding_id: str, decision: str, *, now, sessio
                              f"{row['verification'] or 'senza esito'}")
         conn.execute("UPDATE findings SET user_decision = ? WHERE work = ? AND id = ?",
                      (decision, work, finding_id))
-        _log_finding(conn, _finding(conn, work, finding_id), now=now, session=session)
+        _log_finding(conn, _finding(conn, work, finding_id), now=now, session=session,
+                     reason=reason)
 
 
 def recompute_outcome(conn, work: int, cycle: int, *, now) -> str:
@@ -314,30 +322,38 @@ def close_cycle(conn, state: State, work: int, cycle: int, *, now, session=None)
     """Chiude il ciclo (decisione 6) e ne applica le conseguenze. Esiti: `needs_you` se un
     revisore l'ha dichiarato; `needs_fix` con un rilievo bloccante confermato (fase
     `review` -> `execution`, e al tetto un blocco `needs_you`); altrimenti `ok`.
-    Ripetibile: su un ciclo già chiuso riprende i passi rimasti a metà."""
+    Si chiude solo dallo stadio `verify`, con ogni rilievo giudicato (`ReviewError` altrimenti).
+    Su un ciclo già chiuso dà l'esito senza toccare fase, blocchi ed eventi: la fase e i blocchi
+    dopo la chiusura sono del flusso (`approve finding`, `approve rounds`), e ripeterla non li
+    deve rifare."""
     if conn.in_transaction:
         raise RuntimeError("close_cycle va chiamato fuori da una transazione")
     with db.tx(conn):
         row = _cycle(conn, work, cycle)
         if row["stage"] == "closed":
-            outcome = row["outcome"]
-            if outcome not in ("ok", "needs_fix", "needs_you"):
-                raise ValueError(f"ciclo {cycle} già chiuso ({outcome})")
+            if row["outcome"] not in ("ok", "needs_fix", "needs_you"):
+                raise ValueError(f"ciclo {cycle} già chiuso ({row['outcome']})")
+            return row["outcome"]
+        if row["stage"] != "verify":
+            raise ReviewError(f"ciclo {cycle}: si chiude dallo stadio verify, non da "
+                              f"{row['stage']}")
+        left = unjudged_ids(conn, work, cycle)
+        if left:
+            raise ReviewError(f"ciclo {cycle}: rilievi senza esito ({', '.join(left)})")
+        confirmed = conn.execute("SELECT count(*) FROM findings WHERE work = ? AND cycle = ? "
+                                 "AND verification = 'confirmed'", (work, cycle)).fetchone()[0]
+        if "needs_you" in json.loads(row["reported"]).values():
+            outcome = "needs_you"
+        elif blocking_open(conn, work, cycle):
+            outcome = "needs_fix"
         else:
-            confirmed = conn.execute("SELECT count(*) FROM findings WHERE work = ? AND cycle = ? "
-                                     "AND verification = 'confirmed'", (work, cycle)).fetchone()[0]
-            if "needs_you" in json.loads(row["reported"]).values():
-                outcome = "needs_you"
-            elif blocking_open(conn, work, cycle):
-                outcome = "needs_fix"
-            else:
-                outcome = "ok"
-            conn.execute("UPDATE review_cycles SET outcome = ?, stage = 'closed', "
-                         "findings_confirmed = ?, counted = ? WHERE work = ? AND number = ?",
-                         (outcome, confirmed, 1 if confirmed else 0, work, cycle))
-            record_event(conn, "review_cycle", {"number": cycle, "outcome": outcome,
-                                                "findings_confirmed": confirmed},
-                         now=now, session=session, work=work)
+            outcome = "ok"
+        conn.execute("UPDATE review_cycles SET outcome = ?, stage = 'closed', "
+                     "findings_confirmed = ?, counted = ? WHERE work = ? AND number = ?",
+                     (outcome, confirmed, 1 if confirmed else 0, work, cycle))
+        record_event(conn, "review_cycle", {"number": cycle, "outcome": outcome,
+                                            "findings_confirmed": confirmed},
+                     now=now, session=session, work=work)
     if outcome == "needs_you":
         reason = f"il revisore finale chiede una decisione (ciclo {cycle})"
         if not _has_open_block(conn, work, reason):

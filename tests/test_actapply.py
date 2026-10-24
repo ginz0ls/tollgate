@@ -360,6 +360,9 @@ class ApproveFindingTest(ReviewApplyCase):
         row = reviews.latest(fl.conn, fl.work)
         self.assertEqual((row["outcome"], row["stage"]), ("ok", "closed"))
         self.assertEqual(self.decision("f-1-1"), "dismissed")
+        decided = [e["data"] for e in events.export_events(fl.conn, 0)
+                   if e["type"] == "finding" and e["data"]["user_decision"]]
+        self.assertEqual([d["reason"] for d in decided], ["falso positivo"])
         self.assertEqual(self.work()["phase"], "execution")      # nessun close_cycle: fase ferma
         self.assertEqual(self.state_of(a), "consumed")
         self.assertEqual(reviews.counted(fl.conn, fl.work), 1)

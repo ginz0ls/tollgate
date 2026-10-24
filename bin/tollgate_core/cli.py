@@ -19,8 +19,11 @@ class UsageError(Exception):
 
 
 def current_repo_key(cwd: Path) -> str | None:
-    r = subprocess.run(["git", "-C", str(cwd), "remote", "get-url", "origin"],
-                       capture_output=True, text=True)
+    try:
+        r = subprocess.run(["git", "-C", str(cwd), "remote", "get-url", "origin"],
+                           capture_output=True, text=True)
+    except FileNotFoundError as e:
+        raise UsageError("git non disponibile: serve per riconoscere il repo corrente") from e
     url = r.stdout.strip()
     return repo_key(url) if r.returncode == 0 and url else None
 
@@ -208,11 +211,21 @@ def _print_status(items: list[dict]) -> None:
 
 def _restore(state) -> int:
     interactive = sys.stdin.isatty() and sys.stdout.isatty()
+    interrupted = False
 
     def confirm(question: str) -> bool:
-        return input(question).strip().lower() in ("s", "si", "sì", "y", "yes")
+        nonlocal interrupted
+        try:
+            return input(question).strip().lower() in ("s", "si", "sì", "y", "yes")
+        except (EOFError, KeyboardInterrupt):
+            interrupted = True          # Ctrl-D o Ctrl-C al prompt: come un no, ma uscita 1
+            return False
 
-    print(db.restore(state, interactive=interactive, confirm=confirm))
+    message = db.restore(state, interactive=interactive, confirm=confirm)
+    if interrupted:
+        print(f"\ntollgate: {message}", file=sys.stderr)
+        return 1
+    print(message)
     return 0
 
 

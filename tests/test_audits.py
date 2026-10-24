@@ -84,6 +84,28 @@ class RoundsTest(AuditsCase):
         with self.assertRaises(ValueError):
             self.close("spec-lens", 1)
 
+    def test_close_round_rejects_bad_outcome_and_counts(self):
+        self.open()
+        bad = {"outcome sconosciuto": dict(outcome="boh", counts=COUNTS),
+               "outcome superseded": dict(outcome="superseded", counts=COUNTS),
+               "counts non dict": dict(outcome="empty", counts=[0, 0, 0, 0]),
+               "counts senza chiave": dict(outcome="empty", counts={"blocker": 0}),
+               "counts negativo": dict(outcome="findings", counts={**COUNTS, "major": -1}),
+               "counts non intero": dict(outcome="findings", counts={**COUNTS, "major": 1.5}),
+               "counts booleano": dict(outcome="findings", counts={**COUNTS, "major": True})}
+        for name, kw in bad.items():
+            with self.subTest(name):
+                with self.assertRaises(ValueError):
+                    audits.close_round(self.conn, self.w, kind="spec-adversarial", number=1,
+                                       report_path="r/x.md", now=T0, **kw)
+        row = audits.open_round_row(self.conn, self.w)        # il giro è ancora aperto
+        self.assertEqual((row["stage"], row["outcome"], row["counts"]), ("open", None, None))
+        self.assertEqual([e for e in events.export_events(self.conn, 0)
+                          if e["type"] == "spec_audit_round"], [])
+        self.close("spec-adversarial", 1, "findings", {**COUNTS, "minor": 3})
+        self.assertEqual(audits.rounds(self.conn, self.w, "spec-adversarial")[0]["outcome"],
+                         "findings")
+
     def test_superseded_not_in_rounds(self):
         self.open()
         self.close("spec-adversarial", 1, "findings")

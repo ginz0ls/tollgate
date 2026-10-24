@@ -34,6 +34,23 @@ class IntentsTest(unittest.TestCase):
         self.assertEqual(json.loads(row["data"]), {"sha": "abc", "n": 2})
         self.assertEqual(self.conn.execute("SELECT count(*) FROM intents").fetchone()[0], 1)
 
+    def test_request_existing_key_other_work_or_action_refused(self):
+        intents.request(self.conn, work=self.w, action="pr", key="pr:1:abc", data={"n": 1},
+                        now=T0)
+        other = phases.create_work(self.conn, repo_key="github.com/o/r", issue=2, level="L1",
+                                   now=T0)
+        with self.subTest("altro lavoro"):
+            with self.assertRaisesRegex(ValueError, "pr:1:abc"):
+                intents.request(self.conn, work=other, action="pr", key="pr:1:abc",
+                                data={"n": 2}, now=T0)
+        with self.subTest("altra azione"):
+            with self.assertRaisesRegex(ValueError, "pr:1:abc"):
+                intents.request(self.conn, work=self.w, action="sync", key="pr:1:abc",
+                                data={"n": 3}, now=T0)
+        row = self.row("pr:1:abc")          # la riga esistente è com'era
+        self.assertEqual((row["work"], row["action"], json.loads(row["data"])),
+                         (self.w, "pr", {"n": 1}))
+
     def test_unknown_action_refused(self):
         with self.assertRaises(ValueError):
             intents.request(self.conn, work=self.w, action="boh", key="k", data={}, now=T0)

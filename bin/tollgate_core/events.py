@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timedelta
 
 from . import clock, git
-from .db import tx
+from .db import load_json, tx
 
 ENVELOPE_VERSION = 1
 EVENT_TYPES = frozenset({
@@ -60,7 +60,7 @@ def record_commits(conn: sqlite3.Connection, work: int, wt, base: str, *, now,
 def _as_dict(row) -> dict:
     d = {k: row[k] for k in ("seq", "v", "at", "host", "session", "work", "repo_key", "issue",
                              "type")}
-    d["data"] = json.loads(row["data"])
+    d["data"] = load_json(row["data"], "events.data")
     return d
 
 

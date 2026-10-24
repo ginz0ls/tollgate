@@ -189,13 +189,46 @@ class CheckpointCase(unittest.TestCase):
         self.assertIn("task review-prepare 1", self.step())
         run = self.fl.wt / ".tollgate-run/7"
         run.mkdir(parents=True)
-        (run / "review-1.md").write_text("b", encoding="utf-8")
-        (run / "review-2.md").write_text("b", encoding="utf-8")
+        (run / "review-1.md").write_text('"task": 9, "code": "altro"', encoding="utf-8")
+        (run / "review-2.md").write_text('"task": 1, "code": "c0de"', encoding="utf-8")
         self.set_task(1, review_sha="abc", review_code="c0de", reviewer_type="tollgate:task-reviewer")
         got = self.step()
         self.assertNotIn("review-prepare", got)
         for needle in ("revisione preparata", "tollgate:task-reviewer", str(run / "review-2.md")):
             self.assertIn(needle, got)
+
+    def test_review_brief_by_task_number(self):
+        """Il brief è quello del task (il suo codice), non il `review-<k>.md` con k più alto: k è
+        un contatore del lavoro, e un brief più recente può essere di un altro task."""
+        self.add(1, "start", "report_done")
+        run = self.fl.wt / ".tollgate-run/7"
+        run.mkdir(parents=True)
+        (run / "review-1.md").write_text('"task": 1, "code": "c0de"', encoding="utf-8")
+        (run / "review-2.md").write_text('"task": 2, "code": "beef"', encoding="utf-8")
+        (run / "review-10.md").write_text('"task": 3, "code": "f00d"', encoding="utf-8")
+        self.set_task(1, review_sha="abc", review_code="c0de", reviewer_type="tollgate:task-reviewer")
+        got = self.step()
+        self.assertIn(str(run / "review-1.md"), got)
+        self.assertNotIn("review-2.md", got)
+        self.assertNotIn("review-10.md", got)
+        self.set_task(1, review_code="0000")          # nessun brief porta questo codice
+        self.assertIn("task review-prepare 1", self.step())
+
+    def test_all_cap_blocks_listed(self):
+        self.add(1, "start", "report_done")
+        rounds = phases.open_block(self.conn, self.fl.ts.state, self.work, "needs_you",
+                                   "giri di correzione esauriti sul task 1", now=T0)
+        cycles = phases.open_block(self.conn, self.fl.ts.state, self.work, "needs_you",
+                                   reviews.CAP_REASON, now=T0)
+        got = self.step()
+        for needle in ("giri di correzione esauriti sul task 1", reviews.CAP_REASON,
+                       f"/tollgate:resolve {rounds}", f"/tollgate:resolve {cycles}"):
+            self.assertIn(needle, got)
+        phases.close_block(self.conn, self.fl.ts.state, rounds, "x", now=T0)
+        got = self.step()
+        self.assertIn(reviews.CAP_REASON, got)
+        self.assertNotIn("giri di correzione esauriti sul task 1", got)
+        self.assertIn(f"/tollgate:resolve {cycles}", got)
 
     def test_fix_rounds_cap_asks_user(self):
         self.add(1, "start", "report_done")

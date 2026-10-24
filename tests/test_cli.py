@@ -1,6 +1,10 @@
 import json
 import os
+import pty
+import select
 import shlex
+import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -123,6 +127,97 @@ class CliTest(CliBase):
         r = self.run_cli("db", "restore")
         self.assertEqual(r.returncode, 1)
         self.assertIn("integro", r.stderr)
+
+    def test_status_without_git_is_message_not_traceback(self):
+        self.seed()
+        no_git = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, no_git, ignore_errors=True)
+        env = {**self.t.env(), "PATH": str(no_git)}
+        for args in (("status",), ("status", "--json"), ("stats", "--work", "5")):
+            with self.subTest(args=args):
+                r = subprocess.run([sys.executable, str(BIN / "tollgate"), *args], cwd=self.repo,
+                                   env=env, capture_output=True, text=True,
+                                   stdin=subprocess.DEVNULL)
+                self.assertEqual(r.returncode, 1, r.stderr)
+                self.assertIn("git non disponibile", r.stderr)
+                self.assertNotIn("Traceback", r.stderr)
+
+    def corrupt_db_with_backup(self):
+        """Un DB guasto e una copia integra con un lavoro dentro."""
+        conn = db.open_db(self.t.state)
+        phases.create_work(conn, repo_key="github.com/o/r", issue=5, level="L1", now=T0)
+        db.backup(conn, self.t.state, "fase")
+        conn.close()
+        for suffix in ("", "-wal", "-shm"):
+            p = self.t.state.db_path.with_name(self.t.state.db_path.name + suffix)
+            if p.exists():
+                p.unlink()
+        self.t.state.db_path.write_bytes(os.urandom(4096))
+        return self.t.state.db_path.read_bytes()
+
+    def restore_on_pty(self, answer):
+        """`db restore` con stdin e stdout su un pseudo-terminale. `answer` riceve il PID e il
+        descrittore principale quando il prompt è comparso; dà (uscita, uscita dei due flussi: il
+        prompt di `input()` passa da stderr, perciò stdout e stderr vanno sullo stesso pty)."""
+        master, slave = pty.openpty()
+        try:
+            with subprocess.Popen([sys.executable, str(BIN / "tollgate"), "db", "restore"],
+                                  cwd=self.outside, env=self.t.env(), stdin=slave, stdout=slave,
+                                  stderr=slave, start_new_session=True) as proc:
+                os.close(slave)
+                slave = -1
+                out = self.read_pty(master, proc, until="[s/N] ")
+                answer(proc.pid, master)
+                out += self.read_pty(master, proc)
+                code = proc.wait(timeout=30)
+                return code, out
+        finally:
+            if slave != -1:
+                os.close(slave)
+            os.close(master)
+
+    @staticmethod
+    def read_pty(master, proc, until=None):
+        """Legge dal pty finché compare `until` o il processo chiude (EIO a fine lettura)."""
+        out = ""
+        while until is None or until not in out:
+            ready, _, _ = select.select([master], [], [], 30)
+            if not ready:
+                proc.kill()
+                raise AssertionError(f"nessun output dal pty: {out!r}")
+            try:
+                chunk = os.read(master, 4096)
+            except OSError:
+                break
+            if not chunk:
+                break
+            out += chunk.decode(errors="replace")
+        return out
+
+    def test_db_restore_interactive_eof_and_ctrl_c(self):
+        broken = self.corrupt_db_with_backup()
+        cases = {"EOF": lambda pid, master: os.write(master, b"\x04"),
+                 "Ctrl-C": lambda pid, master: os.kill(pid, signal.SIGINT)}
+        for name, answer in cases.items():
+            with self.subTest(name):
+                code, out = self.restore_on_pty(answer)
+                self.assertEqual(code, 1, out)
+                self.assertIn("annullato", out)
+                self.assertNotIn("Traceback", out)
+                self.assertEqual(self.t.state.db_path.read_bytes(), broken)
+                self.assertFalse(self.t.state.broken_dir.exists()
+                                 and any(self.t.state.broken_dir.iterdir()))
+
+    def test_db_restore_interactive_confirm_from_cli(self):
+        self.corrupt_db_with_backup()
+        code, out = self.restore_on_pty(lambda pid, master: os.write(master, b"s\n"))
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("Traceback", out)
+        self.assertIn("ripristinata la copia", out)
+        conn = db.open_db(self.t.state)
+        self.addCleanup(conn.close)
+        self.assertEqual(conn.execute("SELECT count(*) FROM work_items").fetchone()[0], 1)
+        self.assertEqual(len(list(self.t.state.broken_dir.rglob("tollgate.db"))), 1)
 
 
 class StatusReadOnlyTest(CliBase):
