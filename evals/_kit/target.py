@@ -16,6 +16,8 @@ MARKER = ".tollgate-eval-target"
 # Cartelle della radice che non servono a valutare il plugin (`tests/` si copia a parte).
 SKIP_TOP = frozenset({".git", ".github", ".claude", ".superpowers", "docs", "spikes", "tests",
                       "node_modules", "reports"})
+# HOME temporanee dei test in radice (`tests/test_eval_run.py`): non entrano mai nella copia.
+SKIP_PREFIXES = (".tollgate-test-home-",)
 KEEP_TESTS = ("evalbin", "fakegh.py")
 KEEP_DOCS = ("uso",)        # `status` stampa il percorso di docs/uso/limiti.md sotto la radice del programma
 MANIFEST = Path(".claude-plugin") / "plugin.json"
@@ -39,7 +41,7 @@ def build(plugin_root: Path, out: Path) -> Path:
     out.mkdir(parents=True, exist_ok=True)
     (out / MARKER).write_text("")
     for entry in sorted(root.iterdir()):
-        if entry.name in SKIP_TOP:
+        if entry.name in SKIP_TOP or entry.name.startswith(SKIP_PREFIXES):
             continue
         if entry.is_dir():
             shutil.copytree(entry, out / entry.name, symlinks=True, ignore=_ignore)

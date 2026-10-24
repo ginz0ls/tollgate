@@ -639,6 +639,14 @@ class TargetTest(KitCase):
                                   "skills/s/SKILL.md",
                                   "tests/evalbin/gh", "tests/fakegh.py"])
 
+    def test_target_skips_test_home_dirs(self):
+        root = self.make_root()
+        (root / ".tollgate-test-home-abc" / "bin").mkdir(parents=True)
+        (root / ".tollgate-test-home-abc" / "bin" / "claude").write_text("x")
+        out = target.build(root, self.tmp / "out")
+        self.assertEqual([p.name for p in out.iterdir() if p.name.startswith(".tollgate-test-home-")], [])
+        self.assertTrue((out / "bin" / "tollgate").is_file())
+
     def test_target_rebuilds_its_own_output_only(self):
         root = self.make_root()
         out = target.build(root, self.tmp / "out")

@@ -459,6 +459,18 @@ class RunShTest(EvalRunBase):
         self.assertIn("a secco", r.stdout)
         self.write_budget(80)
         self.assertEqual(self.run_sh("--a-secco", "spec").returncode, 1)
+        self.budget.write_text(HEADER + "2026-10-23T19:00:00Z\tx\t?\t?\ty\n", encoding="utf-8")      # prenotazione rimasta
+        before = self.budget.read_bytes()
+        r = self.run_sh("--a-secco", "spec")
+        self.assertEqual(r.returncode, 1)
+        self.assertEqual(self.budget.read_bytes(), before)
+        self.assertEqual(self.calls(), [])
+
+    def test_dry_run_ignores_held_lock(self):
+        self.write_budget(20)
+        with open(str(self.budget) + ".lock", "w") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.assertEqual(self.run_sh("--a-secco", "spec").returncode, 0)       # a secco non prende il lock
 
 
     def test_prints_command_and_residual(self):
@@ -490,18 +502,40 @@ class DryRunRealRegistryTest(unittest.TestCase):
     def snapshot(self):
         return (self.budget.read_bytes(), sorted(p.name for p in self.real.iterdir()))
 
+    def lock_held(self, budget):
+        """Il lock del registro è tenuto da un'altra invocazione? Tentativo non bloccante su un fd in sola lettura;
+        se il file manca nessun lock è tenuto (e non lo si crea)."""
+        try:
+            fd = os.open(str(budget) + ".lock", os.O_RDONLY)
+        except FileNotFoundError:
+            return False
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        finally:
+            os.close(fd)
+        return False
+
     def test_dry_run_reads_real_registry(self):
+        if self.lock_held(self.budget):
+            self.skipTest("una corsa vera tiene il lock del registro: il test ricostruirebbe il suo bersaglio")
         env = {k: v for k, v in os.environ.items() if not k.startswith(("TOLLGATE_", "CLAUDE"))}
         env.update(HOME=str(self.home), TMPDIR=str(self.home), PYTHONDONTWRITEBYTECODE="1",
                    PATH=f"{self.bin}:{os.environ['PATH']}")
+        cost_py = [sys.executable, "-B", str(ROOT / "evals" / "cost.py"), "remaining"]
+        probe = subprocess.run(cost_py, capture_output=True, text=True, env=env)
+        remaining = probe.stdout.strip()
+        exhausted = probe.returncode != 0 or not remaining or float(remaining) < 0.01   # anche una riga «?» chiude il tetto
         before = self.snapshot()
         r = subprocess.run(["bash", str(RUN_SH), "--a-secco", "spec"], capture_output=True, text=True, env=env,
                            timeout=300, stdin=subprocess.DEVNULL)
-        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
         self.assertFalse(self.marker.exists(), "claude è stato lanciato")
         self.assertEqual(self.snapshot(), before)               # registro uguale byte per byte, nessuna cartella né lock nuovi
-        remaining = subprocess.run([sys.executable, "-B", str(ROOT / "evals" / "cost.py"), "remaining"],
-                                   capture_output=True, text=True, env=env).stdout.strip()
+        if exhausted:
+            self.assertEqual(r.returncode, 1, r.stderr + r.stdout)
+            return
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
         self.assertRegex(remaining, r"^\d+\.\d\d$")
         self.assertIn(f"residuo del tetto: {remaining} USD", r.stdout)
         self.assertNotIn("TEST_MODE", r.stdout)
@@ -510,6 +544,21 @@ class DryRunRealRegistryTest(unittest.TestCase):
         for flag in ("--no-publish", "--allow-tools Bash Write Edit", f"--max-cost-usd {remaining} "):
             self.assertIn(flag, cmd)
         self.assertIn("/tmp/tollgate-eval-target", cmd)
+
+    def test_held_lock_gives_skip_not_error(self):
+        with mock.patch.object(self, "lock_held", return_value=True):
+            with self.assertRaises(unittest.SkipTest):
+                self.test_dry_run_reads_real_registry()
+        self.assertFalse(self.marker.exists())
+
+    def test_lock_held_detection(self):
+        budget = self.home / "b.tsv"
+        self.assertFalse(self.lock_held(budget))
+        self.assertFalse(Path(str(budget) + ".lock").exists())           # non lo crea
+        with open(str(budget) + ".lock", "w") as fh:
+            self.assertFalse(self.lock_held(budget))                     # file presente ma libero
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.assertTrue(self.lock_held(budget))
 
 
 class CostTest(unittest.TestCase):
