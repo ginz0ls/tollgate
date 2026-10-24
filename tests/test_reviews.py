@@ -1,5 +1,6 @@
 import json
 import unittest
+from unittest import mock
 
 from tests.helpers import TempState
 from tollgate_analysis import verdicts
@@ -209,15 +210,32 @@ class CloseTest(ReviewsCase):
         self.assertEqual((reviews.count(self.conn, self.w), reviews.counted(self.conn, self.w)),
                          (1, 0))
 
-    def test_close_is_resumable(self):
+    def test_close_is_atomic_with_phase_and_blocks(self):
+        """Un errore dopo la chiusura e prima della fase non lascia il ciclo chiuso: la
+        ripetizione chiude davvero e porta la fase a execution."""
         c = self.open()
         self.report(c, [finding()], outcome="needs_fix")
         self.confirm_all(c)
-        reviews.close_cycle(self.conn, self.t.state, self.w, c, now=T0)
+        before = len(events.export_events(self.conn, 0))
+        with mock.patch("tollgate_core.phases._change_phase", side_effect=RuntimeError("boom")):
+            with self.assertRaises(RuntimeError):
+                reviews.close_cycle(self.conn, self.t.state, self.w, c, now=T0)
+        row = reviews.latest(self.conn, self.w)
+        self.assertEqual((row["stage"], row["outcome"], row["counted"]), ("verify", None, 0))
+        self.assertEqual((self.phase(), len(events.export_events(self.conn, 0))),
+                         ("review", before))
+        self.assertFalse(self.conn.in_transaction)
         self.assertEqual(reviews.close_cycle(self.conn, self.t.state, self.w, c, now=T0),
                          "needs_fix")
         self.assertEqual(self.phase(), "execution")
         self.assertEqual(reviews.counted(self.conn, self.w), 1)
+
+    def test_close_leaves_a_db_copy_per_phase_change(self):
+        c = self.open()
+        self.report(c, [finding()], outcome="needs_fix")
+        self.confirm_all(c)
+        reviews.close_cycle(self.conn, self.t.state, self.w, c, now=T0)
+        self.assertTrue(list(self.t.state.backup_dir.glob("tollgate-*fase-execution*.db")))
 
     def test_close_cycle_requires_verify_stage(self):
         c = self.open()

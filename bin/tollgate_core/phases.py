@@ -203,23 +203,29 @@ def set_phase(conn, state: State, work: int, to: str, cause: str, *, now, sessio
         raise RuntimeError("set_phase va chiamato fuori da una transazione: "
                            "la copia del DB deve vedere solo dati confermati")
     with db.tx(conn):
-        row = get_work(conn, work)
-        check_transition(row["level"], row["phase"], to, cause)
-        _change_phase(conn, work, row["phase"], to, cause, now, session)
-        if to == "closed":
-            conn.execute("UPDATE work_items SET closed_reason = ?, phase_before_block = NULL "
-                         "WHERE id = ?", (cause, work))
-            for b in conn.execute("SELECT id FROM blocks WHERE work = ? AND closed IS NULL",
-                                  (work,)).fetchall():
-                conn.execute("UPDATE blocks SET closed = ?, resolution = ? WHERE id = ?",
-                             (clock.fmt(now), f"lavoro chiuso: {cause}", b["id"]))
-                record_event(conn, "block_closed", {"id": b["id"]},
-                             now=now, session=session, work=work)
-        if cause == "l0_grew":
-            conn.execute("UPDATE work_items SET level = 'L1' WHERE id = ?", (work,))
-            record_event(conn, "level_change", {"from": "L0", "to": "L1"},
-                         now=now, session=session, work=work)
+        set_phase_in_tx(conn, work, to, cause, now=now, session=session)
     db.backup(conn, state, f"fase-{to}")
+
+
+def set_phase_in_tx(conn, work: int, to: str, cause: str, *, now, session=None) -> None:
+    """Il cambio di fase di `set_phase` dentro la transazione del chiamante, che dopo il commit
+    fa la copia del DB (`db.backup(conn, state, f"fase-{to}")`)."""
+    row = get_work(conn, work)
+    check_transition(row["level"], row["phase"], to, cause)
+    _change_phase(conn, work, row["phase"], to, cause, now, session)
+    if to == "closed":
+        conn.execute("UPDATE work_items SET closed_reason = ?, phase_before_block = NULL "
+                     "WHERE id = ?", (cause, work))
+        for b in conn.execute("SELECT id FROM blocks WHERE work = ? AND closed IS NULL",
+                              (work,)).fetchall():
+            conn.execute("UPDATE blocks SET closed = ?, resolution = ? WHERE id = ?",
+                         (clock.fmt(now), f"lavoro chiuso: {cause}", b["id"]))
+            record_event(conn, "block_closed", {"id": b["id"]},
+                         now=now, session=session, work=work)
+    if cause == "l0_grew":
+        conn.execute("UPDATE work_items SET level = 'L1' WHERE id = ?", (work,))
+        record_event(conn, "level_change", {"from": "L0", "to": "L1"},
+                     now=now, session=session, work=work)
 
 
 def set_level(conn, work: int, level: str, *, now, session=None) -> None:
@@ -270,22 +276,32 @@ def open_block(conn, state: State, work: int, type_: str, reason: str, *, now,
     if conn.in_transaction:
         raise RuntimeError("open_block va chiamato fuori da una transazione")
     with db.tx(conn):
-        row = get_work(conn, work)
-        if row["phase"] == "closed":
-            raise TransitionError("il lavoro è chiuso")
-        cur = conn.execute("INSERT INTO blocks (work, type, reason, opened) VALUES (?, ?, ?, ?)",
-                           (work, type_, reason, clock.fmt(now)))
-        block = cur.lastrowid
-        changed = row["phase"] != "blocked"
-        if changed:
-            conn.execute("UPDATE work_items SET phase_before_block = ? WHERE id = ?",
-                         (row["phase"], work))
-            _change_phase(conn, work, row["phase"], "blocked", "block", now, session)
-        record_event(conn, "block_opened", {"id": block, "type": type_},
-                     now=now, session=session, work=work)
+        block, changed = open_block_in_tx(conn, work, type_, reason, now=now, session=session)
     if changed:
         db.backup(conn, state, "fase-blocked")
     return block
+
+
+def open_block_in_tx(conn, work: int, type_: str, reason: str, *, now,
+                     session=None) -> tuple[int, bool]:
+    """L'apertura di `open_block` dentro la transazione del chiamante. Dà (id, fase cambiata): se
+    cambiata, dopo il commit il chiamante fa `db.backup(conn, state, "fase-blocked")`."""
+    if type_ not in BLOCK_TYPES:
+        raise ValueError(f"tipo di blocco sconosciuto: {type_}")
+    row = get_work(conn, work)
+    if row["phase"] == "closed":
+        raise TransitionError("il lavoro è chiuso")
+    cur = conn.execute("INSERT INTO blocks (work, type, reason, opened) VALUES (?, ?, ?, ?)",
+                       (work, type_, reason, clock.fmt(now)))
+    block = cur.lastrowid
+    changed = row["phase"] != "blocked"
+    if changed:
+        conn.execute("UPDATE work_items SET phase_before_block = ? WHERE id = ?",
+                     (row["phase"], work))
+        _change_phase(conn, work, row["phase"], "blocked", "block", now, session)
+    record_event(conn, "block_opened", {"id": block, "type": type_},
+                 now=now, session=session, work=work)
+    return block, changed
 
 
 def close_block(conn, state: State, block_id: int, resolution: str, *, now,

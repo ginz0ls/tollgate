@@ -475,6 +475,8 @@ class OpenCorruptTest(OpenCase):
               "VALUES (?, 'effect', 'effect:abc', '{guasto', 'requested', ?)")
     EVENT = "INSERT INTO events (v, at, host, work, type, data) VALUES (1, ?, 'h', ?, ?, '{guasto')"
 
+    SHAPED = ("INSERT INTO events (v, at, host, work, type, data) VALUES (1, ?, 'h', ?, ?, ?)")
+
     def test_corrupt_json_fields_are_messages(self):
         """Un campo JSON guasto nel DB dà un `rifiuto:` che lo nomina, mai un traceback, e non
         lascia nulla a metà (nessuna PR, nessun push, fase invariata)."""
@@ -492,6 +494,14 @@ class OpenCorruptTest(OpenCase):
             ("intents.data", self.EFFECT, lambda fl: (fl.work, clock.fmt(fl.now))),
             ("events.data", self.EVENT, lambda fl: (clock.fmt(fl.now), fl.work, "subagent_stop")),
             ("events.data", self.EVENT, lambda fl: (clock.fmt(fl.now), fl.work, "skills_absent")),
+            ("events.data", self.SHAPED, lambda fl: (clock.fmt(fl.now), fl.work, "skills_absent",
+                                                      "{}")),
+            ("events.data", self.SHAPED, lambda fl: (clock.fmt(fl.now), fl.work, "skills_absent",
+                                                      '{"task": "uno", "skills": []}')),
+            ("events.data", self.SHAPED, lambda fl: (clock.fmt(fl.now), fl.work, "skills_absent",
+                                                      '{"task": 1, "skills": "a"}')),
+            ("events.data", self.SHAPED, lambda fl: (clock.fmt(fl.now), fl.work, "subagent_stop",
+                                                      "[1]")),
         ]
         for i, (field, statement, params) in enumerate(cases):
             with self.subTest(i=i, field=field):

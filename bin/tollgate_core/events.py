@@ -42,7 +42,7 @@ def record_event(conn: sqlite3.Connection, type_: str, data: dict | None = None,
 
 
 def known_commits(conn: sqlite3.Connection, work: int) -> set[str]:
-    return {json.loads(r[0]).get("sha") for r in conn.execute(
+    return {load_json(r[0], "events.data", dict).get("sha") for r in conn.execute(
         "SELECT data FROM events WHERE type = 'commit' AND work = ?", (work,))}
 
 

@@ -492,7 +492,8 @@ def _size_reasons(conn, wid: int) -> dict[int, str]:
     for r in conn.execute("SELECT data FROM events WHERE work = ? AND type = 'subagent_stop' "
                           "ORDER BY seq", (wid,)):
         data = db.load_json(r["data"], "events.data", dict)
-        if isinstance(data.get("task"), int) and data.get("size_reason"):
+        if isinstance(data.get("task"), int) and isinstance(data.get("size_reason"), str) \
+                and data["size_reason"]:
             out[data["task"]] = data["size_reason"]
     return out
 
@@ -528,5 +529,8 @@ def _skills_absent(conn, wid: int) -> list[dict]:
     for r in conn.execute("SELECT data FROM events WHERE work = ? AND type = 'skills_absent' "
                           "ORDER BY seq", (wid,)):
         data = db.load_json(r["data"], "events.data", dict)
+        if not isinstance(data.get("task"), int) or not isinstance(data.get("skills"), list):
+            raise db.DbError("il campo events.data del DB ha una forma inattesa "
+                             "(skills_absent: servono task intero e skills elenco)")
         latest[data["task"]] = data["skills"]
     return [{"task": t, "skills": latest[t]} for t in sorted(latest)]

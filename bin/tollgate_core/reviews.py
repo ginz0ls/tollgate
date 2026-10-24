@@ -15,7 +15,7 @@ from tollgate_analysis.verdicts import is_blocking
 from . import clock, db
 from .events import record_event
 from .paths import State
-from .phases import get_work, open_block, set_phase
+from .phases import get_work, open_block, open_block_in_tx, set_phase_in_tx
 
 SEVERITY_ORDER = ("blocker", "major", "moderate", "minor")
 BLOCKING_SEVERITIES = SEVERITY_ORDER[:2]
@@ -318,14 +318,40 @@ def _has_open_block(conn, work: int, reason: str) -> bool:
                         (work, reason)).fetchone() is not None
 
 
+def _consequences(conn, work: int, cycle: int, outcome: str, *, now, session) -> list[str]:
+    """Fase e blocchi dell'esito, nella transazione della chiusura. Dà le copie del DB da fare
+    dopo il commit."""
+    backups = []
+
+    def block(reason: str) -> None:
+        _, changed = open_block_in_tx(conn, work, "needs_you", reason, now=now, session=session)
+        if changed:
+            backups.append("fase-blocked")
+
+    if outcome == "needs_you":
+        reason = f"il revisore finale chiede una decisione (ciclo {cycle})"
+        if not _has_open_block(conn, work, reason):
+            block(reason)
+    elif outcome == "needs_fix":
+        if get_work(conn, work)["phase"] == "review":
+            set_phase_in_tx(conn, work, "execution", "needs_fix", now=now, session=session)
+            backups.append("fase-execution")
+        cap = CAP_COUNTED + get_work(conn, work)["extra_review_cycles"]
+        if counted(conn, work) >= cap and not _has_open_block(conn, work, CAP_REASON):
+            block(CAP_REASON)
+    return backups
+
+
 def close_cycle(conn, state: State, work: int, cycle: int, *, now, session=None) -> str:
     """Chiude il ciclo (decisione 6) e ne applica le conseguenze. Esiti: `needs_you` se un
     revisore l'ha dichiarato; `needs_fix` con un rilievo bloccante confermato (fase
     `review` -> `execution`, e al tetto un blocco `needs_you`); altrimenti `ok`.
+    La chiusura, la fase e i blocchi sono una sola transazione: un errore a metà non lascia un
+    ciclo chiuso senza le sue conseguenze.
     Si chiude solo dallo stadio `verify`, con ogni rilievo giudicato (`ReviewError` altrimenti).
     Su un ciclo già chiuso dà l'esito senza toccare fase, blocchi ed eventi: la fase e i blocchi
     dopo la chiusura sono del flusso (`approve finding`, `approve rounds`), e ripeterla non li
-    deve rifare."""
+    deve rifare: niente passi a metà da riprendere, perché le conseguenze sono atomiche."""
     if conn.in_transaction:
         raise RuntimeError("close_cycle va chiamato fuori da una transazione")
     with db.tx(conn):
@@ -354,14 +380,7 @@ def close_cycle(conn, state: State, work: int, cycle: int, *, now, session=None)
         record_event(conn, "review_cycle", {"number": cycle, "outcome": outcome,
                                             "findings_confirmed": confirmed},
                      now=now, session=session, work=work)
-    if outcome == "needs_you":
-        reason = f"il revisore finale chiede una decisione (ciclo {cycle})"
-        if not _has_open_block(conn, work, reason):
-            open_block(conn, state, work, "needs_you", reason, now=now, session=session)
-    elif outcome == "needs_fix":
-        if get_work(conn, work)["phase"] == "review":
-            set_phase(conn, state, work, "execution", "needs_fix", now=now, session=session)
-        cap = CAP_COUNTED + get_work(conn, work)["extra_review_cycles"]
-        if counted(conn, work) >= cap and not _has_open_block(conn, work, CAP_REASON):
-            open_block(conn, state, work, "needs_you", CAP_REASON, now=now, session=session)
+        backups = _consequences(conn, work, cycle, outcome, now=now, session=session)
+    for reason in backups:
+        db.backup(conn, state, reason)
     return outcome

@@ -25,6 +25,14 @@ class EventsTest(unittest.TestCase):
         self.conn.close()
         self.t.cleanup()
 
+    def test_known_commits_corrupt_data_is_dberror(self):
+        events.record_event(self.conn, "commit", {"sha": "abc"}, now=T0, work=self.work)
+        self.assertEqual(events.known_commits(self.conn, self.work), {"abc"})
+        self.conn.execute("INSERT INTO events (v, at, host, work, type, data) "
+                          "VALUES (1, 'x', 'h', ?, 'commit', '{guasto')", (self.work,))
+        with self.assertRaisesRegex(db.DbError, "events.data"):
+            events.known_commits(self.conn, self.work)
+
     def test_envelope(self):
         seq = events.record_event(self.conn, "veto", {"rule": "scope", "event": "pre_edit",
                                                       "reason": "fuori scope"},
