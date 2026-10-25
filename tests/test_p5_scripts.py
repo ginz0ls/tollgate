@@ -785,6 +785,10 @@ class GateControllaTest(unittest.TestCase):
         self.assertIn("net_push: main e rami con :, + o - rifiutati fuori da skip-ci", self.out)
         self.assertNotIn("NET_PUSH NON RIFIUTATO", self.out)
 
+    def test_runs_are_matched_by_branch_not_by_recency(self):
+        self.assertIn("guard e verdict agganciati per ramo: il run più recente di un altro ramo è scartato", self.out)
+        self.assertNotIn("AGGANCIO DI UN RUN", self.out)
+
     def test_refusals(self):
         self.assertIn("modo pin-off-senza-stato: fermato come previsto", self.out)
         self.assertIn("pin-off: senza stato si rifiuta", self.out)

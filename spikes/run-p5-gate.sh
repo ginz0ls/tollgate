@@ -14,7 +14,7 @@
 #   caso <nome>       pulita-fissata | rifiuto-v4 | rivalutazione | skip-ci (l'ultimo: lascia aperta l'unica issue di sentinella,
 #                     la chiude il controller). Una riga del rapporto per tentativo in gate-casi-righe.md. Servono tollgate 0.2.0
 #                     installato su main (aggiorna) e, per pulita-fissata e rifiuto-v4, pin-on. pulita-fissata e rivalutazione
-#                     chiudono un'issue aperta ("Closes #N"): `issue create` non è ammesso, la apre il controller a mano (titolo
+#                     chiudono un'issue aperta ("Closes #N"): `issue create` è ammesso dalla guardia solo al controller, lo script non lo usa: la apre il controller (titolo
 #                     «prova P5: ...») e la passa in P5_ISSUE; senza P5_ISSUE si cerca l'unica aperta con quel titolo. Con un'issue
 #                     di sentinella aperta questi due casi non partono (codice 6).
 #   raccogli          run, PR, issue e permessi di detect; log dei job di ogni run seguito; minuti; osservazioni sui log; scansione
@@ -236,10 +236,46 @@ open_pr() {
   save_text "$OUT/$1-pr.env" "PR=$PR_NUM" "SHA=$SHA" "BRANCH=$2"
 }
 
-# track <etichetta> <workflow> <sha> <ramo> <ripiego>: attende il run (wait_run), registra durata e riga per `raccogli`
+# wait_run (di common.sh) ridefinito: con ripiego=1 (pull_request_target e workflow_run, che non hanno la testa della PR come
+# head_sha garantito) il run si cerca PRIMA per headBranch uguale al ramo della PR e per event (7° argomento); un run di un altro
+# ramo non si prende mai, nemmeno se è il più recente nello stesso intervallo. Senza run del ramo entro il tetto: nessun run.
+# Con ripiego=0: per SHA o per ramo, come in common.sh. Imposta RUN_ID e RUN_CONC.
+wait_run() {
+  local label="$1" repo="$2" wf="$3" sha="$4" br="$5" fb="$6" ev="${7:-}" deadline id="" left
+  export P4_WAIT_SHA="$sha" P4_WAIT_BRANCH="$br"
+  deadline=$(( $(date +%s) + WAIT_MAX ))
+  RUN_ID=""; RUN_CONC=""
+  while :; do
+    gh_q run list --repo "$repo" --workflow "$wf" --limit 30 \
+      --json databaseId,headSha,headBranch,event,status,conclusion,createdAt >"$WORK/poll.json"
+    id="$(jq -r --arg s "$sha" --arg b "$br" --arg f "$fb" --arg e "$ev" \
+      '[.[] | select(($e == "" or .event == $e)
+                     and (if $f == "1" then ($b != "" and .headBranch == $b) else (.headSha == $s or ($b != "" and .headBranch == $b)) end))]
+       | sort_by(.databaseId) | last | .databaseId // empty' "$WORK/poll.json" 2>/dev/null)"
+    [ -n "$id" ] && break
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      echo "nessun run di $wf del ramo ${br:-?} (evento ${ev:-qualunque}) entro ${WAIT_MAX}s ($label)" >&2
+      save_text "$OUT/$label-runid.txt" "non determinato: nessun run del ramo ${br:-?} entro ${WAIT_MAX}s"
+      return 1
+    fi
+    sleep "$POLL"
+  done
+  left=$(( deadline - $(date +%s) )); [ "$left" -lt 30 ] && left=30
+  GH_TIMEOUT="$left" gh_call "$label-watch" run watch "$id" --repo "$repo" --exit-status
+  gh_call "$label-runs" run list --repo "$repo" --workflow "$wf" --limit 30 \
+    --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+  gh_call "$label-view" run view "$id" --repo "$repo" \
+    --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+  RUN_ID="$id"
+  RUN_CONC="$(jq -r '.conclusion // empty' "$OUT/$label-view.out" 2>/dev/null)"
+  save_text "$OUT/$label-runid.txt" "$id"
+  return 0
+}
+
+# track <etichetta> <workflow> <sha> <ramo> <ripiego> [evento]: attende il run (wait_run), registra durata e riga per `raccogli`
 track() {
   local ms
-  wait_run "$1" "$DET" "$2" "$3" "$4" "$5" || return 1
+  wait_run "$1" "$DET" "$2" "$3" "$4" "$5" "${6:-}" || return 1
   add_run "$1" "$DET" "$RUN_ID" "$RUN_CONC"
   gh_read "$1-timing" api "repos/$DET/actions/runs/$RUN_ID/timing"
   ms="$(jq -r '.run_duration_ms // 0' "$OUT/$1-timing.out" 2>/dev/null)"
@@ -270,7 +306,7 @@ emit_row() {
   case "$6" in riuscito*) ;; *) ROW_FAIL=1 ;; esac
 }
 
-# case_issue: l'issue aperta del caso (decisione 21: `issue create` non è ammesso, la apre il controller). P5_ISSUE, oppure l'unica
+# case_issue: l'issue aperta del caso (lo script non crea issue: `issue create` è ammesso dalla guardia solo al controller, che la apre). P5_ISSUE, oppure l'unica
 # aperta il cui titolo comincia per «prova P5». Nessuna issue di sentinella aperta (renderebbe rossa `attention`).
 case_issue() {
   local n
@@ -480,11 +516,12 @@ caso_pulita_fissata() {
   open_pr "$label" "$BR" "prova P5: pulita-fissata" "$BODY_FILE"
   # i run si agganciano subito dopo l'apertura: pull_request_target e workflow_run non hanno la testa della PR come head_sha in
   # modo garantito, quindi guard e verdict si cercano col ripiego «il più recente creato negli ultimi minuti» (come in Task 1)
-  track "$label-guard" tollgate-guard.yml "$SHA" "$BR" 1 || echo "run di tollgate-guard non trovato su $SHA" >&2
+  GUARD_MISSING=0
+  track "$label-guard" tollgate-guard.yml "$SHA" "$BR" 1 pull_request_target || { GUARD_MISSING=1; echo "run di tollgate-guard del ramo $BR non trovato" >&2; }
   track "$label-run" tollgate-run.yml "$SHA" "$BR" 0 || echo "run di tollgate-run non trovato su $SHA" >&2
   rot "$OUT/$label-cache-mode.txt"
   cm="non determinato: il run di tollgate-verdict non è comparso entro ${WAIT_MAX}s"
-  if track "$label-verdict" tollgate-verdict.yml "$SHA" "$BR" 1; then
+  if track "$label-verdict" tollgate-verdict.yml "$SHA" "$BR" 1 workflow_run; then
     gh_read "$label-verdict-log" run view "$RUN_ID" --repo "$DET" --log
     cm="$(grep -a 'Cache mode:' "$OUT/$label-verdict-log.out" | head -n 1 | sed 's/^.*\(Cache mode:.*\)$/\1/')"
     [ -n "$cm" ] || cm="non determinato: nessuna riga «Cache mode:» nel log del job verdict"
@@ -497,6 +534,8 @@ caso_pulita_fissata() {
   printf '%s\n' "$row| $(awk -v ms="$CASE_MS" -v n="$CASE_RUNS" 'BEGIN { printf "%.1f (%d run)", ms / 60000, n }') |" | tee -a "$ROWS"
   case "$cm" in 'Cache mode: read'*) esito=riuscito ;; *) esito="non riuscito: $cm" ;; esac
   emit_row pulita-fissata-cache "#$PR_NUM" "$SHA" "$cm" "Cache mode: read (VG1)" "$esito"
+  [ "$GUARD_MISSING" = 0 ] || emit_row pulita-fissata-aggancio "#$PR_NUM" "$SHA" "nessun run di guard del ramo $BR" "run di guard agganciato per ramo" \
+    "non riuscito: run di guard non trovato (minuti incompleti; gli stati restano giudicati)"
   close_open_prs
 }
 
@@ -988,8 +1027,12 @@ elif first == "run":
                     for i, (s, subj) in enumerate(main_commits()) if i > 0 and "[skip ci]" not in subj]
             print(json.dumps(rows))
         else:
-            print(json.dumps([{"databaseId": n, "headSha": os.environ.get("P4_WAIT_SHA", ""), "headBranch": os.environ.get("P4_WAIT_BRANCH", ""),
-                               "event": "push", "status": "completed", "conclusion": "success", "createdAt": "2099-01-01T00:00:00Z"}]))
+            ev = {"tollgate-guard.yml": "pull_request_target", "tollgate-verdict.yml": "workflow_run", "tollgate-run.yml": "pull_request"}.get(wf, "push")
+            true = {"databaseId": n, "headSha": os.environ.get("P4_WAIT_SHA", ""), "headBranch": os.environ.get("P4_WAIT_BRANCH", ""),
+                    "event": ev, "status": "completed", "conclusion": "success", "createdAt": "2099-01-01T00:00:00Z"}
+            # un run più recente (id più alto) di un altro ramo nello stesso intervallo: l'aggancio deve scartarlo
+            decoy = dict(true, databaseId=900000 + n, headSha="d" * 40, headBranch="tollgate-config/0.2.0", createdAt="2099-01-01T00:00:01Z")
+            print(json.dumps([decoy, true]))
     elif second == "watch":
         print("Run completed (finto)")
     elif second == "view":
@@ -1134,6 +1177,13 @@ modo_controlla() {
   [ "$(jq -r '.sha_pinning_required' "$T/fake/perm.json")" = false ] && echo "pin-off: valore iniziale rimesso (false)" || { echo "PIN-OFF: VALORE NON RIMESSO"; rc=1; }
   ls "$T/stato"/pin-iniziale.env.rimesso-* >/dev/null 2>&1 && [ ! -e "$T/stato/pin-iniziale.env" ] && echo "pin-off: stato archiviato, non cancellato"
   run_mode raccogli raccogli
+  echo "--- aggancio dei run per ramo"
+  local rid bad=0
+  for f in "$T"/out/gate-caso-pulita-fissata-*-guard-runid.txt "$T"/out/gate-caso-pulita-fissata-*-verdict-runid.txt; do
+    rid="$(cat "$f" 2>/dev/null)"
+    case "$rid" in ''|*[!0-9]*) bad=1 ;; *) [ "$rid" -lt 900000 ] || bad=1 ;; esac
+  done
+  [ "$bad" = 0 ] && echo "  guard e verdict agganciati per ramo: il run più recente di un altro ramo è scartato" || { echo "  AGGANCIO DI UN RUN DI UN ALTRO RAMO"; rc=1; }
   echo "--- rapporto"
   [ -f "$T/out/gate-casi-righe.md" ] && echo "  righe: $(wc -l < "$T/out/gate-casi-righe.md")"
   grep -c 'non riuscito' "$T/out/gate-casi-righe.md" | sed 's/^/  non riuscite: /'
