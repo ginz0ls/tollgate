@@ -426,8 +426,11 @@ def violation(args, lenient=False, profile="script"):
 PR_OPS = {("pr", "create"), ("pr", "close"), ("pr", "merge"), ("pr", "view"), ("pr", "list"), ("pr", "comment"),
           ("issue", "close"), ("issue", "comment"), ("issue", "view"), ("issue", "list")}
 RUN_OPS = {("run", "list"), ("run", "view"), ("run", "watch"), ("run", "download"), ("run", "rerun")}
-P5_REPO_OPS = {TOL: set(RUN_OPS), DET: PR_OPS | RUN_OPS}      # operazioni per repo (decisioni 20 e 21)
-P5_SPECS = {key: SPECS[key] for key in PR_OPS | (RUN_OPS - {("run", "rerun")})}
+ISSUE_CREATE = ("issue", "create")      # solo su detect, titolo «prova P5: …», al più MAX_ISSUE_CREATE per prova (ammesso dall'utente)
+MAX_ISSUE_CREATE = 2
+ISSUE_TITLE_PREFIX = "prova P5: "
+P5_REPO_OPS = {TOL: set(RUN_OPS), DET: PR_OPS | RUN_OPS | {ISSUE_CREATE}}      # operazioni per repo (decisioni 20 e 21)
+P5_SPECS = {key: SPECS[key] for key in PR_OPS | (RUN_OPS - {("run", "rerun")}) | {ISSUE_CREATE}}
 P5_SPECS[("run", "rerun")] = _spec({}, flags=("--failed",), pos="int")
 PERMISSIONS_ENDPOINT = "repos/%s/actions/permissions"
 ALLOWED_ACTIONS = {"all", "local_only", "selected"}
@@ -512,6 +515,43 @@ def _check_api_write_p5(args, lenient=False):
                      "actions/permissions su detect)")
 
 
+def _issue_create_problem(args, lenient):
+    """`issue create` su detect: titolo «prova P5: …» e uno tra --body e --body-file (le altre opzioni le ha già fermate _parse)."""
+    title, bodies, i = None, 0, 0
+    while i < len(args):
+        name, eq, val = args[i].partition("=")
+        if name in ("--body", "--body-file"):
+            bodies += 1
+        if name == "--title":
+            if eq:
+                title, i = val, i + 1
+            else:
+                title, i = (args[i + 1] if i + 1 < len(args) else ""), i + 2
+                while lenient and i < len(args) and not args[i].startswith("-"):      # gli spazi del titolo sono andati persi
+                    title, i = title + " " + args[i], i + 1
+            continue
+        i += 1
+    if title is None or not title.startswith(ISSUE_TITLE_PREFIX if not lenient else ISSUE_TITLE_PREFIX.rstrip()):
+        return "issue create: il titolo deve cominciare per «%s»" % ISSUE_TITLE_PREFIX
+    if len(title) <= len(ISSUE_TITLE_PREFIX.rstrip()):
+        return "issue create: titolo vuoto dopo il prefisso"
+    if bodies != 1:
+        return "issue create: serve esattamente uno tra --body e --body-file"
+    return None
+
+
+def note_issue_create():
+    """Un `issue create` è passato dalla guardia: al più MAX_ISSUE_CREATE per prova (righe `issue` nel registro)."""
+    path = _registry_path()
+    if not path or not os.path.isabs(path):
+        return False
+    if _registry_lines().count("issue") >= MAX_ISSUE_CREATE:
+        return False
+    with open(path, "a") as fh:
+        fh.write("issue\n")
+    return True
+
+
 def _violation_p5(args, lenient):
     first, second = args[0], (args[1] if len(args) > 1 else "")
     foreign = _foreign_repo(args)
@@ -529,6 +569,8 @@ def _violation_p5(args, lenient):
         repo = _parse((first, second), args[2:], lenient, P5_SPECS[(first, second)])
         if (first, second) not in P5_REPO_OPS[repo]:
             return "gh %s %s non ammesso su %s" % (first, second, repo)
+        if (first, second) == ISSUE_CREATE:
+            return _issue_create_problem(args[2:], lenient)
         return None
     if first == "api":
         if any(_is_write(a) for a in args[1:]):
@@ -697,6 +739,9 @@ def main(argv):
             return 1
         if profile == "p5" and argv[3:5] == ["pr", "create"] and not note_pr_create():
             print("pr create: serve P5_PR_REGISTRY (percorso assoluto) per registrare la PR", file=sys.stderr)
+            return 1
+        if profile == "p5" and tuple(argv[3:5]) == ISSUE_CREATE and not note_issue_create():
+            print("issue create: serve P5_PR_REGISTRY (percorso assoluto) e al più %d issue per prova" % MAX_ISSUE_CREATE, file=sys.stderr)
             return 1
         return 0
     if len(argv) >= 3 and argv[1] == "gitcheck":

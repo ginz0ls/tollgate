@@ -139,12 +139,23 @@ net_push() {
 
 # ---------------------------------------------------------------- letture con ritentativo
 
-# gh_read <etichetta> <argomenti di gh...>: come gh_call, ma una lettura che risponde 5xx (anche a corpo vuoto) si ritenta fino a
-# RETRIES volte. Le scritture non passano da qui, salvo quelle idempotenti (PUT con lo stesso corpo).
-gh_read() {
+# is_read <argomenti di gh...>: una lettura (pr/issue view|list, run list|view, api senza scrittura); `run watch` no (esce 1 su un run rosso)
+is_read() {
+  local a
+  case "${1:-} ${2:-}" in "pr view"|"pr list"|"issue view"|"issue list"|"run list"|"run view") return 0 ;; esac
+  [ "${1:-}" = api ] || return 1
+  for a in "$@"; do case "$a" in --method|-X|-f|-F|--input|--field|--raw-field) return 1 ;; esac; done
+  return 0
+}
+
+# gh_call (di common.sh) diventa gh_call_once; gh_call ritenta le LETTURE che rispondono 5xx (anche a corpo vuoto) fino a RETRIES
+# volte, e così fanno statuses, wait_run e close_open_prs. Le scritture (pr create, merge, PATCH, close) non si ritentano mai.
+eval "$(declare -f gh_call | sed '1s/^gh_call/gh_call_once/')"
+gh_call() {
   local label="$1" n=0; shift
+  if ! is_read "$@"; then gh_call_once "$label" "$@"; return 0; fi
   while :; do
-    gh_call "$label" "$@"
+    gh_call_once "$label" "$@"
     [ "$RC" = 0 ] && return 0
     if grep -Eq 'HTTP 5[0-9][0-9]' "$OUT/$label.err" 2>/dev/null && [ "$n" -lt "$RETRIES" ]; then
       n=$((n + 1))
@@ -155,7 +166,20 @@ gh_read() {
     return 0
   done
 }
-gh_write_idem() { gh_read "$@"; }
+gh_read() { gh_call "$@"; }
+gh_write_idem() { gh_call_once_idem "$@"; }
+# la PUT di permessi è idempotente (stesso corpo): si ritenta come una lettura
+gh_call_once_idem() {
+  local label="$1" n=0; shift
+  while :; do
+    gh_call_once "$label" "$@"
+    [ "$RC" = 0 ] && return 0
+    if grep -Eq 'HTTP 5[0-9][0-9]' "$OUT/$label.err" 2>/dev/null && [ "$n" -lt "$RETRIES" ]; then
+      n=$((n + 1)); sleep "$RETRY_SLEEP"; continue
+    fi
+    return 0
+  done
+}
 
 # with_guarded_gh <comando...>: il `gh` dei programmi figli (tollgate init) è il wrapper con guardia (profilo p5); il gh vero lo
 # conosce da P4_REAL_GH. Lo stato di tollgate è una cartella di prova. Anche il `git fetch origin` interno a init passa da qui.
@@ -553,7 +577,6 @@ caso_rivalutazione() {
     sleep "$POLL"
   done
   statuses "$label-statuses" "$DET" "$SHA"
-  track "$label-dopo-run" tollgate-run.yml "$SHA" "$BR" 0 || echo "run di tollgate-run dopo la modifica non trovato" >&2
   # ordine reale (decisione 15): gli stati verdict nuovi, dal più vecchio, con autore e ora
   seq="$(jq -rs --arg c tollgate/verdict --argjson k "$k" '[.[] | select(.context == $c)] | reverse | .[$k:] | map(.state) | join(" -> ")' "$OUT/$label-statuses.out" 2>/dev/null)"
   creators="$(jq -rs --arg c tollgate/verdict --argjson k "$k" '[.[] | select(.context == $c)] | reverse | .[$k:] | map(.creator + "@" + .created_at) | join(", ")' "$OUT/$label-statuses.out" 2>/dev/null)"
@@ -1092,6 +1115,11 @@ modo_controlla() {
   [ ! -s "$T/fake/perm.json" ] && echo "pin-off: nessuna PUT senza stato"
   run_fails caso-sconosciuto caso non-esiste
   run_fails caso-senza-pin-on caso pulita-fissata
+  local b
+  for b in main 'a:b' '+main' '-f' ''; do      # net_push gira davvero: muore prima di toccare git (ALLOW_MAIN_PUSH vale 0 fuori da skip-ci)
+    if ( net_push prova-rifiuto "$WORK/gate-detect" "$b" ) >/dev/null 2>&1; then echo "NET_PUSH NON RIFIUTATO: '$b'"; rc=1; fi
+  done
+  echo "net_push: main e rami con :, + o - rifiutati fuori da skip-ci"
   echo "--- modi"
   run_mode aggiorna aggiorna
   run_mode pin-on pin-on

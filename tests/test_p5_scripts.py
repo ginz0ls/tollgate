@@ -781,6 +781,10 @@ class GateControllaTest(unittest.TestCase):
         for mode in ("aggiorna", "pin-on", "caso-pulita-fissata", "caso-rifiuto-v4", "caso-rivalutazione", "caso-skip-ci", "pin-off", "raccogli"):
             self.assertIn(f"modo {mode}: ok", self.out)
 
+    def test_net_push_is_really_refused_outside_skip_ci(self):
+        self.assertIn("net_push: main e rami con :, + o - rifiutati fuori da skip-ci", self.out)
+        self.assertNotIn("NET_PUSH NON RIFIUTATO", self.out)
+
     def test_refusals(self):
         self.assertIn("modo pin-off-senza-stato: fermato come previsto", self.out)
         self.assertIn("pin-off: senza stato si rifiuta", self.out)
@@ -887,6 +891,60 @@ class GateControllaTest(unittest.TestCase):
         self.assertIn("comandi legittimi ammessi: 23 su 23", self.out)
         self.assertIn("git: 14 fermati su 14", self.out)
         self.assertNotIn("RIFIUTATO gh", self.log)
+
+
+class IssueCreateGuardTest(unittest.TestCase):
+    """Profilo p5: `issue create` ammesso solo su detect, titolo «prova P5: …», al più due per prova."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(ROOT / "spikes" / "gh-p4"))
+        import ghguard
+        cls.g = ghguard
+
+    DET = "ginz0ls/tollgate-p4-detect"
+
+    def v(self, *args, lenient=False):
+        return self.g.violation(list(args), lenient=lenient, profile="p5")
+
+    def test_the_allowed_forms(self):
+        self.assertIsNone(self.v("issue", "create", "-R", self.DET, "--title", "prova P5: pulita-fissata", "--body", "testo"))
+        os.environ["P4_OUT"] = "/tmp/o"
+        try:
+            self.assertIsNone(self.v("issue", "create", "--repo", self.DET, "--title", "prova P5: x", "--body-file", "/tmp/o/b.md"))
+        finally:
+            del os.environ["P4_OUT"]
+        # nel registro comandi.log gli spazi sono andati persi
+        self.assertIsNone(self.v("issue", "create", "--repo", self.DET, "--title", "prova", "P5:", "caso", "--body", "a", "b", lenient=True))
+
+    def test_other_repos_titles_and_options_are_refused(self):
+        for args in (("--repo", "ginz0ls/tollgate", "--title", "prova P5: x", "--body", "t"),
+                     ("--repo", "ginz0ls/tollgate-p4-protected", "--title", "prova P5: x", "--body", "t"),
+                     ("--repo", self.DET, "--title", "altro titolo", "--body", "t"),
+                     ("--repo", self.DET, "--title", "prova P5:", "--body", "t"),
+                     ("--repo", self.DET, "--title", "prova P5: x"),
+                     ("--repo", self.DET, "--title", "prova P5: x", "--body", "t", "--body-file", "/tmp/x"),
+                     ("--repo", self.DET, "--title", "prova P5: x", "--body", "t", "--assignee", "me"),
+                     ("--repo", self.DET, "--title", "prova P5: x", "--body", "t", "--label", "bug"),
+                     ("--repo", self.DET, "--title", "prova P5: x", "--body", "t", "--project", "p"),
+                     ("--repo", self.DET, "--title", "prova P5: x", "--body", "t", "--web"),
+                     ("--title", "prova P5: x", "--body", "t")):
+            with self.subTest(args):
+                self.assertIsNotNone(self.v("issue", "create", *args))
+
+    def test_at_most_two_per_prova_and_the_registry_is_required(self):
+        import subprocess as sp
+        with tempfile.TemporaryDirectory() as d:
+            reg = os.path.join(d, "prs.txt")
+            env = clean_env(P4_PROFILE="p5", P5_PR_REGISTRY=reg)
+            cmd = [sys.executable, "-B", "-I", str(ROOT / "spikes" / "gh-p4" / "ghguard.py"), "check", "--", "issue", "create", "--repo", self.DET,
+                   "--title", "prova P5: x", "--body", "t"]
+            codes = [sp.run(cmd, env=env, capture_output=True).returncode for _ in range(3)]
+            self.assertEqual(codes, [0, 0, 1])
+            env.pop("P5_PR_REGISTRY")
+            self.assertEqual(sp.run(cmd, env=env, capture_output=True).returncode, 1)
+            # `check` non scrive niente per gli altri profili e il log non conta
+            self.assertEqual(open(reg).read().split(), ["issue", "issue"])
 
 
 if __name__ == "__main__":
