@@ -786,7 +786,7 @@ class GateControllaTest(unittest.TestCase):
         self.assertNotIn("NET_PUSH NON RIFIUTATO", self.out)
 
     def test_runs_are_matched_by_branch_not_by_recency(self):
-        self.assertIn("guard e verdict agganciati per ramo: il run più recente di un altro ramo è scartato", self.out)
+        self.assertIn("guard per ramo e verdict per fine del run della PR: i run più recenti di altri rami o PR sono scartati", self.out)
         self.assertNotIn("AGGANCIO DI UN RUN", self.out)
 
     def test_refusals(self):

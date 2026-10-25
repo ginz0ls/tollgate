@@ -236,26 +236,33 @@ open_pr() {
   save_text "$OUT/$1-pr.env" "PR=$PR_NUM" "SHA=$SHA" "BRANCH=$2"
 }
 
-# wait_run (di common.sh) ridefinito: con ripiego=1 (pull_request_target e workflow_run, che non hanno la testa della PR come
-# head_sha garantito) il run si cerca PRIMA per headBranch uguale al ramo della PR e per event (7° argomento); un run di un altro
-# ramo non si prende mai, nemmeno se è il più recente nello stesso intervallo. Senza run del ramo entro il tetto: nessun run.
-# Con ripiego=0: per SHA o per ramo, come in common.sh. Imposta RUN_ID e RUN_CONC.
+# wait_run (di common.sh) ridefinito. ripiego=1 (guard, pull_request_target): per headBranch uguale al ramo della PR e per event
+# (7° argomento); un run di un altro ramo non si prende mai. ripiego=2 (verdict, workflow_run): il run ha headBranch e headSha
+# del PREDEFINITO (verificato sul vero), non della PR; si prende il PRIMO run con quell'event creato non prima di <after>
+# (8° argomento: la fine del tollgate-run della PR), mai il più recente. Senza run entro il tetto: nessun run.
+# ripiego=0: per SHA o per ramo, come in common.sh. Imposta RUN_ID e RUN_CONC.
 wait_run() {
-  local label="$1" repo="$2" wf="$3" sha="$4" br="$5" fb="$6" ev="${7:-}" deadline id="" left
+  local label="$1" repo="$2" wf="$3" sha="$4" br="$5" fb="$6" ev="${7:-}" after="${8:-}" deadline id="" left
   export P4_WAIT_SHA="$sha" P4_WAIT_BRANCH="$br"
   deadline=$(( $(date +%s) + WAIT_MAX ))
   RUN_ID=""; RUN_CONC=""
   while :; do
     gh_q run list --repo "$repo" --workflow "$wf" --limit 30 \
       --json databaseId,headSha,headBranch,event,status,conclusion,createdAt >"$WORK/poll.json"
-    id="$(jq -r --arg s "$sha" --arg b "$br" --arg f "$fb" --arg e "$ev" \
-      '[.[] | select(($e == "" or .event == $e)
-                     and (if $f == "1" then ($b != "" and .headBranch == $b) else (.headSha == $s or ($b != "" and .headBranch == $b)) end))]
-       | sort_by(.databaseId) | last | .databaseId // empty' "$WORK/poll.json" 2>/dev/null)"
+    if [ "$fb" = 2 ]; then
+      id="$(jq -r --arg e "$ev" --arg a "$after" \
+        '[.[] | select(.event == $e and $a != "" and .createdAt >= $a)] | sort_by(.createdAt, .databaseId) | first | .databaseId // empty' \
+        "$WORK/poll.json" 2>/dev/null)"
+    else
+      id="$(jq -r --arg s "$sha" --arg b "$br" --arg f "$fb" --arg e "$ev" \
+        '[.[] | select(($e == "" or .event == $e)
+                       and (if $f == "1" then ($b != "" and .headBranch == $b) else (.headSha == $s or ($b != "" and .headBranch == $b)) end))]
+         | sort_by(.databaseId) | last | .databaseId // empty' "$WORK/poll.json" 2>/dev/null)"
+    fi
     [ -n "$id" ] && break
     if [ "$(date +%s)" -ge "$deadline" ]; then
-      echo "nessun run di $wf del ramo ${br:-?} (evento ${ev:-qualunque}) entro ${WAIT_MAX}s ($label)" >&2
-      save_text "$OUT/$label-runid.txt" "non determinato: nessun run del ramo ${br:-?} entro ${WAIT_MAX}s"
+      echo "nessun run di $wf (ramo ${br:-?}, evento ${ev:-qualunque}, dopo ${after:-n/d}) entro ${WAIT_MAX}s ($label)" >&2
+      save_text "$OUT/$label-runid.txt" "non determinato: nessun run corrispondente entro ${WAIT_MAX}s"
       return 1
     fi
     sleep "$POLL"
@@ -272,10 +279,12 @@ wait_run() {
   return 0
 }
 
-# track <etichetta> <workflow> <sha> <ramo> <ripiego> [evento]: attende il run (wait_run), registra durata e riga per `raccogli`
+# track <etichetta> <workflow> <sha> <ramo> <ripiego> [evento] [dopo]: attende il run (wait_run), registra durata e riga per
+# `raccogli`; RUN_END = updatedAt del run (la fine, per agganciare il verdict che ne segue)
 track() {
   local ms
-  wait_run "$1" "$DET" "$2" "$3" "$4" "$5" "${6:-}" || return 1
+  wait_run "$1" "$DET" "$2" "$3" "$4" "$5" "${6:-}" "${7:-}" || return 1
+  RUN_END="$(jq -r '.updatedAt // empty' "$OUT/$1-view.out" 2>/dev/null)"
   add_run "$1" "$DET" "$RUN_ID" "$RUN_CONC"
   gh_read "$1-timing" api "repos/$DET/actions/runs/$RUN_ID/timing"
   ms="$(jq -r '.run_duration_ms // 0' "$OUT/$1-timing.out" 2>/dev/null)"
@@ -518,10 +527,18 @@ caso_pulita_fissata() {
   # modo garantito, quindi guard e verdict si cercano col ripiego «il più recente creato negli ultimi minuti» (come in Task 1)
   GUARD_MISSING=0
   track "$label-guard" tollgate-guard.yml "$SHA" "$BR" 1 pull_request_target || { GUARD_MISSING=1; echo "run di tollgate-guard del ramo $BR non trovato" >&2; }
-  track "$label-run" tollgate-run.yml "$SHA" "$BR" 0 || echo "run di tollgate-run non trovato su $SHA" >&2
   rot "$OUT/$label-cache-mode.txt"
-  cm="non determinato: il run di tollgate-verdict non è comparso entro ${WAIT_MAX}s"
-  if track "$label-verdict" tollgate-verdict.yml "$SHA" "$BR" 1 workflow_run; then
+  cm="non determinato: il run di tollgate-run della PR non si trova, quindi nemmeno il suo verdict"
+  # il verdict (workflow_run) ha headBranch e headSha del predefinito: si aggancia il primo creato dopo la fine del run della PR
+  if ! track "$label-run" tollgate-run.yml "$SHA" "$BR" 0 pull_request; then
+    echo "run di tollgate-run non trovato su $SHA" >&2
+  elif [ -z "$RUN_END" ]; then
+    cm="non determinato: fine del run di tollgate-run non leggibile"
+  else
+    cm="non determinato: il run di tollgate-verdict non è comparso entro ${WAIT_MAX}s"
+    track "$label-verdict" tollgate-verdict.yml "$SHA" "" 2 workflow_run "$RUN_END" && cm="@run"
+  fi
+  if [ "$cm" = "@run" ]; then
     gh_read "$label-verdict-log" run view "$RUN_ID" --repo "$DET" --log
     cm="$(grep -a 'Cache mode:' "$OUT/$label-verdict-log.out" | head -n 1 | sed 's/^.*\(Cache mode:.*\)$/\1/')"
     [ -n "$cm" ] || cm="non determinato: nessuna riga «Cache mode:» nel log del job verdict"
@@ -1027,6 +1044,14 @@ elif first == "run":
                     for i, (s, subj) in enumerate(main_commits()) if i > 0 and "[skip ci]" not in subj]
             print(json.dumps(rows))
         else:
+            if wf == "tollgate-verdict.yml":      # workflow_run: headBranch e headSha del predefinito, creato dopo la fine di un tollgate-run
+                tip = git("rev-parse", "refs/heads/main")
+                def vr(i, when):
+                    return {"databaseId": i, "headSha": tip, "headBranch": "main", "event": "workflow_run", "status": "completed",
+                            "conclusion": "success", "createdAt": when}
+                # uno creato prima della fine del run (00:05:00), il giusto (00:06), uno più recente di un'altra PR (id più alto)
+                print(json.dumps([vr(900000 + n, "2099-01-01T00:09:00Z"), vr(n, "2099-01-01T00:06:00Z"), vr(800000 + n, "2099-01-01T00:01:00Z")]))
+                sys.exit(0)
             ev = {"tollgate-guard.yml": "pull_request_target", "tollgate-verdict.yml": "workflow_run", "tollgate-run.yml": "pull_request"}.get(wf, "push")
             true = {"databaseId": n, "headSha": os.environ.get("P4_WAIT_SHA", ""), "headBranch": os.environ.get("P4_WAIT_BRANCH", ""),
                     "event": ev, "status": "completed", "conclusion": "success", "createdAt": "2099-01-01T00:00:00Z"}
@@ -1181,9 +1206,9 @@ modo_controlla() {
   local rid bad=0
   for f in "$T"/out/gate-caso-pulita-fissata-*-guard-runid.txt "$T"/out/gate-caso-pulita-fissata-*-verdict-runid.txt; do
     rid="$(cat "$f" 2>/dev/null)"
-    case "$rid" in ''|*[!0-9]*) bad=1 ;; *) [ "$rid" -lt 900000 ] || bad=1 ;; esac
+    case "$rid" in ''|*[!0-9]*) bad=1 ;; *) [ "$rid" -lt 800000 ] || bad=1 ;; esac
   done
-  [ "$bad" = 0 ] && echo "  guard e verdict agganciati per ramo: il run più recente di un altro ramo è scartato" || { echo "  AGGANCIO DI UN RUN DI UN ALTRO RAMO"; rc=1; }
+  [ "$bad" = 0 ] && echo "  guard per ramo e verdict per fine del run della PR: i run più recenti di altri rami o PR sono scartati" || { echo "  AGGANCIO DI UN RUN DI UN ALTRO RAMO"; rc=1; }
   echo "--- rapporto"
   [ -f "$T/out/gate-casi-righe.md" ] && echo "  righe: $(wc -l < "$T/out/gate-casi-righe.md")"
   grep -c 'non riuscito' "$T/out/gate-casi-righe.md" | sed 's/^/  non riuscite: /'
