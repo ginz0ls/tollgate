@@ -1,0 +1,251 @@
+tollgate-verdict	Set up job	﻿2026-10-25T19:25:29.1389517Z Current runner version: '2.338.0'
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1405905Z ##[group]Runner Image Provisioner
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1406507Z Hosted Compute Agent
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1406851Z Version: 20261021.618
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1407208Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1407709Z Build Date: 2026-10-21T00:45:21Z
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1408108Z Worker ID: {25c0de37-f726-45ef-a8c5-2bc3ee2922d4}
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1408543Z Region: westus3
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1408913Z Cloud: Azure
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1409226Z ##[endgroup]
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1410021Z ##[group]Operating System
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1410651Z Ubuntu
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1411010Z 24.04.5
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1411329Z LTS
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1411637Z ##[endgroup]
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1412024Z ##[group]Runner Image
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1412378Z Image: ubuntu-24.04
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1412706Z Version: 20261012.334.1
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1413375Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1414391Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1414936Z ##[endgroup]
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1415799Z ##[group]GITHUB_TOKEN Permissions
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1416997Z Actions: read
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1417405Z Contents: read
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1417742Z Issues: read
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1418066Z Metadata: read
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1418433Z PullRequests: write
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1418766Z Statuses: write
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1419108Z ##[endgroup]
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1420566Z Secret source: Actions
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1421091Z Cache mode: read
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1421548Z Prepare workflow directory
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1623691Z Prepare all required actions
+tollgate-verdict	Set up job	2026-10-25T19:25:29.1654140Z Getting action download info
+tollgate-verdict	Set up job	2026-10-25T19:25:29.5559521Z Download action repository 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+tollgate-verdict	Set up job	2026-10-25T19:25:29.6370084Z Download action repository 'actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333' (SHA:9000827ccba6bdab643e8b6fd33ac0654aef8333)
+tollgate-verdict	Set up job	2026-10-25T19:25:30.3429338Z Download action repository 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9' (SHA:55cc8345863c7cc4c66a329aec7e433d2d1c52a9)
+tollgate-verdict	Set up job	2026-10-25T19:25:30.5985879Z Complete job name: tollgate-verdict
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	﻿2026-10-25T19:25:30.6479231Z ##[group]Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6479752Z with:
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6479966Z   ref: main
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6480321Z   persist-credentials: false
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6480584Z   fetch-depth: 0
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6480828Z   repository: ginz0ls/tollgate-p4-detect
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6482854Z   token: ***
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6483104Z   ssh-strict: true
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6483328Z   ssh-user: git
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6483546Z   clean: true
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6483778Z   sparse-checkout-cone-mode: true
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6484045Z   fetch-tags: false
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6484293Z   show-progress: true
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6484531Z   lfs: false
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6484741Z   submodules: false
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6484975Z   set-safe-directory: true
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6485239Z   allow-unsafe-pr-checkout: false
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.6485585Z ##[endgroup]
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.7215349Z Syncing repository: ginz0ls/tollgate-p4-detect
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.7222695Z ##[group]Getting Git version info
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.7224067Z Working directory is '/home/runner/work/tollgate-p4-detect/tollgate-p4-detect'
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.7227494Z [command]/usr/bin/git version
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.7369032Z git version 2.55.0
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.7392357Z ##[endgroup]
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.7421170Z Temporarily overriding HOME='/home/runner/work/_temp/ef487b1a-d1ba-4fcb-b068-326f2c207f51' before making global git config changes
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.7557997Z Adding repository directory to the temporary git global config as a safe directory
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.7559543Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate-p4-detect/tollgate-p4-detect
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.7562889Z Deleting the contents of '/home/runner/work/tollgate-p4-detect/tollgate-p4-detect'
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:30.7564404Z ##[group]Determining repository object format
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0763670Z ##[endgroup]
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0800444Z ##[group]Initializing the repository
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0802072Z [command]/usr/bin/git init /home/runner/work/tollgate-p4-detect/tollgate-p4-detect
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0921764Z hint: Using 'master' as the name for the initial branch. This default branch name
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0923457Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0925214Z hint: to use in all of your new repositories, which will suppress this warning,
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0927217Z hint: call:
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0928108Z hint:
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0929353Z hint: 	git config --global init.defaultBranch <name>
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0932014Z hint:
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0933041Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0934714Z hint: 'development'. The just-created branch can be renamed via this command:
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0936055Z hint:
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0936759Z hint: 	git branch -m <name>
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0937604Z hint:
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0938849Z hint: Disable this message with "git config set advice.defaultBranchName false"
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0941478Z Initialized empty Git repository in /home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git/
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.0945643Z [command]/usr/bin/git remote add origin https://github.com/ginz0ls/tollgate-p4-detect
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1001073Z ##[endgroup]
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1002979Z ##[group]Disabling automatic garbage collection
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1004806Z [command]/usr/bin/git config --local gc.auto 0
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1033283Z ##[endgroup]
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1034601Z ##[group]Setting up auth
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1037120Z Removing SSH command configuration
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1042413Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1081331Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1378211Z Removing HTTP extra header
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1380078Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1574053Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1647709Z Removing includeIf entries pointing to credentials config files
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1649968Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1681500Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1864057Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-2e2a5913-b624-440a-83a3-074a1124ceb0.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1895911Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git.path /home/runner/work/_temp/git-credentials-2e2a5913-b624-440a-83a3-074a1124ceb0.config
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1927639Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-2e2a5913-b624-440a-83a3-074a1124ceb0.config
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.1965054Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-2e2a5913-b624-440a-83a3-074a1124ceb0.config
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.2000048Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-2e2a5913-b624-440a-83a3-074a1124ceb0.config
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.2055403Z ##[endgroup]
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.2057085Z ##[group]Fetching the repository
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:31.2065291Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0031613Z From https://github.com/ginz0ls/tollgate-p4-detect
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0033708Z  * [new branch]      main                   -> origin/main
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0048072Z  * [new branch]      p4-v3b-20261021-180202 -> origin/p4-v3b-20261021-180202
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0049986Z  * [new branch]      p5-probe-cache         -> origin/p5-probe-cache
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0051806Z  * [new branch]      p5-probe-pin           -> origin/p5-probe-pin
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0053480Z  * [new branch]      tg/13-detect-merge-rosso -> origin/tg/13-detect-merge-rosso
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0055761Z  * [new branch]      tg/18-p5-gate-pulita-fissata-20261025-202502 -> origin/tg/18-p5-gate-pulita-fissata-20261025-202502
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0057882Z  * [new branch]      tg/4-zero-test         -> origin/tg/4-zero-test
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0062176Z  * [new branch]      tg/6-detect-pulita     -> origin/tg/6-detect-pulita
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0063952Z  * [new branch]      tg/8-detect-closes     -> origin/tg/8-detect-closes
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0065719Z  * [new branch]      tollgate-config/0.2.0  -> origin/tollgate-config/0.2.0
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0069428Z ##[endgroup]
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0071168Z ##[group]Determining the checkout info
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0072578Z [command]/usr/bin/git branch --list --remote origin/main
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0091780Z   origin/main
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0127146Z ##[endgroup]
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0137244Z [command]/usr/bin/git sparse-checkout disable
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0237893Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0239425Z ##[group]Checking out the ref
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0239953Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0324831Z Switched to a new branch 'main'
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0336134Z branch 'main' set up to track 'origin/main'.
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0337706Z ##[endgroup]
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0372930Z [command]/usr/bin/git log -1 --format=%H
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0403350Z d606e4cba54fe197092d0f4b8bc347635a286543
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0412773Z ##[group]Removing auth
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0413676Z Removing SSH command configuration
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0416449Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0457986Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0663164Z Removing HTTP extra header
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0665150Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0695430Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0883043Z Removing includeIf entries pointing to credentials config files
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0885354Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0914184Z includeif.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git.path
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0915899Z includeif.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git/worktrees/*.path
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0916685Z includeif.gitdir:/github/workspace/.git.path
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0917279Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0921244Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git.path
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0946660Z /home/runner/work/_temp/git-credentials-2e2a5913-b624-440a-83a3-074a1124ceb0.config
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0955197Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git.path \/home\/runner\/work\/_temp\/git\-credentials\-2e2a5913\-b624\-440a\-83a3\-074a1124ceb0\.config
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.0987521Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git/worktrees/*.path
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.1013887Z /home/runner/work/_temp/git-credentials-2e2a5913-b624-440a-83a3-074a1124ceb0.config
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.1025038Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git/worktrees/*.path \/home\/runner\/work\/_temp\/git\-credentials\-2e2a5913\-b624\-440a\-83a3\-074a1124ceb0\.config
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.1067340Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.1108216Z /github/runner_temp/git-credentials-2e2a5913-b624-440a-83a3-074a1124ceb0.config
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.1121045Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-2e2a5913\-b624\-440a\-83a3\-074a1124ceb0\.config
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.1156212Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.1173310Z /github/runner_temp/git-credentials-2e2a5913-b624-440a-83a3-074a1124ceb0.config
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.1179457Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-2e2a5913\-b624\-440a\-83a3\-074a1124ceb0\.config
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.1245512Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.1580026Z Removing credentials config '/home/runner/work/_temp/git-credentials-2e2a5913-b624-440a-83a3-074a1124ceb0.config'
+tollgate-verdict	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:32.1585482Z ##[endgroup]
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	﻿2026-10-25T19:25:32.1933966Z ##[group]Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.1934277Z with:
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.1934465Z   name: tollgate-run
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.1934665Z   run-id: 40225942726
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.1936414Z   github-token: ***
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.1936625Z   path: /home/runner/work/_temp/tollgate-run
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.1936871Z   merge-multiple: false
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.1937087Z   repository: ginz0ls/tollgate-p4-detect
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.1937322Z   skip-decompress: false
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.1937527Z   digest-mismatch: error
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.1937727Z ##[endgroup]
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.2806418Z Downloading single artifact
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.5950969Z Preparing to download the following artifacts:
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.5952290Z - tollgate-run (ID: 12610738583, Size: 729, Expected Digest: sha256:438150daefdae7f2fbf37d8a6ed3c973d3f4fc67aea340b1a0c1e06918db0485)
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.5953401Z Downloading artifact '12610738583' from 'ginz0ls/tollgate-p4-detect'
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.8326504Z Redirecting to blob download url: https://productionresultssa19.blob.core.windows.net/actions-results/0dfb52f7-1add-896e-a009-832c7be0630e/workflow-job-run-3dfe6aca-d192-52b4-9dc3-5a6a47a5f211/artifacts/3bb610f7a776dba4b1b46866f439e25991484730f46a455895e100bd17afa218.zip
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:32.8327395Z Starting download of artifact to: /home/runner/work/_temp/tollgate-run
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0472618Z (node:2033) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0487093Z (Use `node --trace-deprecation ...` to show where the warning was created)
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0502119Z SHA256 digest of downloaded artifact is 438150daefdae7f2fbf37d8a6ed3c973d3f4fc67aea340b1a0c1e06918db0485
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0503189Z Artifact download completed successfully.
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0503894Z Total of 1 artifact(s) downloaded
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0505985Z Download artifact has finished successfully
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	﻿2026-10-25T19:25:33.0621286Z ##[group]Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0621507Z with:
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0621626Z   name: tollgate-base-ids
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0621752Z   run-id: 40225942726
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0623201Z   github-token: ***
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0623338Z   path: /home/runner/work/_temp/tollgate-base-ids
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0623504Z   merge-multiple: false
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0623637Z   repository: ginz0ls/tollgate-p4-detect
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0623789Z   skip-decompress: false
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0623914Z   digest-mismatch: error
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.0624035Z ##[endgroup]
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.1486834Z Downloading single artifact
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	2026-10-25T19:25:33.4674659Z ##[error]Unable to download artifact(s): Artifact not found for name: tollgate-base-ids
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	        Please ensure that your artifact is not expired and the artifact was uploaded using a compatible version of toolkit/upload-artifact.
+tollgate-verdict	Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333	        For more information, visit the GitHub Artifacts FAQ: https://github.com/actions/toolkit/blob/main/packages/artifact/docs/faq.md
+tollgate-verdict	albero di merge-base	﻿2026-10-25T19:25:33.4916476Z ##[group]Run set -eu
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.4916680Z [36;1mset -eu[0m
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.4916893Z [36;1mauth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)[0m
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.4917100Z [36;1mexport GIT_CONFIG_COUNT=1[0m
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.4917303Z [36;1mexport GIT_CONFIG_KEY_0=http.https://github.com/.extraheader[0m
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.4917549Z [36;1mexport GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth"[0m
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.4917744Z [36;1mgit fetch --no-tags origin "$HEAD_SHA"[0m
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.4917958Z [36;1mmergebase=$(git merge-base "origin/$DEFAULT_BRANCH" "$HEAD_SHA")[0m
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.4918213Z [36;1mecho "tree=$(git rev-parse "$mergebase^{tree}")" >> "$GITHUB_OUTPUT"[0m
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.5144719Z shell: /usr/bin/bash -e {0}
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.5144875Z env:
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.5146306Z   GH_TOKEN: ***
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.5146446Z   HEAD_SHA: 9565f3157fba579c777a970d4242248f731374bb
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.5146612Z   DEFAULT_BRANCH: main
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.5146733Z ##[endgroup]
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.5272811Z From https://github.com/ginz0ls/tollgate-p4-detect
+tollgate-verdict	albero di merge-base	2026-10-25T19:25:33.5273361Z  * branch            9565f3157fba579c777a970d4242248f731374bb -> FETCH_HEAD
+tollgate-verdict	Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9	﻿2026-10-25T19:25:33.5359216Z ##[group]Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+tollgate-verdict	Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9	2026-10-25T19:25:33.5359421Z with:
+tollgate-verdict	Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9	2026-10-25T19:25:33.5359567Z   key: tollgate-ids-45dac5f53c7497ad7a179a0817775b547aee17bd
+tollgate-verdict	Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9	2026-10-25T19:25:33.5359758Z   path: /home/runner/work/_temp/tollgate-ids
+tollgate-verdict	Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9	2026-10-25T19:25:33.5359917Z   enableCrossOsArchive: false
+tollgate-verdict	Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9	2026-10-25T19:25:33.5360051Z   fail-on-cache-miss: false
+tollgate-verdict	Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9	2026-10-25T19:25:33.5360404Z   lookup-only: false
+tollgate-verdict	Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9	2026-10-25T19:25:33.5360530Z ##[endgroup]
+tollgate-verdict	Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9	2026-10-25T19:25:33.8891478Z Cache hit for: tollgate-ids-45dac5f53c7497ad7a179a0817775b547aee17bd
+tollgate-verdict	Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9	2026-10-25T19:25:34.3561855Z Received 1058 of 1058 (100.0%), 0.0 MBs/sec
+tollgate-verdict	Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9	2026-10-25T19:25:34.3563083Z Cache Size: ~0 MB (1058 B)
+tollgate-verdict	Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9	2026-10-25T19:25:34.3601298Z [command]/usr/bin/tar -xf /home/runner/work/_temp/62435e6d-dc4f-41d8-8f8e-2b899900dadc/cache.tzst -P -C /home/runner/work/tollgate-p4-detect/tollgate-p4-detect --use-compress-program unzstd
+tollgate-verdict	Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9	2026-10-25T19:25:34.3667586Z Cache restored successfully
+tollgate-verdict	Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9	2026-10-25T19:25:34.3714183Z Cache restored from key: tollgate-ids-45dac5f53c7497ad7a179a0817775b547aee17bd
+tollgate-verdict	gate evaluate	﻿2026-10-25T19:25:34.3956944Z ##[group]Run python3 .github/tollgate/bin/tollgate gate evaluate --event "$GITHUB_EVENT_PATH" --artifacts "$RUNNER_TEMP/tollgate-run" --base-ids-cache "$RUNNER_TEMP/tollgate-ids/ids.json" --base-ids-artifact "$RUNNER_TEMP/tollgate-base-ids" --publish
+tollgate-verdict	gate evaluate	2026-10-25T19:25:34.3957828Z [36;1mpython3 .github/tollgate/bin/tollgate gate evaluate --event "$GITHUB_EVENT_PATH" --artifacts "$RUNNER_TEMP/tollgate-run" --base-ids-cache "$RUNNER_TEMP/tollgate-ids/ids.json" --base-ids-artifact "$RUNNER_TEMP/tollgate-base-ids" --publish[0m
+tollgate-verdict	gate evaluate	2026-10-25T19:25:34.4007779Z shell: /usr/bin/bash -e {0}
+tollgate-verdict	gate evaluate	2026-10-25T19:25:34.4007916Z env:
+tollgate-verdict	gate evaluate	2026-10-25T19:25:34.4009324Z   GH_TOKEN: ***
+tollgate-verdict	gate evaluate	2026-10-25T19:25:34.4009440Z ##[endgroup]
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	﻿2026-10-25T19:25:40.1741905Z Post job cleanup.
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:40.2441001Z [command]/usr/bin/git version
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:40.2442653Z git version 2.55.0
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:40.2444443Z Temporarily overriding HOME='/home/runner/work/_temp/2418101f-9814-4e8f-af8e-7e882303efac' before making global git config changes
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:40.2445120Z Adding repository directory to the temporary git global config as a safe directory
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:40.2447407Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate-p4-detect/tollgate-p4-detect
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:40.2547658Z Removing SSH command configuration
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:40.2577627Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:40.2579262Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:40.2908181Z Removing HTTP extra header
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:40.2909145Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:40.2911627Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:40.3122003Z Removing includeIf entries pointing to credentials config files
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:40.3126847Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+tollgate-verdict	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:40.3157581Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+tollgate-verdict	Complete job	﻿2026-10-25T19:25:40.3446172Z Cleaning up orphan processes

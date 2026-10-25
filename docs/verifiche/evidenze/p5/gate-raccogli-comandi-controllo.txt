@@ -1,0 +1,21 @@
+comandi gh controllati: 259 (escluse 0 righe annotate «(controller...)»)
+     3  gh --version
+    89  gh api
+     1  gh auth status
+     8  gh git clone
+    10  gh git fetch
+     5  gh git ls-remote
+    11  gh git push
+     2  gh issue close
+     1  gh issue create
+     8  gh issue list
+     3  gh issue view
+     3  gh pr close
+     5  gh pr create
+     5  gh pr list
+     2  gh pr merge
+     6  gh pr view
+     1  gh repo create
+    40  gh run list
+    41  gh run view
+    15  gh run watch

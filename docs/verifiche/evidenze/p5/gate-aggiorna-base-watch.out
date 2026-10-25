@@ -1,0 +1,56 @@
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* main tollgate-base · 40225845683
+Triggered via push less than a minute ago
+
+JOBS
+✓ ids in 10s (ID 121266913935)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ albero del commit
+  ✓ Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+  ✓ gate base-ids
+  ✓ Run actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+  ✓ Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+  ✓ Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Complete job
+* tollgate-base (ID 121266965887)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+  * gate base-publish
+  * Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+ANNOTATIONS
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+ids: .github#1
+
+✓ main tollgate-base · 40225845683
+Triggered via push less than a minute ago
+
+JOBS
+✓ ids in 10s (ID 121266913935)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ albero del commit
+  ✓ Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+  ✓ gate base-ids
+  ✓ Run actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+  ✓ Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+  ✓ Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Complete job
+✓ tollgate-base in 7s (ID 121266965887)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+  ✓ gate base-publish
+  ✓ Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Complete job
+
+ANNOTATIONS
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+ids: .github#1
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+tollgate-base: .github#1
+

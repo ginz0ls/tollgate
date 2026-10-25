@@ -1,0 +1,2 @@
+PR #17, ramo tollgate-config/0.2.0, SHA f6de46341c58d4d2839ad1ff40485650d642f2a6
+stati: guard=success (github-actions[bot]), verdict=success (github-actions[bot]), attention=failure (github-actions[bot])

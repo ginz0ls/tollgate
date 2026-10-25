@@ -71,3 +71,208 @@
 2026-10-23T20:15:55Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40017747716/timing
 2026-10-23T20:16:10Z gh pr list --repo ginz0ls/tollgate-p4-detect --json number,state,headRefName
 2026-10-23T20:16:10Z gh api repos/ginz0ls/tollgate-p4-detect/actions/permissions
+2026-10-24T13:59:07Z gh issue list -R ginz0ls/tollgate-p4-detect --state all --limit 30 --json number,title,state,labels
+2026-10-25T19:23:08Z (modo aggiorna)
+2026-10-25T19:23:09Z git-net dir=/tmp/tollgate-p5/gate-detect clone -q https://github.com/ginz0ls/tollgate-p4-detect.git /tmp/tollgate-p5/gate-detect
+2026-10-25T19:23:10Z tollgate init --update (cwd gate-detect)
+2026-10-25T19:23:11Z gh api --include repos/ginz0ls/tollgate-p4-detect/branches/main/protection
+2026-10-25T19:23:12Z gh api repos/ginz0ls/tollgate-p4-detect/branches/tollgate-config/0.2.0
+2026-10-25T19:23:13Z git-net dir=/tmp/tollgate-p5/gate-detect push https://github.com/ginz0ls/tollgate-p4-detect.git tollgate-config/0.2.0
+2026-10-25T19:23:15Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tollgate-config/0.2.0 --title tollgate: aggiornamento alla 0.2.0 (prova P5) --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-aggiorna-corpo.md
+2026-10-25T19:23:17Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/f6de46341c58d4d2839ad1ff40485650d642f2a6/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:23:33Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/f6de46341c58d4d2839ad1ff40485650d642f2a6/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:23:48Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/f6de46341c58d4d2839ad1ff40485650d642f2a6/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:23:49Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/f6de46341c58d4d2839ad1ff40485650d642f2a6/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:23:49Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-run.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:23:50Z gh run watch 40225794322 --repo ginz0ls/tollgate-p4-detect --exit-status
+2026-10-25T19:23:51Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-run.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:23:52Z gh run view 40225794322 --repo ginz0ls/tollgate-p4-detect --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-25T19:23:54Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225794322/timing
+2026-10-25T19:23:54Z gh pr merge 17 --repo ginz0ls/tollgate-p4-detect --squash
+2026-10-25T19:23:58Z gh pr view 17 --repo ginz0ls/tollgate-p4-detect --json state,mergeCommit
+2026-10-25T19:23:59Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-sentinel.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:24:00Z gh run watch 40225845695 --repo ginz0ls/tollgate-p4-detect --exit-status
+2026-10-25T19:24:14Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-sentinel.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:24:14Z gh run view 40225845695 --repo ginz0ls/tollgate-p4-detect --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-25T19:24:16Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225845695/timing
+2026-10-25T19:24:16Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-base.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:24:17Z gh run watch 40225845683 --repo ginz0ls/tollgate-p4-detect --exit-status
+2026-10-25T19:24:24Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-base.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:24:25Z gh run view 40225845683 --repo ginz0ls/tollgate-p4-detect --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-25T19:24:27Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225845683/timing
+2026-10-25T19:24:27Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d606e4cba54fe197092d0f4b8bc347635a286543/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:24:28Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d606e4cba54fe197092d0f4b8bc347635a286543/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:24:28Z gh pr view 17 --repo ginz0ls/tollgate-p4-detect --json state
+2026-10-25T19:24:47Z (modo pin-on)
+2026-10-25T19:24:47Z gh api repos/ginz0ls/tollgate-p4-detect/actions/permissions
+2026-10-25T19:24:47Z gh api --method PUT repos/ginz0ls/tollgate-p4-detect/actions/permissions -F enabled=true -F sha_pinning_required=true -F allowed_actions=all
+2026-10-25T19:24:48Z gh api repos/ginz0ls/tollgate-p4-detect/actions/permissions
+2026-10-25T19:24:55Z gh issue create --repo ginz0ls/tollgate-p4-detect --title prova P5: pulita-fissata e rivalutazione --body Issue di prova per i casi pulita-fissata e rivalutazione del Task 13 di P5 (aperta dal controller, chiusa a fine prova).
+2026-10-25T19:25:02Z (modo caso pulita-fissata)
+2026-10-25T19:25:02Z gh api repos/ginz0ls/tollgate-p4-detect/actions/permissions
+2026-10-25T19:25:02Z git-net dir=/tmp/tollgate-p5/gate-detect clone -q https://github.com/ginz0ls/tollgate-p4-detect.git /tmp/tollgate-p5/gate-detect
+2026-10-25T19:25:03Z gh issue list --repo ginz0ls/tollgate-p4-detect --state open --limit 100 --json number,title
+2026-10-25T19:25:04Z gh issue view 18 --repo ginz0ls/tollgate-p4-detect --json number,title,state
+2026-10-25T19:25:05Z git-net dir=/tmp/tollgate-p5/gate-detect push https://github.com/ginz0ls/tollgate-p4-detect.git tg/18-p5-gate-pulita-fissata-20261025-202502
+2026-10-25T19:25:07Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tg/18-p5-gate-pulita-fissata-20261025-202502 --title prova P5: pulita-fissata --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-caso-pulita-fissata-20261025-202502-body-tg-18-detect-pulita.md
+2026-10-25T19:25:09Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-guard.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:25:10Z gh run watch 40225794682 --repo ginz0ls/tollgate-p4-detect --exit-status
+2026-10-25T19:25:11Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-guard.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:25:12Z gh run view 40225794682 --repo ginz0ls/tollgate-p4-detect --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-25T19:25:13Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225794682/timing
+2026-10-25T19:25:13Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-run.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:25:14Z gh run watch 40225942726 --repo ginz0ls/tollgate-p4-detect --exit-status
+2026-10-25T19:25:29Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-run.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:25:30Z gh run view 40225942726 --repo ginz0ls/tollgate-p4-detect --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-25T19:25:31Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225942726/timing
+2026-10-25T19:25:32Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-verdict.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:25:33Z gh run watch 40225962034 --repo ginz0ls/tollgate-p4-detect --exit-status
+2026-10-25T19:25:43Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-verdict.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:25:44Z gh run view 40225962034 --repo ginz0ls/tollgate-p4-detect --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-25T19:25:46Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225962034/timing
+2026-10-25T19:25:46Z gh run view 40225962034 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:25:48Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/9565f3157fba579c777a970d4242248f731374bb/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:25:49Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/9565f3157fba579c777a970d4242248f731374bb/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:25:49Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/issues/19/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
+2026-10-25T19:25:50Z gh pr view 19 --repo ginz0ls/tollgate-p4-detect --json state
+2026-10-25T19:25:51Z gh pr close 19 --repo ginz0ls/tollgate-p4-detect
+2026-10-25T19:26:03Z (modo caso rifiuto-v4)
+2026-10-25T19:26:03Z gh api repos/ginz0ls/tollgate-p4-detect/actions/permissions
+2026-10-25T19:26:04Z git-net dir=/tmp/tollgate-p5/gate-detect clone -q https://github.com/ginz0ls/tollgate-p4-detect.git /tmp/tollgate-p5/gate-detect
+2026-10-25T19:26:05Z git-net dir=/tmp/tollgate-p5/gate-detect push https://github.com/ginz0ls/tollgate-p4-detect.git p5-gate-rifiuto-v4-20261025-202603
+2026-10-25T19:26:07Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow p5-gate-rifiuto-v4.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:26:22Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow p5-gate-rifiuto-v4.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:26:23Z gh run watch 40226016168 --repo ginz0ls/tollgate-p4-detect --exit-status
+2026-10-25T19:26:24Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow p5-gate-rifiuto-v4.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:26:25Z gh run view 40226016168 --repo ginz0ls/tollgate-p4-detect --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-25T19:26:26Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40226016168/timing
+2026-10-25T19:26:27Z gh run view 40226016168 --repo ginz0ls/tollgate-p4-detect --log-failed
+2026-10-25T19:26:40Z (modo caso rivalutazione)
+2026-10-25T19:26:40Z git-net dir=/tmp/tollgate-p5/gate-detect clone -q https://github.com/ginz0ls/tollgate-p4-detect.git /tmp/tollgate-p5/gate-detect
+2026-10-25T19:26:42Z gh issue list --repo ginz0ls/tollgate-p4-detect --state open --limit 100 --json number,title
+2026-10-25T19:26:42Z gh issue view 18 --repo ginz0ls/tollgate-p4-detect --json number,title,state
+2026-10-25T19:26:43Z git-net dir=/tmp/tollgate-p5/gate-detect push https://github.com/ginz0ls/tollgate-p4-detect.git tg/18-p5-gate-rivalutazione-20261025-202640
+2026-10-25T19:26:45Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tg/18-p5-gate-rivalutazione-20261025-202640 --title prova P5: rivalutazione --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-caso-rivalutazione-20261025-202640-body-tg-18-detect-pulita.md
+2026-10-25T19:26:47Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d9e3d60a3cc782dcd12e5e28cfc97a2f3776272b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:27:03Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d9e3d60a3cc782dcd12e5e28cfc97a2f3776272b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:27:18Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d9e3d60a3cc782dcd12e5e28cfc97a2f3776272b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:27:19Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d9e3d60a3cc782dcd12e5e28cfc97a2f3776272b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:27:20Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/issues/20/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
+2026-10-25T19:27:20Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-run.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:27:22Z gh run watch 40226068246 --repo ginz0ls/tollgate-p4-detect --exit-status
+2026-10-25T19:27:22Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-run.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:27:23Z gh run view 40226068246 --repo ginz0ls/tollgate-p4-detect --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-25T19:27:24Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40226068246/timing
+2026-10-25T19:27:25Z gh api --method PATCH repos/ginz0ls/tollgate-p4-detect/pulls/20 -F body=@/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-caso-rivalutazione-20261025-202640-corpo-modificato.md
+2026-10-25T19:27:26Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d9e3d60a3cc782dcd12e5e28cfc97a2f3776272b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:27:42Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d9e3d60a3cc782dcd12e5e28cfc97a2f3776272b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:27:57Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d9e3d60a3cc782dcd12e5e28cfc97a2f3776272b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:27:58Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d9e3d60a3cc782dcd12e5e28cfc97a2f3776272b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:27:59Z gh pr view 20 --repo ginz0ls/tollgate-p4-detect --json state
+2026-10-25T19:27:59Z gh pr close 20 --repo ginz0ls/tollgate-p4-detect
+2026-10-25T19:28:13Z (modo caso skip-ci)
+2026-10-25T19:28:13Z git-net dir=/tmp/tollgate-p5/gate-detect clone -q https://github.com/ginz0ls/tollgate-p4-detect.git /tmp/tollgate-p5/gate-detect
+2026-10-25T19:28:14Z gh issue list --repo ginz0ls/tollgate-p4-detect --state open --limit 100 --json number,title
+2026-10-25T19:28:14Z git-net dir=/tmp/tollgate-p5/gate-detect push https://github.com/ginz0ls/tollgate-p4-detect.git p5-gate-skip-ci-base-20261025-202813
+2026-10-25T19:28:16Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head p5-gate-skip-ci-base-20261025-202813 --title prova P5: skip-ci, push controllato --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-caso-skip-ci-20261025-202813-corpo.md
+2026-10-25T19:28:19Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/fa4eb99abe39dced5cc8a683a64a4cc7c4e6da45/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:28:35Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/fa4eb99abe39dced5cc8a683a64a4cc7c4e6da45/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:28:50Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/fa4eb99abe39dced5cc8a683a64a4cc7c4e6da45/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:28:51Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/fa4eb99abe39dced5cc8a683a64a4cc7c4e6da45/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:28:52Z gh pr merge 21 --repo ginz0ls/tollgate-p4-detect --squash
+2026-10-25T19:28:55Z gh pr view 21 --repo ginz0ls/tollgate-p4-detect --json state,mergeCommit
+2026-10-25T19:28:55Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-sentinel.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:29:11Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-sentinel.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:29:12Z gh run watch 40226232025 --repo ginz0ls/tollgate-p4-detect --exit-status
+2026-10-25T19:29:13Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-sentinel.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:29:14Z gh run view 40226232025 --repo ginz0ls/tollgate-p4-detect --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-25T19:29:15Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40226232025/timing
+2026-10-25T19:29:15Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/006817605d356b38729511a2a9efd75277fe0224/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:29:16Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/006817605d356b38729511a2a9efd75277fe0224/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:29:17Z git-net dir=/tmp/tollgate-p5/gate-detect clone -q https://github.com/ginz0ls/tollgate-p4-detect.git /tmp/tollgate-p5/gate-detect
+2026-10-25T19:29:18Z git-net dir=/tmp/tollgate-p5/gate-detect push https://github.com/ginz0ls/tollgate-p4-detect.git main
+2026-10-25T19:31:20Z git-net dir=/tmp/tollgate-p5/gate-detect push https://github.com/ginz0ls/tollgate-p4-detect.git main
+2026-10-25T19:31:22Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-sentinel.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:31:37Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-sentinel.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:31:38Z gh run watch 40226429685 --repo ginz0ls/tollgate-p4-detect --exit-status
+2026-10-25T19:32:01Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-sentinel.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
+2026-10-25T19:32:02Z gh run view 40226429685 --repo ginz0ls/tollgate-p4-detect --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
+2026-10-25T19:32:03Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40226429685/timing
+2026-10-25T19:32:04Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/650a6d774fb0f672440fc07dd9005826c479ff7b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:32:05Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/6d9462e417edfaa74098c3298af9d67215917df1/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:32:05Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/6d9462e417edfaa74098c3298af9d67215917df1/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:32:06Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/650a6d774fb0f672440fc07dd9005826c479ff7b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:32:07Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/006817605d356b38729511a2a9efd75277fe0224/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
+2026-10-25T19:32:07Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-sentinel.yml --limit 30 --json databaseId,headSha,event,status,conclusion,createdAt
+2026-10-25T19:32:08Z gh issue list --repo ginz0ls/tollgate-p4-detect --state open --limit 100 --json number,title
+2026-10-25T19:32:09Z gh issue view 22 --repo ginz0ls/tollgate-p4-detect --json number,title,state,body,comments
+2026-10-25T19:32:10Z gh pr view 21 --repo ginz0ls/tollgate-p4-detect --json state
+2026-10-25T19:32:24Z (modo pin-off)
+2026-10-25T19:32:24Z gh api --method PUT repos/ginz0ls/tollgate-p4-detect/actions/permissions -F enabled=true -F sha_pinning_required=false -F allowed_actions=all
+2026-10-25T19:32:24Z gh api repos/ginz0ls/tollgate-p4-detect/actions/permissions
+2026-10-25T19:32:25Z gh issue list --repo ginz0ls/tollgate-p4-detect --state open --limit 100 --json number,title
+2026-10-25T19:32:35Z (modo raccogli)
+2026-10-25T19:32:35Z gh --version
+2026-10-25T19:32:35Z gh run list --repo ginz0ls/tollgate-p4-detect --limit 200 --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt
+2026-10-25T19:32:37Z gh pr list --repo ginz0ls/tollgate-p4-detect --state all --limit 200 --json number,title,state,headRefName,headRefOid,baseRefName,mergedAt
+2026-10-25T19:32:38Z gh pr list --repo ginz0ls/tollgate-p4-detect --state open --limit 200 --json number,title,state
+2026-10-25T19:32:38Z gh issue list --repo ginz0ls/tollgate-p4-detect --state open --limit 100 --json number,title
+2026-10-25T19:32:39Z gh api repos/ginz0ls/tollgate-p4-detect/actions/permissions
+2026-10-25T19:32:40Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225794322/timing
+2026-10-25T19:32:40Z gh run view 40225794322 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:32:42Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225845695/timing
+2026-10-25T19:32:43Z gh run view 40225845695 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:32:45Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225845683/timing
+2026-10-25T19:32:46Z gh run view 40225845683 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:32:48Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225794682/timing
+2026-10-25T19:32:48Z gh run view 40225794682 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:32:50Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225942726/timing
+2026-10-25T19:32:51Z gh run view 40225942726 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:32:53Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225962034/timing
+2026-10-25T19:32:54Z gh run view 40225962034 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:32:55Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40226016168/timing
+2026-10-25T19:32:55Z gh run view 40226016168 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:32:57Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40226068246/timing
+2026-10-25T19:32:57Z gh run view 40226068246 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:33:00Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40226232025/timing
+2026-10-25T19:33:00Z gh run view 40226232025 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:33:02Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40226429685/timing
+2026-10-25T19:33:03Z gh run view 40226429685 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:33:19Z gh issue close 22 --repo ginz0ls/tollgate-p4-detect
+2026-10-25T19:33:20Z gh issue close 18 --repo ginz0ls/tollgate-p4-detect
+2026-10-25T19:33:22Z (modo raccogli)
+2026-10-25T19:33:22Z gh --version
+2026-10-25T19:33:22Z gh run list --repo ginz0ls/tollgate-p4-detect --limit 200 --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt
+2026-10-25T19:33:24Z gh pr list --repo ginz0ls/tollgate-p4-detect --state all --limit 200 --json number,title,state,headRefName,headRefOid,baseRefName,mergedAt
+2026-10-25T19:33:25Z gh pr list --repo ginz0ls/tollgate-p4-detect --state open --limit 200 --json number,title,state
+2026-10-25T19:33:25Z gh issue list --repo ginz0ls/tollgate-p4-detect --state open --limit 100 --json number,title
+2026-10-25T19:33:26Z gh api repos/ginz0ls/tollgate-p4-detect/actions/permissions
+2026-10-25T19:33:26Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225794322/timing
+2026-10-25T19:33:27Z gh run view 40225794322 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:33:28Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225845695/timing
+2026-10-25T19:33:29Z gh run view 40225845695 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:33:30Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225845683/timing
+2026-10-25T19:33:30Z gh run view 40225845683 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:33:32Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225794682/timing
+2026-10-25T19:33:32Z gh run view 40225794682 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:33:34Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225942726/timing
+2026-10-25T19:33:34Z gh run view 40225942726 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:33:35Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225962034/timing
+2026-10-25T19:33:36Z gh run view 40225962034 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:33:37Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40226016168/timing
+2026-10-25T19:33:38Z gh run view 40226016168 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:33:39Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40226068246/timing
+2026-10-25T19:33:39Z gh run view 40226068246 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:33:41Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40226232025/timing
+2026-10-25T19:33:41Z gh run view 40226232025 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:33:42Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40226429685/timing
+2026-10-25T19:33:43Z gh run view 40226429685 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:33:55Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-guard.yml --limit 8 --json databaseId,event,headBranch,conclusion,createdAt
+2026-10-25T19:34:34Z gh run view 40225942870 --repo ginz0ls/tollgate-p4-detect --log
+2026-10-25T19:34:36Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40225942870/timing
+2026-10-25T20:20:36Z gh run view 40225962034 --repo ginz0ls/tollgate-p4-detect --json headBranch,event,headSha
+2026-10-25T20:20:37Z gh run view 40225942870 --repo ginz0ls/tollgate-p4-detect --json headBranch,event,headSha
+2026-10-25T20:20:46Z gh api repos/ginz0ls/tollgate-p4-detect/commits/9565f3157fba579c777a970d4242248f731374bb/statuses?per_page=100 --jq .[] | [.context,.state,.target_url] | @tsv
+2026-10-25T20:20:47Z gh run view 40225962034 --repo ginz0ls/tollgate-p4-detect --json displayTitle
+2026-10-25T21:07:25Z gh run view 40225942726 --repo ginz0ls/tollgate-p4-detect --json updatedAt,event,headSha
+2026-10-25T21:07:25Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-verdict.yml --limit 8 --json databaseId,event,createdAt

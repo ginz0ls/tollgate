@@ -1,0 +1,2 @@
+stati tollgate/verdict dopo la modifica, dal più vecchio: pending -> success
+autori e ora: github-actions[bot]@2026-10-25T19:27:35Z, github-actions[bot]@2026-10-25T19:27:54Z

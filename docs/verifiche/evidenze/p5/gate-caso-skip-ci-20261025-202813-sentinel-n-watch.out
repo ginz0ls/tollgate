@@ -1,0 +1,70 @@
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* main tollgate-sentinel · 40226429685
+Triggered via push less than a minute ago
+
+JOBS
+* tollgate-sentinel (ID 121268665682)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  * gate sentinel
+  * Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* main tollgate-sentinel · 40226429685
+Triggered via push less than a minute ago
+
+JOBS
+* tollgate-sentinel (ID 121268665682)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  * gate sentinel
+  * Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* main tollgate-sentinel · 40226429685
+Triggered via push less than a minute ago
+
+JOBS
+* tollgate-sentinel (ID 121268665682)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  * gate sentinel
+  * Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* main tollgate-sentinel · 40226429685
+Triggered via push less than a minute ago
+
+JOBS
+* tollgate-sentinel (ID 121268665682)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  * gate sentinel
+  * Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* main tollgate-sentinel · 40226429685
+Triggered via push less than a minute ago
+
+JOBS
+* tollgate-sentinel (ID 121268665682)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ gate sentinel
+  * Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+✓ main tollgate-sentinel · 40226429685
+Triggered via push less than a minute ago
+
+JOBS
+✓ tollgate-sentinel in 33s (ID 121268665682)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ gate sentinel
+  ✓ Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Complete job
+
+ANNOTATIONS
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+tollgate-sentinel: .github#1
+

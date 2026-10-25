@@ -1,0 +1,97 @@
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* tg/18-p5-gate-pulita-fissata-20261025-202502 tollgate-run ginz0ls/tollgate-p4-detect#19 · 40225942726
+Triggered via pull_request less than a minute ago
+
+JOBS
+* base (ID 121267206555)
+  * Set up job
+* head (ID 121267206790)
+  * Set up job
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* tg/18-p5-gate-pulita-fissata-20261025-202502 tollgate-run ginz0ls/tollgate-p4-detect#19 · 40225942726
+Triggered via pull_request less than a minute ago
+
+JOBS
+* base (ID 121267206555)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ merge-base e albero
+  ✓ Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+  - Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  - gate base-ids
+  - Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+  ✓ Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  * Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+* head (ID 121267206790)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ gate run
+  ✓ Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+  * Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+Refreshing run status every 3 seconds. Press Ctrl+C to quit.
+
+* tg/18-p5-gate-pulita-fissata-20261025-202502 tollgate-run ginz0ls/tollgate-p4-detect#19 · 40225942726
+Triggered via pull_request less than a minute ago
+
+JOBS
+✓ base in 7s (ID 121267206555)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ merge-base e albero
+  ✓ Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+  - Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  - gate base-ids
+  - Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+  ✓ Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Complete job
+✓ head in 8s (ID 121267206790)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ gate run
+  ✓ Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+  ✓ Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Complete job
+
+ANNOTATIONS
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+base: .github#1
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+head: .github#1
+
+✓ tg/18-p5-gate-pulita-fissata-20261025-202502 tollgate-run ginz0ls/tollgate-p4-detect#19 · 40225942726
+Triggered via pull_request less than a minute ago
+
+JOBS
+✓ base in 7s (ID 121267206555)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ merge-base e albero
+  ✓ Run actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+  - Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  - gate base-ids
+  - Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+  ✓ Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Complete job
+✓ head in 8s (ID 121267206790)
+  ✓ Set up job
+  ✓ Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ gate run
+  ✓ Run actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+  ✓ Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+  ✓ Complete job
+
+ANNOTATIONS
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+base: .github#1
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+head: .github#1
+

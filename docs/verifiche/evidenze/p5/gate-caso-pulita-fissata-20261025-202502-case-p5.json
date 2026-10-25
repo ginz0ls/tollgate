@@ -1,0 +1,40 @@
+{
+  "name": "pulita-fissata",
+  "repo": "detect",
+  "summary": "PR pulita sul repo detect: stati guard e verdict verdi",
+  "issue": 18,
+  "ops": [
+    {
+      "op": "push",
+      "id": "p1",
+      "branch": "tg/18-p5-gate-pulita-fissata-20261025-202502",
+      "sha": "9565f3157fba579c777a970d4242248f731374bb"
+    },
+    {
+      "op": "pr",
+      "branch": "tg/18-p5-gate-pulita-fissata-20261025-202502",
+      "base": "main",
+      "title": "prova P4: detect-pulita",
+      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-caso-pulita-fissata-20261025-202502-body-tg-18-detect-pulita.md"
+    }
+  ],
+  "expect": [
+    {
+      "push": "p1",
+      "states": {
+        "tollgate/guard": "success",
+        "tollgate/verdict": "success",
+        "tollgate/attention": "success"
+      },
+      "comments": [
+        "<!-- tollgate-verdict"
+      ],
+      "comments_once": [],
+      "merge_state": null,
+      "sentinel_issue": null,
+      "sentinel_comments_min": null,
+      "note": ""
+    }
+  ],
+  "branch": "tg/18-p5-gate-pulita-fissata-20261025-202502"
+}

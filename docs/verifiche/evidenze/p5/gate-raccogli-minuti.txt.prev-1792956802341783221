@@ -1,0 +1,11 @@
+gate-aggiorna-run	ginz0ls/tollgate-p4-detect	run 40225794322	conclusione success	durata 10000 ms
+gate-aggiorna-sentinel	ginz0ls/tollgate-p4-detect	run 40225845695	conclusione success	durata 10000 ms
+gate-aggiorna-base	ginz0ls/tollgate-p4-detect	run 40225845683	conclusione success	durata 23000 ms
+gate-caso-pulita-fissata-20261025-202502-guard	ginz0ls/tollgate-p4-detect	run 40225794682	conclusione success	durata 9000 ms
+gate-caso-pulita-fissata-20261025-202502-run	ginz0ls/tollgate-p4-detect	run 40225942726	conclusione success	durata 13000 ms
+gate-caso-pulita-fissata-20261025-202502-verdict	ginz0ls/tollgate-p4-detect	run 40225962034	conclusione success	durata 16000 ms
+gate-caso-rifiuto-v4-20261025-202603-v4	ginz0ls/tollgate-p4-detect	run 40226016168	conclusione failure	durata 5000 ms
+gate-caso-rivalutazione-20261025-202640-prima-run	ginz0ls/tollgate-p4-detect	run 40226068246	conclusione success	durata 11000 ms
+gate-caso-skip-ci-20261025-202813-sentinel-m1	ginz0ls/tollgate-p4-detect	run 40226232025	conclusione success	durata 11000 ms
+gate-caso-skip-ci-20261025-202813-sentinel-n	ginz0ls/tollgate-p4-detect	run 40226429685	conclusione success	durata 35000 ms
+totale: 10 run, 143000 ms di durata (circa 3 minuti; l API dei minuti fatturati è 0 sui privati Free)

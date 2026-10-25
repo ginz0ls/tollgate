@@ -1,0 +1,178 @@
+tollgate-guard	Set up job	﻿2026-10-25T19:25:14.9405042Z Current runner version: '2.338.0'
+tollgate-guard	Set up job	2026-10-25T19:25:14.9434232Z ##[group]Runner Image Provisioner
+tollgate-guard	Set up job	2026-10-25T19:25:14.9435451Z Hosted Compute Agent
+tollgate-guard	Set up job	2026-10-25T19:25:14.9436164Z Version: 20261021.618
+tollgate-guard	Set up job	2026-10-25T19:25:14.9436964Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+tollgate-guard	Set up job	2026-10-25T19:25:14.9437876Z Build Date: 2026-10-21T00:45:21Z
+tollgate-guard	Set up job	2026-10-25T19:25:14.9438697Z Worker ID: {33356e21-712f-4908-b78d-84e26832c78a}
+tollgate-guard	Set up job	2026-10-25T19:25:14.9439670Z Region: centralus
+tollgate-guard	Set up job	2026-10-25T19:25:14.9440319Z Cloud: Azure
+tollgate-guard	Set up job	2026-10-25T19:25:14.9440883Z ##[endgroup]
+tollgate-guard	Set up job	2026-10-25T19:25:14.9442903Z ##[group]Operating System
+tollgate-guard	Set up job	2026-10-25T19:25:14.9443701Z Ubuntu
+tollgate-guard	Set up job	2026-10-25T19:25:14.9444464Z 24.04.5
+tollgate-guard	Set up job	2026-10-25T19:25:14.9445092Z LTS
+tollgate-guard	Set up job	2026-10-25T19:25:14.9445684Z ##[endgroup]
+tollgate-guard	Set up job	2026-10-25T19:25:14.9446464Z ##[group]Runner Image
+tollgate-guard	Set up job	2026-10-25T19:25:14.9447187Z Image: ubuntu-24.04
+tollgate-guard	Set up job	2026-10-25T19:25:14.9447964Z Version: 20261012.334.1
+tollgate-guard	Set up job	2026-10-25T19:25:14.9449316Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md
+tollgate-guard	Set up job	2026-10-25T19:25:14.9451912Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334
+tollgate-guard	Set up job	2026-10-25T19:25:14.9453149Z ##[endgroup]
+tollgate-guard	Set up job	2026-10-25T19:25:14.9454872Z ##[group]GITHUB_TOKEN Permissions
+tollgate-guard	Set up job	2026-10-25T19:25:14.9456873Z Contents: read
+tollgate-guard	Set up job	2026-10-25T19:25:14.9457758Z Metadata: read
+tollgate-guard	Set up job	2026-10-25T19:25:14.9458503Z PullRequests: write
+tollgate-guard	Set up job	2026-10-25T19:25:14.9459272Z Statuses: write
+tollgate-guard	Set up job	2026-10-25T19:25:14.9460032Z ##[endgroup]
+tollgate-guard	Set up job	2026-10-25T19:25:14.9462461Z Secret source: Actions
+tollgate-guard	Set up job	2026-10-25T19:25:14.9463688Z Cache mode: read
+tollgate-guard	Set up job	2026-10-25T19:25:14.9464727Z Prepare workflow directory
+tollgate-guard	Set up job	2026-10-25T19:25:14.9842879Z Prepare all required actions
+tollgate-guard	Set up job	2026-10-25T19:25:14.9897302Z Getting action download info
+tollgate-guard	Set up job	2026-10-25T19:25:15.2801979Z Download action repository 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+tollgate-guard	Set up job	2026-10-25T19:25:16.0741708Z Complete job name: tollgate-guard
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	﻿2026-10-25T19:25:16.1524742Z ##[group]Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1525753Z with:
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1526125Z   ref: main
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1526514Z   persist-credentials: false
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1526959Z   fetch-depth: 0
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1527386Z   repository: ginz0ls/tollgate-p4-detect
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1530886Z   token: ***
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1531505Z   ssh-strict: true
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1531896Z   ssh-user: git
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1532272Z   clean: true
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1532666Z   sparse-checkout-cone-mode: true
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1533123Z   fetch-tags: false
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1533507Z   show-progress: true
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1533974Z   lfs: false
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1534363Z   submodules: false
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1534757Z   set-safe-directory: true
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1535199Z   allow-unsafe-pr-checkout: false
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.1535860Z ##[endgroup]
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.2517429Z Syncing repository: ginz0ls/tollgate-p4-detect
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.2519892Z ##[group]Getting Git version info
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.2521183Z Working directory is '/home/runner/work/tollgate-p4-detect/tollgate-p4-detect'
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.2536017Z [command]/usr/bin/git version
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.3583929Z git version 2.55.0
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.3671624Z ##[endgroup]
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.3678278Z Temporarily overriding HOME='/home/runner/work/_temp/19193d3f-d6c5-48b4-a54d-87d474cc3105' before making global git config changes
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.3680787Z Adding repository directory to the temporary git global config as a safe directory
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.3683804Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate-p4-detect/tollgate-p4-detect
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.3689075Z Deleting the contents of '/home/runner/work/tollgate-p4-detect/tollgate-p4-detect'
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.3692928Z ##[group]Determining repository object format
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6131442Z ##[endgroup]
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6165711Z ##[group]Initializing the repository
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6167738Z [command]/usr/bin/git init /home/runner/work/tollgate-p4-detect/tollgate-p4-detect
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6198048Z hint: Using 'master' as the name for the initial branch. This default branch name
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6200355Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6222609Z hint: to use in all of your new repositories, which will suppress this warning,
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6224811Z hint: call:
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6242349Z hint:
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6244851Z hint: 	git config --global init.defaultBranch <name>
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6246424Z hint:
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6250521Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6252986Z hint: 'development'. The just-created branch can be renamed via this command:
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6255315Z hint:
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6256387Z hint: 	git branch -m <name>
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6260106Z hint:
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6281171Z hint: Disable this message with "git config set advice.defaultBranchName false"
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6288883Z Initialized empty Git repository in /home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git/
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6294112Z [command]/usr/bin/git remote add origin https://github.com/ginz0ls/tollgate-p4-detect
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6299104Z ##[endgroup]
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6301652Z ##[group]Disabling automatic garbage collection
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6303673Z [command]/usr/bin/git config --local gc.auto 0
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6346063Z ##[endgroup]
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6348187Z ##[group]Setting up auth
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6349972Z Removing SSH command configuration
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6352480Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6415862Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6797838Z Removing HTTP extra header
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6803423Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.6850599Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.7069897Z Removing includeIf entries pointing to credentials config files
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.7073125Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.7098840Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.7315488Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-f7dd80bd-2c6f-4196-9c42-27e4a748ca70.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.7357821Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git.path /home/runner/work/_temp/git-credentials-f7dd80bd-2c6f-4196-9c42-27e4a748ca70.config
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.7400534Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-f7dd80bd-2c6f-4196-9c42-27e4a748ca70.config
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.7440115Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-f7dd80bd-2c6f-4196-9c42-27e4a748ca70.config
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.7477224Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-f7dd80bd-2c6f-4196-9c42-27e4a748ca70.config
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.7508731Z ##[endgroup]
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.7510923Z ##[group]Fetching the repository
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:16.7515388Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3022144Z From https://github.com/ginz0ls/tollgate-p4-detect
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3037788Z  * [new branch]      main                   -> origin/main
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3040571Z  * [new branch]      p4-v3b-20261021-180202 -> origin/p4-v3b-20261021-180202
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3043595Z  * [new branch]      p5-probe-cache         -> origin/p5-probe-cache
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3045971Z  * [new branch]      p5-probe-pin           -> origin/p5-probe-pin
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3048652Z  * [new branch]      tg/13-detect-merge-rosso -> origin/tg/13-detect-merge-rosso
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3052325Z  * [new branch]      tg/18-p5-gate-pulita-fissata-20261025-202502 -> origin/tg/18-p5-gate-pulita-fissata-20261025-202502
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3059834Z  * [new branch]      tg/4-zero-test         -> origin/tg/4-zero-test
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3062939Z  * [new branch]      tg/6-detect-pulita     -> origin/tg/6-detect-pulita
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3065677Z  * [new branch]      tg/8-detect-closes     -> origin/tg/8-detect-closes
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3070154Z  * [new branch]      tollgate-config/0.2.0  -> origin/tollgate-config/0.2.0
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3079095Z ##[endgroup]
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3080914Z ##[group]Determining the checkout info
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3082787Z [command]/usr/bin/git branch --list --remote origin/main
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3084428Z   origin/main
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3087750Z ##[endgroup]
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3088899Z [command]/usr/bin/git sparse-checkout disable
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3092562Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3096506Z ##[group]Checking out the ref
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3099170Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3216861Z Switched to a new branch 'main'
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3223268Z branch 'main' set up to track 'origin/main'.
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3242888Z ##[endgroup]
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3273560Z [command]/usr/bin/git log -1 --format=%H
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3302693Z d606e4cba54fe197092d0f4b8bc347635a286543
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3316673Z ##[group]Removing auth
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3318259Z Removing SSH command configuration
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3320810Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.3355476Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4294284Z Removing HTTP extra header
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4298089Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4306545Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4314282Z Removing includeIf entries pointing to credentials config files
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4317111Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4320388Z includeif.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git.path
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4323970Z includeif.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git/worktrees/*.path
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4326934Z includeif.gitdir:/github/workspace/.git.path
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4330679Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4335485Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git.path
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4338943Z /home/runner/work/_temp/git-credentials-f7dd80bd-2c6f-4196-9c42-27e4a748ca70.config
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4345054Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git.path \/home\/runner\/work\/_temp\/git\-credentials\-f7dd80bd\-2c6f\-4196\-9c42\-27e4a748ca70\.config
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4354706Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git/worktrees/*.path
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4358476Z /home/runner/work/_temp/git-credentials-f7dd80bd-2c6f-4196-9c42-27e4a748ca70.config
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4365148Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/tollgate-p4-detect/tollgate-p4-detect/.git/worktrees/*.path \/home\/runner\/work\/_temp\/git\-credentials\-f7dd80bd\-2c6f\-4196\-9c42\-27e4a748ca70\.config
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4375881Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4379129Z /github/runner_temp/git-credentials-f7dd80bd-2c6f-4196-9c42-27e4a748ca70.config
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4384775Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-f7dd80bd\-2c6f\-4196\-9c42\-27e4a748ca70\.config
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4392668Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4396427Z /github/runner_temp/git-credentials-f7dd80bd-2c6f-4196-9c42-27e4a748ca70.config
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4404012Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-f7dd80bd\-2c6f\-4196\-9c42\-27e4a748ca70\.config
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4440233Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4677342Z Removing credentials config '/home/runner/work/_temp/git-credentials-f7dd80bd-2c6f-4196-9c42-27e4a748ca70.config'
+tollgate-guard	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:17.4703032Z ##[endgroup]
+tollgate-guard	guard	﻿2026-10-25T19:25:17.4910748Z ##[group]Run python3 .github/tollgate/bin/tollgate gate guard --event "$GITHUB_EVENT_PATH" --publish
+tollgate-guard	guard	2026-10-25T19:25:17.4913388Z [36;1mpython3 .github/tollgate/bin/tollgate gate guard --event "$GITHUB_EVENT_PATH" --publish[0m
+tollgate-guard	guard	2026-10-25T19:25:17.5147137Z shell: /usr/bin/bash -e {0}
+tollgate-guard	guard	2026-10-25T19:25:17.5148026Z env:
+tollgate-guard	guard	2026-10-25T19:25:17.5155596Z   GH_TOKEN: ***
+tollgate-guard	guard	2026-10-25T19:25:17.5156308Z ##[endgroup]
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	﻿2026-10-25T19:25:20.8425117Z Post job cleanup.
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:20.9201848Z [command]/usr/bin/git version
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:20.9262013Z git version 2.55.0
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:20.9342209Z Temporarily overriding HOME='/home/runner/work/_temp/7cf8f91c-7652-4e2a-a6a8-0c195e38397d' before making global git config changes
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:20.9361796Z Adding repository directory to the temporary git global config as a safe directory
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:20.9380515Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/tollgate-p4-detect/tollgate-p4-detect
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:20.9382541Z Removing SSH command configuration
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:20.9383194Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:20.9433368Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:20.9811859Z Removing HTTP extra header
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:20.9814691Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:20.9909505Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:21.0166402Z Removing includeIf entries pointing to credentials config files
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:21.0174050Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+tollgate-guard	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-25T19:25:21.0209616Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+tollgate-guard	Complete job	﻿2026-10-25T19:25:21.0618229Z Cleaning up orphan processes

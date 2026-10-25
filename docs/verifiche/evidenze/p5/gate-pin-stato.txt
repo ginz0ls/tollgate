@@ -1,0 +1,3 @@
+valore iniziale di sha_pinning_required: false
+allowed_actions iniziale: all
+stato salvato in /home/crucco/.cache/tollgate-p5-gate/pin-iniziale.env (fuori dal repo)
