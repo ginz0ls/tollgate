@@ -1,0 +1,12 @@
+- (Task 8, D18) Prove a secco con le espressioni come JavaScript (rifiuto di `(?i)`, `(?P<`, `\A`, `\Z`), cercate nella `trace` serializzata JSON con escape. s5 accetta l'iniezione di PostToolUse (`bin/tollgate_checks/_common.py:285-287`) o il `deny` del commit (`commit.py:36-37`).
+- (Task 10, D1) e2 ed e4: forma decisa dal controller dopo VE12 (vedi ledger); se la sessione non può partire legata, e2 è solo prova a secco ed e4 è «`/tollgate:execute` fino a `task done 2` e `finish check`».
+- (Task 10, D2) Prompt di e1 con «entra nel worktree con `cd <percorso>`».
+- (Task 10, D6/D7) e5 solo se la sua ricetta si costruisce col programma vero (Task 7); altrimenti prova a secco con il motivo.
+- (Task 10, D19) e2 cerca il testo reale di `reopen` («spec riaperto (<motivo>): fase spec_audit», `bin/tollgate_flow/l2acts.py:286-299`).
+- (Task 10, D18) come Task 8.
+- (Task 8, VE9) I comandi e i messaggi dei subagenti sono nella `trace` (con `parent_tool_use_id`): i grader di s1, s2, s3 possono cercare il testo prodotto nell'implementatore.
+- (Task 8, VE6) Un prompt `/tollgate:<skill>` espande la skill anche con `disable-model-invocation: true`, ma `tool_used` `Skill` vale 0 in quel caso: nessun grader `tool_used Skill` per la skill del prompt.
+- (Task 8, 9, 10, I1) Nessun grader dipende dallo stderr dei comandi; la prova a secco simula i segnaposto nel checkout principale.
+- (Task 8, 9, 10) Le primitive del banco sono in `evals/_kit/recipes.py` (12 ricette, report `W/task-7-report.md`): componi da lì le ricette dei casi, ognuna con il suo `test_build_<ricetta>` sotto 120 s; una primitiva che manca (giri sul piano e `approve plan`, revisione finale per `finish open-pr` in L1/L2) la aggiunge il task del caso, con test. `CORRECT_PATHS` lo riempiono i Task 8-10.
+- (Task 10, D1 definitivo) e2 resta solo prova a secco; e4 è «L2, `/tollgate:execute` fino a `task done 2` e `finish check`», senza PR né atto `finish`.
+- (Task 10, e3) `start` dall'agente scrive `git config tollgate.defaultBranch` nel workspace: la sandbox non lo nega (nega solo `.git/config` della HOME della corsa).

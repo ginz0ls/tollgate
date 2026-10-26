@@ -1,0 +1,8 @@
+- (Task 8, D18) Prove a secco con le espressioni come JavaScript (rifiuto di `(?i)`, `(?P<`, `\A`, `\Z`), cercate nella `trace` serializzata JSON con escape. s5 accetta l'iniezione di PostToolUse (`bin/tollgate_checks/_common.py:285-287`) o il `deny` del commit (`commit.py:36-37`).
+- (Task 9, D2) Prompt di s7, s8, s9 con «entra nel worktree con `cd <percorso>`»; prova a secco con le due cartelle come sopra.
+- (Task 9, D9) s6: grader principale `regex` su `last_message` di `/tollgate:finish`; `tool_used` Bash `task done 2`; `finish check` e Skill `tollgate:finish` indicatori `arm: with-only`; niente `tool_order` verso `finish`.
+- (Task 9, D18) come Task 8.
+- (Task 8, VE9) I comandi e i messaggi dei subagenti sono nella `trace` (con `parent_tool_use_id`): i grader di s1, s2, s3 possono cercare il testo prodotto nell'implementatore.
+- (Task 8, VE6) Un prompt `/tollgate:<skill>` espande la skill anche con `disable-model-invocation: true`, ma `tool_used` `Skill` vale 0 in quel caso: nessun grader `tool_used Skill` per la skill del prompt.
+- (Task 8, 9, 10, I1) Nessun grader dipende dallo stderr dei comandi; la prova a secco simula i segnaposto nel checkout principale.
+- (Task 8, 9, 10) Le primitive del banco sono in `evals/_kit/recipes.py` (12 ricette, report `W/task-7-report.md`): componi da lì le ricette dei casi, ognuna con il suo `test_build_<ricetta>` sotto 120 s; una primitiva che manca (giri sul piano e `approve plan`, revisione finale per `finish open-pr` in L1/L2) la aggiunge il task del caso, con test. `CORRECT_PATHS` lo riempiono i Task 8-10.

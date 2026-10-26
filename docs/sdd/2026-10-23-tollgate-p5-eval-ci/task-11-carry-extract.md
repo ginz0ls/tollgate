@@ -1,0 +1,19 @@
+# Task 11: voci di carry.md e ruling del controller (prevalgono sul testo del piano)
+
+Da carry.md:
+- (Task 11, D10) `evals/run.sh` costruisce il bersaglio con `target.build` (`evals/_kit/target.py`) in `/tmp/tollgate-eval-target/` prima di ogni invocazione e mette in testa al `PATH` `/tmp/tollgate-eval-target/tests/evalbin`. La radice valutata passata a `claude plugin eval` è la copia, mai la radice del repo.
+- (Task 11, dal Task 1) `budget.tsv` (`docs/verifiche/evidenze/eval-p5/budget.tsv`, già esistente: intestazione `ora	invocazione	costUsd	durationSeconds	casi`, separatore TAB, righe del Task 1 già presenti) può contenere una riga con `costUsd` = `?`: `cost.py remaining` la tratta come tetto esaurito (fail-closed, residuo 0) finché il controller non la corregge a mano.
+- (Task 11, decisione 9 (b) non scattata) `evals/run.sh` passa a `claude plugin eval` un `TMPDIR` fuori da /tmp, /var/tmp, /dev/shm (predefinito `$HOME/.cache/tollgate-eval-tmp`, modo 700, percorso risolto con `realpath`, rifiuto anche dopo la risoluzione: modello `eval_tmpdir` in `spikes/p5/run-p5-checks.sh:273-288`) e, con `--keep-temp`, copia le cartelle delle corse tenute come fa `spikes/p5/run-p5-checks.sh` (`run_dir_ok`, `copy_one_run`, `cp_checked`, righe 182-270 circa: chmod solo su `claude-eval-*` figlie dirette della cartella temporanea dell'eval, trace e file utili, nessun file con forme di token). VE8: `costUsd` e `durationSeconds` sono nel JSON; i token solo nell'ultimo messaggio `result` di ogni `trace.jsonl` (letti da `cost.py`).
+- (Task 11) Controllo nel messaggio `init` di ogni `trace.jsonl` copiata che il plugin `tollgate` sia caricato (un caricamento mancato è silenzioso).
+- (Task 11, M2) `evals/run.sh` passa sempre `--allow-tools Bash Write Edit` (senza, Bash non esiste nella corsa).
+- Decisione 9 (b) non scattata: niente `evals/_kit/local.py` e niente test `test_local_*`.
+
+Ruling del controller per questo task:
+- Il piano per caso: `--runs` predefinito 3 (decisione 8). `spec` → `--tag spec --ablation with-without`; `extra` → `--tag extra --ablation none`; `<caso>` → `--case <caso>` con l'ablazione del suo tag (leggi `tags` dal suo `case.yaml`). Rifiuto di un caso che non esiste in `evals/`.
+- Cartella d'uscita fissa (decisione 23): `docs/verifiche/evidenze/eval-p5/<ora UTC %Y%m%dT%H%M%SZ>-<selettore>/`, con `--json <cartella>/result.json` e `--report <cartella>/report.html`, e le corse tenute copiate in `<cartella>/runs/`. Qualsiasi argomento che provi a cambiare `--output-dir`, `--json`, `--report`, o che porti `--publish-report`/`--publish`, è rifiutato prima di lanciare `claude`.
+- Plugin non caricato in almeno una trace: la riga di costo entra comunque in `budget.tsv`, poi `run.sh` esce con codice diverso da 0, 1 e 2 e il messaggio «plugin tollgate non caricato: controlla prima di continuare», senza lanciare altro.
+- La logica di copia sta in `evals/` (bash in `run.sh` o un sottocomando di `cost.py`, a tua scelta motivata nel report). `spikes/p5/run-p5-checks.sh` non si tocca: è lo strumento del Task 1, congelato; ripetere le sue regole in `evals/` è accettato (ruling del controller), copiale fedeli comprese le guardie.
+- Il comando `claude` è sempre preceduto da `timeout` (predefinito 3600 s per invocazione, variabile `TOLLGATE_EVAL_TIMEOUT`), con stdin da `/dev/null`, stdout/stderr su file nella cartella d'uscita.
+- Prima dell'invocazione `run.sh` stampa il comando completo e il residuo; dopo, il costo dell'invocazione e il nuovo residuo.
+
+Cautele (vincolanti): `evals/run.sh` lo provi SOLO con `bash -n` e con un `claude` finto nel `PATH` dentro i test (`tests/test_eval_run.py`), con una HOME temporanea, `TMPDIR` temporaneo e un `budget.tsv` temporaneo (variabile d'ambiente per il percorso del registro e per la radice delle evidenze, così i test non scrivono mai in `docs/verifiche/evidenze/eval-p5/`). Mai un `claude` vero, mai `claude plugin eval`, nemmeno per prova.

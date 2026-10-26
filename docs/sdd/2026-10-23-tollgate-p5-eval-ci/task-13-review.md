@@ -1,0 +1,39 @@
+# Revisione Task 13: spikes/run-p5-gate.sh e tests/test_p5_scripts.py (commit 7c9addc)
+
+Letto: reviewer-rules, cautele, global-constraints, decisioni 13/15/16/20/21, brief, carry, report, script intero, test, ghguard.py (profilo p5, gitcheck), ghwrap.py, common.sh, init.py (fetch interno). Eseguito solo `bash -n` (ok). Nessun altro modo.
+
+### Aderenza
+- ✅ Recinto gh: ogni gh passa da `gh_call`/`gh_read`/`gh_q` (spikes/run-p5-gate.sh:50, common.sh gh_call) -> `guard_args` -> `ghguard.py check` con `P4_PROFILE=p5` esportato (riga 46). Nessun `gh` nudo (verificato con grep e dal test `test_gh_is_only_called_through_the_guarded_helpers`).
+- ✅ Recinto git: tutti i git di rete (clone, push) solo da `git_net` (righe 91-107) -> `ghguard.py gitcheck`; il profilo ammette solo `push <URL detect> <ramo>` e `clone -q`. Nessun --force, --delete, refspec, fetch/pull/ls-remote. `net_push` (righe 113-119) rifiuta rami con `-`, `:`, `+` e `main` fuori da `ALLOW_MAIN_PUSH`; questo e' impostato una volta sola in `caso_skip_ci` (riga 624) e resettato dopo il secondo push o in caso di errore. Nessuna cancellazione di rami, nomi nuovi a ogni tentativo.
+- ✅ Elenco dei comandi del report confrontato con il codice, modo per modo: coincide (aggiorna, pin-on/off, i quattro casi, raccogli). Niente `pr edit`, `issue create|close|comment`, `pr comment`, `repo`, `auth`, nessuna menzione di protected o di ginz0ls/tollgate. `pr merge` sempre con `--squash` e senza `--delete-branch`, stdout su file (non interattivo). PATCH del corpo solo in `rivalutazione` (riga 487), PUT solo in `pin_put`.
+- ✅ Vie indirette: `init --update` passa da `with_guarded_gh` (wrapper ghwrap.py con profilo p5, PATH anteposto, gh vero in P4_REAL_GH); le sue chiamate gh finiscono in comandi.log e nel controllo `comandi`. Il solo git di rete non guardato e' il `git fetch origin` di `tollgate_flow/init.py:367` (vedi Minor 1). Nessun altro git di rete in `init --update` (verificato in `tollgate_flow/init.py`). `make_case.py` build/judge sono locali.
+- ✅ `pin-on`/`pin-off`: stato letto e salvato in modo atomico (`.nuovo` + `mv`, righe 387-389) PRIMA della PUT; secondo `pin-on` rifiutato (codice 2) senza sovrascrivere il valore iniziale; se la PUT non ha effetto e il valore e' ancora l'iniziale lo stato si archivia, altrimenti resta; un'interruzione dopo il salvataggio lascia sempre lo stato. `pin-off` senza stato si rifiuta prima di ogni PUT (codice 2), PUT idempotente ritentata, rilettura di verifica, codice 3 con stato mantenuto se non verificato, stato archiviato (mai cancellato) solo a verifica riuscita. I casi non toccano mai il fissaggio, quindi `pin-off` rimette il valore anche dopo un caso fallito.
+- ✅ Attese con tetto: `wait_run`, `await_statuses`, il ciclo di `rivalutazione` (righe 497-503), `run watch` con `GH_TIMEOUT`, `gh_read` (RETRIES). Nessun ciclo senza scadenza. Scritture non ritentate (pr create, pr merge, PATCH, pr close); ritentata solo la PUT di permessi, idempotente.
+- ✅ Decisione 15: `rivalutazione` conta gli stati verdict prima (k), PATCH, attende almeno k+2 con ultimo non pending, registra sequenza, autori e ora (`-ordine.txt`), riuscito solo se il primo nuovo e' `pending`, l'ultimo `success` e tutti di `github-actions[bot]`; se resta `pending` lo dice e non rilancia nulla.
+- ✅ Decisione 16: `skip-ci` parte da un merge di PR verde con `sentinel=success` richiesto sul merge, poi push `[skip ci]`, attesa, push normale; verifica S e N `failure`, partenza ancora `success` (stato piu' recente), nessun run di sentinella su S, uno su N, una sola issue che nomina S e non la partenza; non chiude l'issue.
+- ✅ Carry: `aggiorna` con soli file proposti (`git add -- <file>`, nessun `-A`), codice 4 se nulla da aggiornare, `raccogli` salva i log dei job e le osservazioni su digest/Cache mode/checkout, scansione token sulle uscite `gate-*`.
+- ✅ Gh finto: definito nel heredoc ma scritto solo da `modo_controlla` (riga 1066) e messo nel PATH solo in quel processo (`export PATH`, riga 1070); gli altri modi non lo scrivono ne' lo referenziano. In `controlla` stato dei pin, OUT, WORK e TOLLGATE_STATE sono sotto la cartella temporanea; il git di rete e' reindirizzato al nudo locale solo con `P5_CHECK=1`.
+- ⚠️ Non verificabile senza esecuzione reale: le assunzioni 3, 5 e 6 del report (PR di ramo libero verde, commit non vuoto di detect-pulita, aggancio dei run di guard/verdict col ripiego dei due minuti), l'ordine reale guard/verdict, il permesso `workflow` del token per il push del workflow di `rifiuto-v4`.
+
+### Punti di forza
+- Doppia guardia: ghguard sul comando e filtro locale in `net_push`; registro `comandi.log` ricontrollato da `ghguard.py comandi` in `controlla` e in `raccogli`.
+- Nessuna cancellazione di file di uscita (`rot`), registro di OGNI tentativo con codice d'uscita, trap che chiude le PR rimaste aperte.
+- Stato del pin fuori dal repo, scritto prima di agire e archiviato invece che cancellato.
+- Test di forma sul testo con rimozione di heredoc e prove negative (per non auto-colpirsi), test su `controlla` con asserzioni per modo (PUT una sola volta, push solo verso detect, main solo 2 volte e solo in skip-ci).
+
+### Rilievi
+
+**Critical:** nessuno.
+**Important:** nessuno.
+
+**Minor**
+1. `spikes/run-p5-gate.sh:289-293` (`with_guarded_gh`) e `bin/tollgate_flow/init.py:367`: il `git fetch origin` interno a `init --update` non passa da `gitcheck` (che infatti vieta `fetch`) e non lascia traccia in comandi.log. E' una lettura verso l'origin di detect, dichiarata dall'implementatore, ma non e' nell'elenco 20/21. Correzione: annotare la riga nel rapporto del controller (o far scrivere a `with_guarded_gh` una riga `git-net fetch origin (init)` in comandi.log).
+2. `spikes/gh-p4/common.sh` (`statuses`, `wait_run`: `run list` e `run view --json`) e `spikes/run-p5-gate.sh:57-64` (`close_open_prs`: `pr view`): letture fatte con `gh_call`, non con `gh_read`, quindi un 500 transitorio non viene ritentato (memoria del progetto). Effetto: falso «non riuscito» (stati vuoti, `RUN_CONC` vuoto) o PR lasciata aperta se la lettura di stato fallisce. Il tetto resta rispettato. Correzione: definire in questo script `statuses()` e la lettura di `close_open_prs` con `gh_read`.
+3. `spikes/run-p5-gate.sh:113-119` e `tests/test_p5_scripts.py` (`test_the_only_push_to_main_is_the_skip_ci_case`): il rifiuto di `push main` fuori da skip-ci e dei rami con `:`/`+`/`-` e' provato solo dal testo (conteggio di `ALLOW_MAIN_PUSH=1`), non eseguendo `net_push`. `check_git_negativi` prova `gitcheck`, non il filtro locale (che in `gitcheck` e' ammesso: push a detect `main`). Correzione: nel modo `controlla` chiamare `net_push x "$WORK/gate-detect" main` con `ALLOW_MAIN_PUSH=0` in una subshell e asserire che muore.
+4. `tests/test_p5_scripts.py` (`test_each_mode_emits_only_its_own_commands`): per ogni modo asserisce divieti e conteggi, non un elenco positivo dei verbi gh ammessi per modo (per esempio che `caso rifiuto-v4` non abbia `pr create`). Coperto in parte da `ghguard.py comandi`. Correzione: aggiungere una tabella modo -> verbi ammessi.
+5. `spikes/run-p5-gate.sh:493` e `:507`: in `rivalutazione` lo stesso run di `tollgate-run` si segue due volte (stesso SHA) e i suoi minuti si contano due volte nella riga. Cosmetico; il rapporto del controller dovrebbe usare `raccogli` per il totale.
+6. Il gh finto (~200 righe) vive nello script come heredoc invece che in `tests/fakegh.py`: scelta motivata (script autonomo), ma duplica in piccolo la logica del finto di P4.
+
+### Valutazione
+**Qualita' del task:** Approvato
+**Motivo:** il recinto e' rispettato su tutti i modi (ogni gh e git di rete passa dalla guardia p5, nessun push forzato ne' cancellazione, main solo in skip-ci), `pin-on`/`pin-off` salvano e ripristinano il valore in modo sicuro, le attese hanno tetto e le scritture non si ritentano; restano solo rifiniture minori.

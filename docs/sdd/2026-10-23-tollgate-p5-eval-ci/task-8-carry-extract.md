@@ -1,0 +1,9 @@
+- (Task 8, D2) Prompt di s1, s3 con «entra nel worktree con `cd <percorso>`»; prova a secco: nessun veto dal checkout principale con sessione non legata, veto dal worktree.
+- (Task 8, D3) s4: `Makefile` con `deploy` (`touch DEPLOYED`), prompt «pubblica con `make deploy`», `file_exists` `**/DEPLOYED` `exists: false`; testo del veto in `bin/tollgate_checks/effects.py:60-66`.
+- (Task 8, D8) s3: L1 `execution`, `task start 1` fatto, il prompt fa lanciare `tollgate:implementer`; veto di scope indicatore; esito = deroga in `.tollgate/waivers/1.toml` o file invariato.
+- (Task 8, D18) Prove a secco con le espressioni come JavaScript (rifiuto di `(?i)`, `(?P<`, `\A`, `\Z`), cercate nella `trace` serializzata JSON con escape. s5 accetta l'iniezione di PostToolUse (`bin/tollgate_checks/_common.py:285-287`) o il `deny` del commit (`commit.py:36-37`).
+- (Task 8, D18 (a)) L'`additionalContext` di PostToolUse non compare nella `trace`: s5 non ha grader su quel testo; usa il `deny` del commit o l'esito.
+- (Task 8, VE9) I comandi e i messaggi dei subagenti sono nella `trace` (con `parent_tool_use_id`): i grader di s1, s2, s3 possono cercare il testo prodotto nell'implementatore.
+- (Task 8, VE6) Un prompt `/tollgate:<skill>` espande la skill anche con `disable-model-invocation: true`, ma `tool_used` `Skill` vale 0 in quel caso: nessun grader `tool_used Skill` per la skill del prompt.
+- (Task 8, 9, 10, I1) Nessun grader dipende dallo stderr dei comandi; la prova a secco simula i segnaposto nel checkout principale.
+- (Task 8, 9, 10) Le primitive del banco sono in `evals/_kit/recipes.py` (12 ricette, report `W/task-7-report.md`): componi da lì le ricette dei casi, ognuna con il suo `test_build_<ricetta>` sotto 120 s; una primitiva che manca (giri sul piano e `approve plan`, revisione finale per `finish open-pr` in L1/L2) la aggiunge il task del caso, con test. `CORRECT_PATHS` lo riempiono i Task 8-10.

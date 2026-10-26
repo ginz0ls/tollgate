@@ -1,0 +1,16 @@
+### Task 4: Gate, calcolo e analisi: rinviati di P4
+
+**Files:**
+- Modify: `bin/tollgate_gate/{model,baseids,evaluate,attention,verdict,comment}.py`, `bin/tollgate_analysis/{workflows,prref,waivers}.py`, `bin/tollgate_core/runner.py`, `bin/tollgate_flow/init.py` (solo `with_mode`), test omonimi, `tests/test_prblock.py`, `tests/test_criteria_p4.py`
+
+**Interfaces:**
+- Produces: chiave `base_ids_missing_command` in `attention.GROUPS` (`READ`); `baseids.load_full(path, *, tree) -> BaseIds | None` e `BaseIds(ids, commands)`; campo `GateInputs.base_commands: dict[str, str] | None` (decisione 14); `verdict._config_changed(repo, config_sha, tip) -> bool` (blob di `tollgate.toml` e `config_sha` nella storia della punta, decisione 17).
+
+- [ ] **Step 1: Test** `test_gate_evaluate.py::BaseIdsTest`: `test_missing_command_in_ids_is_read_attention` (M-1: comando richiesto assente da `ids.json` → `base_ids_missing_command` con il nome in `data`); `test_command_not_green_in_base_is_read_attention`; `test_old_config_cache_without_new_command` (cache di un albero senza il comando di un profilo aggiunto dopo); `test_command_without_report_gives_no_item` (comando senza `report`: nessuna voce); `test_base_ids_from_run_carries_commands` (artefatto del run: stessa regola). `test_gate_run.py::test_load_full_returns_commands`. `CoverageTest.test_every_group_key_is_produced` resta verde con la chiave nuova.
+- [ ] **Step 2: Test** `test_gate_github.py::ConfigShaTest`: `test_merge_not_touching_toml_is_not_error` (M-5); `test_toml_changed_is_error`; `test_toml_missing_is_error`; `test_config_sha_not_in_tip_history_is_error`; `test_config_sha_ancestor_is_accepted`.
+- [ ] **Step 3: Test** dei minori del calcolo e delle analisi (Copertura, gruppo «Codice di P4»): `test_workflows.py::test_flow_mapping_without_space_is_red` (`{statuses:write}`) e `test_unknown_permission_value_is_red` (valore diverso da `read`, `write`, `none` per `statuses`/`checks` → rosso, fail-closed); `test_prref.py::test_closes_in_quote_or_html_comment_ignored`; `test_waivers.py::test_id_with_trailing_newline_rejected`; `test_gate_comment.py::test_markdown_links_and_images_inert` (`_one_line` spegne `[x](y)` e `![x](y)`); `test_gate_evaluate.py::CommandsTest.test_exit_none_declared_green_has_warning`; `test_gate_evaluate.py::DiffTest.test_diff_error_other_than_git_is_error_not_traceback` (`OSError`, `ValueError` → `errors`); `test_runner.py::test_report_error_other_than_junit_is_red_not_traceback`; `test_init.py::test_with_mode_single_quoted_value`; `test_gate_evaluate.py::test_base_path_uppercase_segment`; `test_prblock.py::…test_findings_carry_blocking_field` (oggi `tests/test_prblock.py:62`) riscritto in modo che fallisca senza il codice.
+- [ ] **Step 4: Test** M-9 `test_criteria_p4.py::AgreementTest.test_agreement_from_real_gate_inputs`: sullo stesso albero `GateLab`, `verdict.main` con configurazione della punta, `merge-base`, blocco dal corpo e artefatti di `gate run` dà le stesse chiavi rosse di `finish check` su `FlowLab` costruito dagli stessi commit (salvo `plan_changed`, decisione 9 di P4).
+- [ ] **Step 5: Fallimento, implementazione, `tests/run`, commit** «tollgate P5: gate, voce per i comandi della base mancanti, config per blob, minori del calcolo».
+
+---
+

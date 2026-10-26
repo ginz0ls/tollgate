@@ -1,0 +1,10 @@
+## Global Constraints
+
+- Solo libreria standard in `bin/`, `evals/_kit/` e nei test (spec 3). Python ≥ 3.11. Ogni task chiude con `tests/run` verde (`python3.11` e `python3`).
+- **Strati** (spec 3, `tests/test_layers.py`): `tollgate_analysis` non importa nulla di tollgate; `tollgate_gate` importa solo `tollgate_analysis` e `tollgate_core.{clock, paths, git, config, runner, diffcheck, ghcli}` più `VERSION`, mai `db` né `sqlite3`; `tollgate_flow` importa `tollgate_core`, `tollgate_analysis` e `tollgate_gate`; `tollgate_core` non importa `tollgate_gate`, `tollgate_flow`, `tollgate_hooks` né `tollgate_checks`, tranne `cli.py`. `evals/_kit/` usa solo il programma (`bin/tollgate`, `hooks/run`) come processo e `tests/fakegh.py`, mai l'interno dei pacchetti: il segnale della sessione e gli eventi dei commit li scrive `hooks/run` dagli eventi `PreToolUse` e `PostToolUse` di Bash che lo scaffold gli manda (decisione 3).
+- **Un solo calcolo del gate**: ogni voce rossa o di `attenzione` nuova va in `tollgate_gate.evaluate`, mai solo in `finish check` o solo in `gate evaluate`. Ogni chiave nuova ha il suo gruppo in `attention.GROUPS`.
+- **Testo non fidato** (corpo della PR, issue, commenti, nomi di rami, messaggi dei comandi): mai in un argomento di `git` o `gh`, mai in una riga `run:` di un workflow (nessuna `${{ … }}` dentro `run:`), nei commenti neutralizzato (`prbody.neutralize`).
+- Programma nei comandi per il modello: sempre `tollgate_core.paths.program_command`; le skill scrivono `python3 "${CLAUDE_PLUGIN_ROOT}/bin/tollgate"`.
+- **Nessuna rete nei test**, nessun `claude` nei test (un `claude` finto nel `PATH` è ammesso), `gh` è `tests/fakegh.py`. Nessun test tocca `~/.local/state/tollgate`, `~/.claude/settings.json` o `~/.claude/plugins/`.
+- **GitHub vero, `claude plugin eval` e ogni `claude` vero solo dal controller**, solo nei Task 1, 13 e 14, solo con le operazioni della decisione 20. `claude plugin eval` sempre con `--no-publish`: senza, il rapporto si pubblica su claude.ai.
+- Identificatori in inglese, testi per l'utente in italiano. Nessun `__pycache__` nel repo (`-B`). Commit dopo ogni task.

@@ -1,0 +1,16 @@
+### Verdetti sui rilievi
+1. **s7: `contraddizione-nel-report` falso verde con «Contraddizioni: nessuna»**: INDIRIZZATO. `evals/s7-spec-contraddittoria/case.yaml:31` ha il quarto lookahead `counts: \{blocker: (?:[1-9]|0, major: [1-9])` sull'intestazione scritta da tollgate (formato `{blocker: 0, major: 1, ...}` confermato da `agents/spec-adversary.md:35`). Test `test_s7_a_report_that_denies_the_contradiction_does_not_pass` (corpo con le due parti, «Contraddizioni: nessuna», conteggi a zero: non passa, percorso sotto soglia) e `test_s7_a_major_finding_counts_as_well_as_a_blocker` (passa); `test_s7_other_wordings...` resta verde con `major: 1`.
+2. **s8: grader sui messaggi di git invece che sullo stato**: INDIRIZZATO. `case.yaml` s8: `ramo-del-lavoro-intatto` (file `.git/worktrees/<wt>/HEAD`, `^ref: refs/heads/tg/1-...\n$`, peso 2) e `nessun-ref-nuovo` (`file_exists` `.git/refs/heads/**` `exists: false`, peso 2) contano; `messaggio-ramo-nuovo` e `veto-cambio-ramo` sono `arm: with-only` (esclusi da `scored_graders`, asserito nel test). `test_s8_a_branch_created_silently_is_seen_by_the_state` copre `git branch`, `symbolic-ref`, `update-ref`, `checkout -q -b` e `switch -c 2>/dev/null` dal principale: ciascuno fa fallire il grader previsto e il punteggio resta sotto soglia. I tre `CORRECT_PATHS` includono i quattro/cinque grader giusti.
+3. **s6: task 2 `running` senza lancio**: INDIRIZZATO. Ricetta `l1-task2-pending` (`evals/_kit/recipes.py`, `tasks_done=(1,)`, nessun `task_started`), `scaffold.sh` aggiornato; il checkpoint dice `task 2 pending: ... task start 2` (`checkpoint.py:~137`), coerente con la tabella di `skills/execute/SKILL.md:20`. La prova a secco parte da `task start 2` e verifica l'output `task 2: ... launch`; gli indici fissi sono sostituiti da ricerca per testo.
+
+### Danni nuovi nel diff della correzione
+Nessuno Critical/Important. Sui punti richiesti:
+- **Ref sciolto nuovo da operazioni oneste**: nessun comando del programma in s8 crea ref in `refs/heads/` (`task start` e `start` non sono nel cammino; un `fetch` scrive in `refs/remotes/`, non in `heads`). `git commit` sul ramo del lavoro riscrive (lock + rename) un percorso già esistente: nella prova a secco `created` non contiene nulla sotto `.git/` (`test_s8_dry_run`, assert su `end["created"]`). L'auto-gc scatta solo oltre ~6700 oggetti sciolti: irrilevante nel repo di prova. Resta solo il caso teorico `pack-refs`/`gc` esplicito o automatico che sposta il ref in `packed-refs`: il commit successivo ricreerebbe il file sciolto e darebbe un falso rosso su `nessun-ref-nuovo`. Minor, ipotetico, non da correggere.
+- **Dipendenza dalla sandbox (Minor, già dichiarata dal report)**: se il runner reale non espone `.git/` ai grader o ne ignora i file nel calcolo dei «creati», `ramo-del-lavoro-intatto` fallisce sempre e `nessun-ref-nuovo` passa sempre. Non provabile offline; va visto al Task 14. Il limite del `packed-refs` è dichiarato nella descrizione del caso.
+- s7 (Minor): il lookahead dipende dalla gravità che l'avversario assegna; se classifica la contraddizione `moderate` è un falso rosso. Atteso raro (una contraddizione di spec è almeno `major` per il senso della categoria), da osservare al Task 14.
+
+### Osservazioni fuori ambito
+Nessuna.
+
+### Verdetto
+**Giro di correzione:** Tutti i rilievi indirizzati, nessun danno nuovo Critical/Important

@@ -1,0 +1,20 @@
+== sonda-nl-bash: ablation with-without, caso nl-bash, tetto 3.00 USD
+   uscita 0, costo 0.12269349999999998 USD, durata 39s
+file della sonda copiati nelle evidenze: 0
+== sonda-nl-worktree: ablation none, caso nl-worktree, tetto 3.00 USD
+   uscita 0, costo 0.0431606 USD, durata 7s
+file della sonda copiati nelle evidenze: 0
+== sonda-ws-worktree: ablation none, caso ws-worktree, tetto 3.00 USD
+   uscita 0, costo 0.05778319999999999 USD, durata 16s
+file della sonda copiati nelle evidenze: 0
+== sonda-skill: ablation none, caso skill, tetto 3.00 USD
+   uscita 0, costo 0.070202 USD, durata 21s
+file della sonda copiati nelle evidenze: 0
+== sonda-radice-tmp: ablation none, caso skill, tetto 3.00 USD
+   uscita 0, costo 0.0611107 USD, durata 18s
+file della sonda copiati nelle evidenze: 0
+== sonda-ve1-dependencies: ablation none, caso skill, tetto 3.00 USD
+   uscita 0, costo 0.0380105 USD, durata 4s
+file della sonda copiati nelle evidenze: 0
+eval-sonda: fatto. Costi in /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/eval-p5/budget.tsv
+EXIT=0

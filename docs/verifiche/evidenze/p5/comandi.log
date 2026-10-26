@@ -307,3 +307,11 @@
 2026-10-26T15:41:10Z gh run view 40271727791 --repo ginz0ls/tollgate --json status,conclusion,attempt,jobs
 2026-10-26T15:41:27Z gh run view 40271727791 --repo ginz0ls/tollgate --json databaseId,headSha,headBranch,event,status,conclusion,createdAt,updatedAt,workflowName,jobs
 2026-10-26T15:41:29Z gh api repos/ginz0ls/tollgate/actions/runs/40271727791/timing
+2026-10-26T17:14:38Z git-net dir=. push https://github.com/ginz0ls/tollgate.git p5-eval-ci
+2026-10-26T17:14:48Z gh api repos/ginz0ls/tollgate/actions/runs?branch=p5-eval-ci&per_page=1
+2026-10-26T17:14:50Z gh run watch 40366780708 --repo ginz0ls/tollgate --exit-status
+2026-10-26T17:37:49Z gh run view 40366780708 --repo ginz0ls/tollgate --json headSha,conclusion,jobs
+2026-10-26T17:38:16Z git-net dir=. push https://github.com/ginz0ls/tollgate.git main
+2026-10-26T17:38:59Z gh api repos/ginz0ls/tollgate/actions/runs?branch=main&per_page=1
+2026-10-26T17:39:00Z gh run watch 40370494816 --repo ginz0ls/tollgate --exit-status
+2026-10-26T18:00:31Z gh run view 40370494816 --repo ginz0ls/tollgate --json headSha,headBranch,conclusion,jobs

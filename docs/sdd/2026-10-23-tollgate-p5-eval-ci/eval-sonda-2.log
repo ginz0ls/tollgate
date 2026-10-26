@@ -1,0 +1,17 @@
+== sonda-nl-bash: ablation with-without, caso nl-bash, tetto 3.00 USD
+   uscita 0, costo 0.1320965 USD, durata 32s
+corsa claude-eval-3vswfF: 9 file copiati in docs/verifiche/evidenze/eval-p5/20261023T201225Z-sonda-nl-bash/corse/claude-eval-3vswfF
+corsa claude-eval-JGdbCR: 13 file copiati in docs/verifiche/evidenze/eval-p5/20261023T201225Z-sonda-nl-bash/corse/claude-eval-JGdbCR
+== sonda-nl-worktree: saltata (P5_ONLY)
+== sonda-ws-worktree: ablation none, caso ws-worktree, tetto 3.00 USD
+   uscita 0, costo 0.06395669999999999 USD, durata 14s
+corsa claude-eval-kBNkCv: 8 file copiati in docs/verifiche/evidenze/eval-p5/20261023T201258Z-sonda-ws-worktree/corse/claude-eval-kBNkCv
+== sonda-skill: ablation none, caso skill, tetto 3.00 USD
+   uscita 0, costo 0.08615500000000001 USD, durata 11s
+corsa claude-eval-K9ttzs: 13 file copiati in docs/verifiche/evidenze/eval-p5/20261023T201313Z-sonda-skill/corse/claude-eval-K9ttzs
+== sonda-radice-tmp: ablation none, caso skill, tetto 3.00 USD
+   uscita 0, costo 0.0734434 USD, durata 12s
+corsa claude-eval-DGS2rf: 13 file copiati in docs/verifiche/evidenze/eval-p5/20261023T201325Z-sonda-radice-tmp/corse/claude-eval-DGS2rf
+== sonda-ve1-dependencies: saltata (P5_ONLY)
+eval-sonda: fatto. Costi in /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/eval-p5/budget.tsv
+EXIT=0
