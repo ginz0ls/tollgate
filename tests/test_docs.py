@@ -48,21 +48,25 @@ def normalize(title):
 
 
 def spec_limit_titles():
-    """(a) le voci in grassetto di tutti gli elenchi di 1.2; (b) le due voci dell'elenco di 17 dopo
-    «Sono le voci di 1.2, più due». Quando la rev 26 porterà le due voci di 17 in 1.2 l'insieme non cambia."""
+    """Le voci in grassetto di tutti gli elenchi di 1.2 (dalla rev 26 comprendono anche le due voci di 17)."""
     text = SPEC.read_text(encoding="utf-8")
     titles = set()
     for line in section(text, "### 1.2"):
         m = BOLD_ITEM.match(line)
         if m:
             titles.add(normalize(m["title"]))
-    after = False
-    for line in section(text, "## 17."):
-        if "Sono le voci di 1.2, più due" in line:
-            after = True
-        elif after and line.startswith("- "):
-            titles.add(normalize(line[2:]))
     return titles
+
+
+def heading_slugs(path):
+    """Gli ancoraggi che GitHub dà ai titoli: minuscole, senza punteggiatura, spazi in trattini."""
+    slugs = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^#{1,6}\s+(.+?)\s*$", line)
+        if m:
+            slug = re.sub(r"[^\w\s-]", "", m[1].replace("`", "").lower())
+            slugs.add(re.sub(r"\s", "-", slug))
+    return slugs
 
 
 class DocsTest(unittest.TestCase):
@@ -94,7 +98,7 @@ class DocsTest(unittest.TestCase):
 
     def test_limits_match_spec_1_2(self):
         in_spec = spec_limit_titles()
-        self.assertGreater(len(in_spec), 20, "la lettura della spec non trova le voci di 1.2 e di 17")
+        self.assertGreater(len(in_spec), 20, "la lettura della spec non trova le voci di 1.2")
         limiti = (USO / "limiti.md").read_text(encoding="utf-8")
         in_doc = {normalize(line[4:]) for line in limiti.splitlines() if line.startswith("### ")}
         self.assertEqual(in_doc - in_spec, set(), "voci di limiti.md che la spec non ha")
@@ -105,6 +109,7 @@ class DocsTest(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             with self.subTest(file=path.name):
                 self.assertNotIn("/home/", text)
+                self.assertNotIn("/Users/", text)
                 self.assertNotIn("MEGA", text)
 
     def test_relative_links_exist(self):
@@ -112,11 +117,15 @@ class DocsTest(unittest.TestCase):
         for path in DOCS:
             for m in LINK.finditer(path.read_text(encoding="utf-8")):
                 target = m["target"]
-                if re.match(r"[a-z]+:", target) or target.startswith("#"):
+                if re.match(r"[a-z]+:", target):
                     continue
                 checked += 1
+                name, _, anchor = target.partition("#")
+                linked = path.parent / name if name else path
                 with self.subTest(file=path.name, link=target):
-                    self.assertTrue((path.parent / target.split("#")[0]).exists())
+                    self.assertTrue(linked.exists())
+                    if anchor and linked.suffix == ".md":
+                        self.assertIn(anchor, heading_slugs(linked))
         self.assertGreater(checked, 5)
 
     def test_update_pins_documented(self):
