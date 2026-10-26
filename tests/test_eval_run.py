@@ -74,6 +74,11 @@ for arm in ("with", "without"):
             fh.write("ok\n")
         with open(os.path.join(cwd, "segreto.txt"), "w") as fh:
             fh.write("ghp_" + "A" * 20 + "\n")
+        state = os.path.join(run, "sealed", "home", ".local", "state", "tollgate")
+        os.makedirs(state)
+        open(os.path.join(state, "migrate.lock"), "w").close()
+        with open(os.path.join(state, "stato.txt"), "w") as fh:
+            fh.write("ok\n")
         os.makedirs(os.path.join(cwd, ".git"))
         with open(os.path.join(cwd, ".git", "config"), "w") as fh:
             fh.write("x\n")
@@ -314,6 +319,8 @@ class RunShTest(EvalRunBase):
         self.assertTrue((w / "settings.json").is_file())
         self.assertTrue((w / "cwd" / "ESITO.txt").is_file())
         self.assertFalse((w / "cwd" / ".git").exists())
+        self.assertTrue((w / "home" / ".local" / "state" / "tollgate" / "stato.txt").is_file())
+        self.assertFalse((w / "home" / ".local" / "state" / "tollgate" / "migrate.lock").exists())
         self.assertFalse((w / "cwd" / "segreto.txt").exists())
         self.assertIn("segreto.txt", (w / "file-non-copiati.txt").read_text())
         self.assertNotIn("ghp_", "".join(p.read_text(errors="replace") for p in out.rglob("*")

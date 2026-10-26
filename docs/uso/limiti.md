@@ -106,7 +106,7 @@ Salta `tollgate-sentinel` per quel push. Dalla 0.2.0 ogni push controllato lasci
 
 ### I subagenti con `isolation: worktree` non vengono bloccati
 
-Gli hook non li bloccano.
+Il subagente parte dal ramo predefinito e le sue modifiche non entrano nel ramo del lavoro.
 
 ### I guardrail locali sono «best effort»
 

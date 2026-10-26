@@ -948,7 +948,8 @@ class IssueCreateGuardTest(unittest.TestCase):
             env.pop("P5_PR_REGISTRY")
             self.assertEqual(sp.run(cmd, env=env, capture_output=True).returncode, 1)
             # `check` non scrive niente per gli altri profili e il log non conta
-            self.assertEqual(open(reg).read().split(), ["issue", "issue"])
+            with open(reg) as f:
+                self.assertEqual(f.read().split(), ["issue", "issue"])
 
 
 if __name__ == "__main__":

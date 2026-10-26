@@ -241,7 +241,7 @@ copy_one_run() {
     while IFS= read -r f; do
       mkdir -p "$dest/home/$(dirname "${f#"$run/sealed/home/"}")"
       cp_checked "$f" "$dest/home/${f#"$run/sealed/home/"}" "$dest" && n=$((n + 1))
-    done < <(find "$run/sealed/home/$d" -maxdepth 6 -type f -size -300k 2>/dev/null)
+    done < <(find "$run/sealed/home/$d" -maxdepth 6 -type f ! -name '*.lock' -size -300k 2>/dev/null)
   done
   f=.claude/plugins/installed_plugins.json
   if real_dir "$run/sealed/home/.claude/plugins" && real_file "$run/sealed/home/$f"; then
