@@ -110,7 +110,7 @@ Gli hook non li bloccano.
 
 ### I guardrail locali sono «best effort»
 
-Sono hook e regole sui comandi Bash: fermano gli errori onesti, non un agente che sa cosa sta aggirando. Il gate su GitHub è il controllo che non dipende dalla macchina dell'agente. Per esempio, i file creati e committati nello stesso comando Bash non li vede il controllo del commit, che guarda il working tree prima che il comando giri: l'avviso arriva dopo il commit. Dopo il passaggio a L1 redirect e heredoc sono negati, ma la scrittura di un file da un interprete (`python3 -c "open(...)"`) no.
+Sono hook e regole sui comandi Bash: fermano gli errori onesti, non un agente che sa cosa sta aggirando. Il gate su GitHub è il controllo che non dipende dalla macchina dell'agente. Per esempio, i file creati e committati nello stesso comando Bash non li vede il controllo del commit, che guarda il working tree prima che il comando giri: l'avviso arriva dopo il commit. Dopo il passaggio a L1 redirect e heredoc sono negati, ma la scrittura di un file da un interprete (per esempio `python3 -c "open(...)"`) non è vista dai guardrail locali: la vede solo il gate su GitHub.
 
 ## Gli eval
 
