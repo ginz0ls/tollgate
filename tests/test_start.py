@@ -77,10 +77,20 @@ class SetConfigTest(StartCase):
 
     def test_same_value_is_not_written_even_with_the_config_locked(self):
         fl = self.make()
-        gitw.set_config(fl.main, "tollgate.defaultBranch", "main")
+        self.assertEqual(fl.git("config", "--local", "--get", "tollgate.defaultBranch"), "main")
         (fl.main / ".git" / "config.lock").mkdir()
         gitw.set_config(fl.main, "tollgate.defaultBranch", "main")
         self.assertEqual(fl.git("config", "--get", "tollgate.defaultBranch"), "main")
+
+    def test_a_value_set_only_in_the_global_config_does_not_skip_the_local_write(self):
+        fl = self.make()
+        home = Path(tempfile.mkdtemp(prefix="tollgate-home-"))
+        self.addCleanup(shutil.rmtree, home, True)
+        (home / ".gitconfig").write_text("[tollgate]\n\tglobalOnly = x\n")
+        env = {"HOME": str(home), "XDG_CONFIG_HOME": str(home / "xdg"), "GIT_CONFIG_NOSYSTEM": "1"}
+        with mock.patch.dict(os.environ, env):
+            gitw.set_config(fl.main, "tollgate.globalOnly", "x")
+            self.assertEqual(fl.git("config", "--local", "--get", "tollgate.globalOnly"), "x")
 
     def test_different_or_missing_value_is_written(self):
         fl = self.make()

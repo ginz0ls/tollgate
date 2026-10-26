@@ -116,7 +116,7 @@ def add_excludes(repo, lines: list[str]) -> None:
 def set_config(repo, key: str, value: str) -> None:
     """Scrive `key` solo se non vale già `value` (unico valore): così non prende il lock di
     `.git/config` quando non serve, e regge una sandbox che lo blocca."""
-    r = _run(repo, "config", "--get-all", key)
+    r = _run(repo, "config", "--local", "--get-all", key)
     if r.returncode == 0 and r.stdout.splitlines() == [value]:
         return
     _checked(repo, "config", key, value)

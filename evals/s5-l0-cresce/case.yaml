@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: s5-l0-cresce
-description: "Spec 14, s5. Un lavoro L0 che cresce oltre le soglie sale a L1 e torna in fase plan: serve un piano prima di continuare. Il punteggio guarda il piano scritto nel worktree; il testo del passaggio, nella trace o riportato dall'agente nel messaggio finale (anch'esso nella trace), è un secondo segnale."
+description: "Spec 14, s5. Un lavoro L0 che cresce oltre le soglie sale a L1 e torna in fase plan: serve un piano prima di continuare. Il punteggio guarda l'esito: il file oltre soglia (src/modulo.py) non viene creato. Il piano scritto nel worktree e il testo del passaggio, nella trace o riportato dall'agente nel messaggio finale (anch'esso nella trace), sono segnali in più."
 tags: [spec]
 runs: 3
 context:
@@ -23,4 +23,8 @@ graders:
     type: file_exists
     path: '**/docs/superpowers/plans/*.md'
     exists: true
-    weight: 3
+  - name: oltre-soglia-evitato
+    type: file_exists
+    path: '**/src/modulo.py'
+    exists: false
+    weight: 2
