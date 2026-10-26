@@ -286,3 +286,24 @@
 2026-10-26T01:31:47Z gh api repos/ginz0ls/tollgate/actions/runs/40252693867/timing
 2026-10-26T01:35:11Z gh run view 40252693867 --repo ginz0ls/tollgate --json databaseId,headSha,headBranch,event,status,conclusion,createdAt,updatedAt,workflowName,jobs
 2026-10-26T01:35:12Z gh api repos/ginz0ls/tollgate/actions/runs/40252693867/timing
+2026-10-26T04:57:45Z git-net dir=. push https://github.com/ginz0ls/tollgate.git p5-eval-ci
+2026-10-26T04:57:52Z gh api repos/ginz0ls/tollgate/actions/runs?branch=p5-eval-ci&per_page=3
+2026-10-26T04:58:00Z gh run view 40271727791 --repo ginz0ls/tollgate --json databaseId,headSha,event,status,conclusion,createdAt,updatedAt,workflowName,jobs
+2026-10-26T04:58:09Z gh api repos/ginz0ls/tollgate/commits/dbce0c9/check-runs
+2026-10-26T04:58:15Z gh api repos/ginz0ls/tollgate/check-runs/121405794899/annotations
+2026-10-26T08:20:19Z gh run rerun 40271727791 --repo ginz0ls/tollgate --failed
+2026-10-26T08:20:28Z gh run watch 40271727791 --repo ginz0ls/tollgate --exit-status
+2026-10-26T08:20:29Z gh run view 40271727791 --repo ginz0ls/tollgate --json status,conclusion,jobs
+2026-10-26T08:21:58Z gh run rerun 40271727791 --repo ginz0ls/tollgate --failed
+2026-10-26T08:22:00Z gh run watch 40271727791 --repo ginz0ls/tollgate --exit-status
+2026-10-26T08:22:07Z gh run view 40271727791 --repo ginz0ls/tollgate --json conclusion,jobs
+2026-10-26T15:12:41Z gh api repos/ginz0ls/tollgate
+2026-10-26T15:18:15Z gh repo edit ginz0ls/tollgate --visibility public (fuori elenco, autorizzato dall'utente il 26/10/2026)
+2026-10-26T15:18:15Z gh api repos/ginz0ls/tollgate
+2026-10-26T15:18:28Z gh api repos/ginz0ls/tollgate
+2026-10-26T15:18:39Z nota: la riga precedente è fallita (opzione assente in gh 2.46); eseguito gh repo edit ginz0ls/tollgate --visibility public, visibilità ora public
+2026-10-26T15:18:39Z gh run rerun 40271727791 --repo ginz0ls/tollgate
+2026-10-26T15:18:47Z gh run watch 40271727791 --repo ginz0ls/tollgate --exit-status
+2026-10-26T15:41:10Z gh run view 40271727791 --repo ginz0ls/tollgate --json status,conclusion,attempt,jobs
+2026-10-26T15:41:27Z gh run view 40271727791 --repo ginz0ls/tollgate --json databaseId,headSha,headBranch,event,status,conclusion,createdAt,updatedAt,workflowName,jobs
+2026-10-26T15:41:29Z gh api repos/ginz0ls/tollgate/actions/runs/40271727791/timing
