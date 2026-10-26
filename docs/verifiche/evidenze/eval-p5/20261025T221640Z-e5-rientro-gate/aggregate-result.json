@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.310",
+  "startedAt": "2026-10-25T22:16:40.772Z",
+  "durationSeconds": 131,
+  "costUsd": 0.45972139999999995,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-eval-target",
+    "ablation": "none",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "e5-rientro-gate",
+    "threshold": 0.66,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "tollgate",
+        "version": "0.2.0",
+        "path": "/tmp/tollgate-eval-target"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "e5-rientro-gate",
+      "dir": "evals/e5-rientro-gate",
+      "source": "case_yaml",
+      "promptMarkdown": "/tollgate:execute\n\nIl lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.\n\nIl gate su GitHub ha giudicato rossa la PR di questo lavoro e ha lasciato il suo commento sulla PR. Avvia il task che corregge quanto il gate segnala e lancia il suo implementatore; quando ha finito, fermati.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 1200,
+      "maxTurns": 40,
+      "graders": [
+        {
+          "name": "task-di-correzione-creato",
+          "type": "regex",
+          "weight": 2,
+          "config": {
+            "target": "trace",
+            "pattern": "task 3: tollgate:implementer name=tg-1-t3 launch",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "brief-con-il-commento-del-gate",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": ".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate-run/1/task-3.md"
+            },
+            "pattern": "(?=[\\s\\S]*tollgate-verdict sha=[0-9a-f]{40})(?=[\\s\\S]*must-have M2 non coperto)",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "implementatore-lanciato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Agent",
+            "input_match": "tollgate:implementer"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 4,
+            "costUsd": 0.16398569999999998,
+            "judgeCostUsd": 0,
+            "durationSeconds": 42,
+            "startedAt": "2026-10-25T22:16:40.797Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-fQelpK/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "task-di-correzione-creato",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched task 3: tollgate:implementer name=tg-1-t3 launch",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "brief-con-il-commento-del-gate",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched (?=[\\s\\S]*tollgate-verdict sha=[0-9a-f]{40})(?=[\\s\\S]*must-have M2 non coperto)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 4,
+            "costUsd": 0.1454745,
+            "judgeCostUsd": 0,
+            "durationSeconds": 47,
+            "startedAt": "2026-10-25T22:17:22.807Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-R7XhX3/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "task-di-correzione-creato",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched task 3: tollgate:implementer name=tg-1-t3 launch",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "brief-con-il-commento-del-gate",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched (?=[\\s\\S]*tollgate-verdict sha=[0-9a-f]{40})(?=[\\s\\S]*must-have M2 non coperto)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 5,
+            "costUsd": 0.15026119999999998,
+            "judgeCostUsd": 0,
+            "durationSeconds": 43,
+            "startedAt": "2026-10-25T22:18:09.400Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-7cGA0u/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "task-di-correzione-creato",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched task 3: tollgate:implementer name=tg-1-t3 launch",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "brief-con-il-commento-del-gate",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched (?=[\\s\\S]*tollgate-verdict sha=[0-9a-f]{40})(?=[\\s\\S]*must-have M2 non coperto)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 1,
+    "overallPassRate": 1
+  }
+}

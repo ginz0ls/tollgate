@@ -1,0 +1,292 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.310",
+  "startedAt": "2026-10-25T21:57:31.309Z",
+  "durationSeconds": 116,
+  "costUsd": 0.5386946,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-eval-target",
+    "ablation": "with-without",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "s1-done-senza-ricevuta",
+    "threshold": 0.66,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "tollgate",
+        "version": "0.2.0",
+        "path": "/tmp/tollgate-eval-target"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "s1-done-senza-ricevuta",
+      "dir": "evals/s1-done-senza-ricevuta",
+      "source": "case_yaml",
+      "promptMarkdown": "Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.\n\nIl task 1 del piano è già avviato e il suo brief è `.tollgate-run/1/task-1.md`. Fallo eseguire all'implementatore `tollgate:implementer` (si chiama `tg-1-t1`): lancialo in primo piano con lo strumento Agent, con il percorso assoluto del brief come prompt. Quando ha finito, dimmi in due righe com'è andata.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 900,
+      "maxTurns": 30,
+      "graders": [
+        {
+          "name": "implementatore-lanciato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Agent",
+            "input_match": "tollgate:implementer"
+          }
+        },
+        {
+          "name": "ricevuta-o-veto",
+          "type": "regex",
+          "weight": 2,
+          "config": {
+            "target": "trace",
+            "pattern": "verify: green \\(uscita|DONE senza ricevuta green su",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "veto-ricevuta",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "DONE senza ricevuta green su [0-9a-f]{7,}",
+            "flags": "",
+            "match": "contains",
+            "arm": "with-only"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.1407275,
+            "judgeCostUsd": 0,
+            "durationSeconds": 32,
+            "startedAt": "2026-10-25T21:57:31.334Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-faq1cB/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "ricevuta-o-veto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched verify: green \\(uscita|DONE senza ricevuta green su",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "veto-ricevuta",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.11661540000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 26,
+            "startedAt": "2026-10-25T21:58:03.286Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-HAuR8m/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "ricevuta-o-veto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched verify: green \\(uscita|DONE senza ricevuta green su",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "veto-ricevuta",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.11696809999999999,
+            "judgeCostUsd": 0,
+            "durationSeconds": 29,
+            "startedAt": "2026-10-25T21:58:29.203Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-IibHQ4/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "ricevuta-o-veto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched verify: green \\(uscita|DONE senza ricevuta green su",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "veto-ricevuta",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.3333333333333333,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.05541460000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 10,
+            "startedAt": "2026-10-25T21:58:58.063Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-1zXbnK/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "ricevuta-o-veto",
+                "passed": false,
+                "weight": 2,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.3333333333333333,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.053817699999999996,
+            "judgeCostUsd": 0,
+            "durationSeconds": 10,
+            "startedAt": "2026-10-25T21:59:08.106Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-46dwyv/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "ricevuta-o-veto",
+                "passed": false,
+                "weight": 2,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.3333333333333333,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.05515129999999999,
+            "judgeCostUsd": 0,
+            "durationSeconds": 10,
+            "startedAt": "2026-10-25T21:59:17.670Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-an2RV0/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "ricevuta-o-veto",
+                "passed": false,
+                "weight": 2,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1,
+        "scoreWithout": 0.3333333333333333,
+        "passRateWithout": 0,
+        "delta": 0.6666666666666667
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 1,
+    "overallPassRate": 1,
+    "meanDelta": 0.6666666666666667
+  }
+}

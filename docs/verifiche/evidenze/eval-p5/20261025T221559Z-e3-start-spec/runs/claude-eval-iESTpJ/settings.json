@@ -1,0 +1,1150 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "autoAllowBashIfSandboxed": false,
+    "allowUnsandboxedCommands": false,
+    "network": {
+      "allowedDomains": []
+    },
+    "filesystem": {
+      "allowWrite": [
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/tmp"
+      ],
+      "denyWrite": [
+        "//tmp",
+        "//var/tmp",
+        "//dev/shm",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/config",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/out",
+        "//tmp/tollgate-eval-target",
+        "//tmp/tollgate-eval-target/evals/e3-start-spec",
+        "//tmp/tollgate-eval-target/.git",
+        "//tmp/tollgate-eval-target/evals/.git",
+        "//tmp/tollgate-eval-target/evals/e3-start-spec/.git",
+        "//tmp/tollgate-eval-target/.claude-plugin/evals",
+        "//tmp/tollgate-eval-target/evals",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.config/git",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.local/lib",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.aws/sso",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.aws",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.aws/cli/cache",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.aws/cli",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.aws/boto/cache",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.aws/boto",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.git/hooks",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.git/config",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.git/commondir",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/cwd/.eval-artifacts",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.vscode",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.idea",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.claude",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.husky",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.cargo",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.devcontainer",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.yarn",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.mvn",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.gitconfig",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.gitmodules",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.bashrc",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.bash_profile",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.zshrc",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.zprofile",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.profile",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.zshenv",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.zlogin",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.zlogout",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.bash_login",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.bash_aliases",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.bash_logout",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.envrc",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.ripgreprc",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.mcp.json",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.claude.json",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.npmrc",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.yarnrc",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.yarnrc.yml",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.pnp.cjs",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.pnp.loader.mjs",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.pnpmfile.cjs",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/bunfig.toml",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.bunfig.toml",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.bazelrc",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.bazelversion",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.bazeliskrc",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.pre-commit-config.yaml",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/lefthook.yml",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.lefthook.yml",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/lefthook.yaml",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.lefthook.yaml",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/gradle-wrapper.properties",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/maven-wrapper.properties",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.devcontainer.json",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/pyrightconfig.json"
+      ],
+      "denyRead": [
+        "//home/crucco",
+        "//home",
+        "//home/crucco/.claude",
+        "//tmp",
+        "//tmp/tollgate-eval-target/evals",
+        "//home/crucco/.cache/tollgate-eval-tmp",
+        "//var/tmp",
+        "//dev/shm",
+        "//run/user/1000",
+        "//run/secrets",
+        "//run/credentials",
+        "//etc/kubernetes/pki",
+        "//var/lib/kubelet/pki",
+        "//var/lib/rancher/k3s/server/tls",
+        "//var/kerberos/krb5/user",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/config",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/out",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.aws/sso",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.aws/cli/cache",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home/.aws/boto/cache",
+        "//tmp/tollgate-eval-target/.git",
+        "//tmp/tollgate-eval-target/evals/.git",
+        "//tmp/tollgate-eval-target/evals/e3-start-spec/.git",
+        "//tmp/tollgate-eval-target/.claude-plugin/evals"
+      ],
+      "allowRead": [
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/home",
+        "//home/crucco/.cache/tollgate-eval-tmp/claude-eval-iESTpJ/tmp",
+        "//tmp/tollgate-eval-target",
+        "//home/crucco/.opencode/bin",
+        "//home/crucco/.kimi-code/bin",
+        "//home/crucco/.pyenv/shims",
+        "//home/crucco/.pyenv/bin",
+        "//home/crucco/.local/bin",
+        "//home/crucco/.nvm/versions/node/v22.20.0/bin"
+      ]
+    },
+    "credentials": {
+      "files": [
+        {
+          "path": "//usr/local/etc/npmrc",
+          "mode": "deny"
+        },
+        {
+          "path": "//opt/homebrew/etc/npmrc",
+          "mode": "deny"
+        },
+        {
+          "path": "//usr/etc/npmrc",
+          "mode": "deny"
+        },
+        {
+          "path": "//etc/npmrc",
+          "mode": "deny"
+        },
+        {
+          "path": "//etc/boto.cfg",
+          "mode": "deny"
+        },
+        {
+          "path": "//usr/local/bundle/config",
+          "mode": "deny"
+        },
+        {
+          "path": "//etc/conda/.condarc",
+          "mode": "deny"
+        },
+        {
+          "path": "//etc/conda/condarc",
+          "mode": "deny"
+        },
+        {
+          "path": "//etc/conda/condarc.d",
+          "mode": "deny"
+        },
+        {
+          "path": "//var/lib/conda/.condarc",
+          "mode": "deny"
+        },
+        {
+          "path": "//var/lib/conda/condarc",
+          "mode": "deny"
+        },
+        {
+          "path": "//var/lib/conda/condarc.d",
+          "mode": "deny"
+        },
+        {
+          "path": "//etc/postgresql-common/pg_service.conf",
+          "mode": "deny"
+        },
+        {
+          "path": "//etc/pg_service.conf",
+          "mode": "deny"
+        },
+        {
+          "path": "//usr/local/etc/postgresql/pg_service.conf",
+          "mode": "deny"
+        },
+        {
+          "path": "//opt/homebrew/etc/postgresql/pg_service.conf",
+          "mode": "deny"
+        },
+        {
+          "path": "//opt/local/etc/postgresql/pg_service.conf",
+          "mode": "deny"
+        },
+        {
+          "path": "//etc/wgetrc",
+          "mode": "deny"
+        },
+        {
+          "path": "//usr/local/etc/wgetrc",
+          "mode": "deny"
+        },
+        {
+          "path": "//opt/homebrew/etc/wgetrc",
+          "mode": "deny"
+        },
+        {
+          "path": "//opt/local/etc/wgetrc",
+          "mode": "deny"
+        },
+        {
+          "path": "//etc/pip.conf",
+          "mode": "deny"
+        },
+        {
+          "path": "//etc/xdg/pip/pip.conf",
+          "mode": "deny"
+        },
+        {
+          "path": "//usr/bin/security",
+          "mode": "deny"
+        },
+        {
+          "path": "//usr/bin/secret-tool",
+          "mode": "deny"
+        },
+        {
+          "path": "//usr/bin/kwallet-query",
+          "mode": "deny"
+        },
+        {
+          "path": "//usr/lib/git-core/git-credential-cache--daemon",
+          "mode": "deny"
+        },
+        {
+          "path": "//usr/lib/git-core/git",
+          "mode": "deny"
+        },
+        {
+          "path": "//usr/lib/git-core/git-credential-store",
+          "mode": "deny"
+        },
+        {
+          "path": "//usr/lib/git-core/git-credential-cache",
+          "mode": "deny"
+        }
+      ],
+      "envVars": [
+        {
+          "name": "ANTHROPIC_API_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ANTHROPIC_API_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "CLAUDE_CODE_OAUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CLAUDE_CODE_OAUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "CLAUDE_CODE_ARTIFACTS_API_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CLAUDE_CODE_ARTIFACTS_API_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "CLAUDE_CODE_MEMORY_API_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CLAUDE_CODE_MEMORY_API_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "CLAUDE_CODE_SLACK_TAG_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CLAUDE_CODE_SLACK_TAG_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "ANTHROPIC_AUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ANTHROPIC_AUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "ANTHROPIC_FOUNDRY_API_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ANTHROPIC_FOUNDRY_API_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "ANTHROPIC_FOUNDRY_AUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ANTHROPIC_FOUNDRY_AUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "ANTHROPIC_AWS_API_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ANTHROPIC_AWS_API_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "ANTHROPIC_CUSTOM_HEADERS",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ANTHROPIC_CUSTOM_HEADERS",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_SECRET_ACCESS_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_AWS_SECRET_ACCESS_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_SESSION_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_AWS_SESSION_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_BEARER_TOKEN_BEDROCK",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_AWS_BEARER_TOKEN_BEDROCK",
+          "mode": "deny"
+        },
+        {
+          "name": "GOOGLE_APPLICATION_CREDENTIALS",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_GOOGLE_APPLICATION_CREDENTIALS",
+          "mode": "deny"
+        },
+        {
+          "name": "GOOGLE_GHA_CREDS_PATH",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_GOOGLE_GHA_CREDS_PATH",
+          "mode": "deny"
+        },
+        {
+          "name": "AZURE_CLIENT_SECRET",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_AZURE_CLIENT_SECRET",
+          "mode": "deny"
+        },
+        {
+          "name": "IDENTITY_HEADER",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_IDENTITY_HEADER",
+          "mode": "deny"
+        },
+        {
+          "name": "MSI_SECRET",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_MSI_SECRET",
+          "mode": "deny"
+        },
+        {
+          "name": "AZURE_CLIENT_CERTIFICATE_PATH",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_AZURE_CLIENT_CERTIFICATE_PATH",
+          "mode": "deny"
+        },
+        {
+          "name": "AZURE_CLIENT_CERTIFICATE_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_AZURE_CLIENT_CERTIFICATE_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "AZURE_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_AZURE_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "AZURE_FEDERATED_TOKEN_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_AZURE_FEDERATED_TOKEN_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_WEB_IDENTITY_TOKEN_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_AWS_WEB_IDENTITY_TOKEN_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_AWS_CONTAINER_CREDENTIALS_FULL_URI",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_CONTAINER_AUTHORIZATION_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_AWS_CONTAINER_AUTHORIZATION_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "CLOUDSDK_AUTH_ACCESS_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CLOUDSDK_AUTH_ACCESS_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "GOOGLE_OAUTH_ACCESS_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_GOOGLE_OAUTH_ACCESS_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "CLAUDE_CODE_OAUTH_REFRESH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CLAUDE_CODE_OAUTH_REFRESH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "HF_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_HF_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "HUGGING_FACE_HUB_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_HUGGING_FACE_HUB_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "HUGGINGFACEHUB_API_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_HUGGINGFACEHUB_API_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "NODE_AUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_NODE_AUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "NUGET_AUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_NUGET_AUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "CARGO_REGISTRY_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CARGO_REGISTRY_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "TWINE_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_TWINE_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "TWINE_USERNAME",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_TWINE_USERNAME",
+          "mode": "deny"
+        },
+        {
+          "name": "PYPI_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_PYPI_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "PYPI_API_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_PYPI_API_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "UV_PUBLISH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_UV_PUBLISH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "UV_PUBLISH_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_UV_PUBLISH_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "UV_PUBLISH_USERNAME",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_UV_PUBLISH_USERNAME",
+          "mode": "deny"
+        },
+        {
+          "name": "FLIT_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_FLIT_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "FLIT_USERNAME",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_FLIT_USERNAME",
+          "mode": "deny"
+        },
+        {
+          "name": "HATCH_INDEX_AUTH",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_HATCH_INDEX_AUTH",
+          "mode": "deny"
+        },
+        {
+          "name": "HATCH_INDEX_USER",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_HATCH_INDEX_USER",
+          "mode": "deny"
+        },
+        {
+          "name": "GEM_HOST_API_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_GEM_HOST_API_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "MATURIN_PYPI_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_MATURIN_PYPI_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "MATURIN_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_MATURIN_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "MATURIN_USERNAME",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_MATURIN_USERNAME",
+          "mode": "deny"
+        },
+        {
+          "name": "CONAN_LOGIN_USERNAME",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CONAN_LOGIN_USERNAME",
+          "mode": "deny"
+        },
+        {
+          "name": "CONAN_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CONAN_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "ANACONDA_API_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ANACONDA_API_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "BINSTAR_API_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_BINSTAR_API_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "VAULT_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_VAULT_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "VAULT_AUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_VAULT_AUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "VAULT_ROLE_ID",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_VAULT_ROLE_ID",
+          "mode": "deny"
+        },
+        {
+          "name": "VAULT_SECRET_ID",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_VAULT_SECRET_ID",
+          "mode": "deny"
+        },
+        {
+          "name": "CONSUL_HTTP_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CONSUL_HTTP_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "CONSUL_HTTP_AUTH",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CONSUL_HTTP_AUTH",
+          "mode": "deny"
+        },
+        {
+          "name": "NOMAD_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_NOMAD_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "NOMAD_HTTP_AUTH",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_NOMAD_HTTP_AUTH",
+          "mode": "deny"
+        },
+        {
+          "name": "CI_REGISTRY_USER",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CI_REGISTRY_USER",
+          "mode": "deny"
+        },
+        {
+          "name": "CI_DEPLOY_USER",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CI_DEPLOY_USER",
+          "mode": "deny"
+        },
+        {
+          "name": "JF_USER",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_JF_USER",
+          "mode": "deny"
+        },
+        {
+          "name": "FASTLANE_SESSION",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_FASTLANE_SESSION",
+          "mode": "deny"
+        },
+        {
+          "name": "MATCH_GIT_BASIC_AUTHORIZATION",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_MATCH_GIT_BASIC_AUTHORIZATION",
+          "mode": "deny"
+        },
+        {
+          "name": "SONAR_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_SONAR_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "SONARQUBE_SCANNER_PARAMS",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_SONARQUBE_SCANNER_PARAMS",
+          "mode": "deny"
+        },
+        {
+          "name": "SONAR_SCANNER_JSON_PARAMS",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_SONAR_SCANNER_JSON_PARAMS",
+          "mode": "deny"
+        },
+        {
+          "name": "SLACK_WEBHOOK_URL",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_SLACK_WEBHOOK_URL",
+          "mode": "deny"
+        },
+        {
+          "name": "SLACK_WEBHOOK",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_SLACK_WEBHOOK",
+          "mode": "deny"
+        },
+        {
+          "name": "DISCORD_WEBHOOK",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_DISCORD_WEBHOOK",
+          "mode": "deny"
+        },
+        {
+          "name": "DISCORD_WEBHOOK_URL",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_DISCORD_WEBHOOK_URL",
+          "mode": "deny"
+        },
+        {
+          "name": "TEAMS_WEBHOOK_URL",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_TEAMS_WEBHOOK_URL",
+          "mode": "deny"
+        },
+        {
+          "name": "MS_TEAMS_WEBHOOK_URI",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_MS_TEAMS_WEBHOOK_URI",
+          "mode": "deny"
+        },
+        {
+          "name": "ANTHROPIC_IDENTITY_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ANTHROPIC_IDENTITY_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "ANTHROPIC_IDENTITY_TOKEN_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ANTHROPIC_IDENTITY_TOKEN_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "CLOUDSDK_AUTH_ACCESS_TOKEN_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CLOUDSDK_AUTH_ACCESS_TOKEN_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "CLOUDSDK_AUTH_AUTHORIZATION_TOKEN_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_CLOUDSDK_AUTH_AUTHORIZATION_TOKEN_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "AZURE_AUTH_LOCATION",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_AZURE_AUTH_LOCATION",
+          "mode": "deny"
+        },
+        {
+          "name": "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "ACTIONS_ID_TOKEN_REQUEST_URL",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ACTIONS_ID_TOKEN_REQUEST_URL",
+          "mode": "deny"
+        },
+        {
+          "name": "ACTIONS_RUNTIME_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ACTIONS_RUNTIME_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "ACTIONS_RUNTIME_URL",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ACTIONS_RUNTIME_URL",
+          "mode": "deny"
+        },
+        {
+          "name": "ALL_INPUTS",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ALL_INPUTS",
+          "mode": "deny"
+        },
+        {
+          "name": "VSS_NUGET_EXTERNAL_FEED_ENDPOINTS",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_VSS_NUGET_EXTERNAL_FEED_ENDPOINTS",
+          "mode": "deny"
+        },
+        {
+          "name": "ARTIFACTS_CREDENTIALPROVIDER_EXTERNAL_FEED_ENDPOINTS",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ARTIFACTS_CREDENTIALPROVIDER_EXTERNAL_FEED_ENDPOINTS",
+          "mode": "deny"
+        },
+        {
+          "name": "VSS_NUGET_ACCESSTOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_VSS_NUGET_ACCESSTOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "ARTIFACTS_CREDENTIALPROVIDER_ACCESSTOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_ARTIFACTS_CREDENTIALPROVIDER_ACCESSTOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "COMPOSER_AUTH",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_COMPOSER_AUTH",
+          "mode": "deny"
+        },
+        {
+          "name": "OVERRIDE_GITHUB_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_OVERRIDE_GITHUB_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "DEFAULT_WORKFLOW_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_DEFAULT_WORKFLOW_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "SSH_SIGNING_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "INPUT_SSH_SIGNING_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "GITHUB_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "GH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_SHARED_CREDENTIALS_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR",
+          "mode": "deny"
+        },
+        {
+          "name": "HTTPS_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "HTTP_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "ALL_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "NO_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "https_proxy",
+          "mode": "deny"
+        },
+        {
+          "name": "http_proxy",
+          "mode": "deny"
+        },
+        {
+          "name": "all_proxy",
+          "mode": "deny"
+        },
+        {
+          "name": "no_proxy",
+          "mode": "deny"
+        },
+        {
+          "name": "npm_config_http_proxy",
+          "mode": "deny"
+        },
+        {
+          "name": "NPM_CONFIG_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "NPM_CONFIG_HTTPS_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "NPM_CONFIG_HTTP_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "YARN_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "YARN_HTTP_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "YARN_HTTPS_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "npm_config_proxy",
+          "mode": "deny"
+        },
+        {
+          "name": "npm_config_https_proxy",
+          "mode": "deny"
+        },
+        {
+          "name": "npm_config_noproxy",
+          "mode": "deny"
+        },
+        {
+          "name": "GLOBAL_AGENT_HTTP_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "GLOBAL_AGENT_HTTPS_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "GLOBAL_AGENT_NO_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "DOCKER_HTTP_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "DOCKER_HTTPS_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "ELECTRON_GET_USE_PROXY",
+          "mode": "deny"
+        },
+        {
+          "name": "CLOUDSDK_PROXY_TYPE",
+          "mode": "deny"
+        },
+        {
+          "name": "CLOUDSDK_PROXY_ADDRESS",
+          "mode": "deny"
+        },
+        {
+          "name": "CLOUDSDK_PROXY_PORT",
+          "mode": "deny"
+        },
+        {
+          "name": "CLOUDSDK_PROXY_USERNAME",
+          "mode": "deny"
+        },
+        {
+          "name": "CLOUDSDK_PROXY_PASSWORD",
+          "mode": "deny"
+        },
+        {
+          "name": "FSSPEC_GCS",
+          "mode": "deny"
+        }
+      ]
+    }
+  },
+  "env": {
+    "DISABLE_AUTOUPDATER": "1"
+  }
+}

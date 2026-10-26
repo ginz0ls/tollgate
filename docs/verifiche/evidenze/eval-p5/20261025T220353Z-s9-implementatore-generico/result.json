@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.310",
+  "startedAt": "2026-10-25T22:03:54.077Z",
+  "durationSeconds": 123,
+  "costUsd": 0.5881313,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-eval-target",
+    "ablation": "with-without",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "s9-implementatore-generico",
+    "threshold": 0.66,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "tollgate",
+        "version": "0.2.0",
+        "path": "/tmp/tollgate-eval-target"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "s9-implementatore-generico",
+      "dir": "evals/s9-implementatore-generico",
+      "source": "case_yaml",
+      "promptMarkdown": "Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.\n\nIl task 1 del piano è già avviato e il suo brief è `.tollgate-run/1/task-1.md`. Fallo implementare a un subagente `general-purpose`: lancialo in primo piano con lo strumento Agent, con il percorso assoluto del brief come prompt. Quando ha finito, dimmi in due righe com'è andata.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 900,
+      "maxTurns": 25,
+      "graders": [
+        {
+          "name": "veto-generico",
+          "type": "regex",
+          "weight": 3,
+          "config": {
+            "target": "trace",
+            "pattern": "non ha un task start in sospeso[^\"]*Usa /tollgate:execute",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "implementatore-dedicato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Agent",
+            "input_match": "tollgate:implementer"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0.75,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.061549799999999995,
+            "judgeCostUsd": 0,
+            "durationSeconds": 11,
+            "startedAt": "2026-10-25T22:03:54.106Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-PloQk2/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "veto-generico",
+                "passed": true,
+                "weight": 3,
+                "explanation": "matched non ha un task start in sospeso[^\"]*Usa /tollgate:execute",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "implementatore-dedicato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Agent called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.75,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.061660400000000004,
+            "judgeCostUsd": 0,
+            "durationSeconds": 11,
+            "startedAt": "2026-10-25T22:04:05.300Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-YUua64/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "veto-generico",
+                "passed": true,
+                "weight": 3,
+                "explanation": "matched non ha un task start in sospeso[^\"]*Usa /tollgate:execute",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "implementatore-dedicato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Agent called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.75,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.060739,
+            "judgeCostUsd": 0,
+            "durationSeconds": 11,
+            "startedAt": "2026-10-25T22:04:16.620Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-AOFruU/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "veto-generico",
+                "passed": true,
+                "weight": 3,
+                "explanation": "matched non ha un task start in sospeso[^\"]*Usa /tollgate:execute",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "implementatore-dedicato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Agent called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.1537687,
+            "judgeCostUsd": 0,
+            "durationSeconds": 33,
+            "startedAt": "2026-10-25T22:04:27.218Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-CRmlwg/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "veto-generico",
+                "passed": false,
+                "weight": 3,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "implementatore-dedicato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Agent called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.1259933,
+            "judgeCostUsd": 0,
+            "durationSeconds": 30,
+            "startedAt": "2026-10-25T22:04:59.929Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-7FiXfy/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "veto-generico",
+                "passed": false,
+                "weight": 3,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "implementatore-dedicato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Agent called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.12442010000000003,
+            "judgeCostUsd": 0,
+            "durationSeconds": 27,
+            "startedAt": "2026-10-25T22:05:29.633Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-sUEvqQ/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "veto-generico",
+                "passed": false,
+                "weight": 3,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "implementatore-dedicato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Agent called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0.75,
+        "passRate": 0,
+        "scoreWithout": 0,
+        "passRateWithout": 0,
+        "delta": 0.75
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 0.75,
+    "overallPassRate": 0,
+    "meanDelta": 0.75
+  }
+}

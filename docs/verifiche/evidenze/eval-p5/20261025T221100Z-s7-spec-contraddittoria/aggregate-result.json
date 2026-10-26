@@ -1,0 +1,316 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.310",
+  "startedAt": "2026-10-25T22:11:01.355Z",
+  "durationSeconds": 225,
+  "costUsd": 0.7893768,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-eval-target",
+    "ablation": "with-without",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "s7-spec-contraddittoria",
+    "threshold": 0.66,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "tollgate",
+        "version": "0.2.0",
+        "path": "/tmp/tollgate-eval-target"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "s7-spec-contraddittoria",
+      "dir": "evals/s7-spec-contraddittoria",
+      "source": "case_yaml",
+      "promptMarkdown": "/tollgate:spec-audit\n\nIl lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 1200,
+      "maxTurns": 40,
+      "graders": [
+        {
+          "name": "avversario-lanciato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Agent",
+            "input_match": "tollgate:spec-adversary"
+          }
+        },
+        {
+          "name": "report-scritto",
+          "type": "file_exists",
+          "weight": 1,
+          "config": {
+            "path": "**/docs/superpowers/reviews/1/spec-adversarial-*.md",
+            "exists": true
+          }
+        },
+        {
+          "name": "contraddizione-nel-report",
+          "type": "regex",
+          "weight": 2,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": ".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/docs/superpowers/reviews/1/spec-adversarial-1.md"
+            },
+            "pattern": "(?=[\\s\\S]*counts: \\{blocker: (?:[1-9]|0, major: [1-9]))(?=[\\s\\S]*(?:arrotond|per difetto))(?=[\\s\\S]*(?:1[.,]5|esatt))(?=[\\s\\S]*(?:contradd|incompatib|inconsisten|incoerent|conflitt|contrast|non (?:può|possono)))",
+            "flags": "i",
+            "match": "contains"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 4,
+            "costUsd": 0.1322338,
+            "judgeCostUsd": 0,
+            "durationSeconds": 34,
+            "startedAt": "2026-10-25T22:11:01.378Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-a0WYSU/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "avversario-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-scritto",
+                "passed": true,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/reviews/1/spec-adversarial-*.md exists as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "contraddizione-nel-report",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched (?=[\\s\\S]*counts: \\{blocker: (?:[1-9]|0, major: [1-9]))(?=[\\s\\S]*(?:arrotond|per difetto))(?=[\\s\\S]*(?:1[.,]5|esatt))(?=[\\s\\S]*(?:contradd|incompatib|inconsisten|incoerent|conflitt|contrast|non (?:può|possono)))",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 9,
+            "costUsd": 0.23781219999999997,
+            "judgeCostUsd": 0,
+            "durationSeconds": 74,
+            "startedAt": "2026-10-25T22:11:35.023Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-rNFbLx/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "avversario-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 3x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-scritto",
+                "passed": true,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/reviews/1/spec-adversarial-*.md exists as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "contraddizione-nel-report",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched (?=[\\s\\S]*counts: \\{blocker: (?:[1-9]|0, major: [1-9]))(?=[\\s\\S]*(?:arrotond|per difetto))(?=[\\s\\S]*(?:1[.,]5|esatt))(?=[\\s\\S]*(?:contradd|incompatib|inconsisten|incoerent|conflitt|contrast|non (?:può|possono)))",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 10,
+            "costUsd": 0.20840039999999999,
+            "judgeCostUsd": 0,
+            "durationSeconds": 71,
+            "startedAt": "2026-10-25T22:12:49.139Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-Vmw7Sc/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "avversario-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 2x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-scritto",
+                "passed": true,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/reviews/1/spec-adversarial-*.md exists as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "contraddizione-nel-report",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched (?=[\\s\\S]*counts: \\{blocker: (?:[1-9]|0, major: [1-9]))(?=[\\s\\S]*(?:arrotond|per difetto))(?=[\\s\\S]*(?:1[.,]5|esatt))(?=[\\s\\S]*(?:contradd|incompatib|inconsisten|incoerent|conflitt|contrast|non (?:può|possono)))",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 4,
+            "costUsd": 0.0671122,
+            "judgeCostUsd": 0,
+            "durationSeconds": 15,
+            "startedAt": "2026-10-25T22:14:00.459Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-709iZs/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "avversario-lanciato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Agent called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-scritto",
+                "passed": false,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/reviews/1/spec-adversarial-*.md missing (expected present)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "contraddizione-nel-report",
+                "passed": false,
+                "weight": 2,
+                "explanation": "grader threw: case \"s7-spec-contraddittoria\" grader focus file \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/docs/superpowers/reviews/1/spec-adversarial-1.md\": path \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/docs/superpowers/reviews/1/spec-adversarial-1.md\" does not exist",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 4,
+            "costUsd": 0.0721511,
+            "judgeCostUsd": 0,
+            "durationSeconds": 16,
+            "startedAt": "2026-10-25T22:14:15.601Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-v5cytT/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "avversario-lanciato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Agent called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-scritto",
+                "passed": false,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/reviews/1/spec-adversarial-*.md missing (expected present)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "contraddizione-nel-report",
+                "passed": false,
+                "weight": 2,
+                "explanation": "grader threw: case \"s7-spec-contraddittoria\" grader focus file \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/docs/superpowers/reviews/1/spec-adversarial-1.md\": path \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/docs/superpowers/reviews/1/spec-adversarial-1.md\" does not exist",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 4,
+            "costUsd": 0.0716671,
+            "judgeCostUsd": 0,
+            "durationSeconds": 15,
+            "startedAt": "2026-10-25T22:14:31.924Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-amcSk6/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "avversario-lanciato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Agent called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-scritto",
+                "passed": false,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/reviews/1/spec-adversarial-*.md missing (expected present)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "contraddizione-nel-report",
+                "passed": false,
+                "weight": 2,
+                "explanation": "grader threw: case \"s7-spec-contraddittoria\" grader focus file \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/docs/superpowers/reviews/1/spec-adversarial-1.md\": path \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/docs/superpowers/reviews/1/spec-adversarial-1.md\" does not exist",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1,
+        "scoreWithout": 0,
+        "passRateWithout": 0,
+        "delta": 1
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 1,
+    "overallPassRate": 1,
+    "meanDelta": 1
+  }
+}

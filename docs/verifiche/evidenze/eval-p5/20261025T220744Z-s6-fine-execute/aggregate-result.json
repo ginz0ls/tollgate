@@ -1,0 +1,360 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.310",
+  "startedAt": "2026-10-25T22:07:45.476Z",
+  "durationSeconds": 192,
+  "costUsd": 0.818296,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-eval-target",
+    "ablation": "with-without",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "s6-fine-execute",
+    "threshold": 0.66,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "tollgate",
+        "version": "0.2.0",
+        "path": "/tmp/tollgate-eval-target"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "s6-fine-execute",
+      "dir": "evals/s6-fine-execute",
+      "source": "case_yaml",
+      "promptMarkdown": "/tollgate:execute\n\nIl lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 1200,
+      "maxTurns": 40,
+      "graders": [
+        {
+          "name": "finish-indicato",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "/tollgate:finish",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "task-2-chiuso",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "task 2: done",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "comando-task-done",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Bash",
+            "input_match": "task done 2",
+            "arm": "with-only"
+          }
+        },
+        {
+          "name": "comando-finish-check",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Bash",
+            "input_match": "finish check",
+            "arm": "with-only"
+          }
+        },
+        {
+          "name": "skill-finish",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "tollgate:finish",
+            "arm": "with-only"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 8,
+            "costUsd": 0.19653079999999998,
+            "judgeCostUsd": 0,
+            "durationSeconds": 43,
+            "startedAt": "2026-10-25T22:07:45.498Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-YiUQtr/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "finish-indicato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched /tollgate:finish",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "task-2-chiuso",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched task 2: done",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "comando-task-done",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "comando-finish-check",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "skill-finish",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 8,
+            "costUsd": 0.182137,
+            "judgeCostUsd": 0,
+            "durationSeconds": 43,
+            "startedAt": "2026-10-25T22:08:28.028Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-lip9L7/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "finish-indicato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched /tollgate:finish",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "task-2-chiuso",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched task 2: done",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "comando-task-done",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "comando-finish-check",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "skill-finish",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 8,
+            "costUsd": 0.18114390000000005,
+            "judgeCostUsd": 0,
+            "durationSeconds": 45,
+            "startedAt": "2026-10-25T22:09:11.424Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-BXtWBO/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "finish-indicato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched /tollgate:finish",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "task-2-chiuso",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched task 2: done",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "comando-task-done",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "comando-finish-check",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Bash called 0x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "skill-finish",
+                "passed": false,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 6,
+            "costUsd": 0.09401820000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 22,
+            "startedAt": "2026-10-25T22:09:56.027Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-cocvCA/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "finish-indicato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "task-2-chiuso",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 7,
+            "costUsd": 0.08444689999999999,
+            "judgeCostUsd": 0,
+            "durationSeconds": 21,
+            "startedAt": "2026-10-25T22:10:17.809Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-5XulW8/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "finish-indicato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "task-2-chiuso",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 7,
+            "costUsd": 0.0800192,
+            "judgeCostUsd": 0,
+            "durationSeconds": 19,
+            "startedAt": "2026-10-25T22:10:38.452Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-7RgJjn/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "finish-indicato",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "task-2-chiuso",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1,
+        "scoreWithout": 0,
+        "passRateWithout": 0,
+        "delta": 1
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 1,
+    "overallPassRate": 1,
+    "meanDelta": 1
+  }
+}

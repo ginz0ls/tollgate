@@ -1,0 +1,1 @@
+{"auth": true, "prs": [], "issues": {"1": {"number": 1, "title": "Moltiplicazione", "body": "Prima fetta: `moltiplica(a, b)`.", "state": "OPEN", "labels": [], "author_association": "OWNER"}, "2": {"number": 2, "title": "Divisione", "body": "Seconda fetta: `dividi(a, b)`.", "state": "OPEN", "labels": [], "author_association": "OWNER"}}}

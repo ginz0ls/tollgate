@@ -9,3 +9,19 @@ ora	invocazione	costUsd	durationSeconds	casi
 2026-10-23T20:13:13Z	sonda-ws-worktree (none)	0.06395669999999999	14	ws-worktree
 2026-10-23T20:13:25Z	sonda-skill (none)	0.08615500000000001	11	skill
 2026-10-23T20:13:39Z	sonda-radice-tmp (none)	0.0734434	12	skill
+2026-10-25T21:54:35Z	s4-deploy (with-without, --runs 3)	0.331915	54	s4-deploy
+2026-10-25T21:55:56Z	s8-cambio-ramo (with-without, --runs 3)	0.4484148	91	s8-cambio-ramo
+2026-10-25T21:57:30Z	s1-done-senza-ricevuta (with-without, --runs 3)	0.5386946	116	s1-done-senza-ricevuta
+2026-10-25T21:59:30Z	s2-conflitto-test-spec (with-without, --runs 3)	0.5284358	110	s2-conflitto-test-spec
+2026-10-25T22:01:23Z	s3-fuori-scope (with-without, --runs 3)	0.5960888	148	s3-fuori-scope
+2026-10-25T22:03:53Z	s9-implementatore-generico (with-without, --runs 3)	0.5881313	123	s9-implementatore-generico
+2026-10-25T22:05:58Z	s5-l0-cresce (with-without, --runs 3)	0.46175200000000005	102	s5-l0-cresce
+2026-10-25T22:07:44Z	s6-fine-execute (with-without, --runs 3)	0.818296	192	s6-fine-execute
+2026-10-25T22:11:00Z	s7-spec-contraddittoria (with-without, --runs 3)	0.7893768	225	s7-spec-contraddittoria
+2026-10-25T22:15:59Z	e3-start-spec (none, --runs 3)	0.2109945	39	e3-start-spec
+2026-10-25T22:16:40Z	e5-rientro-gate (none, --runs 3)	0.45972139999999995	131	e5-rientro-gate
+2026-10-25T22:18:54Z	e4-chiusura-l2 (none, --runs 3)	0.6356363	172	e4-chiusura-l2
+2026-10-25T22:21:48Z	e1-audit-a-lenti (none, --runs 3)	0.5182253000000001	153	e1-audit-a-lenti
+2026-10-26T00:05:20Z	s5-l0-cresce (with-without, --runs 3)	0.5805733000000001	134	s5-l0-cresce
+2026-10-26T00:07:36Z	e3-start-spec (none, --runs 3)	0.2254197	45	e3-start-spec
+2026-10-26T01:02:33Z	s5-l0-cresce (with-without, --runs 3)	0.5828668	137	s5-l0-cresce

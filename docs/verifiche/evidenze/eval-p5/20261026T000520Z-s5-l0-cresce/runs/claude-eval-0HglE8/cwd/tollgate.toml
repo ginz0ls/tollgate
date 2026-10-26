@@ -1,0 +1,12 @@
+schema_version = 1
+
+[project]
+allow_no_tests = false
+
+[gate]
+mode = "protected"
+
+[commands]
+verify = "python3 tools/unittest_junit.py"
+gate = ["verify"]
+report = "junit:reports/junit.xml"

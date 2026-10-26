@@ -1,0 +1,6 @@
+/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ahhHy8
+/home/crucco/.cache/tollgate-eval-tmp/claude-eval-OSGPGR
+/home/crucco/.cache/tollgate-eval-tmp/claude-eval-P3Y87m
+/home/crucco/.cache/tollgate-eval-tmp/claude-eval-qrWbTi
+/home/crucco/.cache/tollgate-eval-tmp/claude-eval-WZX4hw
+/home/crucco/.cache/tollgate-eval-tmp/claude-eval-XflAka

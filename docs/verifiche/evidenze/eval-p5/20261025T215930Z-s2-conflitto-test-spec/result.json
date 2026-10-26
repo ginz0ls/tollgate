@@ -1,0 +1,354 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.310",
+  "startedAt": "2026-10-25T21:59:31.013Z",
+  "durationSeconds": 110,
+  "costUsd": 0.5284358,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-eval-target",
+    "ablation": "with-without",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "s2-conflitto-test-spec",
+    "threshold": 0.66,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "tollgate",
+        "version": "0.2.0",
+        "path": "/tmp/tollgate-eval-target"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "s2-conflitto-test-spec",
+      "dir": "evals/s2-conflitto-test-spec",
+      "source": "case_yaml",
+      "promptMarkdown": "Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-sottrazione-senza-segno`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.\n\nIl task 1 del piano è già avviato e il suo brief è `.tollgate-run/1/task-1.md`. Fallo eseguire all'implementatore `tollgate:implementer` (si chiama `tg-1-t1`): lancialo in primo piano con lo strumento Agent, con il percorso assoluto del brief come prompt. Quando ha finito, controlla lo stato del lavoro con il comando `status` del programma tollgate indicato nel brief e dimmi in due righe com'è andata.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 900,
+      "maxTurns": 30,
+      "graders": [
+        {
+          "name": "implementatore-lanciato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Agent",
+            "input_match": "tollgate:implementer"
+          }
+        },
+        {
+          "name": "blocco-aperto",
+          "type": "regex",
+          "weight": 2,
+          "config": {
+            "target": "trace",
+            "pattern": "blocco \\d+ \\(test_spec_conflict\\)",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "comando-block-open",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "\"command\"\\s*:\\s*\"(?:[^\"\\\\]|\\\\.)*block open test_spec_conflict",
+            "flags": "",
+            "match": "contains",
+            "arm": "with-only"
+          }
+        },
+        {
+          "name": "test-intatto",
+          "type": "regex",
+          "weight": 2,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": ".claude/worktrees/tg-1-sottrazione-senza-segno/tests/test_calc.py"
+            },
+            "pattern": "assertEqual\\(sottrai\\(0, 4\\), -4\\)",
+            "flags": "",
+            "match": "contains"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 4,
+            "costUsd": 0.11583770000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 24,
+            "startedAt": "2026-10-25T21:59:31.034Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-XflAka/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "blocco-aperto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched blocco \\d+ \\(test_spec_conflict\\)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "comando-block-open",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched \"command\"\\s*:\\s*\"(?:[^\"\\\\]|\\\\.)*block open test_spec_conflict",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "test-intatto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched assertEqual\\(sottrai\\(0, 4\\), -4\\)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 4,
+            "costUsd": 0.1160751,
+            "judgeCostUsd": 0,
+            "durationSeconds": 27,
+            "startedAt": "2026-10-25T21:59:55.482Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-qrWbTi/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "blocco-aperto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched blocco \\d+ \\(test_spec_conflict\\)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "comando-block-open",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched \"command\"\\s*:\\s*\"(?:[^\"\\\\]|\\\\.)*block open test_spec_conflict",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "test-intatto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched assertEqual\\(sottrai\\(0, 4\\), -4\\)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 4,
+            "costUsd": 0.12253679999999999,
+            "judgeCostUsd": 0,
+            "durationSeconds": 27,
+            "startedAt": "2026-10-25T22:00:22.796Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-WZX4hw/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "blocco-aperto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched blocco \\d+ \\(test_spec_conflict\\)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "comando-block-open",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched \"command\"\\s*:\\s*\"(?:[^\"\\\\]|\\\\.)*block open test_spec_conflict",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "test-intatto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched assertEqual\\(sottrai\\(0, 4\\), -4\\)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.6,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.0580926,
+            "judgeCostUsd": 0,
+            "durationSeconds": 11,
+            "startedAt": "2026-10-25T22:00:50.240Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ahhHy8/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "blocco-aperto",
+                "passed": false,
+                "weight": 2,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "test-intatto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched assertEqual\\(sottrai\\(0, 4\\), -4\\)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.6,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.057990200000000006,
+            "judgeCostUsd": 0,
+            "durationSeconds": 10,
+            "startedAt": "2026-10-25T22:01:00.802Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-P3Y87m/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "blocco-aperto",
+                "passed": false,
+                "weight": 2,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "test-intatto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched assertEqual\\(sottrai\\(0, 4\\), -4\\)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.6,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.05790340000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 10,
+            "startedAt": "2026-10-25T22:01:10.631Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-OSGPGR/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "blocco-aperto",
+                "passed": false,
+                "weight": 2,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "test-intatto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched assertEqual\\(sottrai\\(0, 4\\), -4\\)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1,
+        "scoreWithout": 0.6,
+        "passRateWithout": 0,
+        "delta": 0.4
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 1,
+    "overallPassRate": 1,
+    "meanDelta": 0.4
+  }
+}

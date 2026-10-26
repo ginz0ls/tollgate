@@ -1,0 +1,228 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.310",
+  "startedAt": "2026-10-25T22:21:49.197Z",
+  "durationSeconds": 153,
+  "costUsd": 0.5182253000000001,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-eval-target",
+    "ablation": "none",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "e1-audit-a-lenti",
+    "threshold": 0.66,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "tollgate",
+        "version": "0.2.0",
+        "path": "/tmp/tollgate-eval-target"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "e1-audit-a-lenti",
+      "dir": "evals/e1-audit-a-lenti",
+      "source": "case_yaml",
+      "promptMarkdown": "/tollgate:spec-audit\n\nIl lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-operazioni-della-calcolatrice`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.\n\nLa spec ha tre fette e l'utente accetta il costo dell'audit a lenti. Fai il primo ciclo a lenti, leggi il suo report e fermati: gli altri cicli non servono.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 1500,
+      "maxTurns": 40,
+      "graders": [
+        {
+          "name": "conferma-chiesta",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "conferma: audit a lenti: da \\d+ a \\d+ cicli di tollgate:spec-auditor",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "ciclo-aperto",
+          "type": "regex",
+          "weight": 2,
+          "config": {
+            "target": "trace",
+            "pattern": "ciclo a lenti della spec 1, punto di vista \\w+ su docs/superpowers/specs/calc-l2-tre-fette\\.md",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "auditor-lanciato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Agent",
+            "input_match": "tollgate:spec-auditor"
+          }
+        },
+        {
+          "name": "report-lenti-scritto",
+          "type": "file_exists",
+          "weight": 1,
+          "config": {
+            "path": "**/docs/superpowers/reviews/1/spec-lens-*.md",
+            "exists": true
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 5,
+            "costUsd": 0.1769771,
+            "judgeCostUsd": 0,
+            "durationSeconds": 51,
+            "startedAt": "2026-10-25T22:21:49.221Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-PYc7Pa/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "conferma-chiesta",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched conferma: audit a lenti: da \\d+ a \\d+ cicli di tollgate:spec-auditor",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "ciclo-aperto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched ciclo a lenti della spec 1, punto di vista \\w+ su docs/superpowers/specs/calc-l2-tre-fette\\.md",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "auditor-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-lenti-scritto",
+                "passed": true,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/reviews/1/spec-lens-*.md exists as expected",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 6,
+            "costUsd": 0.17928010000000003,
+            "judgeCostUsd": 0,
+            "durationSeconds": 53,
+            "startedAt": "2026-10-25T22:22:39.975Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-cQhp4P/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "conferma-chiesta",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched conferma: audit a lenti: da \\d+ a \\d+ cicli di tollgate:spec-auditor",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "ciclo-aperto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched ciclo a lenti della spec 1, punto di vista \\w+ su docs/superpowers/specs/calc-l2-tre-fette\\.md",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "auditor-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-lenti-scritto",
+                "passed": true,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/reviews/1/spec-lens-*.md exists as expected",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 5,
+            "costUsd": 0.1619681,
+            "judgeCostUsd": 0,
+            "durationSeconds": 49,
+            "startedAt": "2026-10-25T22:23:32.865Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-WbXlnh/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "conferma-chiesta",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched conferma: audit a lenti: da \\d+ a \\d+ cicli di tollgate:spec-auditor",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "ciclo-aperto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched ciclo a lenti della spec 1, punto di vista \\w+ su docs/superpowers/specs/calc-l2-tre-fette\\.md",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "auditor-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "report-lenti-scritto",
+                "passed": true,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/reviews/1/spec-lens-*.md exists as expected",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 1,
+    "overallPassRate": 1
+  }
+}

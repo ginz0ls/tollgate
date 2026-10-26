@@ -1,0 +1,230 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.310",
+  "startedAt": "2026-10-25T22:18:54.488Z",
+  "durationSeconds": 172,
+  "costUsd": 0.6356363,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-eval-target",
+    "ablation": "none",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "e4-chiusura-l2",
+    "threshold": 0.66,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "tollgate",
+        "version": "0.2.0",
+        "path": "/tmp/tollgate-eval-target"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "e4-chiusura-l2",
+      "dir": "evals/e4-chiusura-l2",
+      "source": "case_yaml",
+      "promptMarkdown": "/tollgate:execute\n\nIl lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.\n\nQuando tutti i task sono chiusi, fai il controllo locale della Definition of Done del lavoro. Non aprire la PR e non lanciare la revisione finale.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 1800,
+      "maxTurns": 50,
+      "graders": [
+        {
+          "name": "implementatore-lanciato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Agent",
+            "input_match": "tollgate:implementer"
+          }
+        },
+        {
+          "name": "task-2-chiuso",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "task 2: done",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "approvazioni-l2-nel-controllo",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "\\[sì\\] Spec e piano approvati, report avversariali presenti",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "controllo-verde",
+          "type": "regex",
+          "weight": 2,
+          "config": {
+            "target": "trace",
+            "pattern": "prossimo passo: python3 [^\\\\]*bin/tollgate'? review prepare",
+            "flags": "",
+            "match": "contains"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 11,
+            "costUsd": 0.22310990000000006,
+            "judgeCostUsd": 0,
+            "durationSeconds": 59,
+            "startedAt": "2026-10-25T22:18:54.512Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-zfOzU3/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "task-2-chiuso",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched task 2: done",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "approvazioni-l2-nel-controllo",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched \\[sì\\] Spec e piano approvati, report avversariali presenti",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "controllo-verde",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched prossimo passo: python3 [^\\\\]*bin/tollgate'? review prepare",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 11,
+            "costUsd": 0.2075286,
+            "judgeCostUsd": 0,
+            "durationSeconds": 57,
+            "startedAt": "2026-10-25T22:19:53.416Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-BkJl3b/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "task-2-chiuso",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched task 2: done",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "approvazioni-l2-nel-controllo",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched \\[sì\\] Spec e piano approvati, report avversariali presenti",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "controllo-verde",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched prossimo passo: python3 [^\\\\]*bin/tollgate'? review prepare",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 11,
+            "costUsd": 0.2049978,
+            "judgeCostUsd": 0,
+            "durationSeconds": 57,
+            "startedAt": "2026-10-25T22:20:50.247Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-mr7ygg/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "task-2-chiuso",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched task 2: done",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "approvazioni-l2-nel-controllo",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched \\[sì\\] Spec e piano approvati, report avversariali presenti",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "controllo-verde",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched prossimo passo: python3 [^\\\\]*bin/tollgate'? review prepare",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 1,
+    "overallPassRate": 1
+  }
+}

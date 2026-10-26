@@ -1,0 +1,195 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.310",
+  "startedAt": "2026-10-26T00:07:37.292Z",
+  "durationSeconds": 45,
+  "costUsd": 0.2254197,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-eval-target",
+    "ablation": "none",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "e3-start-spec",
+    "threshold": 0.66,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "tollgate",
+        "version": "0.2.0",
+        "path": "/tmp/tollgate-eval-target"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "e3-start-spec",
+      "dir": "evals/e3-start-spec",
+      "source": "case_yaml",
+      "promptMarkdown": "/tollgate:start #2 --spec docs/superpowers/specs/calc-l2-tre-fette.md\n\nQuando tollgate ha creato il lavoro, fermati: il piano si scrive in una sessione pulita.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 900,
+      "maxTurns": 25,
+      "graders": [
+        {
+          "name": "lavoro-in-fase-plan",
+          "type": "regex",
+          "weight": 2,
+          "config": {
+            "target": "trace",
+            "pattern": "lavoro #2 avviato: livello L2, fase plan, ramo tg/2-divisione",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "spec-approvata-riconosciuta",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "spec approvata: docs/superpowers/specs/calc-l2-tre-fette\\.md \\(approvazione in docs/superpowers/reviews/1/\\)",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "worktree-creato",
+          "type": "file_exists",
+          "weight": 1,
+          "config": {
+            "path": "**/worktrees/tg-2-divisione/src/calc.py",
+            "exists": true
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.0760242,
+            "judgeCostUsd": 0,
+            "durationSeconds": 14,
+            "startedAt": "2026-10-26T00:07:37.316Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ekUnGj/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "lavoro-in-fase-plan",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched lavoro #2 avviato: livello L2, fase plan, ramo tg/2-divisione",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "spec-approvata-riconosciuta",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched spec approvata: docs/superpowers/specs/calc-l2-tre-fette\\.md \\(approvazione in docs/superpowers/reviews/1/\\)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "worktree-creato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "**/worktrees/tg-2-divisione/src/calc.py exists as expected",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.07455780000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 14,
+            "startedAt": "2026-10-26T00:07:51.746Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-T55SAY/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "lavoro-in-fase-plan",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched lavoro #2 avviato: livello L2, fase plan, ramo tg/2-divisione",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "spec-approvata-riconosciuta",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched spec approvata: docs/superpowers/specs/calc-l2-tre-fette\\.md \\(approvazione in docs/superpowers/reviews/1/\\)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "worktree-creato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "**/worktrees/tg-2-divisione/src/calc.py exists as expected",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.0748377,
+            "judgeCostUsd": 0,
+            "durationSeconds": 17,
+            "startedAt": "2026-10-26T00:08:05.849Z",
+            "error": null,
+            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-u1fO0g/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "lavoro-in-fase-plan",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched lavoro #2 avviato: livello L2, fase plan, ramo tg/2-divisione",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "spec-approvata-riconosciuta",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched spec approvata: docs/superpowers/specs/calc-l2-tre-fette\\.md \\(approvazione in docs/superpowers/reviews/1/\\)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "worktree-creato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "**/worktrees/tg-2-divisione/src/calc.py exists as expected",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 1,
+    "overallPassRate": 1
+  }
+}

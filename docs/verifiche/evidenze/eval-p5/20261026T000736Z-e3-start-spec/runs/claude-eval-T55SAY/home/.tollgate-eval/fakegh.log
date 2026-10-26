@@ -1,0 +1,12 @@
+{"argv": ["auth", "status"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-T55SAY/home/cwd"}
+{"argv": ["api", "repos/{owner}/{repo}/issues/1"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-T55SAY/home/cwd"}
+{"argv": ["api", "--paginate", "repos/{owner}/{repo}/pulls?state=all&per_page=100", "--jq", ".[] | {number, headRefName: .head.ref, state: (if .merged_at then \"MERGED\" else (.state | ascii_upcase) end), url: .html_url}"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-T55SAY/home/cwd"}
+{"argv": ["api", "repos/{owner}/{repo}/commits/32c4bcaba38706922abe8106b409dfe91852cf3a/status"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-T55SAY/home/cwd"}
+{"argv": ["api", "repos/{owner}/{repo}/actions/permissions"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-T55SAY/home/cwd"}
+{"argv": ["api", "--include", "repos/{owner}/{repo}/branches/main/protection"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-T55SAY/home/cwd"}
+{"argv": ["auth", "status"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-T55SAY/home/cwd"}
+{"argv": ["api", "repos/{owner}/{repo}/issues/2"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-T55SAY/home/cwd"}
+{"argv": ["api", "--paginate", "repos/{owner}/{repo}/pulls?state=all&per_page=100", "--jq", ".[] | {number, headRefName: .head.ref, state: (if .merged_at then \"MERGED\" else (.state | ascii_upcase) end), url: .html_url}"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-T55SAY/home/cwd"}
+{"argv": ["api", "repos/{owner}/{repo}/commits/ec4f949ab96cca8aab532128e8bb469c315465b3/status"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-T55SAY/home/cwd"}
+{"argv": ["api", "repos/{owner}/{repo}/actions/permissions"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-T55SAY/home/cwd"}
+{"argv": ["api", "--include", "repos/{owner}/{repo}/branches/main/protection"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-T55SAY/home/cwd"}

@@ -1,0 +1,12 @@
+{"argv": ["auth", "status"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ekUnGj/home/cwd"}
+{"argv": ["api", "repos/{owner}/{repo}/issues/1"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ekUnGj/home/cwd"}
+{"argv": ["api", "--paginate", "repos/{owner}/{repo}/pulls?state=all&per_page=100", "--jq", ".[] | {number, headRefName: .head.ref, state: (if .merged_at then \"MERGED\" else (.state | ascii_upcase) end), url: .html_url}"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ekUnGj/home/cwd"}
+{"argv": ["api", "repos/{owner}/{repo}/commits/a661a01f799485250bde4fd81cbd9a7b2b8e31f2/status"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ekUnGj/home/cwd"}
+{"argv": ["api", "repos/{owner}/{repo}/actions/permissions"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ekUnGj/home/cwd"}
+{"argv": ["api", "--include", "repos/{owner}/{repo}/branches/main/protection"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ekUnGj/home/cwd"}
+{"argv": ["auth", "status"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ekUnGj/home/cwd"}
+{"argv": ["api", "repos/{owner}/{repo}/issues/2"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ekUnGj/home/cwd"}
+{"argv": ["api", "--paginate", "repos/{owner}/{repo}/pulls?state=all&per_page=100", "--jq", ".[] | {number, headRefName: .head.ref, state: (if .merged_at then \"MERGED\" else (.state | ascii_upcase) end), url: .html_url}"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ekUnGj/home/cwd"}
+{"argv": ["api", "repos/{owner}/{repo}/commits/a0653cf77919d9c74e9feffbe54f27edb2659e23/status"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ekUnGj/home/cwd"}
+{"argv": ["api", "repos/{owner}/{repo}/actions/permissions"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ekUnGj/home/cwd"}
+{"argv": ["api", "--include", "repos/{owner}/{repo}/branches/main/protection"], "cwd": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-ekUnGj/home/cwd"}
