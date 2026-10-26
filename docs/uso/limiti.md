@@ -106,8 +106,8 @@ Gli hook non li bloccano.
 
 ### i guardrail locali sono «best effort»
 
-Sono hook e regole sui comandi Bash: fermano gli errori onesti, non un agente che sa cosa sta aggirando. Il gate su GitHub è il controllo che non dipende dalla macchina dell'agente.
+Sono hook e regole sui comandi Bash: fermano gli errori onesti, non un agente che sa cosa sta aggirando. Il gate su GitHub è il controllo che non dipende dalla macchina dell'agente. Per esempio, i file creati e committati nello stesso comando Bash non li vede il controllo del commit, che guarda il working tree prima che il comando giri: l'avviso arriva dopo il commit.
 
 ## Limiti degli eval
 
-Gli eval di comportamento ([eval e CI](eval-e-ci.md)) girano in una sandbox di `claude plugin eval`: senza rete, con `gh` finto, su casi costruiti. Misurano se l'agente rispetta gli obblighi nei casi scelti, con tre corse per caso e un modello solo. Non provano il gate su GitHub vero, che si prova su repo di prova.
+Gli eval di comportamento ([eval e CI](eval-e-ci.md)) girano in una sandbox di `claude plugin eval`: senza rete, con `gh` finto, su casi costruiti. Misurano se l'agente rispetta gli obblighi nei casi scelti, con tre corse per caso e un modello solo. Non provano il gate su GitHub vero, che si prova su repo di prova. La sandbox protegge anche `.git/config` del workspace: tollgate non lo riscrive se il valore c'è già, ma un caso che lo cambiasse davvero non potrebbe girare lì.

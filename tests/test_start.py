@@ -71,6 +71,40 @@ class StartCase(unittest.TestCase):
         return r
 
 
+class SetConfigTest(StartCase):
+    """`gitw.set_config` non scrive se il valore c'è già: nella sandbox degli eval `.git/config.lock`
+    è bloccato e anche una scrittura dello stesso valore fallirebbe."""
+
+    def test_same_value_is_not_written_even_with_the_config_locked(self):
+        fl = self.make()
+        gitw.set_config(fl.main, "tollgate.defaultBranch", "main")
+        (fl.main / ".git" / "config.lock").mkdir()
+        gitw.set_config(fl.main, "tollgate.defaultBranch", "main")
+        self.assertEqual(fl.git("config", "--get", "tollgate.defaultBranch"), "main")
+
+    def test_different_or_missing_value_is_written(self):
+        fl = self.make()
+        gitw.set_config(fl.main, "tollgate.defaultBranch", "main")
+        gitw.set_config(fl.main, "tollgate.defaultBranch", "trunk")
+        self.assertEqual(fl.git("config", "--get", "tollgate.defaultBranch"), "trunk")
+        gitw.set_config(fl.main, "tollgate.altro", "x")
+        self.assertEqual(fl.git("config", "--get", "tollgate.altro"), "x")
+
+    def test_locked_config_still_fails_when_the_value_changes(self):
+        fl = self.make()
+        gitw.set_config(fl.main, "tollgate.defaultBranch", "main")
+        (fl.main / ".git" / "config.lock").mkdir()
+        with self.assertRaises(gitw.GitWriteError):
+            gitw.set_config(fl.main, "tollgate.defaultBranch", "trunk")
+
+    def test_multiple_values_are_rewritten_as_before(self):
+        fl = self.make()
+        fl.git("config", "--add", "tollgate.multi", "a")
+        fl.git("config", "--add", "tollgate.multi", "b")
+        with self.assertRaises(gitw.GitWriteError):
+            gitw.set_config(fl.main, "tollgate.multi", "a")
+
+
 class StartNewTest(StartCase):
     def test_start_creates_work_in_path_with_spaces(self):
         fl = self.make()
@@ -474,8 +508,16 @@ class StartNewTest(StartCase):
 
     def test_git_config_failure_refuses(self):
         fl = self.make()
+        fl.git("config", "--unset", "tollgate.defaultBranch")        # assente: la scrittura serve
         (fl.main / ".git" / "config.lock").write_text("")
         self.refused(fl, "configurazione git")
+
+    def test_locked_config_with_the_value_already_set_does_not_refuse(self):
+        fl = self.make()
+        self.assertEqual(fl.git("config", "--get", "tollgate.defaultBranch"), "main")
+        (fl.main / ".git" / "config.lock").write_text("")
+        r = fl.cli("start", "7")
+        self.assertEqual(r.returncode, 0, out(r))
 
     def test_issue_file_failure_is_incomplete_registration(self):
         fl = self.make(files={".tollgate-run": "un file dove serve una cartella\n"})

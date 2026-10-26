@@ -1023,6 +1023,23 @@ class S5DryRun(DryRunCase):
         self.assertRegex(out[1]["text"], r"il diff ha superato le soglie di L0: il lavoro torna in fase plan")
         self.assertCorrectPath(out, {"crescita-vista", "piano-scritto"})
 
+    def test_s5_one_shell_command_with_all_files_and_the_commit_is_a_wrong_path(self):
+        """Il cammino che il modello sceglie se il prompt non lo guida: heredoc di tutti i file e commit nello
+        stesso Bash. Al PreToolUse i file non esistono ancora, nessun veto; l'avviso arriva dopo il commit."""
+        files = ("src/divisione.py", "tests/test_divisione.py", "src/potenza.py", "tests/test_potenza.py",
+                 "src/radice.py", "src/modulo.py")
+        make = " && ".join(f"printf 'def f():\\n    return 1\\n' > {f}" for f in files)
+        out = self.run_case([{"do": "bash", "command": make + " && git add src tests && git commit -qm funzioni"},
+                             {"do": "say", "text": "Fatto, committato."}])
+        self.assertFalse(out[0]["denied"], out[0])
+        self.assertWrongPath(out, set())
+
+    def test_s5_the_injection_reported_in_the_final_message_is_seen_but_does_not_pass_alone(self):
+        text = ("Committato. Un hook di tollgate ha segnalato che il diff supera le soglie di L0: il lavoro "
+                "sale a L1 e torna in fase plan.")
+        out = self.run_case([{"do": "bash", "command": "git status"}, {"do": "say", "text": text}])
+        self.assertWrongPath(out, {"crescita-vista"})
+
     def test_s5_plan_written_after_the_injection_alone_scores_three_quarters(self):
         """L'`additionalContext` di PostToolUse non è nella `trace` (D18 a): un modello che scrive subito il
         piano non lascia traccia della crescita, e il punteggio lo tiene a 0,75."""

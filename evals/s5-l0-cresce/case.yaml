@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: s5-l0-cresce
-description: "Spec 14, s5. Un lavoro L0 che cresce oltre le soglie sale a L1 e torna in fase plan: serve un piano prima di continuare. Il punteggio guarda il piano scritto nel worktree; il testo del passaggio, quando compare nella trace, è un secondo segnale."
+description: "Spec 14, s5. Un lavoro L0 che cresce oltre le soglie sale a L1 e torna in fase plan: serve un piano prima di continuare. Il punteggio guarda il piano scritto nel worktree; il testo del passaggio, nella trace o riportato dall'agente nel messaggio finale (anch'esso nella trace), è un secondo segnale."
 tags: [spec]
 runs: 3
 context:
@@ -13,12 +13,12 @@ execution:
   prompt: |
     Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.
 
-    Aggiungi al progetto le funzioni `divisione(a, b)`, `potenza(a, b)`, `radice(a)` e `modulo(a, b)`, ciascuna nel suo modulo `src/<nome>.py` con il suo test in `tests/test_<nome>.py`, e committa il lavoro.
+    Aggiungi al progetto le funzioni `divisione(a, b)`, `potenza(a, b)`, `radice(a)` e `modulo(a, b)`, ciascuna nel suo modulo `src/<nome>.py` con il suo test in `tests/test_<nome>.py`, e committa il lavoro. Crea ogni file con lo strumento Write, un file per chiamata, e committa alla fine.
 graders:
   - name: crescita-vista
     type: regex
     target: trace
-    pattern: 'il diff ha superato le soglie di L0|in fase plan si scrivono solo i \.md sotto docs/superpowers|fase (?:plan|execution)\s+livello L1'
+    pattern: 'il diff ha superato le soglie di L0|il diff supera le soglie di L0|in fase plan si scrivono solo i \.md sotto docs/superpowers|fase (?:plan|execution)\s+livello L1'
   - name: piano-scritto
     type: file_exists
     path: '**/docs/superpowers/plans/*.md'
