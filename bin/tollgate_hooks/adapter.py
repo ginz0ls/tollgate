@@ -8,6 +8,8 @@ from .model import Event
 
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 _PRE = {"Bash": "pre_bash", "Agent": "pre_agent", "SendMessage": "pre_send_message"}
+# Letture di un subagente (B1): Read, Grep, WebFetch, WebSearch e ogni strumento MCP; Glob no.
+LOOKUP_TOOLS = frozenset({"Read", "Grep", "WebFetch", "WebSearch"})
 _POST = {"Bash": "post_bash", "Agent": "post_agent", "Skill": "post_skill",
          "SubagentHandback": "subagent_handback"}
 _PLAIN = {"SessionStart": "session_start", "UserPromptExpansion": "prompt_expansion",
@@ -36,6 +38,8 @@ def _kind(hook_event: str, tool: str | None) -> str | None:
     if hook_event == "PostToolUse":
         if tool in EDIT_TOOLS:
             return "post_edit"
+        if tool in LOOKUP_TOOLS or (tool and tool.startswith("mcp__")):
+            return "post_lookup"
         return _POST.get(tool)
     if hook_event == "PostToolUseFailure":
         # Il comando o la modifica sono partiti anche se sono finiti male: stessi effetti di

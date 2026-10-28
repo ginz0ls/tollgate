@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -197,6 +198,51 @@ class WrapperTest(unittest.TestCase):
                    "cwd": str(self.repo), "prompt": "<task-notification>x</task-notification>"}
         r, _ = self.run_wrapper("UserPromptSubmit", payload, mode="0")
         self.assertEqual((r.returncode, r.stdout.strip()), (0, "OUT"))
+
+    def post(self, tool, **extra):
+        payload = {"hook_event_name": "PostToolUse", "session_id": "s1", "cwd": str(self.repo),
+                   "tool_name": tool, "tool_input": {"file_path": "a.txt"}}
+        payload.update(extra)
+        return self.run_wrapper("PostToolUse", payload, mode="0")[0]
+
+    def test_main_session_read_exits_early(self):
+        # con uno stato che farebbe fallire Python (uscita 7): l'uscita anticipata la nasconde
+        for tool in ("Read", "Grep", "WebFetch", "mcp__plugin_context7_context7__query-docs"):
+            with self.subTest(tool=tool):
+                r, _ = self.run_wrapper("PostToolUse", {
+                    "hook_event_name": "PostToolUse", "session_id": "s1", "cwd": str(self.repo),
+                    "tool_input": {"file_path": "a.txt"}, "tool_name": tool}, mode="7")
+                self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "", ""))
+        self.assertFalse((self.ts.dir / "hook-errors.log").exists())
+
+    def test_main_session_websearch_exits_early(self):
+        r = self.post("WebSearch", tool_input={"query": "x"})
+        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "", ""))
+
+    def test_subagent_read_reaches_python(self):
+        for tool in ("Read", "WebSearch", "mcp__srv__x"):
+            with self.subTest(tool=tool):
+                r = self.post(tool, agent_id="a1", agent_type="tollgate:implementer")
+                self.assertEqual((r.returncode, r.stdout.strip()), (0, "OUT"))
+
+    def test_other_post_tools_without_agent_id_still_reach_python(self):
+        for tool in ("Bash", "Edit"):
+            with self.subTest(tool=tool):
+                self.assertEqual(self.post(tool).stdout.strip(), "OUT")
+
+    def test_early_exit_list_matches_unnamed_tools_constant(self):
+        from tollgate_analysis import research
+        text = (ROOT / "hooks" / "run").read_text()
+        m = re.search(r'^UNNAMED_TOOLS="([^"]*)"$', text, re.M)
+        self.assertIsNotNone(m)
+        self.assertEqual(frozenset(m.group(1).split()), research.ATTRIBUTE_UNNAMED_TOOLS)
+
+    def test_unnamed_tool_in_list_reaches_python(self):
+        # copia del wrapper con WebFetch tra gli strumenti attribuiti senza agent_id
+        run = self.plugin / "hooks" / "run"
+        run.write_text(run.read_text().replace('UNNAMED_TOOLS=""', 'UNNAMED_TOOLS="WebFetch"'))
+        self.assertEqual(self.post("WebFetch").stdout.strip(), "OUT")
+        self.assertEqual(self.post("Read").stdout.strip(), "")
 
     def _path_without_python(self):
         d = self.tmp / "nopy"

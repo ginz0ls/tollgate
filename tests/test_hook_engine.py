@@ -6,12 +6,13 @@ import textwrap
 import time
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from tests.hookkit import DEFAULT_TOML, SESSION, Lab, sample
 from tests.helpers import ROOT, TempState
 from tollgate_core import db, paths
-from tollgate_hooks import adapter, registry, runner
-from tollgate_hooks.model import Event, deny, inject, record
+from tollgate_hooks import adapter, apply as applier, registry, runner
+from tollgate_hooks.model import INPUT_EVENTS, Event, deny, inject, record
 
 FAKE = {
     "rotto.py": '''
@@ -110,7 +111,10 @@ class AdapterTest(unittest.TestCase):
                  ("PostToolUse-SubagentHandback", "subagent_handback"),
                  ("UserPromptExpansion-none", "prompt_expansion"),
                  ("UserPromptSubmit-none", "prompt_submit"),
-                 ("PreToolUse-Read", None), ("PreToolUse-ToolSearch", None)]
+                 ("PreToolUse-Read", None), ("PreToolUse-ToolSearch", None),
+                 ("PostToolUse-Read", "post_lookup"), ("PostToolUse-Grep", "post_lookup"),
+                 ("PostToolUse-WebFetch", "post_lookup"), ("PostToolUse-WebSearch", "post_lookup"),
+                 ("PostToolUse-Glob", None)]
         for name, kind in cases:
             s = sample(name)
             ev = adapter.to_event(s["hook_event_name"], s)
@@ -123,6 +127,37 @@ class AdapterTest(unittest.TestCase):
         nb = sample("PreToolUse-Bash", tool_name="NotebookEdit",
                     tool_input={"notebook_path": "/x/n.ipynb"})
         self.assertEqual(adapter.edit_path(adapter.to_event("PreToolUse", nb)), "/x/n.ipynb")
+
+    def test_post_lookup_kinds(self):
+        for tool, kind in (("Read", "post_lookup"), ("Grep", "post_lookup"),
+                           ("WebFetch", "post_lookup"), ("WebSearch", "post_lookup"),
+                           ("mcp__srv__x", "post_lookup"), ("Glob", None), ("LS", None)):
+            s = sample("PostToolUse-Bash", tool_name=tool)
+            ev = adapter.to_event("PostToolUse", s)
+            with self.subTest(tool=tool):
+                self.assertEqual(ev.kind if ev else None, kind)
+        self.assertIn("post_lookup", INPUT_EVENTS)
+        # una lettura fallita non conta
+        for tool in ("Read", "Grep", "WebFetch", "WebSearch", "mcp__srv__x"):
+            s = sample("PostToolUse-Bash", hook_event_name="PostToolUseFailure", tool_name=tool)
+            self.assertIsNone(adapter.to_event("PostToolUseFailure", s))
+
+    def test_lookup_op(self):
+        lab = Lab(research=True)
+        try:
+            ctx = SimpleNamespace(event=SimpleNamespace(session="s9"), now=lab.now)
+            d = record("lookup", work=lab.work, task=1, agent_id="a1", kind="read",
+                       target="src/app.py")
+            applier.apply(lab.conn, lab.ts.state, ctx, d)
+            applier.apply(lab.conn, lab.ts.state, ctx, d)    # la stessa terna una volta sola
+            self.assertEqual([tuple(r) for r in lab.conn.execute(
+                "SELECT work, task, agent_id, session, kind, target FROM lookups")],
+                [(lab.work, 1, "a1", "s9", "read", "src/app.py")])
+            with self.assertRaises(ValueError):
+                applier.apply(lab.conn, lab.ts.state, ctx, record(
+                    "lookup", work=lab.work, task=1, agent_id=None, kind="boh", target="x"))
+        finally:
+            lab.close()
 
     def test_post_tool_use_failure_maps_to_post_kinds(self):
         for tool, kind in (("Bash", "post_bash"), ("Write", "post_edit"), ("Edit", "post_edit"),

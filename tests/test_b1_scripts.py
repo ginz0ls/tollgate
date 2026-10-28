@@ -425,10 +425,18 @@ class LatencyTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertTrue((tmp / "tollgate-b1" / "state" / ".tollgate-test").exists())
         data = json.loads((tmp / "out" / "latenza.json").read_text())
-        self.assertEqual(sorted(data["series"]), ["post_bash_subagent", "post_read_no_agent"])
+        self.assertEqual(sorted(data["series"]), ["post_bash_subagent", "post_read_no_agent", "post_read_subagent"])
         for series in data["series"].values():
             self.assertEqual(series["n"], 2)
             self.assertLessEqual(series["median_ms"], series["p95_ms"])
+        # la serie del Read da subagente misura la registrazione vera, non un'uscita a vuoto
+        import sqlite3
+        conn = sqlite3.connect(str(tmp / "tollgate-b1" / "state" / "tollgate.db"))
+        try:
+            self.assertIn(("read", "src/app.py", 1), conn.execute(
+                "SELECT kind, target, task FROM lookups").fetchall())
+        finally:
+            conn.close()
         v3 = json.loads((tmp / "out" / "b1v3-prova.json").read_text())
         self.assertEqual(v3["tool_name"], "mcp__plugin_context7_context7__query-docs")
         self.assertTrue(v3["denied"], v3)

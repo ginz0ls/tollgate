@@ -12,6 +12,7 @@ from tollgate_core.paths import repo_key
 from tollgate_hooks import runner
 
 SAMPLES = json.loads((ROOT / "spikes/fixtures/hook-inputs/samples.json").read_text())
+SAMPLES_B1 = json.loads((ROOT / "spikes/fixtures/hook-inputs/samples-b1.json").read_text())
 SESSION = "sess-lab"
 T0 = datetime(2026, 10, 9, 10, 0, tzinfo=timezone.utc)
 DROP = object()
@@ -52,10 +53,21 @@ def sample(name, **changes):
     return s
 
 
+def sample_b1(name, phase="post", **changes):
+    """Un input reale di B1 (`pre` o `post` del campione `name`) con i campi cambiati."""
+    s = copy.deepcopy(SAMPLES_B1[name][phase])
+    for k, v in changes.items():
+        if v is DROP:
+            s.pop(k, None)
+        else:
+            s[k] = v
+    return s
+
+
 class Lab:
     def __init__(self, *, level="L1", phase="execution", toml=DEFAULT_TOML, files=None,
                  bind=True, work=True, session=SESSION, issue=7, origin_url=None,
-                 worktree=True):
+                 worktree=True, research: bool = False):
         self.session = session
         self.ts = TempState()
         self.tmp = Path(tempfile.mkdtemp(prefix="tollgate lab "))
@@ -78,7 +90,7 @@ class Lab:
                 self.conn, repo_key=repo_key(key_source), issue=issue, level=level, now=T0,
                 session=session if bind else None, branch=f"tg/{issue}-demo",
                 worktree=str(self.wt),
-                work_base_sha=self.base, gate_mode="protected")
+                work_base_sha=self.base, gate_mode="protected", research=research)
             self.goto(phase)
 
     def goto(self, phase):
@@ -125,6 +137,17 @@ class Lab:
             extra["tool_response"] = response or {"stdout": "", "stderr": "",
                                                   "interrupted": False}
         return self.hook(self._base(name, agent_id, cwd, **extra, **kw))
+
+    def lookup(self, name, *, agent_id=None, agent_type="tollgate:implementer", cwd=None,
+               phase="post", **changes):
+        """Un input reale di B1 (campione `name`) recapitato al runner, come lo manda Claude Code."""
+        extra = {"session_id": self.session, "cwd": str(cwd or self.wt)}
+        if agent_id:
+            extra.update(agent_id=agent_id, agent_type=agent_type)
+        else:
+            extra.update(agent_id=DROP, agent_type=DROP)
+        extra.update(changes)
+        return self.hook(sample_b1(name, phase, **extra))
 
     def events(self, type_):
         return [json.loads(r["data"]) for r in self.conn.execute(

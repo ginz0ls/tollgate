@@ -573,9 +573,10 @@ class OtherPathsTest(RoundCase):
         self.assertEqual(r.exit, 2)
         self.assertIn("protett", r.stderr)
 
-    def test_ops_count_is_28(self):
-        self.assertEqual(len(apply.OPS), 28)
+    def test_ops_count_is_29(self):
+        self.assertEqual(len(apply.OPS), 29)
         self.assertIn("audit_report", apply.OPS)
+        self.assertIn("lookup", apply.OPS)
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ from pathlib import Path
 INPUT_EVENTS = ("session_start", "prompt_expansion", "pre_edit", "post_edit", "pre_bash",
                 "post_bash", "pre_agent", "post_agent", "pre_send_message", "pre_mcp",
                 "subagent_start", "subagent_stop", "subagent_handback", "post_skill",
-                "prompt_submit")
+                "prompt_submit", "post_lookup")
 CONTROL_EVENTS = frozenset({"pre_edit", "pre_bash", "pre_agent", "pre_send_message", "pre_mcp"})
 
 

@@ -45,6 +45,21 @@ json_str() {
     }'
 }
 
+# Le letture (PostToolUse di Read, Grep, WebFetch, WebSearch, mcp__*) si registrano solo per i
+# subagenti (B1, decisione 5): senza agent_id Python non deve partire. UNNAMED_TOOLS rispecchia
+# research.ATTRIBUTE_UNNAMED_TOOLS (separati da spazio): quegli strumenti passano anche senza agent_id.
+UNNAMED_TOOLS=""
+if [ "$EVENT" = "PostToolUse" ]; then
+  TOOL="$(json_str tool_name)"
+  case "$TOOL" in
+    Read|Grep|WebFetch|WebSearch|mcp__*)
+      case " $UNNAMED_TOOLS " in
+        *" $TOOL "*) ;;
+        *) [ -n "$(json_str agent_id)" ] || exit 0 ;;
+      esac ;;
+  esac
+fi
+
 # Messaggio per l'utente e per il modello dei rami off/on (D2 del Task 1: stderr con uscita 0
 # viene scartato da Claude Code). Un solo oggetto JSON su stdout, escape di virgolette e backslash.
 expansion_json() {

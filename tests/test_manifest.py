@@ -51,6 +51,15 @@ class ManifestTest(unittest.TestCase):
                 self.assertEqual(h["command"], f'"${{CLAUDE_PLUGIN_ROOT}}/hooks/run" {event}')
                 self.assertEqual(h["timeout"], 90)
 
+    def test_post_tool_use_matcher_has_lookups(self):
+        post = json.loads((ROOT / "hooks" / "hooks.json").read_text())["hooks"][
+            "PostToolUse"][0]["matcher"]
+        for tool in ("Read", "WebFetch", "WebSearch", "mcp__plugin_context7_context7__query-docs"):
+            self.assertRegex(tool, f"^(?:{post})$")
+        # Glob non si registra mai; Grep è fuori per la soglia della decisione 15 (latenza)
+        for tool in ("Glob", "Grep", "ToolSearch"):
+            self.assertNotRegex(tool, f"^(?:{post})$")
+
     def test_plugin_json(self):
         p = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())
         self.assertEqual(p["name"], "tollgate")

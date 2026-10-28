@@ -10,7 +10,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from tollgate_analysis import bash
-from tollgate_core import active, clock, db, git, offlog, sessions, subagents
+from tollgate_analysis import research
+from tollgate_core import (active, clock, config as cfgmod, db, git, lookups, offlog, sessions,
+                           subagents)
 from tollgate_core.acts import ActError
 from tollgate_core.config import ConfigError, ConfigNotFound, load_config
 from tollgate_core.phases import TransitionError
@@ -169,6 +171,33 @@ def _target(event) -> list[tuple[Path, Path]]:
     return list(found.values())
 
 
+def _record_lookup(conn, event, now) -> None:
+    """Via breve di `post_lookup` (decisione 15 di B1, soglia superata): una lettura costa un
+    processo Python a ogni chiamata dell'implementatore, quindi niente `load_config` né registro
+    dei moduli. Lavoro dalla cartella dell'evento, task dall'implementatore, poi
+    `lookups.record` (la regola di cosa registrare è `lookups.observed`, la stessa di
+    `lookup_rec`). Non legge `[components]`: registra anche con `research_note` spento, e
+    scrive nel DB perché non passa dal registro (il divieto di scrivere è dei moduli)."""
+    named = bool(event.agent_id)
+    if not named and event.tool_name not in research.ATTRIBUTE_UNNAMED_TOOLS:
+        return
+    work = sessions.work_for_path(conn, event.cwd) if event.cwd.is_dir() else None
+    if work is None or not work["research"] or not work["worktree"] \
+            or not Path(work["worktree"]).is_dir():
+        return
+    if named and subagents.get(conn, event.agent_id) is not None:
+        subagents.touch(conn, event.agent_id, now=now)
+    owner = lookups.owner(conn, agent_id=event.agent_id, tool=event.tool_name, work=work["id"],
+                          now=now, stale_minutes=cfgmod.DEFAULTS["review"]["stale_minutes"])
+    if owner is None:
+        return
+    for found in lookups.observed(event.tool_name or "", event.tool_input, event.tool_response,
+                                  cwd=str(event.cwd), worktree=work["worktree"]):
+        lookups.record(conn, work=owner[0], task=owner[1], agent_id=event.agent_id,
+                       session=event.session or None, kind=found.kind, target=found.target,
+                       now=now)
+
+
 def run_hook(hook_event: str, stdin_text: str, *, env=None, now=None, plugin_root=None,
              checks=None, alarm: bool = False) -> HookResult:
     env = os.environ if env is None else env
@@ -189,6 +218,10 @@ def run_hook(hook_event: str, stdin_text: str, *, env=None, now=None, plugin_roo
         if event is None:
             return HookResult(0)
         control = event.kind in CONTROL_EVENTS
+        if event.kind == "post_lookup":
+            conn = db.open_db(state)
+            _record_lookup(conn, event, now)
+            return HookResult(0)
         if event.kind == "pre_edit" and adapter.edit_path(event) is None:
             return _fail(control, "modifica senza percorso: tool_input privo di file_path",
                          state.root)

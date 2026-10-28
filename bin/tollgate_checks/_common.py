@@ -7,7 +7,7 @@ from pathlib import Path
 
 from tollgate_analysis import level as lv, prref, profiles as prof
 from tollgate_analysis.protected import is_protected
-from tollgate_core import audits, config, git, reviews, subagents, violations
+from tollgate_core import audits, config, git, lookups, reviews, subagents, violations
 from tollgate_core.paths import program_command, repo_key
 from tollgate_hooks.adapter import edit_path
 from tollgate_hooks.model import inject, record
@@ -186,6 +186,16 @@ def orphan_next(ctx, repo, n: int) -> tuple[str, str]:
     if closed_tg(ctx, repo) == n:
         return "di un lavoro chiuso", "/tollgate:cleanup"
     return "senza lavoro nel DB", f"/tollgate:adopt #{n}"
+
+
+def lookup_owner(ctx, event) -> tuple[int, int] | None:
+    """`(lavoro, task)` a cui appartiene una lettura (decisione 5 di B1), o None. La regola è in
+    `lookups.owner`; qui in più un subagente di sola lettura non possiede mai letture."""
+    work = governing_work(ctx, event.cwd)
+    if work is None or (event.agent_id and ctx.readonly(event.agent_type)):
+        return None
+    return lookups.owner(ctx.db, agent_id=event.agent_id, tool=event.tool_name, work=work["id"],
+                         now=ctx.now, stale_minutes=ctx.stale_minutes)
 
 
 def governing_work(ctx, path):

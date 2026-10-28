@@ -5,10 +5,14 @@ nuovo eredita quelle dei giri precedenti. La nota sta in `tasks.research_note`, 
 `tasks.research_ok`."""
 from __future__ import annotations
 
+import os
 from datetime import timedelta
+from pathlib import Path
 from typing import NamedTuple
 
-from . import clock, db
+from tollgate_analysis import bash, research
+
+from . import clock, db, subagents
 
 KINDS = ("read", "grep", "bash_read", "fetch", "search", "docs")
 
@@ -33,6 +37,99 @@ def record(conn, *, work: int, task: int | None, agent_id: str | None, session: 
         conn.execute("INSERT INTO lookups (work, task, agent_id, session, kind, target, at) "
                      "VALUES (?, ?, ?, ?, ?, ?, ?)",
                      (work, task, agent_id, session, kind, target, clock.fmt(now)))
+
+
+def _resolved(path: str, *, base: str) -> str:
+    """Percorso assoluto e risolto (collegamenti compresi): un collegamento nel worktree che
+    punta fuori non rende il file «del worktree» (decisione 14)."""
+    return str(Path(os.path.join(base, os.path.expanduser(path))).resolve())
+
+
+def _file_target(path: str, *, cwd: str, worktree: str, must_exist: bool) -> str | None:
+    full = _resolved(path, base=cwd)
+    if must_exist and not os.path.isfile(full):
+        return None
+    return research.normalize_path(full, cwd=cwd, worktree=_resolved(".", base=worktree))
+
+
+def observed(tool: str, tool_input: dict, tool_response: dict | None, *, cwd: str,
+             worktree: str) -> list[Lookup]:
+    """Cosa registrare per una lettura (decisione 4): una sola regola, per la via breve del
+    runner e per il modulo `lookup_rec`. `Grep` conta solo in modo `content` esplicito su un
+    file; `WebFetch` con codice di errore, e ogni forma non riconosciuta, non contano."""
+    ti = tool_input if isinstance(tool_input, dict) else {}
+    if tool == "Read":
+        raw = ti.get("file_path")
+        rel = _file_target(raw, cwd=cwd, worktree=worktree, must_exist=False) \
+            if isinstance(raw, str) and raw else None
+        return [Lookup("read", rel)] if rel else []
+    if tool == "Grep":
+        raw = ti.get("path")
+        if ti.get("output_mode") != "content" or not isinstance(raw, str) or not raw:
+            return []
+        rel = _file_target(raw, cwd=cwd, worktree=worktree, must_exist=True)
+        return [Lookup("grep", rel)] if rel else []
+    if tool == "WebFetch":
+        code = (tool_response or {}).get("code")
+        if isinstance(code, int) and not isinstance(code, bool) and code >= 400:
+            return []
+        raw = ti.get("url")
+        url = research.normalize_url(raw) if isinstance(raw, str) else None
+        return [Lookup(research.URL_KIND, url)] if url else []
+    if tool == "WebSearch":
+        query = ti.get("query")
+        return [Lookup("search", query.strip())] if isinstance(query, str) and query.strip() \
+            else []
+    if tool.startswith("mcp__") and research.is_doc_tool(tool):
+        library = research.doc_library(ti)
+        return [Lookup(research.DOCS_KIND, library)] if library else []
+    return []
+
+
+def observed_bash(command: str, *, cwd: str, worktree: str) -> list[Lookup]:
+    """I file che un comando Bash mostra (`bash.read_targets`), ognuno risolto dalla cartella
+    effettiva del comando (dopo `cd` o `-C`). Conta solo un file che esiste nel worktree: i
+    bersagli possono essere cartelle (`grep -r foo src`) o glob."""
+    try:
+        cmds = bash.parse(command, cwd)
+    except bash.BashParseError:
+        return []
+    out: list[Lookup] = []
+    for c in cmds:
+        for t in bash.read_targets(c):
+            rel = _file_target(t, cwd=bash.effective_dir(c), worktree=worktree, must_exist=True)
+            if rel:
+                out.append(Lookup("bash_read", rel))
+    return list(dict.fromkeys(out))
+
+
+def _implementer_task(conn, row) -> int | None:
+    """Il task di un subagente che lo sta eseguendo: il suo tipo è l'`agent_type` del task, che
+    è `running`. Un revisore (tipo diverso, task in `review`) non lo è."""
+    if row is None or row["task"] is None or row["work"] is None:
+        return None
+    t = conn.execute("SELECT 1 FROM tasks WHERE work = ? AND number = ? AND state = 'running' "
+                     "AND agent_type = ?", (row["work"], row["task"], row["type"])).fetchone()
+    return row["task"] if t else None
+
+
+def owner(conn, *, agent_id: str | None, tool: str | None, work: int | None, now,
+          stale_minutes: int) -> tuple[int, int] | None:
+    """`(lavoro, task)` a cui appartiene una lettura (decisione 5), o None. Con `agent_id`: il
+    task dell'implementatore. Senza (sessione principale): nessuno, salvo gli strumenti di
+    `research.ATTRIBUTE_UNNAMED_TOOLS`, che vanno all'unico implementatore vivo del lavoro."""
+    if work is None:
+        return None
+    if agent_id:
+        row = subagents.get(conn, agent_id)
+        task = _implementer_task(conn, row)
+        return (work, task) if task is not None and row["work"] == work else None
+    if tool not in research.ATTRIBUTE_UNNAMED_TOOLS:
+        return None
+    live = [r for r in subagents.running(conn, work=work)
+            if _implementer_task(conn, r) is not None
+            and not subagents.is_stale(r, now=now, stale_minutes=stale_minutes)]
+    return (work, live[0]["task"]) if len(live) == 1 else None
 
 
 def for_task(conn, work: int, task: int) -> list[Lookup]:

@@ -3,8 +3,8 @@
 
 Costruisce sotto `--root` (di norma /tmp/tollgate-b1) uno stato con la sentinella, una HOME temporanea e un repo attivo con un
 lavoro L1 in esecuzione e un implementatore registrato da `hooks/run SubagentStart`; poi misura `--runs` invocazioni di
-`hooks/run PostToolUse` con un Bash `cat` da subagente (il percorso che `post_lookup` farà) e altrettante con un `Read` senza
-`agent_id` (il costo della sola shell). In più prova a secco un `PreToolUse` di uno strumento MCP dell'implementatore (B1-V3).
+`hooks/run PostToolUse` con un Bash `cat` da subagente, altrettante con un `Read` senza `agent_id` (il costo della sola shell) e
+altrettante con un `Read` da subagente (la via breve di `post_lookup`, che scrive in `lookups`). In più prova a secco un `PreToolUse` di uno strumento MCP dell'implementatore (B1-V3).
 Scrive `latenza.json` e `b1v3-prova.json` in `--out` e stampa mediana e 95° percentile. Le cartelle e i file che esistono già
 si rinominano in `<nome>.prev-<tempo>`: niente si cancella."""
 import argparse
@@ -22,7 +22,7 @@ HERE = Path(__file__).resolve().parent
 PLUGIN_ROOT = HERE.parent.parent
 sys.path.insert(0, str(PLUGIN_ROOT / "bin"))
 
-from tollgate_core import db, git as core_git, phases     # noqa: E402
+from tollgate_core import db, git as core_git, phases, scope, tasks     # noqa: E402
 from tollgate_core.paths import SENTINEL, State, repo_key    # noqa: E402
 
 SESSION = "sess-b1-latenza"
@@ -72,13 +72,18 @@ def make_work(state_dir, main, wt, base_sha):
     try:
         work = phases.create_work(conn, repo_key=repo_key(core_git.origin_url(main)), issue=7, level="L1", now=T0,
                                   session=SESSION, branch="tg/7-demo", worktree=str(wt), work_base_sha=base_sha,
-                                  gate_mode="protected")
+                                  gate_mode="protected", research=True)
         seq = phases.SEQUENCES["L1"]
         cur = phases.get_work(conn, work)["phase"]
         while cur != "execution":
             nxt = seq[seq.index(cur) + 1]
             phases.set_phase(conn, state, work, nxt, phases._FORWARD_CONDITION.get((cur, nxt), "advance"), now=T0 + timedelta(seconds=1))
             cur = nxt
+        # Un task già in corso con il suo implementatore: la lettura va davvero nella tabella `lookups`.
+        scope.register_plan(conn, state, work, plan_path="docs/superpowers/plans/p.md", plan_sha="s",
+                            scope_paths=["src/app.py"], plan_tasks=[(1, [])], advance=False, now=T0)
+        tasks.assign(conn, work, 1, implementer="impl", agent_type="tollgate:implementer", pending="launch", now=T0)
+        tasks.task_event(conn, work, 1, "start", now=T0)
         return work
     finally:
         conn.close()
@@ -151,8 +156,10 @@ def main(argv=None):
     read_pre = envelope("PostToolUse", wt, tool_name="Read", tool_input={"file_path": str(wt / "src" / "app.py")},
                         tool_response={"type": "text", "file": {"filePath": str(wt / "src" / "app.py"), "content": FILES["src/app.py"]}},
                         tool_use_id="toolu_b1_read")
+    read_sub = dict(read_pre, agent_id=AGENT, agent_type="tollgate:implementer", tool_use_id="toolu_b1_read_sub")
     series = {}
-    for label, payload in (("post_bash_subagent", cat_pre), ("post_read_no_agent", read_pre)):
+    for label, payload in (("post_bash_subagent", cat_pre), ("post_read_no_agent", read_pre),
+                           ("post_read_subagent", read_sub)):
         times = []
         for i in range(args.runs + 1):
             secs, rc, _, err = run_hook("PostToolUse", payload, env)

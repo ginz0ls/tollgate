@@ -7,8 +7,8 @@ import os
 from pathlib import Path
 
 from tollgate_analysis import approvals, auditrules, brief, profiles as prof
-from tollgate_core import (acts, audits, effects, events, git, phases, reviews, scope, sessions,
-                           subagents, tasks, violations)
+from tollgate_core import (acts, audits, effects, events, git, lookups, phases, reviews, scope,
+                           sessions, subagents, tasks, violations)
 
 REPORT_MAX_CHARS = 60000
 
@@ -270,6 +270,9 @@ _OPS = {
     "review_report": _review_report,
     "finding_verify": _finding_verify,
     "audit_report": _audit_report,
+    "lookup": lambda c, s, x, d: lookups.record(
+        c, work=d["work"], task=d["task"], agent_id=d.get("agent_id"),
+        session=x.event.session or None, kind=d["kind"], target=d["target"], now=x.now),
 }
 OPS = frozenset(_OPS)
 
