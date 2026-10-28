@@ -33,6 +33,8 @@ DOC_MCP_TOOLS: tuple[str, ...] = (
 )
 _LIBRARY_PARAMS = ("libraryId", "context7CompatibleLibraryID")
 
+# Valori YAML che non sono una data di approvazione.
+_YAML_EMPTY = {"null", "~", "|", ">", "|-", ">-", "|+", ">+", "false"}
 _DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
@@ -53,7 +55,10 @@ def enforced(skill_text: str | None) -> bool:
             return False
         m = re.match(r"approved\s*:(.*)$", line)
         if m:
-            return m.group(1).split(" #")[0].strip().strip("'\"").strip() != ""
+            raw = m.group(1).split(" #")[0].strip()
+            if raw.lower() in _YAML_EMPTY:
+                return False
+            return raw.strip("'\"").strip() != ""
     return False
 
 
@@ -117,9 +122,9 @@ class Note:
     problems: list[str] = field(default_factory=list)
 
 
-_HEADING = re.compile(r"^##[ \t]+(.+?)[ \t]*$")
 _BULLET = re.compile(r"^[-*][ \t]+(.*)$")
-_SEPARATOR = re.compile(r"[ \t]+(?:—|-)[ \t]+")
+_SEP_LONG = " — "
+_SEP_ANY = (" — ", " - ")
 _CONTEXT7 = "context7:"
 
 
@@ -127,23 +132,31 @@ def _sections(text: str) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     current: list[str] | None = None
     for line in text.splitlines():
-        m = _HEADING.match(line)
-        if m:
-            current = out.setdefault(m.group(1).strip(), [])
+        if line.startswith("##") and line[2:3] in (" ", "\t") and line[2:].strip():
+            current = out.setdefault(line[2:].strip(), [])
         elif current is not None:
             current.append(line)
     return out
 
 
-def _item(line: str) -> tuple[str, str] | None:
+def _split_description(body: str, separators: tuple[str, ...]) -> tuple[str, str]:
+    """Spezza al primo separatore, con ricerche lineari (la nota è testo non fidato)."""
+    cuts = [(i, sep) for sep in separators if (i := body.find(sep)) >= 0]
+    if not cuts:
+        return body, ""
+    i, sep = min(cuts)
+    return body[:i], body[i + len(sep):]
+
+
+def _item(line: str, separators: tuple[str, ...]) -> tuple[str, str] | None:
     """(riferimento, descrizione) di una riga di elenco; None se non è un elemento."""
     m = _BULLET.match(line.strip())
     if not m:
         return None
     body = m.group(1).strip()
-    parts = _SEPARATOR.split(body, maxsplit=1)
-    ref = parts[0].strip().strip("`").strip().strip("<>").strip()
-    return (ref, parts[1].strip() if len(parts) > 1 else "") if ref else None
+    ref, desc = _split_description(body, separators)
+    ref = ref.strip().strip("`").strip().strip("<>").strip()
+    return (ref, desc.strip()) if ref else None
 
 
 def parse_note(text: str) -> Note:
@@ -151,13 +164,14 @@ def parse_note(text: str) -> Note:
     note = Note()
     if len(text) > MAX_NOTE_CHARS:
         note.problems.append(f"nota oltre {MAX_NOTE_CHARS} caratteri")
+        return note
     sec = _sections(text)
 
     if SECTION_FILES not in sec:
         note.problems.append(f"manca la sezione «{SECTION_FILES}»")
     else:
         for line in sec[SECTION_FILES]:
-            item = _item(line)
+            item = _item(line, (_SEP_LONG,))
             if item:
                 note.files.append(item[0])
         if not note.files:
@@ -165,7 +179,7 @@ def parse_note(text: str) -> Note:
 
     if SECTION_DOCS in sec:
         for line in sec[SECTION_DOCS]:
-            item = _item(line)
+            item = _item(line, _SEP_ANY)
             if not item:
                 continue
             ref, desc = item
@@ -176,7 +190,7 @@ def parse_note(text: str) -> Note:
             else:
                 note.problems.append(f"fonte non riconosciuta in «{SECTION_DOCS}»: {ref} "
                                      f"(serve un URL http/https o {_CONTEXT7}<libraryId>)")
-        if not note.sources and not any(_item(line) for line in sec[SECTION_DOCS]):
+        if not note.sources and not any(_item(line, _SEP_ANY) for line in sec[SECTION_DOCS]):
             note.problems.append(f"la sezione «{SECTION_DOCS}» non elenca nessuna fonte")
     if SECTION_NONE in sec:
         note.no_external = "\n".join(sec[SECTION_NONE]).strip()

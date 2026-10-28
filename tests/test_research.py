@@ -1,3 +1,4 @@
+import time
 import unittest
 
 from tollgate_analysis import research as r
@@ -38,6 +39,12 @@ class EnforcedTest(unittest.TestCase):
         self.assertFalse(r.enforced("---\nname: x\n---\napproved: 2026-11-02\n"))
         self.assertFalse(r.enforced(None))
         self.assertFalse(r.enforced(""))
+
+    def test_enforced_not_a_real_value(self):
+        for v in ("null", "~", "|", ">", "|-", '""', "''", "false", "# solo commento"):
+            with self.subTest(value=v):
+                self.assertFalse(r.enforced(f"---\nname: x\napproved: {v}\n---\n"))
+        self.assertTrue(r.enforced("---\napproved: '2026-11-02'\n---\n"))
 
     def test_active(self):
         self.assertTrue(r.active(1, True))
@@ -132,6 +139,29 @@ class ParseTest(unittest.TestCase):
     def test_parse_note_too_long(self):
         n = r.parse_note(NOTE + "x" * 8000)
         self.assertIn("nota oltre 8000 caratteri", n.problems)
+
+    def test_parse_note_too_long_not_analyzed(self):
+        start = time.monotonic()
+        n = r.parse_note("## Letto nel progetto\n- a" + " " * 100000 + "b\n")
+        self.assertLess(time.monotonic() - start, 0.5)
+        self.assertEqual(n.problems, ["nota oltre 8000 caratteri"])
+        self.assertEqual(n.files, [])
+
+    def test_parse_note_long_line_under_cap_is_fast(self):
+        for body in ("- a" + " " * 7900 + "b", "- a" + " -" * 3900, "- a" + " — " * 2600):
+            for head in ("## Letto nel progetto\n", "## Documentazione\n"):
+                with self.subTest(head=head, n=len(body)):
+                    start = time.monotonic()
+                    r.parse_note(head + body + "\n## Cosa ho trovato\nx\n")
+                    self.assertLess(time.monotonic() - start, 0.5)
+        start = time.monotonic()
+        r.parse_note("## a" + " " * 7900 + "b\n")
+        self.assertLess(time.monotonic() - start, 0.5)
+
+    def test_parse_note_file_with_dash_in_name(self):
+        n = r.parse_note("## Letto nel progetto\n- docs/A - B.md\n- c.py — descrizione - con trattino\n"
+                         "## Nessuna fonte esterna\nm\n## Cosa ho trovato\nx\n")
+        self.assertEqual(n.files, ["docs/A - B.md", "c.py"])
 
     def test_parse_note_never_raises(self):
         for text in ("", "\x00", "## ", "##Letto nel progetto", "- x"):

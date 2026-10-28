@@ -544,6 +544,7 @@ class ReadTargetsTest(unittest.TestCase):
                            ("sed -n -f s.sed f", ["f"]), ("sed 1p f", []),
                            ("cat -", []), ("cat -n a - b", ["a", "b"]),
                            ("less +G f", ["f"]), ("/usr/bin/cat a", ["a"]),
+                           ("grep --color foo f", ["f"]), ("grep --colour=auto foo f", ["f"]),
                            ("grep -l foo f", []), ("grep -c foo f", []), ("rg -l foo f", [])):
             with self.subTest(text=text):
                 self.assertEqual(bash.read_targets(one(text)), want)
