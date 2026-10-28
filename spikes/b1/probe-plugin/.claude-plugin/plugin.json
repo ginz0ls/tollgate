@@ -1,0 +1,7 @@
+{
+  "name": "probe",
+  "version": "0.0.1",
+  "description": "Sonda di tollgate B1 (B1-V1..V5): registra gli input degli hook delle letture del subagente. Non fa parte del prodotto.",
+  "author": {"name": "sAInapse"},
+  "license": "MIT"
+}
