@@ -88,9 +88,11 @@ def find_latest(conn, repo_key: str, issue: int):
 def create_work(conn, *, repo_key: str, issue: int, level: str, now, session=None, branch=None,
                 worktree=None, work_base_sha=None, gate_mode=None, spec_path=None,
                 from_approved_spec: bool = False, phase: str | None = None,
-                cause: str = "start") -> int:
+                cause: str = "start", research: bool = False) -> int:
     """`phase` (adopt, spec 12.4) fa partire il lavoro da una fase diversa dalla iniziale: deve
-    stare nella sequenza del livello e non essere `closed`; esclude `from_approved_spec`."""
+    stare nella sequenza del livello e non essere `closed`; esclude `from_approved_spec`.
+    `research` accende il passo «informati prima» (B1, decisione 10): spento è un lavoro nato
+    prima di B1, che continua con le regole con cui era partito."""
     if level not in LEVELS:
         raise ValueError(f"livello sconosciuto: {level}")
     if from_approved_spec and phase is None and not spec_path:
@@ -107,10 +109,10 @@ def create_work(conn, *, repo_key: str, issue: int, level: str, now, session=Non
         try:
             cur = conn.execute(
                 "INSERT INTO work_items (repo_key, issue, level, phase, branch, worktree, "
-                "work_base_sha, gate_mode, spec_path, sessions, created, updated) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "work_base_sha, gate_mode, spec_path, sessions, research, created, updated) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (repo_key, issue, level, phase, branch, worktree, work_base_sha, gate_mode,
-                 spec_path, json.dumps([session] if session else []), ts, ts))
+                 spec_path, json.dumps([session] if session else []), int(research), ts, ts))
         except sqlite3.IntegrityError as e:
             raise WorkExists(f"esiste già un lavoro attivo per {repo_key}#{issue}") from e
         work = cur.lastrowid

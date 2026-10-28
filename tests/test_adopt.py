@@ -110,6 +110,10 @@ class AdoptPhaseTest(AdoptCase):
                                                          "cause": "adopt"})
         self.assertEqual(fl.pre_edit(fl.wt / "src/app.py").exit, 0)
 
+    def test_adopted_work_has_research_on(self):
+        row = self.adopted(self.branch_lab(L0_FILES))
+        self.assertEqual(row["research"], 1)
+
     def test_start_refusal_then_adopt(self):
         fl = self.branch_lab(L0_FILES, remote_only=True)
         refused = self.refused(fl, "/tollgate:adopt #7")

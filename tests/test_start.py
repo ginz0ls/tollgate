@@ -17,8 +17,8 @@ from tests.flowkit import ORIGIN_URL, SESSION, SPEC, FlowLab, spec_text
 from tests.helpers import BIN
 from tests.hookkit import DEFAULT_TOML
 from tollgate_analysis import approvals
-from tollgate_core import (VERSION, cli, clock, effects, events, intents, phases, sessions, subagents,
-                           tasks)
+from tollgate_core import (VERSION, cli, clock, effects, events, intents, lookups, phases, sessions,
+                           subagents, tasks)
 from tollgate_flow import gitw, housekeeping, start as flow_start
 
 SENTINEL_TITLE = "tollgate: merge non verificato"
@@ -138,6 +138,13 @@ class StartNewTest(StartCase):
         self.assertIn(str(wt), active.splitlines())
         self.assertTrue(list((fl.ts.dir / "backup").glob("*-start.db")))
         self.assertEqual(fl.git("config", "--get", "tollgate.defaultBranch"), "main")
+
+    def test_new_work_has_research_on(self):
+        fl = self.make()
+        r = fl.cli("start", "7")
+        self.assertEqual(r.returncode, 0, out(r))
+        (row,) = self.rows(fl)
+        self.assertEqual(row["research"], 1)
 
     def test_worktree_branch_has_no_upstream(self):
         fl = self.make()
@@ -1154,6 +1161,22 @@ class HousekeepingTest(StartCase):
         seqs = [r[0] for r in fl.conn.execute("SELECT seq FROM events")]
         self.assertNotIn(old_event, seqs)
         self.assertIn(new_event, seqs)
+
+    def test_prune_lookups_of_closed_works(self):
+        fl = self.make(issue=9)
+        now = clock.now()
+        old = clock.fmt(now - timedelta(days=200))
+        (live,) = [r["id"] for r in fl.conn.execute("SELECT id FROM work_items")]
+        closed = phases.create_work(fl.conn, repo_key="github.com/o/altro", issue=3, level="L1",
+                                    now=now, research=True)
+        fl.conn.execute("UPDATE work_items SET phase = 'closed', updated = ? WHERE id = ?",
+                        (old, closed))
+        for w in (live, closed):
+            lookups.record(fl.conn, work=w, task=1, agent_id="ag", session="s", kind="read",
+                           target="src/a.py", now=now)
+        warnings = housekeeping.run(fl.conn, fl.ts.state, self.cfg(fl), now=now)
+        self.assertEqual(warnings, [])
+        self.assertEqual([r[0] for r in fl.conn.execute("SELECT work FROM lookups")], [live])
 
     def test_housekeeping_without_directories(self):
         fl = self.make(issue=9)

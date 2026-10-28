@@ -16,6 +16,7 @@ EVENT_TYPES = frozenset({
     "veto", "effect_requested", "effect_executed", "review_cycle", "pr_opened", "pr_updated",
     "merge_detected", "sentinel_alert", "spec_audit_round", "act_expired", "task_change",
     "finding", "off", "on", "finish_check", "base_realigned", "plan_reset", "skills_absent",
+    "research_note", "research_reminder",
 })
 _COLUMNS = "seq, v, at, host, session, work, repo_key, issue, type, data"
 

@@ -6,7 +6,7 @@ import sqlite3
 from datetime import timedelta
 from pathlib import Path
 
-from tollgate_core import events, sessions
+from tollgate_core import events, lookups, sessions
 
 TMP_BACKUP_MAX_AGE = timedelta(hours=1)
 CLI_SIGNAL_MAX_AGE = timedelta(days=1)
@@ -37,6 +37,7 @@ def run(conn, state, cfg, *, now) -> list[str]:
             warnings.append(f"pulizia non riuscita ({what}): {e}")
 
     step("eventi", lambda: events.prune_events(conn, now, cfg.get("retention.events_days")))
+    step("letture", lambda: lookups.prune(conn, now=now, days=cfg.get("retention.events_days")))
     step("segnalini delle sessioni", lambda: sessions.prune_bound(
         conn, state, now=now, stale_minutes=cfg.get("review.stale_minutes")))
     step("copie temporanee", lambda: _remove_older(

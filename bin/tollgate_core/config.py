@@ -89,7 +89,7 @@ DEFAULTS: dict = {
         "single_writer", "readonly_check", "final_review", "spec_adversary", "spec_audit",
         "plan_adversary", "base_test_ids", "sentinel", "task_size", "task_budget",
         "definition_of_done", "must_have_tests", "report_fields", "reviewer_standard",
-        "spec_pitch")},
+        "spec_pitch", "research_note")},
 }
 
 PROFILE_DEFAULTS: dict = {

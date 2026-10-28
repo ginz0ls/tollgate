@@ -88,6 +88,12 @@ class WorkTest(unittest.TestCase):
         self.assertEqual(first["type"], "phase_change")
         self.assertEqual(first["data"], {"from": None, "to": "execution", "cause": "start"})
 
+    def test_create_work_research_flag(self):
+        a = self.new(issue=11)
+        b = self.new(issue=12, research=True)
+        self.assertEqual(phases.get_work(self.conn, a)["research"], 0)
+        self.assertEqual(phases.get_work(self.conn, b)["research"], 1)
+
     def test_sessions_and_duplicates(self):
         w = self.new()
         self.assertEqual(json.loads(phases.get_work(self.conn, w)["sessions"]), ["s1"])

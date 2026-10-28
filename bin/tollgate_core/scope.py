@@ -1,7 +1,7 @@
 """Scope del piano e registrazione del piano (spec 7.5, 6.2)."""
 from __future__ import annotations
 
-from . import clock, db, phases, tasks
+from . import clock, db, lookups, phases, tasks
 from .events import record_event
 
 
@@ -20,7 +20,8 @@ def reset_plan(conn, work: int, *, now, session=None) -> list[int]:
     """Ritira la registrazione del piano (reopen, decisione 12): toglie lo scope `plan`, azzera
     `plan_sha` e cancella i task del lavoro, di cui dà i numeri. `plan_path` resta, così
     `post_edit` riconosce lo stesso file. Le righe storiche dei subagenti restano, ma senza il
-    numero del task: il piano nuovo rinumera i task e non deve ereditare i loro report."""
+    numero del task: il piano nuovo rinumera i task e non deve ereditare i loro report; lo stesso
+    vale per le letture (B1, decisione 14)."""
     with db.tx(conn):
         row = phases.get_work(conn, work)
         if row["plan_sha"] is None:
@@ -31,6 +32,7 @@ def reset_plan(conn, work: int, *, now, session=None) -> list[int]:
         conn.execute("UPDATE subagents SET task = NULL WHERE work = ? AND task IS NOT NULL",
                      (work,))
         conn.execute("DELETE FROM tasks WHERE work = ?", (work,))
+        lookups.detach_tasks(conn, work)
         conn.execute("UPDATE work_items SET plan_sha = NULL, updated = ? WHERE id = ?",
                      (clock.fmt(now), work))
         record_event(conn, "plan_reset", {"plan_sha": row["plan_sha"], "tasks": numbers},

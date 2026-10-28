@@ -180,8 +180,22 @@ SCHEMA_V5 = [
     "ALTER TABLE work_items ADD COLUMN audit_suspended TEXT NOT NULL DEFAULT '{}'",
 ]
 
+# Migrazione 6 (piano B1, Task 2): letture registrate per task, nota di ricerca del task e
+# interruttore del passo «informati prima» per lavoro (0 = lavoro nato prima di B1: nessun passo).
+SCHEMA_V6 = [
+    """CREATE TABLE lookups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, work INTEGER NOT NULL, task INTEGER,
+        agent_id TEXT, session TEXT,
+        kind TEXT NOT NULL CHECK (kind IN ('read','grep','bash_read','fetch','search','docs')),
+        target TEXT NOT NULL, at TEXT NOT NULL)""",
+    "CREATE INDEX lookups_task ON lookups(work, task)",
+    "ALTER TABLE tasks ADD COLUMN research_note TEXT",
+    "ALTER TABLE tasks ADD COLUMN research_ok INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE work_items ADD COLUMN research INTEGER NOT NULL DEFAULT 0",
+]
+
 MIGRATIONS: list[tuple[int, list[str]]] = [(1, SCHEMA_V1), (2, SCHEMA_V2), (3, SCHEMA_V3),
-                                           (4, SCHEMA_V4), (5, SCHEMA_V5)]
+                                           (4, SCHEMA_V4), (5, SCHEMA_V5), (6, SCHEMA_V6)]
 
 
 def latest_version() -> int:

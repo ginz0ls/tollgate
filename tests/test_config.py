@@ -76,6 +76,9 @@ class LoadTextTest(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "components.nuovo"):
             load_config_text(MIN + '[components]\nnuovo = "no"\n')
 
+    def test_research_note_component_default_true(self):
+        self.assertIs(load_config_text(MIN).get("components.research_note"), True)
+
     def test_report_string_or_map(self):
         a = load_config_text(MIN + '[commands]\nreport = "junit:r.xml"\n')
         self.assertEqual(a.get("commands.report"), "junit:r.xml")

@@ -493,7 +493,8 @@ def _create(state, conn, main, ref, base_sha, cfg, iss, issue, key, session, lev
                                   session=session, branch=branch, worktree=str(wt),
                                   work_base_sha=base_sha, gate_mode=cfg.get("gate.mode"),
                                   spec_path=later.path if later else None,
-                                  from_approved_spec=bool(later and later.current))
+                                  from_approved_spec=bool(later and later.current),
+                                  research=True)
     except (phases.WorkExists, sqlite3.Error, db.DbError) as e:
         return _refuse(f"{e} (creati il ramo {branch} e il worktree {wt}: rimuovili a mano)")
     # La riga esiste: una registrazione che fallisce non ferma le altre (la ripresa le completa).

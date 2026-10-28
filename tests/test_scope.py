@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime, timezone
 
 from tests.helpers import TempState
-from tollgate_core import db, events, phases, scope, tasks
+from tollgate_core import db, events, lookups, phases, scope, tasks
 
 T0 = datetime(2026, 10, 9, 10, 0, tzinfo=timezone.utc)
 
@@ -79,6 +79,16 @@ class ResetPlanTest(unittest.TestCase):
         self.assertEqual(scope.paths(self.conn, self.w), {"extra", "c"})
         self.assertEqual(self.conn.execute("SELECT count(*) FROM tasks").fetchone()[0], 3)
         self.assertEqual(phases.get_work(self.conn, self.w)["plan_sha"], "s2")
+
+    def test_reset_plan_drops_task_lookups(self):
+        self.register("s1", ("a",))
+        lookups.record(self.conn, work=self.w, task=2, agent_id="ag", session="s",
+                       kind="read", target="src/a.py", now=T0)
+        self.assertEqual(len(lookups.for_task(self.conn, self.w, 2)), 1)
+        scope.reset_plan(self.conn, self.w, now=T0)
+        self.assertEqual(lookups.for_task(self.conn, self.w, 2), [])
+        self.register("s2", ("a",))
+        self.assertEqual(lookups.for_task(self.conn, self.w, 2), [])
 
     def test_reset_without_plan_is_noop_without_event(self):
         self.assertEqual(scope.reset_plan(self.conn, self.w, now=T0), [])

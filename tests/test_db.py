@@ -195,8 +195,8 @@ class MigrationV4Test(unittest.TestCase):
     def tearDown(self):
         self.ts.cleanup()
 
-    def test_latest_version_is_5(self):
-        self.assertEqual(db.latest_version(), 5)
+    def test_latest_version_is_6(self):
+        self.assertEqual(db.latest_version(), 6)
 
     def test_from_v3_adds_columns_keeps_rows_and_backup(self):
         saved = db.MIGRATIONS[:]
@@ -269,7 +269,8 @@ class MigrationV5Test(unittest.TestCase):
         conn = db.open_db(self.ts.state)
         try:
             self.assertEqual(conn.execute(
-                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "5")
+                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0],
+                str(db.latest_version()))
 
             def cols(table):
                 return {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
@@ -287,6 +288,61 @@ class MigrationV5Test(unittest.TestCase):
     def test_fresh_db_makes_no_copy(self):
         db.open_db(self.ts.state).close()
         self.assertEqual(list(self.ts.state.backup_dir.glob("*migrazione-5*")), [])
+
+
+class MigrationV6Test(unittest.TestCase):
+    def setUp(self):
+        self.ts = TempState()
+
+    def tearDown(self):
+        self.ts.cleanup()
+
+    def test_migration_6_columns(self):
+        conn = db.open_db(self.ts.state)
+        try:
+            def cols(table):
+                return {r[1]: r for r in conn.execute(f"PRAGMA table_info({table})")}
+            self.assertEqual(list(cols("lookups")), ["id", "work", "task", "agent_id", "session",
+                                                     "kind", "target", "at"])
+            self.assertIn("research_note", cols("tasks"))
+            self.assertIn("research_ok", cols("tasks"))
+            self.assertIn("research", cols("work_items"))
+            idx = [(r[1], [c[2] for c in conn.execute(f"PRAGMA index_info({r[1]})")])
+                   for r in conn.execute("PRAGMA index_list(lookups)")]
+            self.assertIn(("lookups_task", ["work", "task"]), idx)
+            with self.assertRaises(sqlite3.IntegrityError):
+                conn.execute("INSERT INTO lookups (work, kind, target, at) "
+                             "VALUES (1, 'write', 'x', 'x')")
+        finally:
+            conn.close()
+
+    def test_migration_keeps_existing_works_outside(self):
+        saved = db.MIGRATIONS[:]
+        try:
+            db.MIGRATIONS[:] = saved[:5]
+            conn = db.open_db(self.ts.state)
+            insert_work(conn, phase="execution")
+            conn.execute("INSERT INTO tasks (work, number, kind, source, state) "
+                         "VALUES (1, 1, 'plan', 'plan', 'running')")
+            conn.close()
+        finally:
+            db.MIGRATIONS[:] = saved
+        conn = db.open_db(self.ts.state)
+        try:
+            self.assertEqual(conn.execute(
+                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "6")
+            w = conn.execute("SELECT * FROM work_items").fetchone()
+            self.assertEqual((w["phase"], w["research"]), ("execution", 0))
+            t = conn.execute("SELECT * FROM tasks").fetchone()
+            self.assertEqual((t["state"], t["research_ok"], t["research_note"]),
+                             ("running", 0, None))
+        finally:
+            conn.close()
+        self.assertTrue(list(self.ts.state.backup_dir.glob("tollgate-*-migrazione-6.db")))
+
+    def test_fresh_db_makes_no_copy(self):
+        db.open_db(self.ts.state).close()
+        self.assertEqual(list(self.ts.state.backup_dir.glob("*migrazione-6*")), [])
 
 
 _FROZEN = datetime(2026, 10, 9, 12, 0, 0, 123456, tzinfo=timezone.utc)

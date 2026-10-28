@@ -346,7 +346,7 @@ def _adopt(state, conn, main: Path, ref: str, cfg, key: str, issue: int, session
         work = phases.create_work(
             conn, repo_key=key, issue=issue, level=ev.level, now=now, session=session,
             branch=branch, worktree=str(wt), work_base_sha=base, gate_mode=cfg.get("gate.mode"),
-            spec_path=spec_path, phase=ev.phase, cause="adopt")
+            spec_path=spec_path, phase=ev.phase, cause="adopt", research=True)
     except (phases.WorkExists, sqlite3.Error, db.DbError) as e:
         return _refuse(f"{e} (ramo {branch} e worktree {wt} restano: adottali di nuovo con "
                        "/tollgate:adopt dopo aver risolto)", warnings=warnings)
