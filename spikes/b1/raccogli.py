@@ -6,7 +6,9 @@
   raccogli.py raccogli --tentativo DIR --out DIR --samples FILE --skill SKILL.md [--home HOME]
       copia (anonimizzati) i file del tentativo in <out>/<nome del tentativo>/, scrive l'esito dell'heredoc
       (eco-esito.txt: integro | diverso | assente), un riepilogo degli eventi (riepilogo.txt) e i campioni
-      anonimizzati per le funzioni dei Task 3 e 4 (<samples>, chiavi read, grep_content, grep_files, glob,
+      anonimizzati per le funzioni dei Task 3 e 4 (<samples>, chiavi read, grep_content (Grep su un file),
+      grep_content_dir (Grep content su una cartella), grep_default (Grep su un file senza
+      output_mode), grep_files, glob,
       bash_cat, webfetch, webfetch_redirect, websearch, mcp_docs, ognuna con pre e post; una chiave senza
       campione resta assente).
 
@@ -25,7 +27,7 @@ HEREDOC = re.compile(r"<<'NOTA_DI_RICERCA_FINE'\n(.*?)\nNOTA_DI_RICERCA_FINE\n",
 PLACEHOLDER_KEYS = {"session_id": "SESSION-ID", "transcript_path": "/home/USER/.claude/projects/TRANSCRIPT.jsonl",
                     "agent_transcript_path": "/home/USER/.claude/projects/AGENT-TRANSCRIPT.jsonl",
                     "scratchpad_dir": "SCRATCHPAD-DIR"}
-SAMPLE_KEYS = ("read", "grep_content", "grep_files", "glob", "bash_cat", "webfetch", "webfetch_redirect",
+SAMPLE_KEYS = ("read", "grep_content", "grep_content_dir", "grep_default", "grep_files", "glob", "bash_cat", "webfetch", "webfetch_redirect",
                "websearch", "mcp_docs")
 MAX_STRING = 4000                                    # nei campioni una stringa più lunga si tronca (il registro resta intero)
 COPIED = ("argv.txt", "versione.txt", "claude.err", "uscita.txt", "redirect-url.txt")
@@ -104,7 +106,11 @@ def classify(e, redirect):
     if tool == "Read" and str(ti.get("file_path", "")).endswith("src/app.py"):
         return "read"
     if tool == "Grep":
-        return "grep_content" if ti.get("output_mode") == "content" else (
+        if ti.get("output_mode") == "content":
+            return "grep_content" if str(ti.get("path", "")).endswith(".py") else "grep_content_dir"
+        if ti.get("output_mode") is None and str(ti.get("path", "")).endswith(".py"):
+            return "grep_default"
+        return (
             "grep_files" if ti.get("output_mode") in (None, "files_with_matches") else None)
     if tool == "Glob":
         return "glob"
@@ -188,7 +194,9 @@ def cmd_raccogli(args):
     att = Path(args.tentativo)
     if not att.is_dir():
         raise SystemExit("manca la cartella del tentativo: %s" % att)
-    home = args.home or ""
+    home = (args.home or "").strip()
+    if not home or home == "/":
+        raise SystemExit("--home vuoto o assente: senza non si può anonimizzare (le evidenze si committano)")
     dest = Path(args.out) / att.name
     rot(dest)
     dest.mkdir(parents=True)

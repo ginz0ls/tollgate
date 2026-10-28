@@ -57,14 +57,16 @@ Usa la skill probe:leggi (strumento Skill). Il subagente probe:lettore deve eseg
 1. Read di src/app.py.
 2. Read di src/assente.py (il file non esiste: serve l'errore).
 3. Grep del pattern «somma» nella cartella src, con output_mode content.
-4. Grep del pattern «somma» nella cartella src, con output_mode files_with_matches.
-5. Glob con pattern «**/*.py».
-6. Bash: cat pyproject.toml.
-7. WebFetch di https://docs.python.org/3/library/tomllib.html, chiedendo una riga su cosa fa il modulo.
-8. WebFetch di $1, chiedendo una riga su cosa fa il modulo.
-9. WebSearch di «python tomllib».
-10. Se hai uno strumento di context7 (un nome che contiene context7): risolvi la libreria «tomllib» o «python» e interroga la documentazione su tomllib; se lo strumento non c'è, o chiede l'autenticazione, scrivilo e passa oltre.
-Dopo i dieci passi il passo finale della skill (l'heredoc verso bin/eco). Alla fine riporta una riga per passo.
+4. Grep del pattern «somma» con path src/app.py (un file), con output_mode content.
+5. Grep del pattern «somma» con path src/app.py, senza output_mode (non passare il parametro).
+6. Grep del pattern «somma» nella cartella src, con output_mode files_with_matches.
+7. Glob con pattern «**/*.py».
+8. Bash: cat pyproject.toml.
+9. WebFetch di https://docs.python.org/3/library/tomllib.html, chiedendo una riga su cosa fa il modulo.
+10. WebFetch di $1, chiedendo una riga su cosa fa il modulo.
+11. WebSearch di «python tomllib».
+12. Se hai uno strumento di context7 (un nome che contiene context7): risolvi la libreria «tomllib» o «python» e interroga la documentazione su tomllib; se lo strumento non c'è, o chiede l'autenticazione, scrivilo e passa oltre.
+Dopo i dodici passi il passo finale della skill (l'heredoc verso bin/eco). Alla fine riporta una riga per passo.
 TESTO
 }
 
@@ -152,11 +154,12 @@ modo_sonda() {
   rot "$WORK"
   crea_repo_di_prova "$WORK" || die "repo di prova non creato"
   if [ "$CHECK" != 1 ]; then rot "$DEFAULT_TMP/hooks.jsonl" "$DEFAULT_TMP/eco.txt"; fi
+  mkdir -p "$TMP/state" && : > "$TMP/state/.tollgate-test"     # stato isolato con la sentinella: un hook di tollgate attivo nella sessione non usa mai lo stato dell'utente
   printf '%s\n' "$url" > "$att/redirect-url.txt"
   { printf 'cwd: %s\n' "$WORK"; printf '%q ' "${CMD[@]}"; printf '\n'; } > "$att/argv.txt"
   timeout 30 claude --version > "$att/versione.txt" 2>&1 < /dev/null
   echo "tentativo $n: claude -p da $WORK (tetto $TIMEOUT_S s)"
-  ( cd "$WORK" && B1_PROBE_LOG="$att/hooks.jsonl" B1_ECO_OUT="$att/eco.txt" \
+  ( cd "$WORK" && B1_PROBE_LOG="$att/hooks.jsonl" B1_ECO_OUT="$att/eco.txt" TOLLGATE_STATE="$TMP/state" \
       timeout "$TIMEOUT_S" "${CMD[@]}" < /dev/null ) > "$att/claude.json" 2> "$att/claude.err"
   rc=$?
   echo "$rc" > "$att/uscita.txt"
@@ -216,9 +219,10 @@ modo_raccogli() {
   fi
   att="$TMP/tentativo-$n"
   [ -d "$att" ] || die "manca $att"
+  [ -n "${HOME:-}" ] && [ "$HOME" != / ] || die "--home vuoto: HOME non è impostata, non si può anonimizzare"
   mkdir -p "$OUT"
   python3 -B "$here/raccogli.py" raccogli --tentativo "$att" --out "$OUT" --samples "$SAMPLES" \
-    --skill "$here/probe-plugin/skills/leggi/SKILL.md" --home "$HOME"
+    --skill "$here/probe-plugin/skills/leggi/SKILL.md" --home "${HOME:-}"
 }
 
 case "$MODE" in

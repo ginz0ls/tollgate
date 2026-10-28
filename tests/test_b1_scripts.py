@@ -20,7 +20,7 @@ PLUGIN = B1 / "probe-plugin"
 SKILL = PLUGIN / "skills" / "leggi" / "SKILL.md"
 REDIRECT = "https://docs.python.org/library/json.html"
 FAKE_CLAUDE = """#!/usr/bin/env bash
-{ printf 'CWD\\0%s\\0' "$PWD"; for a in "$@"; do printf 'ARG\\0%s\\0' "$a"; done; printf 'END\\0'; } >> "$B1_FAKE_LOG"
+{ printf 'CWD\\0%s\\0ENV\\0%s\\0' "$PWD" "${TOLLGATE_STATE-}"; for a in "$@"; do printf 'ARG\\0%s\\0' "$a"; done; printf 'END\\0'; } >> "$B1_FAKE_LOG"
 case "$1" in --version) echo "9.9.9 (Claude Code finto)" ;; -p) echo '{"result":"ok"}' ;; esac
 exit 0
 """
@@ -41,8 +41,8 @@ def read_calls(log):
     i = 0
     while i < len(parts) - 1:
         if parts[i] == "CWD":
-            cur = {"cwd": parts[i + 1], "args": []}
-            i += 2
+            cur = {"cwd": parts[i + 1], "args": [], "state": parts[i + 3]}
+            i += 4
         elif parts[i] == "ARG":
             cur["args"].append(parts[i + 1])
             i += 2
@@ -193,9 +193,15 @@ class ChecksTest(unittest.TestCase):
         self.assertEqual(denied, ["Bash(curl:*)", "Bash(wget:*)", "Bash(gh:*)", "Bash(git push:*)"])
         prompt = args[-1]
         self.assertIn(REDIRECT, prompt)
+        self.assertIn("Dopo i dodici passi", prompt)
+        self.assertIn("path src/app.py, senza output_mode (non passare il parametro)", prompt)
+        self.assertIn("path src/app.py (un file), con output_mode content", prompt)
         for word in ("src/app.py", "src/assente.py", "content", "files_with_matches", "Glob", "pyproject.toml",
                      "https://docs.python.org/3/library/tomllib.html", "WebSearch", "context7", "probe:leggi"):
             self.assertIn(word, prompt)
+        state = Path(calls[0]["state"])
+        self.assertEqual(os.path.realpath(state), os.path.realpath(self.b.tmp / "state"))
+        self.assertTrue((state / ".tollgate-test").is_file())
         # il repo di prova
         probe = self.b.tmp / "probe"
         self.assertTrue((probe / "src" / "app.py").exists() and (probe / "pyproject.toml").exists())
@@ -232,7 +238,9 @@ class ChecksTest(unittest.TestCase):
         events = [dict(base, hook_event_name="SubagentStart", agent_id=agent, agent_type="probe:lettore")]
         pairs = [
             ("t1", "Read", {"file_path": "/tmp/tollgate-b1/probe/src/app.py"}, {"type": "text", "file": {"content": f"x {home}"}}),
-            ("t2", "Grep", {"pattern": "somma", "output_mode": "content"}, {"mode": "content", "content": "src/app.py:1:def somma"}),
+            ("t2", "Grep", {"pattern": "somma", "path": "src", "output_mode": "content"}, {"mode": "content", "content": "src/app.py:1:def somma"}),
+            ("t2f", "Grep", {"pattern": "somma", "path": "src/app.py", "output_mode": "content"}, {"mode": "content", "content": "1:def somma"}),
+            ("t3d", "Grep", {"pattern": "somma", "path": "src/app.py"}, {"mode": "files_with_matches", "filenames": ["src/app.py"]}),
             ("t3", "Grep", {"pattern": "somma", "output_mode": "files_with_matches"}, {"mode": "files_with_matches", "filenames": ["src/app.py"]}),
             ("t4", "Glob", {"pattern": "**/*.py"}, {"filenames": ["src/app.py"]}),
             ("t5", "Bash", {"command": "cat pyproject.toml"}, {"stdout": "[project]", "stderr": ""}),
@@ -266,7 +274,7 @@ class ChecksTest(unittest.TestCase):
         r = self.b.run("raccogli", HOME=home)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         samples = json.loads(self.b.samples.read_text())
-        self.assertEqual(list(samples), ["read", "grep_content", "grep_files", "glob", "bash_cat", "webfetch", "webfetch_redirect",
+        self.assertEqual(list(samples), ["read", "grep_content", "grep_content_dir", "grep_default", "grep_files", "glob", "bash_cat", "webfetch", "webfetch_redirect",
                                          "websearch"], "mcp_docs resta assente senza campione")
         for key, entry in samples.items():
             with self.subTest(key):
@@ -281,6 +289,10 @@ class ChecksTest(unittest.TestCase):
         self.assertEqual(samples["webfetch_redirect"]["pre"]["tool_input"]["url"], REDIRECT)
         self.assertEqual(samples["webfetch"]["pre"]["tool_input"]["url"], "https://docs.python.org/3/library/tomllib.html")
         self.assertTrue(samples["webfetch"]["post"]["tool_response"]["result"].endswith("[troncato, 9000 caratteri]"))
+        self.assertEqual(samples["grep_content"]["pre"]["tool_input"]["path"], "src/app.py")
+        self.assertEqual(samples["grep_content_dir"]["pre"]["tool_input"]["path"], "src")
+        self.assertNotIn("output_mode", samples["grep_default"]["pre"]["tool_input"])
+        self.assertEqual(samples["grep_files"]["pre"]["tool_input"]["output_mode"], "files_with_matches")
         self.assertEqual(samples["bash_cat"]["pre"]["tool_input"]["command"], "cat pyproject.toml")
         # nulla di personale in tutto ciò che si è scritto
         written = [self.b.samples, *[p for p in self.b.out.rglob("*") if p.is_file()]]
@@ -298,6 +310,16 @@ class ChecksTest(unittest.TestCase):
         self.assertIn("righe non valide: 1", summary)
         self.assertIn("senza campione: mcp_docs", summary)
         self.assertIn("probe:lettore", summary)
+
+    def test_checks_raccogli_refuses_an_empty_home(self):
+        self._fake_attempt(eco="")
+        for home in ("", "/"):
+            with self.subTest(home):
+                r = self.b.run("raccogli", HOME=home)
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn("--home vuoto", r.stderr)
+                self.assertFalse(self.b.samples.exists())
+                self.assertFalse(self.b.out.exists())
 
     def test_checks_raccogli_flags_a_changed_heredoc_and_a_missing_one(self):
         home, _, _ = self._fake_attempt(eco=self._expected_eco().replace("`backtick`", "backtick"))
