@@ -1,0 +1,26 @@
+eventi: 30 (righe non valide: 0)
+  PostToolUse          Agent                                         senza agent_id  1
+  PostToolUse          Bash                                          agent_id        2
+  PostToolUse          Glob                                          agent_id        1
+  PostToolUse          Grep                                          agent_id        4
+  PostToolUse          Read                                          agent_id        1
+  PostToolUse          Skill                                         senza agent_id  1
+  PostToolUse          WebFetch                                      agent_id        2
+  PostToolUse          WebSearch                                     agent_id        1
+  PostToolUseFailure   Read                                          agent_id        1
+  PreToolUse           Agent                                         senza agent_id  1
+  PreToolUse           Bash                                          agent_id        2
+  PreToolUse           Glob                                          agent_id        1
+  PreToolUse           Grep                                          agent_id        4
+  PreToolUse           Read                                          agent_id        2
+  PreToolUse           Skill                                         senza agent_id  1
+  PreToolUse           WebFetch                                      agent_id        2
+  PreToolUse           WebSearch                                     agent_id        1
+  SubagentStart        -                                             agent_id        1
+  SubagentStop         -                                             agent_id        1
+SubagentStart: probe:lettore
+PostToolUseFailure: Read {"file_path": "/tmp/tollgate-b1/probe/src/assente.py"}
+URL con reindirizzamento: https://docs.python.org/library/json.html
+campioni: read, grep_content, grep_content_dir, grep_default, grep_files, glob, bash_cat, webfetch, webfetch_redirect, websearch
+senza campione: mcp_docs
+heredoc di B1-V5: integro

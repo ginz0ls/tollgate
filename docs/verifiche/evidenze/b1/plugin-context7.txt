@@ -1,0 +1,4 @@
+  ❯ context7@claude-plugins-official
+    Version: f8c5e7a1dcb7
+    Scope: user
+    Status: ✔ enabled

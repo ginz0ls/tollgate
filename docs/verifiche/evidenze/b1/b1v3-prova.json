@@ -1,0 +1,10 @@
+{
+  "tool_name": "mcp__plugin_context7_context7__query-docs",
+  "agent_id": "agent-impl-b1",
+  "exit_code": 2,
+  "stdout": "",
+  "stderr": "tollgate: effetto esterno (strumento MCP non in mcp_allow): mcp__plugin_context7_context7__query-docs {\"libraryId\": \"/python/cpython\", \"query\": \"tomllib\"}. Per eseguirlo una volta l'utente digita /tollgate:approve effect e-ebd27425\n",
+  "denied": true,
+  "seconds": 0.358,
+  "work": 1
+}

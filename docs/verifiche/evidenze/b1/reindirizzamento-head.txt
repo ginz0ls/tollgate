@@ -1,0 +1,15 @@
+Prova a mano del controller, 28/10/2026, prima della sonda (curl -sI --max-time 15, solo le righe HTTP e location):
+
+== https://docs.python.org/library/json.html
+HTTP/2 301
+location: https://docs.python.org/3/library/json.html
+
+Altre candidate scartate:
+== https://docs.python.org/library/tomllib.html
+HTTP/2 301
+location: https://docs.python.org/3/library/tomllib.html   (stessa pagina dell'altro WebFetch: non si distinguerebbe)
+== https://docs.python.org/3/library/tomllib
+HTTP/2 301
+location: https://docs.python.org:/3/library/tomllib.html
+== https://docs.python.org/3.11/library/tomllib.html
+HTTP/2 200
