@@ -744,6 +744,98 @@ def write_targets(cmd: Cmd) -> list[str]:
     return out
 
 
+# --- letture (best effort, decisione 4 di B1) --------------------------------------------------
+
+_READERS = {"cat", "head", "tail", "less", "sed", "grep", "rg"}
+# Opzioni che consumano l'argomento seguente (corte: lettera sola; lunghe: senza `=`).
+_READ_OPT_ARG: dict[str, tuple[str, tuple[str, ...]]] = {
+    "cat": ("", ()),
+    "head": ("nc", ("--lines", "--bytes")),
+    "tail": ("ncs", ("--lines", "--bytes", "--sleep-interval", "--pid",
+                     "--max-unchanged-stats")),
+    "less": ("pPtTxyzbhjkoODU", ("--pattern", "--tag", "--tag-file", "--tabs", "--max-back-scroll",
+                                 "--max-forw-scroll", "--shift", "--jump-target", "--lesskey-file",
+                                 "--log-file", "--LOG-FILE")),
+    "sed": ("efl", ("--expression", "--file", "--line-length")),
+    "grep": ("efABCmdD", ("--regexp", "--file", "--after-context", "--before-context", "--context",
+                          "--max-count", "--directories", "--devices", "--include", "--exclude",
+                          "--exclude-from", "--exclude-dir", "--label", "--binary-files",
+                          "--color", "--colour")),
+    "rg": ("efABCmgtTjMrEd", ("--regexp", "--file", "--after-context", "--before-context",
+                               "--context", "--max-count", "--glob", "--iglob", "--type",
+                               "--type-not", "--type-add", "--max-depth", "--threads", "--replace",
+                               "--max-columns", "--encoding", "--ignore-file", "--sort", "--sortr",
+                               "--pre", "--pre-glob", "--max-filesize", "--path-separator",
+                               "--engine", "--colors", "--context-separator")),
+}
+# Opzioni che non mostrano il contenuto (solo nomi o conteggi): la lettura non c'è.
+_NO_CONTENT_SHORT = {"grep": set("lLcq"), "rg": set("lcq")}
+_NO_CONTENT_LONG = {"grep": {"--files-with-matches", "--files-without-match", "--count",
+                             "--quiet", "--silent"},
+                    "rg": {"--files-with-matches", "--files-without-match", "--count",
+                           "--count-matches", "--quiet", "--files"}}
+# Opzioni che portano il programma/pattern, così il primo posizionale non è più il pattern.
+_PATTERN_SHORT = {"sed": "ef", "grep": "ef", "rg": "ef"}
+_PATTERN_LONG = {"sed": ("--expression", "--file"), "grep": ("--regexp", "--file"),
+                 "rg": ("--regexp", "--file")}
+
+
+def _parse_read_args(base: str, args: list[str]) -> tuple[set[str], set[str], list[str]]:
+    """(lettere corte usate, opzioni lunghe usate, posizionali) di una chiamata."""
+    short_arg, long_arg = _READ_OPT_ARG[base]
+    shorts: set[str] = set()
+    longs: set[str] = set()
+    pos: list[str] = []
+    i = 0
+    while i < len(args):
+        x = args[i]
+        i += 1
+        if x == "--":
+            pos += args[i:]
+            break
+        if x.startswith("--"):
+            longs.add(x.split("=", 1)[0])
+            if "=" not in x and x in long_arg:
+                i += 1
+        elif x.startswith("-") and len(x) > 1:
+            for k, ch in enumerate(x[1:], 1):
+                shorts.add(ch)
+                if ch in short_arg:
+                    if k == len(x) - 1:
+                        i += 1
+                    break
+        elif base == "less" and x.startswith("+") and len(x) > 1:
+            continue
+        else:
+            pos.append(x)
+    return shorts, longs, pos
+
+
+def read_targets(c: Cmd) -> list[str]:
+    """File che il comando mostra (decisione 4 di B1): argomenti non opzione di `cat`, `head`,
+    `tail`, `less`, `sed -n`, e quelli dopo il pattern per `grep` e `rg`. `-` è lo stdin.
+    Non conta `wc` né altro. Best effort: i percorsi vanno poi risolti contro `Cmd.cwd`.
+    Il bersaglio di `<` non arriva in `Cmd.redirects` (solo le uscite): non si conta."""
+    if not c.argv:
+        return []
+    base = os.path.basename(c.argv[0])
+    if base not in _READERS:
+        return []
+    shorts, longs, pos = _parse_read_args(base, c.argv[1:])
+    if base == "sed":
+        quiet = "n" in shorts or bool(longs & {"--quiet", "--silent"})
+        if not quiet or _inplace(c.argv[1:]):
+            return []
+    if base in _NO_CONTENT_SHORT and (shorts & _NO_CONTENT_SHORT[base]
+                                       or longs & _NO_CONTENT_LONG[base]):
+        return []
+    if base in _PATTERN_SHORT:
+        has_pattern = bool(shorts & set(_PATTERN_SHORT[base]) or longs & set(_PATTERN_LONG[base]))
+        if not has_pattern and pos:
+            pos = pos[1:]
+    return [x for x in pos if x != "-"]
+
+
 _REMOVERS = {"rm", "rmdir", "unlink", "mv", "shred"}
 
 

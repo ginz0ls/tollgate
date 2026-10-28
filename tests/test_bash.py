@@ -529,5 +529,38 @@ class ScriptIndexTest(unittest.TestCase):
                 self.assertIsNone(bash.script_index(argv))
 
 
+class ReadTargetsTest(unittest.TestCase):
+    def test_read_targets(self):
+        for text, want in (("cat a b", ["a", "b"]), ("sed -n 1,20p f", ["f"]),
+                           ("sed -i s/x/y/ f", []), ("grep -n foo src/a.py", ["src/a.py"]),
+                           ("rg foo", []), ("head -n 5 f", ["f"]), ("wc -l f", []),
+                           ("echo f", []), ("grep -A 3 foo f", ["f"]),
+                           ("tail -n +3 f g", ["f", "g"]), ("head -c 10 -- f", ["f"]),
+                           ("head -n5 f", ["f"]), ("head --lines 5 f", ["f"]),
+                           ("grep -e foo -e bar f", ["f"]), ("grep -f pats f", ["f"]),
+                           ("grep -rn foo src tests", ["src", "tests"]),
+                           ("rg -g '*.py' foo src", ["src"]), ("rg -e foo a b", ["a", "b"]),
+                           ("sed -n -e 1p f", ["f"]), ("sed -ne 1p f", ["f"]),
+                           ("sed -n -f s.sed f", ["f"]), ("sed 1p f", []),
+                           ("cat -", []), ("cat -n a - b", ["a", "b"]),
+                           ("less +G f", ["f"]), ("/usr/bin/cat a", ["a"]),
+                           ("grep -l foo f", []), ("grep -c foo f", []), ("rg -l foo f", [])):
+            with self.subTest(text=text):
+                self.assertEqual(bash.read_targets(one(text)), want)
+
+    def test_read_targets_pipeline(self):
+        a, b = cmds("cat a | head -n 5")
+        self.assertEqual(bash.read_targets(a), ["a"])
+        self.assertEqual(bash.read_targets(b), [])
+
+    def test_read_targets_stdin_redirect_not_in_redirects(self):
+        # `<` non arriva in Cmd.redirects (solo le uscite): nessun bersaglio, né falso.
+        self.assertEqual(bash.read_targets(one("cat < f > out")), [])
+        self.assertEqual(bash.read_targets(one("cat a > out")), ["a"])
+
+    def test_read_targets_empty(self):
+        self.assertEqual(bash.read_targets(bash.Cmd([], "/r")), [])
+
+
 if __name__ == "__main__":
     unittest.main()
