@@ -125,7 +125,22 @@ class SkillContractTest(unittest.TestCase):
         text = squash(skill_text("setup"))
         for word in ("permissions.allow", "WebFetch", "WebSearch"):
             self.assertIn(word, text)
-        self.assertRegex(text, r"(?i)lo aggiunge (?:lui|l'utente)|da sé|da lui")
+        self.assertRegex(text, r"le regole le aggiunge l'utente da sé")
+        self.assertNotRegex(text, r"(?i)\bsono gratis\b.*non scrivono niente")
+
+    def test_setup_proposes_domain_rules_first_in_the_project(self):
+        text = squash(skill_text("setup"))
+        by_domain, bare = text.index("WebFetch(domain:"), text.index('"WebFetch"')
+        self.assertLess(by_domain, bare)
+        self.assertIn(".claude/settings.json` del progetto", text)
+
+    def test_setup_says_the_risk_of_a_free_webfetch(self):
+        text = squash(skill_text("setup"))
+        self.assertRegex(text, r"un `WebFetch` libero può portare dati fuori nell'URL")
+        self.assertIn("tollgate non controlla `WebFetch`", text)
+        # il permesso globale resta una scelta dell'utente, con il rischio scritto prima
+        self.assertLess(text.index("può portare dati fuori"), text.index('"WebFetch"'))
+        self.assertRegex(text, r"(?i)scelta dell'utente")
 
     def test_caps_section_says_resolve_always_suspends(self):
         text = squash(section(skill_text("spec-audit"), "## I tetti"))
