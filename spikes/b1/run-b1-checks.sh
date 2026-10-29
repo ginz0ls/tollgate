@@ -115,11 +115,11 @@ modo_controlla() {
   echo "--- i file della sonda"
   bash -n "$here/run-b1-checks.sh" || { echo "  bash -n fallito"; rc=1; }
   for f in latenza.py raccogli.py probe-plugin/hooks/record.py probe-plugin/bin/eco; do
-    python3 -B -c "import sys; compile(open(sys.argv[1]).read(), sys.argv[1], 'exec')" "$here/$f" || { echo "  non compila: $f"; rc=1; }
+    python3 -B -c "import sys, pathlib; compile(pathlib.Path(sys.argv[1]).read_text(), sys.argv[1], 'exec')" "$here/$f" || { echo "  non compila: $f"; rc=1; }
   done
   python3 -B -c "
-import json, sys
-h = json.load(open(sys.argv[1]))['hooks']
+import json, pathlib, sys
+h = json.loads(pathlib.Path(sys.argv[1]).read_text())['hooks']
 want = {'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'SubagentStart', 'SubagentStop'}
 assert set(h) == want, sorted(h)
 for ev in ('PreToolUse', 'PostToolUse', 'PostToolUseFailure'):

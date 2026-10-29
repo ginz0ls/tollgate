@@ -129,7 +129,7 @@ modo_controlla() {
   printf '  passo2 (cwd = worktree del lavoro): '; printf '%q ' "${CMD[@]:0:${#CMD[@]}-1}"; echo "<prompt>"
   echo "--- i file"
   bash -n "$here/run-b1-flow.sh" || { echo "  bash -n fallito"; rc=1; }
-  python3 -B -c "import sys; compile(open(sys.argv[1]).read(), sys.argv[1], 'exec')" "$here/b1/flowreg.py" || { echo "  non compila: flowreg.py"; rc=1; }
+  python3 -B -c "import sys, pathlib; compile(pathlib.Path(sys.argv[1]).read_text(), sys.argv[1], 'exec')" "$here/b1/flowreg.py" || { echo "  non compila: flowreg.py"; rc=1; }
   for f in tollgate.toml config.toml issue-1.md piano-L1.md src/__init__.py tests/__init__.py tests/test_smoke.py .gitignore; do
     [ -f "$here/b1/flow/$f" ] || { echo "  manca b1/flow/$f"; rc=1; }
   done
@@ -189,15 +189,15 @@ PY
   ) || die "repo di prova non creato"
   sha="$(git -C "$REPO" rev-parse origin/main)"
   python3 -B - "$GH_DATA" "$sha" "$here/b1/flow/issue-1.md" <<'PY' || die "dati del gh finto non scritti"
-import json, sys
+import json, pathlib, sys
 path, sha, issue = sys.argv[1:4]
-json.dump({"auth": True,
-           "issues": {"1": {"number": 1, "title": "Leggi il nome dell'app da config.toml", "state": "OPEN",
-                            "body": open(issue).read().strip(), "labels": [], "author_association": "OWNER"}},
-           "prs": [], "issue_list": [],
-           "statuses": {sha: {"statuses": [{"context": "tollgate/guard", "state": "success"},
-                                           {"context": "tollgate/verdict", "state": "success"}]}}},
-          open(path, "w"))
+pathlib.Path(path).write_text(json.dumps(
+    {"auth": True,
+     "issues": {"1": {"number": 1, "title": "Leggi il nome dell'app da config.toml", "state": "OPEN",
+                      "body": pathlib.Path(issue).read_text().strip(), "labels": [], "author_association": "OWNER"}},
+     "prs": [], "issue_list": [],
+     "statuses": {sha: {"statuses": [{"context": "tollgate/guard", "state": "success"},
+                                     {"context": "tollgate/verdict", "state": "success"}]}}}))
 PY
   # il piano di prova deve passare plan-check PRIMA della prova reale
   python3 -B - "$PLUGIN" "$REPO" "$PLAN_SRC" <<'PY' || die "il piano di prova non passa plan-check"
