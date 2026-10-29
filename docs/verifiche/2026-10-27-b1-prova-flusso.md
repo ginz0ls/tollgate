@@ -5,8 +5,10 @@ Data: 29 ottobre 2026. Piano: `docs/superpowers/plans/2026-10-27-tollgate-b1-inf
 - Versioni: Claude Code `2.1.312`, modello `sonnet` (`claude-sonnet-5-5`; `modelUsage` riporta anche `claude-haiku-5-5`).
 - Script: `spikes/run-b1-flow.sh` (modi `controlla`, `prepara`, `passo1`, `passo2`, `registra`), progetto di prova `spikes/b1/flow/`, raccolta `spikes/b1/flowreg.py`. Nessun GitHub: `gh` finto (`tests/fakegh.py`) in testa al `PATH`, `origin` nudo locale, stato di prova con la sentinella in `/tmp/tollgate-b1/state`.
 - Interruttore acceso: `prepara` ha aggiunto **solo nella copia** del plugin (`/tmp/tollgate-b1/plugin`) `skills/rules-base/SKILL.md` con `approved: prova-b1` (decisione 8). Nel repo `skills/rules-base/` non esiste.
-- Comando di ogni passo: `claude -p --plugin-dir /tmp/tollgate-b1/plugin --model sonnet --permission-mode acceptEdits --allowedTools "Bash,Agent,Skill,EnterWorktree,SendMessage,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch"` con `--disallowedTools` per `gh` per percorso, `git push` verso remoti non locali o forzato, `curl` e `wget`, tetto di 2400 s. Nessuna voce MCP (B1-V2 negativo). Argomenti esatti in `evidenze/b1/flusso/passo*/tentativo-1/argv.txt`.
-- Evidenze: `docs/verifiche/evidenze/b1/flusso/` (`validate/validate-1.txt`, `passo1/tentativo-1/`, `passo2/tentativo-1/`, `registro-1/` con `lookups.txt`, `research-1.md`, `eventi-ricerca.jsonl`, `events.jsonl`, `stats.json`, `status.json`, `comandi-modello.txt`, `grep-non-registrati.txt`, `limiti.txt`). Anonimizzate come quelle del Task 1 prima del commit: la cartella home è `/home/USER`, gli id di sessione sono `SESSION-ID`, e dagli stream-json sono tolti il messaggio `init` (elenco dei plugin e dei server MCP della macchina) e gli eventi degli hook di `SessionStart` degli altri plugin (26 righe in tutto).
+- Comando di ogni passo: `claude -p --plugin-dir /tmp/tollgate-b1/plugin --model sonnet --permission-mode acceptEdits --allowedTools "Bash,Agent,Skill,EnterWorktree,SendMessage,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch"` con `--disallowedTools` per `gh` per percorso, `git push` verso remoti non locali o forzato, `curl` e `wget`, tetto di 2400 s. Nessuna voce MCP (B1-V2 negativo). Argomenti esatti in `argv.txt` di ogni tentativo.
+- Evidenze della prima corsa: `docs/verifiche/evidenze/b1/flusso/` (`validate/validate-1.txt`, `passo1.prev-20261029-104334-3824318/tentativo-1/` e `passo2.prev-20261029-104334-3824318/tentativo-1/`, spostate da `prepara` alla seconda corsa e mai cancellate, `registro-1/` con `lookups.txt`, `research-1.md`, `eventi-ricerca.jsonl`, `events.jsonl`, `stats.json`, `status.json`, `comandi-modello.txt`, `grep-non-registrati.txt`, `limiti.txt`). Anonimizzate come quelle del Task 1 prima del commit: la cartella home è `/home/USER`, gli id di sessione sono `SESSION-ID`, e dagli stream-json sono tolti il messaggio `init` (elenco dei plugin e dei server MCP della macchina) e gli eventi degli hook di `SessionStart` degli altri plugin (26 righe in tutto).
+
+La prova è stata eseguita due volte: la prima prima della revisione finale, la seconda dopo le sue correzioni (sezione «Seconda corsa» in fondo). Le sezioni da «Passi e tentativi» a «Limiti» descrivono la prima corsa.
 
 ## Passi e tentativi
 
@@ -71,3 +73,35 @@ Il brief del revisore (`.tollgate-run/1/review-1.md`) aveva la sezione «Nota di
 - Il ramo di `passo2` che scrive il piano di prova con `Write` non è stato esercitato: il piano c'era già dal passo 1, e il modello ha ignorato quello del prompt (`src/conf.py`, `leggi_nome`), segnalando la differenza nel messaggio finale. B1 non dipende da quale dei due piani si esegue: in entrambi l'implementatore deve leggere `config.toml` e la documentazione di `tomllib`.
 - Nelle evidenze restano il nome del percorso del progetto sotto `/home/USER` e gli host anonimizzati come `HOST`.
 - Il lavoro è uno solo, piccolo, con un solo task e una sola libreria: la prova mostra il percorso completo, non la sua tenuta su un lavoro grande.
+
+## Seconda corsa, dopo la revisione finale
+
+Le correzioni della revisione finale del ramo toccano tre punti che il passo 2 aveva provato:
+- l'uscita anticipata di `hooks/run`, che ora vale anche per i sei tipi di sola lettura di tollgate;
+- il lavoro della via breve delle letture, che ora si prende dal subagente e non dalla cartella;
+- l'esito della nota nel brief del revisore.
+
+Il passo 2 da solo non si può ripetere, perché ha bisogno del lavoro in `execution` creato dal passo 1. Il controller ha quindi rilanciato `prepara`, `passo1`, `passo2` e `registra` sullo stesso commit del plugin, `4545b93`, il 29 ottobre 2026.
+- Tentativi: secondo di `passo1` e secondo di `passo2` (tetto 3 su tutta la prova). Ogni passo è riuscito al primo colpo.
+- Evidenze, anonimizzate come quelle della prima corsa (26 righe tolte): `validate/validate-2.txt`, `passo1/tentativo-2/`, `passo2/tentativo-2/` e `registro-2/`. L'uscita di `prepara` non è salvata dallo script.
+
+| Passo | Esito | Durata | Consumo stimato |
+|---|---|---|---|
+| `passo1`: `validate --strict` | «✔ Validation passed», di nuovo con il solo avviso `ICON_MISSING` | — | nessuno |
+| `passo1`: `/tollgate:start #1 L1` | piano di un task scritto con `Write`, committato dal modello (`30baa43`) e registrato da tollgate; fase `execution`; nessun `veto` | 70 s | 0,35 USD |
+| `passo2`: `/tollgate:execute` | task 1 `done`, verdetto `approved`, commit `89d6f12` | 112 s | 0,51 USD |
+
+- **Letture del task 1** (`registro-2/lookups.txt`), tutte con l'`agent_id` dell'implementatore:
+  - `read` del brief;
+  - `bash_read` di `config.toml`;
+  - `fetch` di `https://docs.python.org/3/library/tomllib.html`;
+  - `read` di `tests/test_smoke.py`, `src/__init__.py` e `config.toml`.
+
+  Nessuna lettura del revisore del task, che è uno dei tipi di sola lettura.
+- **Nota:** la sequenza è la stessa della prima corsa.
+  - Prima consegna (`seq` 9) non valida: `tests/test_smoke.py` era stato letto solo con il glob di `cat tests/*.py`, e `src/__init__.py` solo elencato da `ls -R`.
+  - I due file sono stati riaperti con `Read`, poi è arrivata la seconda consegna (`seq` 10): valida, `research_ok = 1`.
+  - Nessun `research_reminder` e nessun `veto`.
+- **Brief del revisore:** dopo il recinto della nota c'è il nuovo blocco «Esito del controllo di tollgate» con `esito: valida`, anch'esso in un recinto. Verdetto `approved`.
+- **Totale stimato:** 0,86 USD, dentro l'abbonamento. Token di tollgate: implementatore 47.058, revisore del task 28.467.
+- **Difetti trovati:** nessuno nel prodotto e nessuno nello script.

@@ -1,0 +1,2 @@
+Grep del modello: 0; letture registrate (read): 4
+I Grep dell'implementatore non sono registrati (B1-V6): non entrano in lookups.

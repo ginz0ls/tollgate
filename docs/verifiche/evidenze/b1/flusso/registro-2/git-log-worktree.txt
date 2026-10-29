@@ -1,0 +1,3 @@
+89d6f12 feat: leggi il nome dell'app da config.toml con tomllib
+30baa43 docs: piano per leggere il nome dell'app da config.toml (#1)
+361df6e base

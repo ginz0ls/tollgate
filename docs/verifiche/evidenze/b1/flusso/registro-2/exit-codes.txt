@@ -1,0 +1,4 @@
+passo1: tentativo 1, uscita 0
+passo2: tentativo 1, uscita 0
+passo1: tentativo 2, uscita 0
+passo2: tentativo 2, uscita 0

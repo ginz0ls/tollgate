@@ -1,0 +1,25 @@
+# lookups: id, work, task, agent_id, kind, target, at
+1	1	1	aa9ced27e7bc48ef3	read	.tollgate-run/1/task-1.md	2026-10-29T09:45:56.189077Z
+2	1	1	aa9ced27e7bc48ef3	bash_read	config.toml	2026-10-29T09:45:59.766911Z
+3	1	1	aa9ced27e7bc48ef3	fetch	https://docs.python.org/3/library/tomllib.html	2026-10-29T09:46:05.096983Z
+4	1	1	aa9ced27e7bc48ef3	read	tests/test_smoke.py	2026-10-29T09:46:11.641807Z
+5	1	1	aa9ced27e7bc48ef3	read	src/__init__.py	2026-10-29T09:46:11.940459Z
+6	1	1	aa9ced27e7bc48ef3	read	config.toml	2026-10-29T09:46:12.080059Z
+# per tipo
+bash_read: 1
+fetch: 1
+read: 4
+# task: work, number, state, research_ok
+1	1	done	1
+# nota salvata, lavoro 1 task 1
+## Letto nel progetto
+- config.toml
+- tests/test_smoke.py
+- src/__init__.py
+
+## Documentazione
+- https://docs.python.org/3/library/tomllib.html — tomllib.load(fp) vuole un file binario ("rb"); TOMLDecodeError sottoclasse di ValueError; restituisce dict.
+
+## Cosa ho trovato
+config.toml contiene [app] nome = "prova-b1". Uso open(percorso, "rb") + tomllib.load e dati["app"]["nome"]; KeyError e FileNotFoundError si propagano naturalmente. Il default è ancorato a __file__ per non dipendere dalla cwd. Python 3.13, tomllib in stdlib.
+
