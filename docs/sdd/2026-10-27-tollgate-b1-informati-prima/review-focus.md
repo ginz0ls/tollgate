@@ -1,0 +1,7 @@
+## Review Focus
+
+1. **Attribuzione delle letture.** Una lettura fatta da un altro task, da un altro lavoro, da un revisore di sola lettura o dalla sessione principale non deve rendere valida la nota del task. Test: Task 4 `test_read_by_other_task_not_counted`, `test_readonly_agent_reads_not_recorded`, `test_main_session_read_not_recorded`.
+2. **Percorsi in forme diverse.** Lo stesso file dichiarato come assoluto nel worktree, con `./`, o letto con un percorso assoluto, deve combaciare; un percorso con `..` che esce dal worktree o che sta nel checkout principale non deve combaciare con un file del worktree. Test: Task 3 `test_normalize_path_forms`.
+3. **URL in forme diverse.** Host in maiuscolo, frammento, barra finale e porta predefinita non devono rompere la corrispondenza; un percorso diverso sullo stesso host sì. Test: Task 3 `test_url_forms`.
+4. **Lavori nati prima di B1 e lavori che crescono.** Un DB migrato con un lavoro in corso non riceve mai avvisi né rifiuti; un lavoro L0 avvisato che sale a L1 riceve il rifiuto (con l'interruttore acceso) al primo task. Test: Task 2 `test_migration_keeps_existing_works_outside`; Task 7 `test_legacy_work_never_reminded`, `test_l0_grown_to_l1_blocks`.
+5. **Nota e giri di correzione.** Un implementatore nuovo del quarto giro con la nota valida del task non viene fermato; una nuova consegna non valida torna a fermare. Test: Task 7 `test_round4_new_implementer_keeps_valid_note`, `test_resubmitted_invalid_note_blocks_again`.
