@@ -10,12 +10,13 @@ import sqlite3
 from pathlib import Path
 
 from tollgate_analysis import (brief as briefs, naming, plan as planmod, profiles as prof,
-                               report, size)
-from tollgate_core import (clock, config, db, events, git, phases, reviews, scope as scopes,
-                           sessions, tasks)
+                               report, research, size)
+from tollgate_core import (clock, config, db, events, git, lookups, phases, reviews,
+                           scope as scopes, sessions, tasks)
 from tollgate_core.paths import program_command
 
 from . import prereq
+from .research_cmd import note_path
 
 MAX_FIX_ROUNDS = tasks.BASE_FIX_ROUNDS
 MODEL_HINT = "inherit"
@@ -79,6 +80,21 @@ def _fix_files(conn, work, row) -> list[str]:
                         "ORDER BY rowid",
                         (work["id"], int(ref), *reviews.BLOCKING_SEVERITIES)).fetchall()
     return list(dict.fromkeys(r["file"] for r in rows if r["file"]))
+
+
+def _research_on(work, cfg) -> bool:
+    """Il passo «informati prima» vale per questo lavoro (decisione 10, componente R10)."""
+    return research.active(work["research"], bool(cfg.data["components"].get("research_note", True)))
+
+
+def _rules_enforced() -> bool:
+    """Decisione 8: l'interruttore è nella radice del plugin, come gli altri percorsi del programma."""
+    try:
+        text = (db.BIN_PATH.parents[1] / research.RULES_BASE).read_text(encoding="utf-8",
+                                                                        errors="replace")
+    except OSError:
+        return False
+    return research.enforced(text)
 
 
 def _related_tests(task, must_haves: list[planmod.MustHave]) -> list[str]:
@@ -168,12 +184,18 @@ def _task_start(state, conn, cwd: Path, number: int, *, fix: bool, claude_dir: P
     # decisione 21: il modello di `[review] models`; dal giro 4 il nuovo implementatore è inherit
     hint = MODEL_HINT if renamed else cfg.get("review.models").get(routing.implementer)
 
+    research_on = _research_on(work, cfg)
+    delivered = lookups.note(conn, work["id"], number)[0] if research_on and fix else None
     impl_brief = briefs.ImplBrief(
         issue=work["issue"], task=number, name=name, agent_type=routing.implementer,
         model_hint=hint, task_text=text, scope=scope_files,
         related_tests=related, must_haves=must_haves, skills=present,
         absent_skills=absent, verify_cmd=f"{program_command(db.BIN_PATH)} verify",
-        fix_findings=json.loads(row["review_findings"]) if fix else [], fix_round=round_)
+        fix_findings=json.loads(row["review_findings"]) if fix else [], fix_round=round_,
+        research_cmd=research.submit_command(program_command(db.BIN_PATH), number)
+        if research_on else None,
+        research_note_path=str(note_path(wt, work["issue"], number))
+        if delivered is not None else None)
     file_name = f"task-{number}-fix-{round_}.md" if fix else f"task-{number}.md"
     path = wt / ".tollgate-run" / str(work["issue"]) / file_name
     try:
@@ -324,6 +346,8 @@ def _review_prepare(state, conn, cwd: Path, number: int) -> Path:
         else f"task-{number}.md"
     code = secrets.token_hex(4)
     diff_path, brief_path = run_dir / f"review-{k}.diff", run_dir / f"review-{k}.md"
+    research_on = _research_on(work, cfg)
+    note_text = lookups.note(conn, work["id"], number)[0] if research_on else None
     text = briefs.review_brief(briefs.ReviewBrief(
         issue=work["issue"], task=number, sha=head, code=code, base=base, head=head,
         brief_path=str(run_dir / brief_name), diff_path=str(diff_path),
@@ -331,7 +355,11 @@ def _review_prepare(state, conn, cwd: Path, number: int) -> Path:
         lines_warn=cfg.get("tasks.task_lines_warn"), lines_max=cfg.get("tasks.task_lines_max"),
         concerns=_concerns(conn, work, row), reviewer_skills=routing.reviewer_skills,
         standard=bool(cfg.data["components"].get("reviewer_standard", True)),
-        no_changes=not json.loads(row["commits"])))
+        no_changes=not json.loads(row["commits"]), research=research_on,
+        research_enforced=research_on and _rules_enforced(), research_note=note_text,
+        research_note_path=str(note_path(wt, work["issue"], number))
+        if note_text is not None else None,
+        first_diff_file=changes[0].path if changes else None))
     try:
         run_dir.mkdir(parents=True, exist_ok=True)
         diff_path.write_text(_diff_text(wt, base, head), encoding="utf-8", errors="replace")

@@ -195,6 +195,26 @@ class StartAndResumeTest(unittest.TestCase):
         row = subagents.get(self.lab.conn, "a1")
         self.assertEqual((row["agent_base_sha"], row["resumes"]), (self.lab.base, 1))
 
+    def test_implementer_reminder_mentions_note(self):
+        lab = Lab(research=True)
+        self.addCleanup(lab.close)
+        with_scope(lab)
+        tasks.assign(lab.conn, lab.work, 1, implementer="tg-7-t1", agent_type=IMPL,
+                     pending="launch", now=lab.now)
+        r = start(lab, "a1")
+        self.assertIn("consegna la nota di ricerca (vedi il brief)", r.stdout)
+
+    def test_reminder_without_note_for_legacy_work(self):
+        self.assertNotIn("nota di ricerca", start(self.lab, "a1").stdout)
+
+    def test_component_off_reminder_without_note(self):
+        lab = Lab(research=True, toml=DEFAULT_TOML + "\n[components]\nresearch_note = false\n")
+        self.addCleanup(lab.close)
+        with_scope(lab)
+        tasks.assign(lab.conn, lab.work, 1, implementer="tg-7-t1", agent_type=IMPL,
+                     pending="launch", now=lab.now)
+        self.assertNotIn("nota di ricerca", start(lab, "a1").stdout)
+
     def test_name_registry_and_send_message(self):
         start(self.lab, "a1")
         post = sample("PostToolUse-Agent-foreground-manual", session_id=SESSION,

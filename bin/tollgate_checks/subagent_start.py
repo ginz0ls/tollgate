@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from tollgate_analysis import research
 from tollgate_core import git, subagents
 from tollgate_core.paths import program_command
 from tollgate_hooks.model import inject, record
@@ -28,9 +29,11 @@ def decide(event, ctx):
                   take_pending=implementer and work is not None, resume=resume,
                   refresh_fingerprint=resume and not implementer)]
     if implementer and work is not None:
+        note = (" Prima di modificare file consegna la nota di ricerca (vedi il brief)."
+                if research.active(work["research"], ctx.component("research_note")) else "")
         out.append(inject(
             f"tollgate: sei un subagente che scrive nel lavoro #{work['issue']}. Lavora solo sui "
-            f"file dello scope del task, con TDD. Prima di DONE: committa, poi lancia "
+            f"file dello scope del task, con TDD.{note} Prima di DONE: committa, poi lancia "
             f"{program_command(ctx.plugin_bin)} verify e controlla che la ricevuta sia green. "
             f"Chiudi con il "
             f"report JSON di 18.5 (v, task, status, done, tests, files, must_have, concerns, "

@@ -124,6 +124,13 @@ class ManifestTest(unittest.TestCase):
             self.assertIn(f"## {section}", text)
         self.assertIn(research.HEREDOC_END, text)
 
+    def test_task_reviewer_checks_note(self):
+        text = (ROOT / "agents" / "task-reviewer.md").read_text()
+        self.assertIn("«Nota di ricerca»", text)
+        self.assertIn("`nota di ricerca`", text)
+        self.assertIn("Nessuna fonte esterna", text)
+        self.assertIn("la gravità e il `file`/`line` che il brief indica", text)
+
     def test_user_only_skills(self):
         for name in ("approve", "resolve", "setup", "off", "on", "reopen"):
             text = (ROOT / "skills" / name / "SKILL.md").read_text()
