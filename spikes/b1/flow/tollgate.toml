@@ -1,0 +1,11 @@
+schema_version = 1
+
+[project]
+allow_no_tests = true
+
+[gate]
+mode = "protected"
+
+[commands]
+verify = "python3 -m unittest discover -s tests -t ."
+gate = ["verify"]

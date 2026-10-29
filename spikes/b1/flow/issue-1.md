@@ -1,0 +1,1 @@
+Leggi la configurazione da `config.toml` con `tomllib` e restituisci il valore di `[app] nome`; prima di scrivere controlla sulla documentazione ufficiale di Python come si apre il file per `tomllib.load` e da quale versione esiste il modulo, e cita la pagina.

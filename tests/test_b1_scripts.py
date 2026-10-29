@@ -446,5 +446,312 @@ class LatencyTest(unittest.TestCase):
         self.assertFalse(list(tmp.rglob("__pycache__")))
 
 
+
+FLOW_SCRIPT = ROOT / "spikes" / "run-b1-flow.sh"
+FLOW_REG = B1 / "flowreg.py"
+FLOW_EVIDENCE = ROOT / "docs" / "verifiche" / "evidenze" / "b1" / "flusso"
+FLOW_TOOLS = "Bash,Agent,Skill,EnterWorktree,SendMessage,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch"
+FLOW_FAKE_CLAUDE = FAKE_CLAUDE.replace('case "$1" in', '[ "$1" = plugin ] && exit "${B1_FAKE_VALIDATE_RC:-0}"\ncase "$1" in', 1)
+
+
+class FlowBench(Bench):
+    """Radici temporanee per lo script della prova reale del Task 9, con un `claude` finto: nulla va in /tmp/tollgate-b1 né nelle evidenze del repo."""
+
+    def __init__(self):
+        super().__init__()
+        (self.bin / "claude").write_text(FLOW_FAKE_CLAUDE)
+        self.root = self.dir / "tollgate-b1"
+
+    @property
+    def flow(self):
+        return self.root / "flow"
+
+    @property
+    def plugin(self):
+        return self.root / "plugin"
+
+    def env(self, **extra):
+        base = dict(PATH=f"{self.bin}:{os.environ['PATH']}", B1_FAKE_LOG=str(self.log), B1_FLOW_CHECK="1", B1_FLOW_ROOT=str(self.root),
+                    B1_FLOW_OUT=str(self.out), B1_FLOW_TIMEOUT="60", HOME=str(self.dir / "home"), GIT_CONFIG_GLOBAL="/dev/null",
+                    GIT_CONFIG_NOSYSTEM="1")
+        base.update(extra)
+        return clean_env(**base)
+
+    def run(self, *args, **extra):
+        return subprocess.run(["bash", str(FLOW_SCRIPT), *args], capture_output=True, text=True, env=self.env(**extra), timeout=300)
+
+    def prepara(self):
+        r = self.run("prepara")
+        if r.returncode != 0:
+            raise AssertionError(r.stdout + r.stderr)
+        return r
+
+    def worktree(self):
+        wt = self.flow / ".claude" / "worktrees" / "tg-1-prova"
+        subprocess.run(["git", "-C", str(self.flow), "worktree", "add", "-q", "-b", "tg/1-prova", str(wt)], check=True,
+                       capture_output=True, env=self.env())
+        return wt
+
+    def claude_p(self):
+        return [c for c in self.calls() if c["args"][:1] == ["-p"]]
+
+
+class FlowScriptTest(unittest.TestCase):
+    def setUp(self):
+        self.b = FlowBench()
+        self.addCleanup(self.b.cleanup)
+        self.evidence_before = sorted(p.name for p in FLOW_EVIDENCE.iterdir()) if FLOW_EVIDENCE.exists() else None
+
+        def no_repo_evidence():
+            after = sorted(p.name for p in FLOW_EVIDENCE.iterdir()) if FLOW_EVIDENCE.exists() else None
+            self.assertEqual(after, self.evidence_before, "un test ha scritto nelle evidenze del repo")
+        self.addCleanup(no_repo_evidence)
+
+    def test_flow_syntax_and_static_rules(self):
+        r = subprocess.run(["bash", "-n", str(FLOW_SCRIPT)], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        compile(FLOW_REG.read_text(), str(FLOW_REG), "exec")
+        text = FLOW_SCRIPT.read_text()
+        code = re.sub(r"(?m)^\s*#.*$", "", text)
+        self.assertEqual(len(re.findall(r"=\(claude -p\b", code)), 1)
+        self.assertEqual(len(re.findall(r'&& claude plugin validate --strict', code)), 1)
+        self.assertNotRegex(code, r"\brm\s+-[a-zA-Z]*[rR]")
+        self.assertNotRegex(code, r"\b(pkill|killall)\b")
+        self.assertNotRegex(code, r"\bkill\s")
+        self.assertNotRegex(code, r"claude plugin (install|marketplace|enable|uninstall)|claude plugin eval")
+        self.assertNotRegex(code, r"(?<!push )--force|--no-verify|reset --hard|git stash|--amend")
+        self.assertIn("DEFAULT_TMP=/tmp/tollgate-b1", text)
+
+    def test_flow_controlla_lists_steps(self):
+        r = subprocess.run(["bash", str(FLOW_SCRIPT), "controlla"], capture_output=True, text=True, env=clean_env(), timeout=120)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("CONTROLLA: ok", r.stdout)
+        for word in ("prepara", "passo1", "passo2", "registra", "/tmp/tollgate-b1/plugin", "approved: prova-b1", "plugin validate --strict",
+                     "--plugin-dir", "--allowedTools", "--disallowedTools", "acceptEdits", "--model sonnet", "/tollgate:start #1 L1"):
+            self.assertIn(word, r.stdout)
+        self.assertEqual(r.stderr, "")
+
+    def test_flow_refuses_outside_tmp(self):
+        for root in ("/tmp/fuori-da-tollgate-b1", "/tmp/tollgate-b1x", "/tmp/tollgate-b1/../altro", str(Path.home() / "x"), "/tmp"):
+            for mode in ("prepara", "passo1", "passo2", "registra"):
+                with self.subTest(root=root, mode=mode):
+                    r = self.b.run(mode, B1_FLOW_CHECK="0", B1_FLOW_ROOT=root, B1_FLOW_PLUGIN=str(self.b.dir / "p"))
+                    self.assertNotEqual(r.returncode, 0)
+                    self.assertIn("non è sotto /tmp/tollgate-b1/", r.stderr)
+        self.assertEqual(self.b.calls(), [])
+        self.assertFalse(Path("/tmp/fuori-da-tollgate-b1").exists())
+
+    def test_flow_rules_base_only_in_copy(self):
+        r = self.b.prepara()
+        self.assertIn("plan-check: ok", r.stdout)
+        skill = self.b.plugin / "skills" / "rules-base" / "SKILL.md"
+        text = skill.read_text()
+        self.assertRegex(text, r"(?m)^name: rules-base$")
+        self.assertRegex(text, r"(?m)^approved: prova-b1$")
+        self.assertIn("Regole di prova della prova reale di B1: non sono le regole di B2", text)
+        self.assertFalse((ROOT / "skills" / "rules-base").exists(), "il repo non deve cambiare")
+        self.assertFalse(list(self.b.plugin.rglob("APPROVED")))
+        self.assertFalse(list(self.b.plugin.rglob("__pycache__")))
+        for part in (".claude-plugin/plugin.json", "bin/tollgate", "hooks/hooks.json", "agents/implementer.md", "skills/start/SKILL.md"):
+            self.assertTrue((self.b.plugin / part).is_file(), part)
+        # lo stato, il gh finto e il progetto
+        self.assertTrue((self.b.root / "state" / ".tollgate-test").is_file())
+        self.assertIn("fakegh.py", (self.b.root / "ghbin" / "gh").read_text())
+        for part in ("tollgate.toml", "config.toml", "src/__init__.py", "tests/test_smoke.py", ".github/tollgate/VERSION"):
+            self.assertTrue((self.b.flow / part).is_file(), part)
+        self.assertFalse((self.b.flow / "piano-L1.md").exists())
+        self.assertFalse((self.b.flow / "issue-1.md").exists())
+        data = json.loads((self.b.root / "fakegh-data.json").read_text())
+        self.assertIn("tomllib.load", data["issues"]["1"]["body"])
+        self.assertIn("documentazione ufficiale di Python", data["issues"]["1"]["body"])
+        remotes = subprocess.run(["git", "-C", str(self.b.flow), "config", "remote.origin.url"], capture_output=True, text=True).stdout.strip()
+        self.assertEqual(remotes, "https://github.com/prova/flow.git")
+        # un secondo prepara non cancella: rinomina
+        self.b.prepara()
+        self.assertEqual(len(list(self.b.root.glob("plugin.prev-*"))), 1)
+        self.assertEqual(len(list(self.b.root.glob("flow.prev-*"))), 1)
+
+    def test_flow_requires_plugin_dir(self):
+        self.b.prepara()
+        r = self.b.run("passo1", B1_FLOW_PLUGIN="")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("senza --plugin-dir", r.stderr)
+        r = self.b.run("passo1", B1_FLOW_PLUGIN=str(self.b.dir / "non-esiste"))
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("non esiste", r.stderr)
+        self.assertEqual(self.b.calls(), [])
+
+    def test_flow_passo1_validates_the_copy_first_and_stops_on_failure(self):
+        self.b.prepara()
+        r = self.b.run("passo1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        calls = self.b.calls()
+        self.assertEqual(calls[0]["args"], ["plugin", "validate", "--strict", "."])
+        self.assertEqual(os.path.realpath(calls[0]["cwd"]), os.path.realpath(self.b.plugin))
+        self.assertEqual(calls[1]["args"][0], "-p")
+        self.assertEqual(len(calls), 2)
+        self.assertIn("uscita: 0", (self.b.out / "validate" / "validate-1.txt").read_text())
+        # una validazione che fallisce ferma il passo: nessun claude -p, nessun tentativo consumato
+        shutil.rmtree(self.b.out)
+        self.b.log.unlink()
+        r = self.b.run("passo1", B1_FAKE_VALIDATE_RC="3")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("plugin validate --strict ha fallito", r.stderr)
+        self.assertEqual([c["args"][:2] for c in self.b.calls()], [["plugin", "validate"]])
+        self.assertIn("uscita: 3", (self.b.out / "validate" / "validate-1.txt").read_text())
+        self.assertFalse((self.b.out / "passo1").exists())
+
+    def test_flow_allowed_tools(self):
+        self.b.prepara()
+        wt = self.b.worktree()
+        for step in ("passo1", "passo2"):
+            with self.subTest(step):
+                r = self.b.run(step)
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        first, second = self.b.claude_p()
+        self.assertEqual(os.path.realpath(first["cwd"]), os.path.realpath(self.b.flow))
+        self.assertEqual(os.path.realpath(second["cwd"]), os.path.realpath(wt))
+        for call in (first, second):
+            args = call["args"]
+            self.assertEqual(Path(args[args.index("--plugin-dir") + 1]), self.b.plugin)
+            self.assertEqual(args[args.index("--permission-mode") + 1], "acceptEdits")
+            self.assertEqual(args[args.index("--model") + 1], "sonnet")
+            self.assertEqual(args[args.index("--output-format") + 1], "stream-json")
+            allowed = args[args.index("--allowedTools") + 1]
+            self.assertEqual(allowed, FLOW_TOOLS)
+            self.assertTrue({"WebFetch", "WebSearch"} <= set(allowed.split(",")))
+            self.assertNotIn("context7", allowed)
+            denied = args[args.index("--disallowedTools") + 1].split(",")
+            for item in ("Bash(*/gh:*)", "Bash(git push https:*)", "Bash(git push ssh:*)", "Bash(git push git@:*)", "Bash(curl:*)", "Bash(wget:*)"):
+                self.assertIn(item, denied)
+            self.assertEqual(os.path.realpath(call["state"]), os.path.realpath(self.b.root / "state"))
+        self.assertEqual(first["args"][-1], "/tollgate:start #1 L1")
+        # i divieti di rete sono nel comando registrato
+        self.assertIn("--disallowedTools", (self.b.out / "passo1" / "tentativo-1" / "argv.txt").read_text())
+
+    def test_flow_passo2_writes_plan(self):
+        self.b.prepara()
+        self.b.worktree()
+        r = self.b.run("passo2")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        prompt = self.b.claude_p()[0]["args"][-1]
+        i_write, i_commit, i_execute = prompt.index("Write"), prompt.index("committalo"), prompt.index("/tollgate:execute")
+        self.assertLess(i_write, i_commit)
+        self.assertLess(i_commit, i_execute)
+        self.assertIn("docs/superpowers/plans/2026-10-27-prova-b1.md", prompt)
+        self.assertIn("Non lanciare /tollgate:finish", prompt)
+        plan = (B1 / "flow" / "piano-L1.md").read_text()
+        self.assertIn(plan.strip(), prompt)
+        self.assertIn("tests.test_conf.ConfTest::test_leggi_nome", prompt)
+
+    def test_flow_passo2_needs_a_worktree_under_the_root(self):
+        self.b.prepara()
+        r = self.b.run("passo2")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("worktree del lavoro non trovato", r.stderr)
+        self.assertEqual(self.b.calls(), [])
+
+    def test_flow_attempts_are_new_folders_and_capped_at_three(self):
+        self.b.prepara()
+        att1 = self.b.out / "passo1" / "tentativo-1"
+        for n in (1, 2, 3):
+            r = self.b.run("passo1")
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            att = self.b.out / "passo1" / f"tentativo-{n}"
+            for name in ("argv.txt", "claude.jsonl", "claude.err", "uscita.txt", "esito.txt"):
+                self.assertTrue((att / name).is_file(), f"{att.name}/{name}")
+            if n == 1:
+                (att1 / "prova.txt").write_text("resta")
+        self.assertEqual((att1 / "prova.txt").read_text(), "resta")
+        esito = (self.b.out / "passo1" / "tentativo-2" / "esito.txt").read_text()
+        self.assertIn("tentativo: 2", esito)
+        self.assertIn("uscita: 0", esito)
+        before = len(self.b.calls())
+        r = self.b.run("passo1")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("già 3 tentativi", r.stderr)
+        self.assertEqual(len(self.b.calls()), before, "oltre il tetto non parte né validate né claude")
+        self.assertFalse((self.b.out / "passo1" / "tentativo-4").exists())
+        # un nuovo prepara rinomina i tentativi, non li cancella
+        self.b.prepara()
+        self.assertEqual(len(list(self.b.out.glob("passo1.prev-*"))), 1)
+        self.assertTrue(list(self.b.out.glob("passo1.prev-*/tentativo-3")))
+
+    def test_flow_timeout_is_recorded(self):
+        self.b.prepara()
+        slow = self.b.bin / "claude"
+        slow.write_text('#!/usr/bin/env bash\ncase "$1" in plugin) exit 0 ;; esac\nsleep 5\n')
+        r = self.b.run("passo1", B1_FLOW_TIMEOUT="1")
+        self.assertEqual(r.returncode, 124)
+        self.assertIn("tetto di tempo superato", (self.b.out / "passo1" / "tentativo-1" / "esito.txt").read_text())
+
+    def test_flow_registra_collects_the_evidence(self):
+        self.b.prepara()
+        wt = self.b.worktree()
+        r = self.b.run("passo1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        # un tentativo con un flusso finto: un Grep e un Bash del modello; una nota nel worktree
+        att = self.b.out / "passo1" / "tentativo-1"
+        stream = [{"type": "assistant", "parent_tool_use_id": None, "message": {"content": [
+                      {"type": "tool_use", "name": "Bash", "input": {"command": "git push https://github.com/x/y main"}}]}},
+                  {"type": "assistant", "parent_tool_use_id": "t1", "message": {"content": [
+                      {"type": "tool_use", "name": "Grep", "input": {"pattern": "tomllib"}},
+                      {"type": "tool_use", "name": "Read", "input": {"file_path": "config.toml"}}]}}]
+        (att / "claude.jsonl").write_text("".join(json.dumps(x) + "\n" for x in stream) + "non json\n")
+        (wt / ".tollgate-run" / "1").mkdir(parents=True)
+        (wt / ".tollgate-run" / "1" / "research-1.md").write_text("nota\nesito: valida\n")
+        r = self.b.run("registra")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = self.b.out / "registro-1"
+        self.assertIn("9.9.9", (d / "versione-claude.txt").read_text())
+        for name in ("events.jsonl", "stats.json", "status.json", "lookups.txt", "eventi-ricerca.jsonl", "comandi-modello.txt",
+                     "grep-non-registrati.txt", "comandi-rischiosi.txt", "git-log-worktree.txt", "research-1.md"):
+            self.assertTrue((d / name).is_file(), name)
+        commands = (d / "comandi-modello.txt").read_text()
+        self.assertIn("bash: git push https://github.com/x/y main", commands)
+        self.assertIn("Grep: 1 (1)", commands)
+        self.assertIn("Read: 1 (1)", commands)
+        self.assertIn("git push https://github.com", (d / "comandi-rischiosi.txt").read_text())
+        grep = (d / "grep-non-registrati.txt").read_text()
+        self.assertIn("Grep del modello: 1; letture registrate (read): 0", grep)
+        self.assertIn("non sono registrati", grep)
+        self.assertIn("# lookups", (d / "lookups.txt").read_text())
+        # un secondo registra non tocca il primo
+        r = self.b.run("registra")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue((self.b.out / "registro-2").is_dir())
+        self.assertTrue((d / "research-1.md").is_file())
+
+    def test_flowreg_lookups_events_and_commands(self):
+        import sqlite3
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-b1-flowreg-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        db = tmp / "t.db"
+        conn = sqlite3.connect(str(db))
+        conn.executescript("""CREATE TABLE lookups (id INTEGER PRIMARY KEY, work INTEGER, task INTEGER, agent_id TEXT, session TEXT,
+                                kind TEXT, target TEXT, at TEXT);
+                              CREATE TABLE tasks (work INTEGER, number INTEGER, state TEXT, research_ok INTEGER, research_note TEXT);
+                              INSERT INTO lookups VALUES (1, 1, 1, 'a1', 's', 'read', 'config.toml', '2026-10-28T10:00:00Z');
+                              INSERT INTO lookups VALUES (2, 1, 1, 'a1', 's', 'fetch', 'https://docs.python.org/3/library/tomllib.html', '2026-10-28T10:01:00Z');
+                              INSERT INTO tasks VALUES (1, 1, 'done', 1, 'Letto nel progetto\n- config.toml');""")
+        conn.commit()
+        conn.close()
+        out = subprocess.run([sys.executable, "-B", str(FLOW_REG), "lookups", str(db)], capture_output=True, text=True, check=True).stdout
+        self.assertIn("read\tconfig.toml", out)
+        self.assertIn("fetch: 1", out)
+        self.assertIn("read: 1", out)
+        self.assertIn("# nota salvata, lavoro 1 task 1", out)
+        self.assertIn("Letto nel progetto", out)
+        events = tmp / "e.jsonl"
+        events.write_text("".join(json.dumps({"seq": i, "type": t, "data": {}}) + "\n" for i, t in enumerate(["commit", "research_note", "veto", "research_reminder"])))
+        out = subprocess.run([sys.executable, "-B", str(FLOW_REG), "eventi", str(events)], capture_output=True, text=True, check=True).stdout
+        self.assertEqual([json.loads(x)["type"] for x in out.splitlines()], ["research_note", "veto", "research_reminder"])
+        read_only = sqlite3.connect(str(db))
+        try:
+            self.assertEqual(read_only.execute("SELECT COUNT(*) FROM lookups").fetchone()[0], 2)
+        finally:
+            read_only.close()
+
+
 if __name__ == "__main__":
     unittest.main()
