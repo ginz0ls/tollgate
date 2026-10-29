@@ -13,9 +13,9 @@ from tollgate_analysis.protected import REPO_PROTECTED
 from tollgate_core import git
 from tollgate_hooks.model import deny
 
-from ._common import (_braces, _expand, _inside, _write_paths, governing_work,  # noqa: F401
-                      in_main_checkout, is_docs_md, is_protected_path, orphan_next, orphan_tg,
-                      output_excludes, path_forms, repo_key_of)
+from ._common import (_expand, _inside, _write_paths, governing_work, in_main_checkout,
+                      is_docs_md, is_protected_path, orphan_next, orphan_tg, output_excludes,
+                      path_forms, repo_key_of)
 
 CHECK = {"api": 1, "events": ["pre_bash"], "component": None, "order": 20}
 # `TOLLGATE_X=1; cmd`: l'assegnazione da sola non lascia traccia nei comandi letti.

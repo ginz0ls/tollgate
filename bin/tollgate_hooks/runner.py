@@ -9,8 +9,7 @@ import traceback
 from dataclasses import dataclass
 from pathlib import Path
 
-from tollgate_analysis import bash
-from tollgate_analysis import research
+from tollgate_analysis import bash, research
 from tollgate_core import (active, clock, config as cfgmod, db, git, lookups, offlog, sessions,
                            subagents)
 from tollgate_core.acts import ActError
@@ -181,11 +180,10 @@ def _record_lookup(conn, event, now) -> None:
     named = bool(event.agent_id)
     if not named and event.tool_name not in research.ATTRIBUTE_UNNAMED_TOOLS:
         return
-    work = sessions.work_for_path(conn, event.cwd) if event.cwd.is_dir() else None
-    if work is None or not work["research"] or not work["worktree"] \
-            or not Path(work["worktree"]).is_dir():
+    work = lookups.tracked_work(conn, agent_id=event.agent_id, cwd=event.cwd)
+    if work is None:
         return
-    if named and subagents.get(conn, event.agent_id) is not None:
+    if named:
         subagents.touch(conn, event.agent_id, now=now)
     owner = lookups.owner(conn, agent_id=event.agent_id, tool=event.tool_name, work=work["id"],
                           now=now, stale_minutes=cfgmod.DEFAULTS["review"]["stale_minutes"])

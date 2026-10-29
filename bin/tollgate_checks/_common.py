@@ -190,29 +190,31 @@ def orphan_next(ctx, repo, n: int) -> tuple[str, str]:
     return "senza lavoro nel DB", f"/tollgate:adopt #{n}"
 
 
-def work_events(ctx, work: int, type_: str) -> list[dict]:
-    """I `data` degli eventi `type_` del lavoro successivi all'ultimo `plan_reset` (dopo
-    `reopen plan` i task si rinumerano: gli eventi di prima non parlano dei nuovi). Lettura in
-    sola lettura dal DB del contesto; il filtro su `data` lo fa il chiamante in Python."""
+def work_events(ctx, work: int, *types: str) -> list[tuple[str, dict]]:
+    """`(tipo, data)` degli eventi di quei tipi del lavoro successivi all'ultimo `plan_reset`
+    (dopo `reopen plan` i task si rinumerano: gli eventi di prima non parlano dei nuovi), in
+    ordine. Lettura in sola lettura dal DB del contesto; il filtro su `data` lo fa il chiamante
+    in Python."""
     row = ctx.db.execute("SELECT max(seq) FROM events WHERE work = ? AND type = 'plan_reset'",
                          (work,)).fetchone()
+    marks = ",".join("?" * len(types))
     out = []
-    for r in ctx.db.execute("SELECT data FROM events WHERE work = ? AND type = ? AND seq > ? "
-                            "ORDER BY seq", (work, type_, row[0] or 0)):
+    for r in ctx.db.execute(f"SELECT type, data FROM events WHERE work = ? AND type IN ({marks}) "
+                            "AND seq > ? ORDER BY seq", (work, *types, row[0] or 0)):
         try:
-            data = json.loads(r[0])
+            data = json.loads(r[1])
         except ValueError:
             continue
         if isinstance(data, dict):
-            out.append(data)
+            out.append((r[0], data))
     return out
 
 
-def lookup_owner(ctx, event) -> tuple[int, int] | None:
-    """`(lavoro, task)` a cui appartiene una lettura (decisione 5 di B1), o None. La regola è in
-    `lookups.owner`; qui in più un subagente di sola lettura non possiede mai letture."""
-    work = governing_work(ctx, event.cwd)
-    if work is None or (event.agent_id and ctx.readonly(event.agent_type)):
+def lookup_owner(ctx, event, work) -> tuple[int, int] | None:
+    """`(lavoro, task)` a cui appartiene una lettura di `work` (decisione 5 di B1), o None. La
+    regola è in `lookups.owner`; qui in più un subagente di sola lettura non possiede mai
+    letture."""
+    if event.agent_id and ctx.readonly(event.agent_type):
         return None
     return lookups.owner(ctx.db, agent_id=event.agent_id, tool=event.tool_name, work=work["id"],
                          now=ctx.now, stale_minutes=ctx.stale_minutes)

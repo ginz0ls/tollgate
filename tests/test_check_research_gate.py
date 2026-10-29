@@ -163,6 +163,20 @@ class EnforcedTest(Base):
                           cwd=self.lab.wt / "src")
         self.assertNotIn(REFUSAL, r.stderr)
 
+    def test_bash_exempt_targets_not_gated(self):
+        for target in ("docs/superpowers/plans/x.md", ".superpowers/x", ".tollgate-run/1/x",
+                       "reports/junit.xml"):
+            with self.subTest(target=target):
+                r = self.lab.bash(f"echo x > {target}", agent_id="a1")
+                self.assertNotIn(REFUSAL, r.stderr)
+
+    def test_other_phase_not_gated(self):
+        phases.set_phase(self.lab.conn, self.lab.ts.state, self.lab.work, "review",
+                         "finish_check_green", now=self.lab.now)
+        r = self.lab.pre_edit(self.app, agent_id="a1")
+        self.assertNotIn(REFUSAL, r.stderr)
+        self.assertNotIn("informati prima", r.stdout)
+
     def test_bash_main_session_not_gated(self):
         r = self.lab.bash("sed -i s/a/b/ src/app.py")
         self.assertNotIn(REFUSAL, r.stderr)
@@ -216,6 +230,27 @@ class NotEnforcedTest(Base):
         r = self.lab.pre_edit(self.app, agent_id="a2")
         self.assertIn(WARNING, r.stdout)
 
+    def test_reminder_again_after_invalid_redelivery(self):
+        """Decisione 14: una consegna non valida riporta il task a «avviso alla modifica
+        successiva», anche se era già stato avvisato."""
+        edit_and_post(self.lab, "src/app.py", agent_id="a1")
+        self.assertNotIn(WARNING, self.lab.pre_edit(self.app, agent_id="a1").stdout)
+        self.note(False, ["manca la sezione «Cosa ho trovato»"])
+        r = self.lab.pre_edit(self.app, agent_id="a1")
+        self.assertIn(WARNING, r.stdout)
+        self.lab.post_edit(self.app, agent_id="a1")
+        self.assertEqual(self.lab.events("research_reminder"), [{"task": 1}, {"task": 1}])
+        self.assertNotIn(WARNING, self.lab.pre_edit(self.app, agent_id="a1").stdout)
+
+    def test_reminder_of_other_task_not_reset_by_a_note(self):
+        scope.reset_plan(self.lab.conn, self.lab.work, now=self.lab.now)
+        plan(self.lab, numbers=(1, 2))
+        start_agent(self.lab, "a1", 1)
+        start_agent(self.lab, "a2", 2)
+        edit_and_post(self.lab, "src/app.py", agent_id="a1")
+        self.note(False, ["x"], task=2)
+        self.assertNotIn(WARNING, self.lab.pre_edit(self.app, agent_id="a1").stdout)
+
     def test_reminder_per_task(self):
         scope.reset_plan(self.lab.conn, self.lab.work, now=self.lab.now)
         plan(self.lab, numbers=(1, 2))
@@ -227,7 +262,6 @@ class NotEnforcedTest(Base):
     def test_reminder_not_consumed_by_other_deny(self):
         r = self.lab.pre_edit(self.lab.wt / "src/altro.py", agent_id="a1")
         self.assertEqual(r.exit, 2)
-        self.assertEqual(self.lab.events("research_reminder"), [])
         self.assertEqual(self.lab.events("research_reminder"), [])
         r = self.lab.pre_edit(self.app, agent_id="a1")
         self.assertIn(WARNING, r.stdout)
@@ -243,12 +277,42 @@ class NotEnforcedTest(Base):
             tool_input={"file_path": str(self.app), "content": "x"}))
         self.assertEqual(self.lab.events("research_reminder"), [])
 
+    def test_failed_bash_does_not_consume_reminder(self):
+        self.lab.bash("sed -i s/a/b/ src/app.py", agent_id="a1")
+        self.lab.bash("sed -i s/a/b/ src/app.py", post=True, agent_id="a1",
+                      hook_event_name="PostToolUseFailure")
+        self.assertEqual(self.lab.events("research_reminder"), [])
+
     def test_bash_write_warns_and_records(self):
         r = self.lab.bash("sed -i s/a/b/ src/app.py", agent_id="a1")
         self.assertEqual(r.exit, 0)
         self.assertIn(WARNING, r.stdout)
         self.lab.bash("sed -i s/a/b/ src/app.py", post=True, agent_id="a1")
         self.assertEqual(self.lab.events("research_reminder"), [{"task": 1}])
+
+
+class L2Test(unittest.TestCase):
+    """Un lavoro L2 in execution ha lo stesso blocco di L1 (decisione 3)."""
+
+    def setUp(self):
+        self.root = make_root(True)
+        self.lab = Lab(level="L2", phase="execution", research=True, plugin_root=self.root)
+        plan(self.lab)
+        start_agent(self.lab, "a1", 1)
+        self.app = self.lab.wt / "src/app.py"
+
+    def tearDown(self):
+        self.lab.close()
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_l2_without_note_denied(self):
+        r = self.lab.pre_edit(self.app, agent_id="a1")
+        self.assertEqual(r.exit, 2)
+        self.assertIn(REFUSAL + " 1", r.stderr)
+
+    def test_l2_valid_note_passes(self):
+        lookups.set_note(self.lab.conn, self.lab.work, 1, text="n", ok=True)
+        self.assertEqual(self.lab.pre_edit(self.app, agent_id="a1").exit, 0)
 
 
 class L0Test(Base):

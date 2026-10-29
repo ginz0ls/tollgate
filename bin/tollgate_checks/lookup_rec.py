@@ -5,12 +5,10 @@ percorso vero degli hook `post_lookup` non passa di qui (la via breve del runner
 `lookups.observed`); questo modulo serve `post_bash`, i file che un comando mostra."""
 from __future__ import annotations
 
-from pathlib import Path
-
 from tollgate_core import lookups
 from tollgate_hooks.model import record
 
-from ._common import governing_work, lookup_owner
+from ._common import lookup_owner
 
 CHECK = {"api": 1, "events": ["post_lookup", "post_bash"], "component": "research_note",
          "order": 40}
@@ -19,11 +17,10 @@ CHECK = {"api": 1, "events": ["post_lookup", "post_bash"], "component": "researc
 def decide(event, ctx):
     if event.kind == "post_bash" and event.hook_event == "PostToolUseFailure":
         return []   # un comando fallito non ha mostrato niente
-    work = governing_work(ctx, event.cwd)
-    if work is None or not work["research"] or not work["worktree"] \
-            or not Path(work["worktree"]).is_dir():
+    work = lookups.tracked_work(ctx.db, agent_id=event.agent_id, cwd=event.cwd)
+    if work is None:
         return []
-    owner = lookup_owner(ctx, event)
+    owner = lookup_owner(ctx, event, work)
     if owner is None:
         return []
     wt, cwd = str(work["worktree"]), str(event.cwd)

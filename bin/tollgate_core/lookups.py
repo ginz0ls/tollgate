@@ -13,7 +13,7 @@ from typing import NamedTuple
 
 from tollgate_analysis import bash, research
 
-from . import clock, db, subagents
+from . import clock, db, sessions, subagents
 
 KINDS = ("read", "grep", "bash_read", "fetch", "search", "docs")
 
@@ -104,6 +104,25 @@ def observed_bash(command: str, *, cwd: str, worktree: str) -> list[Lookup]:
     return list(dict.fromkeys(out))
 
 
+def tracked_work(conn, *, agent_id: str | None, cwd):
+    """Il lavoro a cui registrare le letture di un evento, o None: con `agent_id` è il lavoro del
+    subagente (come per il gate: il suo cwd può stare fuori dal worktree), senza (ripiego
+    spento, decisione 5) quello della cartella. Deve avere il passo (`research`) e un worktree
+    che esiste, e non essere chiuso."""
+    if agent_id:
+        sub = subagents.get(conn, agent_id)
+        work = conn.execute("SELECT * FROM work_items WHERE id = ? AND phase <> 'closed'",
+                            (sub["work"],)).fetchone() if sub and sub["work"] is not None \
+            else None
+    else:
+        work = sessions.work_for_path(conn, cwd) if cwd is not None and Path(cwd).is_dir() \
+            else None
+    if work is None or not work["research"] or not work["worktree"] \
+            or not Path(work["worktree"]).is_dir():
+        return None
+    return work
+
+
 def _implementer_task(conn, row) -> int | None:
     """Il task di un subagente che lo sta eseguendo: il suo tipo è l'`agent_type` del task, che
     è `running`. Un revisore (tipo diverso, task in `review`) non lo è."""
@@ -146,6 +165,16 @@ def detach_tasks(conn, work: int) -> None:
     with db.tx(conn):
         conn.execute("UPDATE lookups SET task = NULL WHERE work = ? AND task IS NOT NULL",
                      (work,))
+
+
+def rules_enforced(root) -> bool:
+    """L'interruttore del blocco (decisione 8): `rules-base` della radice del plugin è approvata.
+    Un file illeggibile vale «spento» (la distinzione tra assente e illeggibile è di B2)."""
+    try:
+        text = (Path(root) / research.RULES_BASE).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return research.enforced(text)
 
 
 def set_note(conn, work: int, task: int, *, text: str, ok: bool) -> None:

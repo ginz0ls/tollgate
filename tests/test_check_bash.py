@@ -292,7 +292,7 @@ class GlobRemovalTest(unittest.TestCase):
                 self.assertEqual(self.code(cmd), 0)
 
     def test_brace_expansion(self):
-        from tollgate_checks.bash_rules import _braces
+        from tollgate_checks._common import _braces
         self.assertEqual(_braces("{a,b}"), ["a", "b"])
         self.assertEqual(_braces("x/{a,b}/y"), ["x/a/y", "x/b/y"])
         self.assertEqual(_braces("{a,b{c,d}}"), ["a", "bc", "bd"])

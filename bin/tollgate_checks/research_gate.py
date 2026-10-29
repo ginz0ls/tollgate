@@ -64,16 +64,13 @@ def _bash_work(event, ctx):
 
 
 def _reminded(ctx, work, task: int | None) -> bool:
-    return any(d.get("task") == task for d in work_events(ctx, work["id"], "research_reminder"))
-
-
-def _rules_enforced(ctx) -> bool:
-    try:
-        text = (ctx.plugin_root / research.RULES_BASE).read_text(encoding="utf-8",
-                                                                 errors="replace")
-    except OSError:
-        return False
-    return research.enforced(text)
+    """Il task è già stato avvisato dopo la sua ultima consegna della nota: una consegna non
+    valida riporta a «avviso alla modifica successiva» (decisione 14)."""
+    reminded = False
+    for type_, data in work_events(ctx, work["id"], "research_reminder", "research_note"):
+        if data.get("task") == task:
+            reminded = type_ == "research_reminder"
+    return reminded
 
 
 def _verdict(event, ctx):
@@ -100,7 +97,7 @@ def _verdict(event, ctx):
     task = owner[1]
     if lookups.note(ctx.db, work["id"], task)[1]:
         return None
-    if _rules_enforced(ctx):
+    if lookups.rules_enforced(ctx.plugin_root):
         return "deny", work, task
     return ("remind", work, task) if not _reminded(ctx, work, task) else None
 

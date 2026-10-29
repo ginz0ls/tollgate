@@ -87,16 +87,6 @@ def _research_on(work, cfg) -> bool:
     return research.active(work["research"], bool(cfg.data["components"].get("research_note", True)))
 
 
-def _rules_enforced() -> bool:
-    """Decisione 8: l'interruttore è nella radice del plugin, come gli altri percorsi del programma."""
-    try:
-        text = (db.BIN_PATH.parents[1] / research.RULES_BASE).read_text(encoding="utf-8",
-                                                                        errors="replace")
-    except OSError:
-        return False
-    return research.enforced(text)
-
-
 def _related_tests(task, must_haves: list[planmod.MustHave]) -> list[str]:
     out = list(task.test_files)
     out += [t for m in must_haves for t in m.tests if t != "manuale"]
@@ -360,7 +350,8 @@ def _review_prepare(state, conn, cwd: Path, number: int) -> Path:
         concerns=_concerns(conn, work, row), reviewer_skills=routing.reviewer_skills,
         standard=bool(cfg.data["components"].get("reviewer_standard", True)),
         no_changes=not json.loads(row["commits"]), research=research_on,
-        research_enforced=research_on and _rules_enforced(), research_note=note_text,
+        research_enforced=research_on and lookups.rules_enforced(db.BIN_PATH.parents[1]),
+        research_note=note_text,
         research_note_path=str(note_path(wt, work["issue"], number))
         if note_text is not None else None,
         research_valid=note_ok,

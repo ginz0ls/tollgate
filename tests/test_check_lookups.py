@@ -5,7 +5,7 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
-from tests.hookkit import DROP, SESSION, Lab, sample_b1
+from tests.hookkit import DEFAULT_TOML, DROP, SESSION, Lab, sample_b1
 from tollgate_analysis import research
 from tollgate_checks import lookup_rec
 from tollgate_core import lookups, scope, subagents, tasks
@@ -22,7 +22,7 @@ def rows(lab):
         "SELECT task, kind, target, agent_id FROM lookups ORDER BY id")]
 
 
-def start_impl(lab, agent_id, task, *, type_=IMPL, tstate="running"):
+def start_impl(lab, agent_id, task, *, type_=IMPL):
     subagents.start(lab.conn, agent_id=agent_id, type_=type_, session=SESSION, work=lab.work,
                     task=task, base_sha=lab.base, fingerprint="f", now=lab.now)
 
@@ -307,6 +307,52 @@ class UnnamedTest(LookupBase):
         self.assertEqual([x[0] for x in rows(self.lab)], [1])
 
 
+class WorkFromSubagentTest(LookupBase):
+    def decide(self, command, cwd):
+        from tollgate_hooks import adapter
+        raw = sample_b1("bash_cat", "post", session_id=SESSION, cwd=str(cwd),
+                        agent_id="impl1", agent_type=IMPL, tool_input={"command": command})
+        event = adapter.to_event("PostToolUse", raw)
+        ctx = SimpleNamespace(db=ReadDb(self.lab.conn), work=None, bound=False,
+                              now=self.lab.now, stale_minutes=30,
+                              readonly=lambda t: t == REVIEWER, work_for_path=lambda p: None)
+        return lookup_rec.decide(event, ctx)
+
+    def test_bash_read_with_cwd_outside_the_worktree(self):
+        out = self.decide(f"cat '{self.app}'", self.lab.tmp)
+        self.assertEqual([(d.op, d.data["kind"], d.data["target"], d.data["task"])
+                          for d in out], [("lookup", "bash_read", "src/app.py", 1)])
+
+    def test_closed_work_not_tracked(self):
+        self.lab.conn.execute("UPDATE work_items SET phase = 'closed' WHERE id = ?",
+                              (self.lab.work,))
+        self.lab.conn.commit()
+        self.assertEqual(self.decide(f"cat '{self.app}'", self.lab.wt), [])
+
+
+class ComponentOffTest(unittest.TestCase):
+    """`[components] research_note = false`: la via breve registra lo stesso (dati inutilizzati,
+    potati da `prune`); `lookup_rec` no, perché il suo componente è spento."""
+
+    def setUp(self):
+        self.lab = Lab(research=True, toml=DEFAULT_TOML + "\n[components]\nresearch_note = false\n")
+        setup_tasks(self.lab, (1,))
+        start_impl(self.lab, "impl1", 1)
+
+    def tearDown(self):
+        self.lab.close()
+
+    def test_short_path_records_with_component_off(self):
+        r = self.lab.lookup("read", agent_id="impl1",
+                            tool_input={"file_path": str(self.lab.wt / "src/app.py")})
+        self.assertEqual(r.exit, 0, r.stderr)
+        self.assertEqual(rows(self.lab), [(1, "read", "src/app.py", "impl1")])
+
+    def test_bash_read_not_recorded_with_component_off(self):
+        self.lab.bash("cat src/app.py", post=True, agent_id="impl1")
+        self.assertEqual(rows(self.lab), [])
+
+
 class ShortPathTest(LookupBase):
     def test_post_lookup_short_path_skips_config(self):
         boom = mock.Mock(side_effect=AssertionError("la via breve non carica la configurazione"))
@@ -327,10 +373,17 @@ class ShortPathTest(LookupBase):
         self.assertEqual(r.exit, 0)
         self.assertRows([])
 
-    def test_cwd_outside_any_work(self):
-        r = self.read(agent_id="impl1", cwd=self.lab.tmp)
+    def test_cwd_outside_any_work_relative_path_not_recorded(self):
+        r = self.read("src/app.py", agent_id="impl1", cwd=self.lab.tmp)
         self.assertEqual(r.exit, 0, r.stderr)
         self.assertRows([])
+
+    def test_work_comes_from_the_subagent_not_from_the_cwd(self):
+        """Minor 1: il gate usa il lavoro dell'implementatore; la lettura deve contare anche con
+        il cwd fuori dal worktree."""
+        r = self.read(agent_id="impl1", cwd=self.lab.tmp)
+        self.assertEqual(r.exit, 0, r.stderr)
+        self.assertRows([(1, "read", "src/app.py", "impl1")])
 
     def test_error_in_recording_is_informative(self):
         with mock.patch.object(lookups, "record", side_effect=ValueError("guasto")):

@@ -87,8 +87,18 @@ class ResetPlanTest(unittest.TestCase):
         self.assertEqual(len(lookups.for_task(self.conn, self.w, 2)), 1)
         scope.reset_plan(self.conn, self.w, now=T0)
         self.assertEqual(lookups.for_task(self.conn, self.w, 2), [])
+        # le righe restano, staccate dal task (task NULL)
+        self.assertEqual([tuple(r) for r in self.conn.execute(
+            "SELECT task, target FROM lookups WHERE work = ?", (self.w,))], [(None, "src/a.py")])
         self.register("s2", ("a",))
         self.assertEqual(lookups.for_task(self.conn, self.w, 2), [])
+        # il nuovo task 2 registra le sue letture, senza ereditare quelle del vecchio
+        lookups.record(self.conn, work=self.w, task=2, agent_id="ag", session="s",
+                       kind="read", target="src/a.py", now=T0)
+        self.assertEqual(lookups.for_task(self.conn, self.w, 2),
+                         [lookups.Lookup("read", "src/a.py")])
+        self.assertEqual(self.conn.execute(
+            "SELECT count(*) FROM lookups WHERE work = ?", (self.w,)).fetchone()[0], 2)
 
     def test_reset_without_plan_is_noop_without_event(self):
         self.assertEqual(scope.reset_plan(self.conn, self.w, now=T0), [])
