@@ -87,6 +87,23 @@ class ImplementerResearchTest(unittest.TestCase):
         self.assertNotIn("Nota di ricerca", out)
         self.assertNotIn("research submit", out)
 
+    def test_impl_brief_warns_about_tollgate_prefix_in_note(self):
+        out = brief.implementer_brief(impl(research_cmd=RESEARCH_CMD))
+        self.assertIn("TOLLGATE_", out)
+
+    def test_fix_brief_valid_note_has_no_invalid_warning(self):
+        out = brief.implementer_brief(impl(
+            research_cmd=RESEARCH_CMD, fix_round=1, research_note_path="/w/n.md"))
+        self.assertNotIn("non è valida", out)
+
+    def test_fix_brief_invalid_note_says_to_deliver_again(self):
+        out = brief.implementer_brief(impl(
+            research_cmd=RESEARCH_CMD, fix_round=1, research_note_path="/w/n.md",
+            research_note_valid=False, research_problems=["il file a.py non risulta letto"]))
+        self.assertIn("la nota non è valida: correggila e consegnala di nuovo prima di "
+                      "modificare", out)
+        self.assertIn("```\nesito: non valida\n- il file a.py non risulta letto\n```", out)
+
     def test_fix_brief_points_to_note(self):
         out = brief.implementer_brief(impl(
             research_cmd=RESEARCH_CMD, fix_round=1, research_note_path="/w/.tollgate-run/7/research-2.md",
@@ -162,6 +179,50 @@ class ReviewResearchTest(unittest.TestCase):
                                         research_note_path=self.NOTE_PATH,
                                         first_diff_file="src/app.py"))
         self.assertIn(f"`file` `{self.NOTE_PATH}`", out)
+
+    PROBLEMS = ["il file src/x.py non risulta letto", "la fonte https://a.example/``` non risulta aperta"]
+
+    def research_section(self, **kw):
+        out = brief.review_brief(review(research=True, first_diff_file="src/app.py", **kw))
+        return out.split("## Nota di ricerca")[1].split("## Verdetto")[0]
+
+    def test_review_brief_gives_outcome_valid(self):
+        section = self.research_section(research_enforced=True, research_valid=True,
+                                        research_note="## Cosa ho trovato\nx",
+                                        research_note_path=self.NOTE_PATH)
+        self.assertIn("esito: valida", section)
+        self.assertNotIn("non valida", section)
+        self.assertNotIn("`missing`", section)
+
+    def test_review_brief_invalid_note_enforced_is_missing(self):
+        section = self.research_section(research_enforced=True, research_valid=False,
+                                        research_problems=self.PROBLEMS,
+                                        research_note="## Cosa ho trovato\nx",
+                                        research_note_path=self.NOTE_PATH)
+        self.assertIn("esito: non valida", section)
+        self.assertIn("trattala come mancante", section)
+        self.assertIn("`major`", section)
+        self.assertIn("`missing`", section)
+        fenced = "````\nesito: non valida\n" + "\n".join(f"- {p}" for p in self.PROBLEMS) + "\n````"
+        self.assertIn(fenced, section)
+        self.assertIn(f"`file` `{self.NOTE_PATH}`", section)
+
+    def test_review_brief_invalid_note_not_enforced_is_moderate(self):
+        section = self.research_section(research_enforced=False, research_valid=False,
+                                        research_problems=self.PROBLEMS,
+                                        research_note="## Cosa ho trovato\nx",
+                                        research_note_path=self.NOTE_PATH)
+        self.assertIn("esito: non valida", section)
+        self.assertIn("`moderate`", section)
+        self.assertNotIn("`major`", section)
+        self.assertNotIn("missing", section)
+
+    def test_review_brief_no_changes_asks_nothing_about_missing_note(self):
+        section = self.research_section(research_enforced=True, no_changes=True)
+        self.assertNotIn("`major`", section)
+        self.assertNotIn("missing", section)
+        self.assertNotIn("rule", section)
+        self.assertIn("non era richiesta", section)
 
     def test_review_brief_legacy_has_no_section(self):
         out = brief.review_brief(review(research=False, research_enforced=True,

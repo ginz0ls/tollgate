@@ -46,6 +46,8 @@ class ImplBrief:
     fix_round: int = 0
     research_cmd: str | None = None        # da `research.submit_command`; None: senza il passo
     research_note_path: str | None = None  # la nota già consegnata, nei giri `--fix`
+    research_note_valid: bool = True       # esito del controllo meccanico di quella nota
+    research_problems: list[str] = field(default_factory=list)
 
 
 def _effective_severity(f: dict):
@@ -95,6 +97,13 @@ def _report_example(task: int) -> str:
             '"must_have": ["M1"], "concerns": "…", "left": "…", "size_reason": null}' % task)
 
 
+def _outcome_block(valid: bool, problems: list[str]) -> str:
+    """Esito del controllo meccanico della nota e i suoi problemi, in un recinto: i problemi
+    nominano file e URL scritti nella nota, che è testo non fidato."""
+    return _block("\n".join([f"esito: {'valida' if valid else 'non valida'}",
+                             *(f"- {p}" for p in problems)]))
+
+
 def _impl_research(b: ImplBrief) -> list[str]:
     """La sezione «Nota di ricerca» (decisione 2): il formato e il comando di consegna."""
     out = ["", "## Nota di ricerca",
@@ -107,11 +116,17 @@ def _impl_research(b: ImplBrief) -> list[str]:
            f"- `## {research.SECTION_FOUND}`: testo non vuoto;",
            f"- al posto di `## {research.SECTION_DOCS}`, `## {research.SECTION_NONE}` con il "
            "motivo sulla riga seguente.",
-           f"La nota è al più {research.MAX_NOTE_CHARS} caratteri. Comando di consegna:",
+           f"La nota è al più {research.MAX_NOTE_CHARS} caratteri; una nota che contiene "
+           "`TOLLGATE_` viene negata. Comando di consegna:",
            _block(b.research_cmd or "")]
-    if b.research_note_path:
-        out.append(f"Giro di correzione: la nota è in {b.research_note_path}: integrala e risottomettila solo se "
-                   "questo giro tocca librerie o servizi nuovi.")
+    if b.research_note_path and b.research_note_valid:
+        out.append(f"Giro di correzione: la nota è in {b.research_note_path}: integrala e "
+                   "risottomettila solo se questo giro tocca librerie o servizi nuovi.")
+    elif b.research_note_path:
+        out += [f"Giro di correzione: la nota è in {b.research_note_path}. Attenzione: la nota "
+                "non è valida: correggila e consegnala di nuovo prima di modificare. Esito del "
+                "controllo di tollgate:",
+                _outcome_block(False, b.research_problems)]
     return out
 
 
@@ -165,6 +180,8 @@ class ReviewBrief:
     research_enforced: bool = False        # l'interruttore della decisione 8
     research_note: str | None = None
     research_note_path: str | None = None
+    research_valid: bool = False           # esito del controllo meccanico della nota
+    research_problems: list[str] = field(default_factory=list)
     first_diff_file: str | None = None     # il `file` del rilievo quando la nota manca
 
 
@@ -180,20 +197,29 @@ STANDARD = [
 
 
 def _review_research(b: ReviewBrief) -> list[str]:
-    """La sezione «Nota di ricerca» del revisore (decisione 13): la nota in un recinto e la
-    gravità del rilievo `nota di ricerca` secondo l'interruttore."""
+    """La sezione «Nota di ricerca» del revisore (decisione 13): la nota e l'esito del controllo
+    di tollgate in due recinti, e la gravità del rilievo `nota di ricerca` secondo
+    l'interruttore. Una nota non valida vale come mancante."""
     has_note = b.research_note is not None
+    usable = has_note and b.research_valid
     out = ["", "## Nota di ricerca"]
     if has_note:
         out += [f"Nota consegnata dall'implementatore: `{b.research_note_path}`.", DATA_NOTE,
-                _block(b.research_note)]
+                _block(b.research_note), "Esito del controllo di tollgate (letture registrate "
+                "contro la nota):", _outcome_block(b.research_valid, b.research_problems)]
+        if not b.research_valid:
+            out.append("La nota non è valida: trattala come mancante.")
     else:
         out.append("(nessuna nota consegnata)")
+    if b.no_changes and not has_note:
+        out.append("Il task non ha modifiche: la nota non era richiesta, nessun rilievo sulla "
+                   "nota.")
+        return out
     where = (b.research_note_path if has_note else None) or b.first_diff_file \
         or str(b.research_note_path)
     if b.research_enforced:
         severity = "gravità `major` (bloccante)" + (
-            " e `missing` in `spec_compliance`" if not has_note else "")
+            " e `missing` in `spec_compliance`" if not usable else "")
     else:
         severity = ("gravità `moderate`, che non ferma il task (l'interruttore delle regole base "
                     "è spento), e niente in `spec_compliance`")

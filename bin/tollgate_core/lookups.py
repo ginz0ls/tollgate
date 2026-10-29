@@ -5,6 +5,7 @@ nuovo eredita quelle dei giri precedenti. La nota sta in `tasks.research_note`, 
 `tasks.research_ok`."""
 from __future__ import annotations
 
+import json
 import os
 from datetime import timedelta
 from pathlib import Path
@@ -159,6 +160,25 @@ def note(conn, work: int, task: int) -> tuple[str | None, bool]:
     if row is None:
         return None, False
     return row[0], bool(row[1])
+
+
+def last_problems(conn, work: int, task: int) -> list[str]:
+    """I problemi dell'ultima consegna della nota del task, se non era valida; vuota se era
+    valida o non c'è. Conta solo gli eventi dopo l'ultimo `plan_reset` (dopo `reopen plan` i
+    task si rinumerano). `conn` può essere anche la lettura sola del contesto degli hook."""
+    reset = conn.execute("SELECT max(seq) FROM events WHERE work = ? AND type = 'plan_reset'",
+                         (work,)).fetchone()[0] or 0
+    last = None
+    for (raw,) in conn.execute("SELECT data FROM events WHERE work = ? AND type = "
+                               "'research_note' AND seq > ? ORDER BY seq", (work, reset)):
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(data, dict) and data.get("task") == task:
+            last = data
+    problems = last.get("problems") if last and not last.get("ok") else None
+    return [str(x) for x in problems] if isinstance(problems, list) else []
 
 
 def prune(conn, *, now, days: int) -> int:

@@ -76,12 +76,6 @@ def _rules_enforced(ctx) -> bool:
     return research.enforced(text)
 
 
-def _problems(ctx, work, task: int) -> list[str]:
-    notes = [d for d in work_events(ctx, work["id"], "research_note") if d.get("task") == task]
-    last = notes[-1].get("problems") if notes else None
-    return [str(x) for x in last] if isinstance(last, list) and not notes[-1].get("ok") else []
-
-
 def _verdict(event, ctx):
     """`(esito, lavoro, task)`: esito `deny` o `remind`, o None se non c'è niente da dire."""
     is_bash = event.kind in ("pre_bash", "post_bash")
@@ -116,7 +110,7 @@ def _refusal(ctx, work, task: int) -> str:
     text = (f"nota di ricerca mancante o non valida per il task {task}: prima di modificare "
             f"file leggi con Read i file del progetto che il task tocca, apri la "
             f"documentazione di ciò che usi, poi consegna la nota:\n{command}")
-    problems = _problems(ctx, work, task)
+    problems = lookups.last_problems(ctx.db, work["id"], task)
     if problems:
         text += "\nProblemi della consegna precedente:\n- " + "\n- ".join(problems)
     return text

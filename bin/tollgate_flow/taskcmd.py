@@ -185,7 +185,8 @@ def _task_start(state, conn, cwd: Path, number: int, *, fix: bool, claude_dir: P
     hint = MODEL_HINT if renamed else cfg.get("review.models").get(routing.implementer)
 
     research_on = _research_on(work, cfg)
-    delivered = lookups.note(conn, work["id"], number)[0] if research_on and fix else None
+    delivered, delivered_ok = lookups.note(conn, work["id"], number) \
+        if research_on and fix else (None, True)
     impl_brief = briefs.ImplBrief(
         issue=work["issue"], task=number, name=name, agent_type=routing.implementer,
         model_hint=hint, task_text=text, scope=scope_files,
@@ -195,7 +196,10 @@ def _task_start(state, conn, cwd: Path, number: int, *, fix: bool, claude_dir: P
         research_cmd=research.submit_command(program_command(db.BIN_PATH), number)
         if research_on else None,
         research_note_path=str(note_path(wt, work["issue"], number))
-        if delivered is not None else None)
+        if delivered is not None else None,
+        research_note_valid=delivered_ok,
+        research_problems=lookups.last_problems(conn, work["id"], number)
+        if delivered is not None and not delivered_ok else [])
     file_name = f"task-{number}-fix-{round_}.md" if fix else f"task-{number}.md"
     path = wt / ".tollgate-run" / str(work["issue"]) / file_name
     try:
@@ -347,7 +351,7 @@ def _review_prepare(state, conn, cwd: Path, number: int) -> Path:
     code = secrets.token_hex(4)
     diff_path, brief_path = run_dir / f"review-{k}.diff", run_dir / f"review-{k}.md"
     research_on = _research_on(work, cfg)
-    note_text = lookups.note(conn, work["id"], number)[0] if research_on else None
+    note_text, note_ok = lookups.note(conn, work["id"], number) if research_on else (None, False)
     text = briefs.review_brief(briefs.ReviewBrief(
         issue=work["issue"], task=number, sha=head, code=code, base=base, head=head,
         brief_path=str(run_dir / brief_name), diff_path=str(diff_path),
@@ -359,6 +363,9 @@ def _review_prepare(state, conn, cwd: Path, number: int) -> Path:
         research_enforced=research_on and _rules_enforced(), research_note=note_text,
         research_note_path=str(note_path(wt, work["issue"], number))
         if note_text is not None else None,
+        research_valid=note_ok,
+        research_problems=lookups.last_problems(conn, work["id"], number)
+        if note_text is not None and not note_ok else [],
         first_diff_file=changes[0].path if changes else None))
     try:
         run_dir.mkdir(parents=True, exist_ok=True)

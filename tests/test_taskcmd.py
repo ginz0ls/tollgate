@@ -8,7 +8,7 @@ from tests.flowkit import PLAN, FlowLab, plan_text
 from tests.helpers import BIN
 from tests.hookkit import DEFAULT_TOML
 from tollgate_analysis import research
-from tollgate_core import lookups, phases, subagents, tasks
+from tollgate_core import events, lookups, phases, subagents, tasks
 from tollgate_core.paths import program_command
 from tollgate_flow import research_cmd, taskcmd
 
@@ -115,6 +115,20 @@ class TaskStartTest(TaskCase):
         path, _ = self.start(fix=True)
         note_file = research_cmd.note_path(self.fl.wt, 7, 1)
         self.assertIn(f"la nota è in {note_file}: integrala", path.read_text())
+
+    def test_fix_brief_invalid_note_says_to_deliver_again(self):
+        self.make()
+        self.set_research()
+        self.start()
+        lookups.set_note(self.fl.conn, self.fl.work, 1, text="## Cosa ho trovato\nx", ok=False)
+        events.record_event(self.fl.conn, "research_note",
+                            {"task": 1, "ok": False, "problems": ["la fonte https://x.example non risulta aperta"]},
+                            now=self.fl.now, work=self.fl.work)
+        self.to_changes()
+        brief = self.start(fix=True)[0].read_text()
+        self.assertIn("la nota non è valida: correggila e consegnala di nuovo prima di "
+                      "modificare", brief)
+        self.assertIn("- la fonte https://x.example non risulta aperta", brief)
 
     def test_task_without_must_have_line_links_all(self):
         self.make()
@@ -397,6 +411,34 @@ class ReviewDoneTest(TaskCase):
         self.assertIn("````\n" + note + "\n````", brief)
         self.assertIn(str(research_cmd.note_path(self.fl.wt, 7, 1)), brief)
         self.assertIn("gravità `moderate`", brief)  # rules-base non è approvata: interruttore spento
+
+    def test_review_prepare_gives_outcome_and_problems_of_invalid_note(self):
+        self.to_review()
+        self.set_research()
+        lookups.set_note(self.fl.conn, self.fl.work, 1, text="## Cosa ho trovato\nx", ok=False)
+        events.record_event(self.fl.conn, "research_note",
+                            {"task": 1, "ok": False, "problems": ["il file src/x.py non risulta letto"]},
+                            now=self.fl.now, work=self.fl.work)
+        brief = self.prepare().read_text()
+        self.assertIn("```\nesito: non valida\n- il file src/x.py non risulta letto\n```", brief)
+        self.assertIn("trattala come mancante", brief)
+        self.assertIn("gravità `moderate`", brief)  # interruttore spento
+
+    def test_review_prepare_valid_note_outcome(self):
+        self.to_review()
+        self.set_research()
+        lookups.set_note(self.fl.conn, self.fl.work, 1, text="## Cosa ho trovato\nx", ok=True)
+        self.assertIn("esito: valida", self.prepare().read_text())
+
+    def test_review_prepare_ignores_problems_before_plan_reset(self):
+        self.to_review()
+        self.set_research()
+        events.record_event(self.fl.conn, "research_note",
+                            {"task": 1, "ok": False, "problems": ["vecchio problema"]},
+                            now=self.fl.now, work=self.fl.work)
+        events.record_event(self.fl.conn, "plan_reset", {}, now=self.fl.now, work=self.fl.work)
+        lookups.set_note(self.fl.conn, self.fl.work, 1, text="x", ok=False)
+        self.assertNotIn("vecchio problema", self.prepare().read_text())
 
     def test_review_prepare_missing_note_names_first_diff_file(self):
         self.to_review()
