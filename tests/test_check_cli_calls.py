@@ -1,11 +1,15 @@
 import json
 import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-from tests.helpers import BIN
+from tests.helpers import BIN, ROOT
 from tests.hookkit import SESSION, Lab
+from tollgate_analysis import research
+from tollgate_core import scope, subagents, tasks
+from tollgate_core.paths import program_command
 
 PROGRAM = BIN / "tollgate"
 
@@ -206,3 +210,90 @@ class CliCallsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ResearchSubcommandTest(unittest.TestCase):
+    """`research submit` è dell'implementatore (decisione 12); `research show` no."""
+
+    def make(self, **kw):
+        lab = Lab(research=True, **kw)
+        self.addCleanup(lab.close)
+        return lab
+
+    def test_research_denied_to_main_session_in_l1(self):
+        lab = self.make()
+        for cmd in (f"python3 '{PROGRAM}' research submit 1", f"'{PROGRAM}' research submit 1",
+                    f"python3 '{PROGRAM}' research submit 1 <<'X'\ntesto\nX"):
+            with self.subTest(cmd=cmd):
+                r = lab.bash(cmd)
+                self.assertEqual(r.exit, 2)
+                self.assertIn("la nota la scrive l'implementatore del task", r.stderr)
+
+    def test_research_denied_to_main_session_in_l2(self):
+        lab = self.make(level="L2", phase="execution")
+        self.assertEqual(lab.bash(f"python3 '{PROGRAM}' research submit 1").exit, 2)
+
+    def test_research_allowed_in_l0(self):
+        lab = self.make(level="L0")
+        self.assertEqual(lab.bash(f"python3 '{PROGRAM}' research submit 1").exit, 0)
+
+    def test_research_allowed_to_implementer(self):
+        lab = self.make()
+        r = lab.bash(f"python3 '{PROGRAM}' research submit 1", agent_id="ag-1")
+        self.assertEqual(r.exit, 0, r.stderr)
+
+    def test_research_show_allowed_to_main_session(self):
+        lab = self.make()
+        self.assertEqual(lab.bash(f"python3 '{PROGRAM}' research show 1").exit, 0)
+
+    def test_research_uncertain_program_denied_to_main_session(self):
+        lab = self.make()
+        for cmd in (f'p="{PROGRAM}"; python3 "$p" research submit 1',
+                    f'p="{PROGRAM}"; "$p" research submit 1'):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(lab.bash(cmd).exit, 2)
+        self.assertEqual(lab.bash(f'p="{PROGRAM}"; python3 "$p" research show 1').exit, 0)
+        self.assertEqual(lab.bash('python3 "$x" research'
+                                  ).exit, 0)
+
+    def test_unparseable_research_denied_to_main_session(self):
+        lab = self.make()
+        self.assertEqual(
+            lab.bash(f"python3 '{PROGRAM}' research submit 1 \"unchiuso").exit, 2)
+        self.assertEqual(lab.bash('echo "unchiuso research submit').exit, 0)
+        self.assertEqual(
+            lab.bash(f"python3 '{PROGRAM}' research show 1 \"unchiuso").exit, 0)
+        self.assertEqual(
+            lab.bash(f"python3 '{PROGRAM}' research submit 1 \"unchiuso", agent_id="ag-1").exit,
+            0)
+
+    def test_heredoc_research_passes_bash_rules(self):
+        """Il comando di consegna dell'implementatore, con una nota che ha backtick e una riga
+        `EOF`, non riceve `deny` da nessun modulo con `hooks/run` vero e arriva intero alla CLI."""
+        lab = self.make()
+        scope.register_plan(lab.conn, lab.ts.state, lab.work,
+                            plan_path="docs/superpowers/plans/p.md", plan_sha="s",
+                            scope_paths=["src/app.py"], plan_tasks=[(1, [])], advance=False,
+                            now=lab.now)
+        tasks.assign(lab.conn, lab.work, 1, implementer="impl-1", agent_type="tollgate:implementer",
+                     reviewer_type="tollgate:task-reviewer", pending="launch", now=lab.now)
+        tasks.task_event(lab.conn, lab.work, 1, "start", now=lab.now)
+        subagents.start(lab.conn, agent_id="impl-1", type_="tollgate:implementer",
+                        session=SESSION, work=lab.work, task=1, base_sha=lab.base,
+                        fingerprint="f", now=lab.now)
+        note = (f"## {research.SECTION_FILES}\n- src/app.py\n\n"
+                f"## {research.SECTION_NONE}\nnessuna fonte, `solo` codice $(non eseguito)\n\n"
+                f"## {research.SECTION_FOUND}\nuna riga EOF qui sotto\nEOF\ne `backtick`\n")
+        command = research.submit_command(program_command(PROGRAM), 1)
+        head, _, tail = command.partition("\n")
+        command = head + "\n" + note + research.HEREDOC_END
+        payload = lab._base("PreToolUse-Bash", "impl-1", lab.wt,
+                            tool_input={"command": command, "description": "x"})
+        r = subprocess.run([str(ROOT / "hooks" / "run"), "PreToolUse"], input=json.dumps(payload),
+                           capture_output=True, text=True, env=lab.ts.env(), cwd=str(lab.wt),
+                           timeout=60)
+        self.assertEqual((r.returncode, r.stderr), (0, ""), r.stdout)
+        run = subprocess.run(["bash", "-c", command], capture_output=True, text=True,
+                             env=lab.ts.env(), cwd=str(lab.wt), timeout=60)
+        self.assertIn("non valida", run.stdout + run.stderr)
+        self.assertEqual(tasks.get_task(lab.conn, lab.work, 1)["research_note"], note)

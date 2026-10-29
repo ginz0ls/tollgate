@@ -12,6 +12,8 @@ import re
 from tollgate_analysis import bash
 from tollgate_hooks.model import deny, record
 
+from ._common import governing_work
+
 CHECK = {"api": 1, "events": ["pre_bash"], "component": None, "order": 5}
 _SIGNALLED = ("start", "act", "finish", "sync", "adopt", "cleanup", "abandon")
 _COORDINATOR_ONLY = ("start", "task", "act", "finish", "review", "sync", "adopt", "cleanup",
@@ -50,6 +52,23 @@ def _subcommand(args: list[str]) -> str | None:
 
 def _coordinator_only(sub: str | None, args: list[str]) -> bool:
     return sub in _COORDINATOR_ONLY or (sub == "status" and "--checkpoint" in args)
+
+
+def _research_submit(args: list[str]) -> bool:
+    """`research submit`: la consegna della nota è dell'implementatore (decisione 12 di B1)."""
+    return [x for x in args if not x.startswith("-")][:2] == ["research", "submit"]
+
+
+def _deny_main_research():
+    return deny("la nota la scrive l'implementatore del task: `research submit` non si lancia "
+                "dalla sessione principale. Il coordinatore la legge con `research show <k>`.",
+                rule="research_main_session")
+
+
+def _tiered(ctx, path) -> bool:
+    """Il lavoro che governa `path` è L1 o L2 (in L0 non c'è nota)."""
+    work = governing_work(ctx, path)
+    return work is not None and work["level"] in ("L1", "L2")
 
 
 def _is_publish(token: str) -> bool:
@@ -94,6 +113,9 @@ def decide(event, ctx):
                          "(BLOCKED o NEEDS_CONTEXT). Se non stai lanciando tollgate, scrivi il "
                          "comando in modo letterale, senza variabili né $(…)",
                          rule="coordinator_only")]
+        if not event.agent_id and "tollgate" in raw and {"research", "submit"} <= words \
+                and _tiered(ctx, event.cwd):
+            return [_deny_main_research()]
         return []
     out = []
     for c in cmds:
@@ -108,6 +130,8 @@ def decide(event, ctx):
             if _coordinator_only(sub, args):
                 return [_deny_subagent(sub, certain)]
             continue
+        if sub == "research" and _research_submit(args) and _tiered(ctx, bash.effective_dir(c)):
+            return [_deny_main_research()]
         if certain and sub in _SIGNALLED:
             out.append(record("cli_call", cwd=bash.effective_dir(c), argv=args[args.index(sub):]))
     return out

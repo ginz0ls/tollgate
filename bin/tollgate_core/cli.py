@@ -120,6 +120,13 @@ def build_parser() -> argparse.ArgumentParser:
     tr.add_argument("number", type=int, metavar="K")
     td = tsub.add_parser("done", help="chiude il task approvato dal revisore")
     td.add_argument("number", type=int, metavar="K")
+    rsp = sub.add_parser("research", help="nota di ricerca dell'implementatore (B1)")
+    rssub = rsp.add_subparsers(dest="research_cmd", required=True)
+    rss = rssub.add_parser("submit", help="consegna la nota (testo da stdin) e la confronta con "
+                                          "le letture del task")
+    rss.add_argument("number", type=int, metavar="K")
+    rsh = rssub.add_parser("show", help="mostra la nota consegnata e l'esito")
+    rsh.add_argument("number", type=int, metavar="K")
     ap = sub.add_parser("act", help="atti dell'utente (8.4)")
     asub = ap.add_subparsers(dest="act_cmd", required=True)
     aa = asub.add_parser("apply", help="applica un atto registrato (resolve, approve level)")
@@ -376,6 +383,16 @@ def main(argv: list[str]) -> int:
                 print(f"tollgate: {e}", file=sys.stderr)
                 return 1
             return 0
+        if args.cmd == "research":
+            from tollgate_flow import research_cmd
+            if args.research_cmd == "submit":
+                res = research_cmd.submit(state, Path.cwd(), args.number, sys.stdin.read())
+            else:
+                res = research_cmd.show(state, Path.cwd(), args.number)
+            shown = res.code == research_cmd.OK or (args.research_cmd == "show"
+                                                    and res.code == research_cmd.INVALID)
+            print("\n".join(res.lines), file=sys.stdout if shown else sys.stderr)
+            return res.code
         if args.cmd == "act":
             from tollgate_flow import actapply
             try:

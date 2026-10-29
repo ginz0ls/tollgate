@@ -14,7 +14,7 @@ from pathlib import Path
 from tests.flowkit import SESSION, FlowLab
 from tests.helpers import BIN, ROOT, TempState, git, make_repo
 from tests.hookkit import sample
-from tollgate_core import clock, db, events, paths, phases
+from tollgate_core import clock, db, events, paths, phases, tasks
 
 T0 = clock.parse("2026-10-08T10:00:00.000000Z")
 
@@ -342,3 +342,38 @@ class ArgvSignalTest(unittest.TestCase):
         r = self.run_start("7", "--level", "L1")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertNotIn("sessione non riconosciuta", r.stdout + r.stderr)
+
+
+class ResearchCliTest(unittest.TestCase):
+    def setUp(self):
+        self.fl = FlowLab(issue=7, phase="plan")
+        self.addCleanup(self.fl.close)
+        self.fl.register_plan(1)
+        tasks.assign(self.fl.conn, self.fl.work, 1, implementer="impl-1",
+                     agent_type="tollgate:implementer", reviewer_type="tollgate:task-reviewer",
+                     pending="launch", now=self.fl.now)
+        tasks.task_event(self.fl.conn, self.fl.work, 1, "start", now=self.fl.now)
+        self.fl.conn.execute("UPDATE work_items SET research = 1")
+        self.fl.conn.commit()
+
+    def run_research(self, *argv, stdin=""):
+        return subprocess.run([sys.executable, "-B", str(BIN / "tollgate"), "research", *argv],
+                              cwd=str(self.fl.wt), env=self.fl.env(), input=stdin,
+                              capture_output=True, text=True, timeout=120)
+
+    def test_research_submit_reads_stdin(self):
+        note = ("## Letto nel progetto\n- src/app.py\n\n## Nessuna fonte esterna\nsolo codice\n\n"
+                "## Cosa ho trovato\nniente di strano\n")
+        r = self.run_research("submit", "1", stdin=note)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)   # src/app.py non è stato letto
+        self.assertIn("src/app.py", r.stderr)
+        self.assertEqual(tasks.get_task(self.fl.conn, self.fl.work, 1)["research_note"], note)
+        shown = self.run_research("show", "1")
+        self.assertEqual(shown.returncode, 1)
+        self.assertIn("niente di strano", shown.stdout)
+        self.assertTrue(shown.stdout.rstrip().endswith("esito: non valida"))
+
+    def test_research_submit_refused_exit_2(self):
+        r = self.run_research("submit", "9", stdin="x")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("inesistente", r.stderr)
