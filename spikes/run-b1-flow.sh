@@ -44,6 +44,7 @@ ISSUE=1
 MODEL=sonnet
 STEP_TIMEOUT="${B1_FLOW_TIMEOUT:-2400}"
 MAX_ATTEMPTS=3
+KILL_AFTER="${B1_FLOW_KILL:-60}"       # dopo il tetto, SIGKILL al solo processo claude se ignora SIGTERM
 PLAN_SRC="$here/b1/flow/piano-L1.md"
 PLAN_REL=docs/superpowers/plans/2026-10-27-prova-b1.md
 # B1-V2: nessuna voce MCP di context7 (non autenticato). WebFetch e WebSearch servono all'implementatore per informarsi.
@@ -75,6 +76,13 @@ verifica_radice() {
 verifica_stato() {
   [ -f "$STATE/.tollgate-test" ] || die "manca lo stato di prova con la sentinella ($STATE/.tollgate-test): lancia prepara"
   [ -z "${TOLLGATE_TEST_CONFIG:-}" ] || die "TOLLGATE_TEST_CONFIG è impostata"
+}
+
+# tentativi_fatti <id>: i tentativi di un passo in tutta la prova, anche quelli spostati da prepara in <id>.prev-*
+tentativi_fatti() {
+  local c=0 d
+  for d in "$OUT/$1"/tentativo-* "$OUT/$1".prev-*/tentativo-*; do [ -d "$d" ] && c=$((c + 1)); done
+  echo "$c"
 }
 
 # comando_claude <id> <prompt>: riempie l'array CMD; rifiuta se manca --plugin-dir
@@ -139,7 +147,9 @@ modo_prepara() {
   rot "$PLUGIN" "$REPO" "$BARE" "$STATE" "$GHBIN" "$GH_DATA" "$GH_LOG" "$OUT/passo1" "$OUT/passo2"
   mkdir -p "$PLUGIN" "$REPO" "$STATE" "$GHBIN" || die "cartelle di lavoro non create"
   # la copia del plugin (senza __pycache__): il repo non cambia
-  ( cd "$root" && tar --exclude=__pycache__ -cf - .claude-plugin agents bin gate hooks skills templates statusline LICENSE ) \
+  # lista di esclusione: tutto il plugin (evals e LICENSES compresi, li cita plugin.json), non i dati di sviluppo
+  ( cd "$root" && tar --anchored --exclude=./.git --exclude=./.github --exclude=./.claude --exclude=./.superpowers \
+      --exclude=./docs --exclude=./spikes --exclude=./tests --no-anchored --exclude=__pycache__ -cf - . ) \
     | ( cd "$PLUGIN" && tar -xf - ) || die "copia del plugin non riuscita"
   mkdir -p "$PLUGIN/skills/rules-base"
   cat > "$PLUGIN/skills/rules-base/SKILL.md" <<'TESTO'
@@ -234,8 +244,10 @@ claude_step() {
   comando_claude "$id" "$prompt"
   [ -d "$PLUGIN" ] || die "la cartella del plugin non esiste: $PLUGIN"
   [ "$(PATH="$GHBIN:$PATH" command -v gh)" = "$GHBIN/gh" ] || die "il primo gh del PATH non è il finto $GHBIN/gh"
+  n="$(tentativi_fatti "$id")"
+  [ "$n" -lt "$MAX_ATTEMPTS" ] || die "$id: già $n tentativi in tutta la prova (anche quelli spostati da prepara in $id.prev-*): mi fermo, il tetto è $MAX_ATTEMPTS"
+  n=$((n + 1))
   while [ -e "$OUT/$id/tentativo-$n" ]; do n=$((n + 1)); done
-  [ "$n" -le "$MAX_ATTEMPTS" ] || die "$id: già $MAX_ATTEMPTS tentativi in $OUT/$id: mi fermo (nulla si cancella)"
   if [ "$id" = passo1 ]; then valida_copia || return 1; fi
   mkdir -p "$OUT/$id"
   att="$OUT/$id/tentativo-$n"
@@ -245,7 +257,7 @@ claude_step() {
   echo "$id, tentativo $n: claude -p da $dir (tetto $STEP_TIMEOUT s)"
   ( cd "$dir" && env PATH="$GHBIN:$PATH" TOLLGATE_STATE="$STATE" TOLLGATE_GH="$root/tests/fakegh.py" \
       TOLLGATE_FAKEGH_DATA="$GH_DATA" TOLLGATE_FAKEGH_LOG="$GH_LOG" \
-      timeout "$STEP_TIMEOUT" "${CMD[@]}" < /dev/null ) > "$att/claude.jsonl" 2> "$att/claude.err"
+      timeout -k "$KILL_AFTER" "$STEP_TIMEOUT" "${CMD[@]}" < /dev/null ) > "$att/claude.jsonl" 2> "$att/claude.err"
   rc=$?
   t1="$(date +%Y-%m-%dT%H:%M:%S)"
   echo "$rc" > "$att/uscita.txt"
@@ -270,28 +282,51 @@ modo_passo2() {
 
 # ---------------------------------------------------------------- registra
 
+scrivi_limiti() { # limiti.txt: ciò che i divieti a prefisso non chiudono e ciò che la raccolta non dice
+  cat > "$1" <<'TESTO'
+Limiti della prova reale del Task 9 (da citare nel rapporto)
+- I divieti di --disallowedTools sono a prefisso (Bash(<comando>:*)) e non chiudono ogni forma: restano aperti `git -C x push ...`,
+  `git push --force-with-lease`, `git remote set-url` seguito da un push, `env gh`, `bash -c '...'`. Il modello è cooperativo; lo
+  script non lo impedisce: lo rileva a posteriori in comandi-rischiosi.txt (git ... push, gh, curl, wget nei comandi Bash).
+- Write ed Edit nudi in --allowedTools valgono per qualsiasi percorso: acceptEdits non limita il modello alla cartella di lavoro.
+- I Grep dell'implementatore non sono registrati in lookups (B1-V6): vedi grep-non-registrati.txt.
+- Gli eventi research_note, research_reminder e veto sono tutti in eventi-ricerca.jsonl, non separati per passo: si distinguono
+  con `at` e `seq` e con inizio e fine di ogni tentativo (esito.txt).
+- La colonna «di cui da subagenti» di comandi-modello.txt si basa su parent_tool_use_id dello stream-json, non verificato: se il
+  campo manca, il valore è 0.
+- Il tetto di 3 tentativi vale per tutta la prova (anche i tentativi spostati da prepara in <passo>.prev-*); registra legge solo i
+  tentativi della preparazione corrente.
+TESTO
+}
+
 modo_registra() {
-  local n=1 d wt att
+  local n=1 d wt att rc=0 f
+  local -a files=()
   verifica_radice
   [ -d "$REPO/.git" ] || die "manca il progetto $REPO: lancia prepara"
   mkdir -p "$OUT"
   while [ -e "$OUT/registro-$n" ]; do n=$((n + 1)); done
   d="$OUT/registro-$n"
   mkdir "$d" || die "non riesco a creare $d"
+  : > "$d/fallimenti.txt"
+  # fallisce <nome> <uscita>: un comando di raccolta fallito si scrive nelle evidenze e rende l'uscita diversa da 0; il resto si raccoglie lo stesso
+  fallisce() { [ "$2" = 0 ] || { echo "$1: uscita $2 (vedi $1.err o il file omonimo)" >> "$d/fallimenti.txt"; rc=1; }; }
   timeout 30 claude --version > "$d/versione-claude.txt" 2>&1 < /dev/null
   export TOLLGATE_STATE="$STATE" TOLLGATE_GH="$root/tests/fakegh.py" TOLLGATE_FAKEGH_DATA="$GH_DATA" TOLLGATE_FAKEGH_LOG="$GH_LOG"
   TG=(python3 -B "$PLUGIN/bin/tollgate")
-  ( cd "$REPO" && "${TG[@]}" events > "$d/events.jsonl" 2> "$d/events.err"
-    "${TG[@]}" stats > "$d/stats.json" 2> "$d/stats.err"
-    "${TG[@]}" status --json > "$d/status.json" 2> "$d/status.err" )
-  python3 -B "$here/b1/flowreg.py" eventi "$d/events.jsonl" > "$d/eventi-ricerca.jsonl" 2> "$d/eventi-ricerca.err"
-  python3 -B "$here/b1/flowreg.py" lookups "$STATE/tollgate.db" > "$d/lookups.txt" 2> "$d/lookups.err"
-  for att in "$OUT"/passo1/tentativo-*/claude.jsonl "$OUT"/passo2/tentativo-*/claude.jsonl; do
-    [ -f "$att" ] && python3 -B "$here/b1/flowreg.py" comandi "$att" >> "$d/comandi-modello.txt" 2>> "$d/comandi-modello.err"
-  done
-  : >> "$d/comandi-modello.txt"
+  ( cd "$REPO" && "${TG[@]}" events > "$d/events.jsonl" 2> "$d/events.err" ); fallisce events $?
+  ( cd "$REPO" && "${TG[@]}" stats > "$d/stats.json" 2> "$d/stats.err" ); fallisce stats $?
+  ( cd "$REPO" && "${TG[@]}" status --json > "$d/status.json" 2> "$d/status.err" ); fallisce status $?
+  python3 -B "$here/b1/flowreg.py" eventi "$d/events.jsonl" > "$d/eventi-ricerca.jsonl" 2> "$d/eventi-ricerca.err"; fallisce eventi-ricerca $?
+  python3 -B "$here/b1/flowreg.py" lookups "$STATE/tollgate.db" > "$d/lookups.txt" 2> "$d/lookups.err"; fallisce lookups $?
+  # una sola chiamata con i flussi di tutti i tentativi e di tutti e due i passi: i conteggi sono somme
+  for f in "$OUT"/passo1/tentativo-*/claude.jsonl "$OUT"/passo2/tentativo-*/claude.jsonl; do [ -f "$f" ] && files+=("$f"); done
+  : > "$d/comandi-modello.txt"
+  if [ "${#files[@]}" -gt 0 ]; then
+    python3 -B "$here/b1/flowreg.py" comandi "${files[@]}" > "$d/comandi-modello.txt" 2> "$d/comandi-modello.err"; fallisce comandi-modello $?
+  fi
   python3 -B "$here/b1/flowreg.py" grep "$d/comandi-modello.txt" "$d/lookups.txt" > "$d/grep-non-registrati.txt" 2>&1
-  grep -E '(^bash.*(git push|gh |curl|wget))' "$d/comandi-modello.txt" > "$d/comandi-rischiosi.txt" 2>&1
+  grep -E '^bash.*(git[^|;&]*push|gh |curl|wget)' "$d/comandi-modello.txt" > "$d/comandi-rischiosi.txt" 2>&1
   wt="$(worktree_lavoro 2>/dev/null)" && {
     git -C "$wt" log --format='%h %s' > "$d/git-log-worktree.txt" 2>&1
     for att in "$wt"/.tollgate-run/$ISSUE/research-*.md; do [ -f "$att" ] && cp "$att" "$d/$(basename "$att")"; done
@@ -300,8 +335,11 @@ modo_registra() {
   [ -f "$STATE/hook-errors.log" ] && cp "$STATE/hook-errors.log" "$d/hooks.log"
   [ -f "$STATE/skipped.log" ] && cp "$STATE/skipped.log" "$d/skipped.log"
   [ -f "$OUT/exit-codes.txt" ] && cp "$OUT/exit-codes.txt" "$d/exit-codes.txt"
+  scrivi_limiti "$d/limiti.txt"
   echo "registrato in $d"
   cat "$d/grep-non-registrati.txt"
+  if [ "$rc" != 0 ]; then echo "ATTENZIONE: raccolta incompleta:" >&2; cat "$d/fallimenti.txt" >&2; fi
+  return "$rc"
 }
 
 case "$MODE" in

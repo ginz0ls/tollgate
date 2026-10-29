@@ -451,7 +451,9 @@ FLOW_SCRIPT = ROOT / "spikes" / "run-b1-flow.sh"
 FLOW_REG = B1 / "flowreg.py"
 FLOW_EVIDENCE = ROOT / "docs" / "verifiche" / "evidenze" / "b1" / "flusso"
 FLOW_TOOLS = "Bash,Agent,Skill,EnterWorktree,SendMessage,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch"
-FLOW_FAKE_CLAUDE = FAKE_CLAUDE.replace('case "$1" in', '[ "$1" = plugin ] && exit "${B1_FAKE_VALIDATE_RC:-0}"\ncase "$1" in', 1)
+FLOW_FAKE_CLAUDE = FAKE_CLAUDE.replace('case "$1" in', '[ "$1" = plugin ] && exit "${B1_FAKE_VALIDATE_RC:-0}"\n'
+                                       '[ "$1" = -p ] && printf \'%s\\n%s\\n%s\\n\' "$PATH" "${TOLLGATE_GH-}" "${TOLLGATE_FAKEGH_DATA-}" >> "$B1_FAKE_LOG.env"\n'
+                                       'case "$1" in', 1)
 
 
 class FlowBench(Bench):
@@ -515,6 +517,7 @@ class FlowScriptTest(unittest.TestCase):
         code = re.sub(r"(?m)^\s*#.*$", "", text)
         self.assertEqual(len(re.findall(r"=\(claude -p\b", code)), 1)
         self.assertEqual(len(re.findall(r'&& claude plugin validate --strict', code)), 1)
+        self.assertRegex(code, r'timeout -k "\$KILL_AFTER" "\$STEP_TIMEOUT" "\$\{CMD\[@\]\}"')
         self.assertNotRegex(code, r"\brm\s+-[a-zA-Z]*[rR]")
         self.assertNotRegex(code, r"\b(pkill|killall)\b")
         self.assertNotRegex(code, r"\bkill\s")
@@ -552,6 +555,13 @@ class FlowScriptTest(unittest.TestCase):
         self.assertFalse((ROOT / "skills" / "rules-base").exists(), "il repo non deve cambiare")
         self.assertFalse(list(self.b.plugin.rglob("APPROVED")))
         self.assertFalse(list(self.b.plugin.rglob("__pycache__")))
+        # la copia è il plugin intero meno i dati di sviluppo; ogni percorso che plugin.json cita esiste
+        manifest = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())
+        self.assertTrue((self.b.plugin / manifest["experimental"]["evals"]).is_dir())
+        for part in ("evals", "LICENSES", "LICENSE", "gate", "templates", "statusline", "README.md"):
+            self.assertTrue((self.b.plugin / part).exists(), part)
+        for part in (".git", ".github", ".claude", ".superpowers", "docs", "spikes", "tests"):
+            self.assertFalse((self.b.plugin / part).exists(), part)
         for part in (".claude-plugin/plugin.json", "bin/tollgate", "hooks/hooks.json", "agents/implementer.md", "skills/start/SKILL.md"):
             self.assertTrue((self.b.plugin / part).is_file(), part)
         # lo stato, il gh finto e il progetto
@@ -629,6 +639,16 @@ class FlowScriptTest(unittest.TestCase):
         # i divieti di rete sono nel comando registrato
         self.assertIn("--disallowedTools", (self.b.out / "passo1" / "tentativo-1" / "argv.txt").read_text())
 
+    def test_flow_claude_gets_the_fake_gh_first_in_path(self):
+        self.b.prepara()
+        r = self.b.run("passo1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        path, gh, data = Path(str(self.b.log) + ".env").read_text().splitlines()
+        self.assertEqual(path.split(":")[0], str(self.b.root / "ghbin"))
+        self.assertEqual(gh, str(ROOT / "tests" / "fakegh.py"))
+        self.assertEqual(data, str(self.b.root / "fakegh-data.json"))
+        self.assertTrue(os.access(self.b.root / "ghbin" / "gh", os.X_OK))
+
     def test_flow_passo2_writes_plan(self):
         self.b.prepara()
         self.b.worktree()
@@ -672,10 +692,31 @@ class FlowScriptTest(unittest.TestCase):
         self.assertIn("già 3 tentativi", r.stderr)
         self.assertEqual(len(self.b.calls()), before, "oltre il tetto non parte né validate né claude")
         self.assertFalse((self.b.out / "passo1" / "tentativo-4").exists())
-        # un nuovo prepara rinomina i tentativi, non li cancella
+        # un nuovo prepara rinomina i tentativi, non li cancella, e non azzera il tetto: vale per tutta la prova
         self.b.prepara()
         self.assertEqual(len(list(self.b.out.glob("passo1.prev-*"))), 1)
         self.assertTrue(list(self.b.out.glob("passo1.prev-*/tentativo-3")))
+        before = len(self.b.calls())
+        r = self.b.run("passo1")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("già 3 tentativi in tutta la prova", r.stderr)
+        self.assertEqual(len(self.b.calls()), before)
+        self.assertFalse((self.b.out / "passo1").exists())
+
+    def test_flow_attempt_cap_counts_moved_attempts_in_two_folders(self):
+        self.b.prepara()
+        for _ in range(2):
+            self.assertEqual(self.b.run("passo1").returncode, 0)
+        self.b.prepara()
+        r = self.b.run("passo1")                      # il terzo della prova, il primo della nuova cartella
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue((self.b.out / "passo1" / "tentativo-3").is_dir(), "la numerazione prosegue, non si ripete")
+        r = self.b.run("passo1")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("già 3 tentativi in tutta la prova", r.stderr)
+        # l'altro passo ha il suo tetto
+        self.b.worktree()
+        self.assertEqual(self.b.run("passo2").returncode, 0)
 
     def test_flow_timeout_is_recorded(self):
         self.b.prepara()
@@ -716,11 +757,61 @@ class FlowScriptTest(unittest.TestCase):
         self.assertIn("Grep del modello: 1; letture registrate (read): 0", grep)
         self.assertIn("non sono registrati", grep)
         self.assertIn("# lookups", (d / "lookups.txt").read_text())
+        self.assertIn("Write ed Edit nudi", (d / "limiti.txt").read_text())
+        self.assertIn("git -C x push", (d / "limiti.txt").read_text())
+        self.assertEqual((d / "fallimenti.txt").read_text(), "")
         # un secondo registra non tocca il primo
         r = self.b.run("registra")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertTrue((self.b.out / "registro-2").is_dir())
         self.assertTrue((d / "research-1.md").is_file())
+
+    def test_flow_registra_sums_greps_over_attempts_and_steps(self):
+        self.b.prepara()
+        wt = self.b.worktree()
+        for step in ("passo1", "passo1", "passo2"):
+            self.assertEqual(self.b.run(step).returncode, 0)
+
+        def stream(greps, reads=0):
+            blocks = [{"type": "tool_use", "name": "Grep", "input": {"pattern": f"p{i}"}} for i in range(greps)]
+            blocks += [{"type": "tool_use", "name": "Read", "input": {"file_path": "x"}}] * reads
+            return json.dumps({"type": "assistant", "parent_tool_use_id": None, "message": {"content": blocks}}) + "\n"
+        (self.b.out / "passo1" / "tentativo-1" / "claude.jsonl").write_text(stream(2))
+        (self.b.out / "passo1" / "tentativo-2" / "claude.jsonl").write_text(stream(0, 1))
+        (self.b.out / "passo2" / "tentativo-1" / "claude.jsonl").write_text(stream(7))
+        self.assertEqual(self.b.run("registra").returncode, 0)
+        d = self.b.out / "registro-1"
+        self.assertIn("Grep del modello: 9;", (d / "grep-non-registrati.txt").read_text())
+        commands = (d / "comandi-modello.txt").read_text()
+        self.assertEqual(commands.count("# strumenti del modello"), 1)
+        self.assertIn("Grep: 9 (0)", commands)
+        # anche il conteggio delle letture registrate somma le righe
+        import sqlite3
+        conn = sqlite3.connect(str(self.b.root / "state" / "tollgate.db"))
+        try:
+            conn.execute("INSERT INTO lookups (work, task, kind, target, at) VALUES (1, 1, 'read', 'a', 'x')")
+            conn.execute("INSERT INTO lookups (work, task, kind, target, at) VALUES (1, 1, 'read', 'b', 'x')")
+            conn.commit()
+        except sqlite3.Error as e:
+            self.skipTest(f"schema non pronto: {e}")
+        finally:
+            conn.close()
+        self.assertEqual(self.b.run("registra").returncode, 0)
+        self.assertIn("letture registrate (read): 2", (self.b.out / "registro-2" / "grep-non-registrati.txt").read_text())
+
+    def test_flow_registra_reports_collection_failures_but_collects_the_rest(self):
+        self.b.prepara()
+        self.assertEqual(self.b.run("passo1").returncode, 0)
+        (self.b.root / "state" / "tollgate.db").write_text("non è un database")
+        r = self.b.run("registra")
+        self.assertNotEqual(r.returncode, 0)
+        d = self.b.out / "registro-1"
+        failures = (d / "fallimenti.txt").read_text()
+        for name in ("events", "stats", "status"):
+            self.assertIn(f"{name}: uscita", failures)
+        self.assertIn("raccolta incompleta", r.stderr)
+        for name in ("versione-claude.txt", "comandi-modello.txt", "grep-non-registrati.txt", "limiti.txt"):
+            self.assertTrue((d / name).is_file(), name)
 
     def test_flowreg_lookups_events_and_commands(self):
         import sqlite3

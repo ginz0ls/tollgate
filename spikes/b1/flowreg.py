@@ -75,10 +75,12 @@ def eventi(path):
 
 
 def _count(path, prefix):
+    """Somma i valori di tutte le righe che cominciano per `prefix` (una per file di flusso, se mai ce ne fossero più blocchi)."""
+    total = 0
     for line in Path(path).read_text().splitlines():
         if line.startswith(prefix):
-            return int(line[len(prefix):].split()[0])
-    return 0
+            total += int(line[len(prefix):].split()[0])
+    return total
 
 
 def grep(comandi_txt, lookups_txt):
