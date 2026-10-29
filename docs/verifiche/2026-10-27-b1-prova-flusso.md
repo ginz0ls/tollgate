@@ -12,14 +12,16 @@ Data: 29 ottobre 2026. Piano: `docs/superpowers/plans/2026-10-27-tollgate-b1-inf
 
 | Passo | Tentativi | Esito | Durata | Consumo stimato |
 |---|---|---|---|---|
-| `prepara` | 1 | copia del plugin, progetto, `plan-check` del piano di prova ok | — | nessuno |
-| `passo1`: `claude plugin validate --strict` sulla copia | 1 | «✔ Validation passed», uscita 0 (un solo consiglio sul README, che non cambia l'esito) | — | nessuno (senza modello) |
-| `passo1`: `/tollgate:start #1 L1` | 1 | lavoro L1, piano di un task scritto, registrato e committato dal modello (`c568a8b`), fase `execution` | 65 s | 0,41 USD |
+| `prepara` | 1 | copia del plugin, progetto, `plan-check` del piano di prova ok (`prepara.txt`, ricopiato dal controller: lo script non salva questa uscita) | — | nessuno |
+| `passo1`: `claude plugin validate --strict` sulla copia | 1 | «✔ Validation passed», uscita 0; un avviso `ICON_MISSING` dei controlli della «plugin directory» e un consiglio sul README, che per l'uscita stessa non cambiano l'esito | — | nessuno (senza modello) |
+| `passo1`: `/tollgate:start #1 L1` | 1 | lavoro L1, piano di un task scritto e committato dal modello (`c568a8b`) e registrato da tollgate (`scope_registered`), fase `execution` | 65 s | 0,41 USD |
 | `passo2`: `/tollgate:execute` | 1 | task 1 `done`, verdetto `approved`, commit `26aed41` | 81 s | 0,50 USD |
 
 L'esito **non è composito**: ogni passo è riuscito al primo tentativo. Totale stimato: 0,91 USD, dentro l'abbonamento (nessuna spesa in più); token degli agenti di tollgate (`tollgate stats`): implementatore 46.532, revisore del task 27.783, totale 74.315.
 
-Il piano non è quello di `spikes/b1/flow/piano-L1.md`: nel passo 1 `/tollgate:start` in L1 ha scritto e registrato da sé un piano di un task (`src/config.py` con `app_name(path)` e cinque test in `tests/test_config.py`), con lo stesso compito dell'issue. Il prompt di `passo2` è stato riportato alla forma di `spikes/run-p4-flow.sh` («se un piano non è già scritto e committato…», commit `2765018`) prima di lanciarlo: un secondo piano in fase `execution` avrebbe falsato la prova. Nel passo 1 la sessione principale ha provato a scrivere il piano con un heredoc in Bash e ha ricevuto il `veto` di `coordinator` («in L1 il codice lo scrivono gli implementatori, anche con redirect o sed -i»); ha poi usato `Write`, che per il piano è ammesso.
+Sul consumo e sui tempi: «dentro l'abbonamento» vuol dire che le corse usano il login di Claude Code e non una chiave API; `total_cost_usd` è la stima che Claude Code scrive nell'evento `result`. Il tetto di 2400 s per passo sta in `spikes/run-b1-flow.sh` (`STEP_TIMEOUT`). Gli orari di questo rapporto sono nell'ora locale (UTC+1); quelli degli eventi di tollgate sono in UTC.
+
+Il piano non è quello di `spikes/b1/flow/piano-L1.md`: nel passo 1, con `/tollgate:start` in L1, il modello ha scritto e committato un piano di un task e tollgate l'ha registrato (`scope_registered`, `seq` 4) (`src/config.py` con `app_name(path)` e cinque test in `tests/test_config.py`), con lo stesso compito dell'issue. Il prompt di `passo2` è stato riportato alla forma di `spikes/run-p4-flow.sh` («se un piano non è già scritto e committato…», commit `2765018`) prima di lanciarlo: un secondo piano in fase `execution` avrebbe falsato la prova. Nel passo 1 la sessione principale ha provato a scrivere il piano con un heredoc in Bash e ha ricevuto il `veto` di `coordinator` («in L1 il codice lo scrivono gli implementatori, anche con redirect o sed -i»); ha poi usato `Write`, che per il piano è ammesso. Sempre nel passo 1 la sessione principale ha aperto con `WebFetch` la pagina di `tomllib` per scrivere il piano: le letture della sessione principale non si registrano (decisione 5), e infatti in `lookups` non c'è. Gli avvisi di `start` (impostazioni di GitHub Actions e protezione del ramo non leggibili) vengono dal `gh` finto, i cui dati di prova non hanno quelle risposte, e non riguardano B1.
 
 ## Letture registrate (task 1)
 
@@ -41,7 +43,7 @@ Sequenza dell'implementatore (dallo stream-json del passo 2): `Read` del brief, 
 - Prima consegna (evento `research_note`, `seq` 10): `ok: false`, problemi «il file «src/__init__.py» è nella nota ma non l'hai letto in questo task (aprilo con Read)» e lo stesso per `tests/test_smoke.py`. È il controllo 3.3 che fa il suo lavoro: i due file erano stati letti solo con il glob di `cat`.
 - Seconda consegna (`seq` 11): `ok: true`, `tasks.research_ok = 1`. Testo in `registro-1/research-1.md`, con la riga finale `esito: valida`: tre file in «Letto nel progetto», una fonte in «Documentazione» («tomllib.load vuole un file binario ("rb"); TOML invalido solleva TOMLDecodeError (sottoclasse di ValueError); disponibile da Python 3.11»), e «Cosa ho trovato».
 - Nessun `research_reminder` e nessun `veto` di `research_gate`: l'implementatore non ha provato a modificare file prima della nota valida. L'unico `veto` del lavoro è quello di `coordinator` nel passo 1, sulla sessione principale.
-- Nessuna modifica di codice prima della nota valida: il primo `Write` viene dopo la seconda consegna, e il commit (`26aed41`, 07:30:10) dopo l'evento `research_note` valido (07:30:00).
+- Nessuna modifica di codice prima della nota valida: il primo `Write` viene dopo la seconda consegna, e il commit (`26aed41`; evento `commit` alle 06:30:11 UTC) dopo l'evento `research_note` valido (06:30:00 UTC).
 
 ## Revisione del task
 
@@ -66,4 +68,6 @@ Il brief del revisore (`.tollgate-run/1/review-1.md`) aveva la sezione «Nota di
 
 - Decisione 18: i permessi di `WebFetch` e `WebSearch` sono concessi con `--allowedTools`. In una sessione interattiva `WebFetch` chiede un permesso per dominio e questa prova non lo rappresenta.
 - I divieti di `--disallowedTools` sono a prefisso e non chiudono ogni forma (`git -C x push`, `bash -c '…'`); `Write` ed `Edit` valgono per qualsiasi percorso. Il modello è stato cooperativo: `comandi-rischiosi.txt` è vuoto. Elenco completo in `registro-1/limiti.txt`.
+- Il ramo di `passo2` che scrive il piano di prova con `Write` non è stato esercitato: il piano c'era già dal passo 1, e il modello ha ignorato quello del prompt (`src/conf.py`, `leggi_nome`), segnalando la differenza nel messaggio finale. B1 non dipende da quale dei due piani si esegue: in entrambi l'implementatore deve leggere `config.toml` e la documentazione di `tomllib`.
+- Nelle evidenze restano il nome del percorso del progetto sotto `/home/USER` e gli host anonimizzati come `HOST`.
 - Il lavoro è uno solo, piccolo, con un solo task e una sola libreria: la prova mostra il percorso completo, non la sua tenuta su un lavoro grande.

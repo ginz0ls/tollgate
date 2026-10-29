@@ -1,0 +1,4 @@
+# Uscita di `bash spikes/run-b1-flow.sh prepara`, 29 ottobre 2026, ricopiata dal controller.
+# Lo script non salva l'uscita di prepara; il controller l'ha letta con `tail -15`, e queste sono tutte le righe stampate.
+plan-check: ok []
+pronto: /tmp/tollgate-b1/flow (plugin: /tmp/tollgate-b1/plugin, stato: /tmp/tollgate-b1/state)
