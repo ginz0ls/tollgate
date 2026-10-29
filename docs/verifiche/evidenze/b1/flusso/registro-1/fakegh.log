@@ -1,0 +1,6 @@
+{"argv": ["auth", "status"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["api", "repos/{owner}/{repo}/issues/1"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["api", "--paginate", "repos/{owner}/{repo}/pulls?state=all&per_page=100", "--jq", ".[] | {number, headRefName: .head.ref, state: (if .merged_at then \"MERGED\" else (.state | ascii_upcase) end), url: .html_url}"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["api", "repos/{owner}/{repo}/commits/5c57ef524ee0e0066e9e4b71f041f324d51244fa/status"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["api", "repos/{owner}/{repo}/actions/permissions"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["api", "--include", "repos/{owner}/{repo}/branches/main/protection"], "cwd": "/tmp/tollgate-b1/flow"}

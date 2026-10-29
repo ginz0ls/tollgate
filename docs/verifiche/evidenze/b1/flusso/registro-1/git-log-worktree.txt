@@ -1,0 +1,3 @@
+26aed41 feat: leggi [app] nome da config.toml con tomllib
+c568a8b docs: piano per issue #1 (nome app da config.toml)
+5c57ef5 base

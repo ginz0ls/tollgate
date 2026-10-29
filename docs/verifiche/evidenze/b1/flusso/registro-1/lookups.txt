@@ -1,0 +1,25 @@
+# lookups: id, work, task, agent_id, kind, target, at
+1	1	1	a36b98ad8d214c293	read	.tollgate-run/1/task-1.md	2026-10-29T06:29:41.617540Z
+2	1	1	a36b98ad8d214c293	bash_read	config.toml	2026-10-29T06:29:44.036877Z
+3	1	1	a36b98ad8d214c293	fetch	https://docs.python.org/3/library/tomllib.html	2026-10-29T06:29:51.311464Z
+4	1	1	a36b98ad8d214c293	read	src/__init__.py	2026-10-29T06:29:57.313712Z
+5	1	1	a36b98ad8d214c293	read	tests/test_smoke.py	2026-10-29T06:29:57.568856Z
+6	1	1	a36b98ad8d214c293	read	config.toml	2026-10-29T06:29:57.740299Z
+# per tipo
+bash_read: 1
+fetch: 1
+read: 4
+# task: work, number, state, research_ok
+1	1	done	1
+# nota salvata, lavoro 1 task 1
+## Letto nel progetto
+- config.toml
+- src/__init__.py
+- tests/test_smoke.py
+
+## Documentazione
+- https://docs.python.org/3/library/tomllib.html — tomllib.load vuole un file binario ("rb"); TOML invalido solleva TOMLDecodeError (sottoclasse di ValueError); disponibile da Python 3.11.
+
+## Cosa ho trovato
+config.toml contiene [app] nome = "prova-b1". Python 3.13. Test in unittest sotto tests/. CONFIG_PATH sarà la radice del repo/config.toml calcolata da __file__; open "rb" lascia propagare FileNotFoundError e TOMLDecodeError, e l'accesso a data["app"]["nome"] dà KeyError.
+

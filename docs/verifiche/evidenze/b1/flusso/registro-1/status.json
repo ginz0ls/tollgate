@@ -1,0 +1,16 @@
+[
+  {
+    "issue": 1,
+    "repo_key": "/tmp/tollgate-b1/origin",
+    "level": "L1",
+    "level_cap": null,
+    "phase": "execution",
+    "phase_before_block": null,
+    "branch": "tg/1-leggi-il-nome-dell-app-da-config-toml",
+    "blocks": [],
+    "tasks": {
+      "done": 1
+    },
+    "stopped_by": []
+  }
+]
