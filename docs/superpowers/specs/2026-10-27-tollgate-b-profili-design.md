@@ -1,6 +1,7 @@
 # tollgate B: profili con «informati prima»
 
 Data: 27 ottobre 2026. Stato: **approvato dall'utente il 27 ottobre 2026**.
+Avanzamento: B1 eseguita, vedi piano principale di B (`docs/superpowers/plans/2026-10-27-tollgate-b-piano-principale.md`).
 Sotto-progetto B di tollgate (spec del nucleo `2026-10-08-tollgate-nucleo-design.md`, rev 26, sezioni 1.3, 5, 6.3, 7.2, 8.1, 8.6, 11.4). Parte dal catalogo `2026-10-08-tollgate-profili-verticali.md` e lo restringe.
 
 Le scelte prese con l'utente nella conversazione del 26-27 ottobre sono marcate **(utente)**. Quelle prese da chi scrive, che l'utente può ribaltare, sono marcate **(mia scelta)**.
