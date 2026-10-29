@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from tollgate_analysis import bash
+from tollgate_analysis import bash, research
 from tollgate_core import acts, effects, git
 from tollgate_hooks.model import deny, inject, record
 
@@ -134,6 +134,8 @@ def _bash_intents(event, ctx) -> list[Intent]:
 def decide(event, ctx):
     if event.kind == "pre_mcp":
         name = event.tool_name or ""
+        if research.is_doc_tool(name):
+            return []
         if any(fnmatch.fnmatchcase(name, pat) for pat in ctx.cfg("external_effects.mcp_allow")):
             return []
         command = f"{name} {json.dumps(event.tool_input, sort_keys=True, ensure_ascii=False)}"

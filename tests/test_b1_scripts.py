@@ -439,8 +439,9 @@ class LatencyTest(unittest.TestCase):
             conn.close()
         v3 = json.loads((tmp / "out" / "b1v3-prova.json").read_text())
         self.assertEqual(v3["tool_name"], "mcp__plugin_context7_context7__query-docs")
-        self.assertTrue(v3["denied"], v3)
-        self.assertIn("effetto esterno", v3["stderr"])
+        # dal Task 5 lo strumento di documentazione non è più un effetto esterno
+        self.assertFalse(v3["denied"], v3)
+        self.assertNotIn("effetto esterno", v3["stderr"])
         self.assertIn("mediana", r.stdout)
         self.assertFalse(list(tmp.rglob("__pycache__")))
 

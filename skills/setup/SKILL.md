@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Propone la modifica di statusLine.command per avvolgere la statusline con statusline/ctx, che alimenta la guardia del contesto di tollgate. Solo l'utente.
+description: Propone la modifica di statusLine.command per avvolgere la statusline con statusline/ctx, che alimenta la guardia del contesto di tollgate, e le regole permissions.allow per WebFetch e WebSearch. Solo l'utente.
 disable-model-invocation: true
 ---
 
@@ -15,5 +15,7 @@ disable-model-invocation: true
    La radice va **sempre tra virgolette**: il percorso può contenere spazi. Se il comando attuale contiene apici singoli, avvisa l'utente di doverli proteggere.
    La radice nella cache del plugin contiene la versione: la riga va riaggiornata a ogni aggiornamento del plugin.
 3. Mostra la riga da incollare, indica dove va (`~/.claude/settings.json`, chiave `statusLine`) e di' che la modifica è sua. Se `statusLine.command` ha già `statusline/ctx`, di' che non serve fare nulla.
+
+4. **Permessi per leggere la documentazione.** Gli implementatori aprono pagine pubbliche con `WebFetch` e cercano con `WebSearch`. Senza una regola Claude Code chiede un permesso la prima volta che si apre un dominio nuovo, e il lavoro si ferma su quella domanda. Proponi all'utente di aggiungere a `permissions.allow` in `~/.claude/settings.json` le voci `"WebFetch"` e `"WebSearch"`. Sono gratis: leggono pagine pubbliche e non scrivono niente. Non modificare il file: le regole le aggiunge l'utente da sé, e se non le aggiunge risponde a una domanda per ogni dominio.
 
 Non eseguire altri comandi e non scrivere in `~/.claude/`.

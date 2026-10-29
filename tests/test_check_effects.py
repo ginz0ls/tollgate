@@ -194,6 +194,18 @@ class EffectsTest(unittest.TestCase):
         self.assertEqual(r.exit, 2)
         self.assertNotEqual(EID.search(r.stderr).group(1), eid)
 
+    def test_doc_mcp_not_an_effect(self):
+        r = mcp(self.lab, "mcp__plugin_context7_context7__query-docs",
+                {"libraryId": "/vercel/next.js", "query": "routing"})
+        self.assertEqual(r.exit, 0, r.stderr)
+        self.assertNotIn("approve effect", r.stderr)
+        self.assertEqual(self.lab.events("effect_request"), [])
+
+    def test_other_mcp_still_effect(self):
+        r = mcp(self.lab, "mcp__github__create_issue", {"title": "x"})
+        self.assertEqual(r.exit, 2)
+        self.assertIn("strumento MCP non in mcp_allow", r.stderr)
+
     def test_unparsable_command_is_searched_by_text(self):
         self.assertEqual(self.lab.bash("echo 'ciao").exit, 0)
         for cmd in ("echo 'x; ssh host", "echo 'a && psql -c x", "echo 'a; gh pr create --fill",
