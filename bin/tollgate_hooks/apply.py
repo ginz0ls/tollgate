@@ -200,7 +200,7 @@ def _audit_report(conn, state, ctx, d):
             suspended=kind in audits.suspended(conn, wid))
         try:
             write_atomic(wt / approvals.REVIEWS_DIR / str(work["issue"]) / "spec-lens-stato.md",
-                          text)
+                         text)
         except (OSError, ValueError) as e:
             _audit_veto(conn, ctx, wid, f"stato delle lenti non scritto: {e}")
     _cap_block(conn, state, ctx, wid, kind, number, counts)

@@ -146,10 +146,10 @@ modo_prepara() {
   mkdir -p "$TMP" "$OUT" || die "non riesco a creare $TMP"
   rot "$PLUGIN" "$REPO" "$BARE" "$STATE" "$GHBIN" "$GH_DATA" "$GH_LOG" "$OUT/passo1" "$OUT/passo2"
   mkdir -p "$PLUGIN" "$REPO" "$STATE" "$GHBIN" || die "cartelle di lavoro non create"
-  # la copia del plugin (senza __pycache__): il repo non cambia
-  # lista di esclusione: tutto il plugin (evals e LICENSES compresi, li cita plugin.json), non i dati di sviluppo
-  ( cd "$root" && tar --anchored --exclude=./.git --exclude=./.github --exclude=./.claude --exclude=./.superpowers \
-      --exclude=./docs --exclude=./spikes --exclude=./tests --no-anchored --exclude=__pycache__ -cf - . ) \
+  # la copia del plugin: solo i file tracciati da git (mai un file ignorato o non tracciato della radice,
+  # come un futuro .env), senza i dati di sviluppo; evals e LICENSES restano, li cita plugin.json
+  ( cd "$root" && git ls-files -z -- . ':!.github' ':!.claude' ':!.superpowers' ':!docs' ':!spikes' ':!tests' \
+      | tar --null -T - -cf - ) \
     | ( cd "$PLUGIN" && tar -xf - ) || die "copia del plugin non riuscita"
   mkdir -p "$PLUGIN/skills/rules-base"
   cat > "$PLUGIN/skills/rules-base/SKILL.md" <<'TESTO'

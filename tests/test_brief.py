@@ -162,7 +162,7 @@ class ReviewResearchTest(unittest.TestCase):
         self.assertIn('`missing`', out.split("## Nota di ricerca")[1].split("## Verdetto")[0])
         self.assertIn("`file` `src/app.py`", out)
         self.assertIn("`line` 1", out)
-        self.assertIn(f"`rule` `nota di ricerca`", out)
+        self.assertIn("`rule` `nota di ricerca`", out)
 
     def test_review_brief_missing_note_not_enforced(self):
         out = brief.review_brief(review(research=True, research_enforced=False,

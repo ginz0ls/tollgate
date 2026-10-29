@@ -581,6 +581,15 @@ class FlowScriptTest(unittest.TestCase):
         self.assertEqual(len(list(self.b.root.glob("plugin.prev-*"))), 1)
         self.assertEqual(len(list(self.b.root.glob("flow.prev-*"))), 1)
 
+    def test_flow_copy_is_made_of_tracked_files_only(self):
+        """Un file non tracciato nella radice (per esempio un futuro `.env`) non entra nella copia."""
+        stray = ROOT / "segreto-di-prova.local"
+        stray.write_text("non deve finire nella copia\n")
+        self.addCleanup(lambda: stray.unlink(missing_ok=True))
+        self.b.prepara()
+        self.assertFalse((self.b.plugin / stray.name).exists())
+        self.assertTrue((self.b.plugin / "bin" / "tollgate").is_file())
+
     def test_flow_requires_plugin_dir(self):
         self.b.prepara()
         r = self.b.run("passo1", B1_FLOW_PLUGIN="")
