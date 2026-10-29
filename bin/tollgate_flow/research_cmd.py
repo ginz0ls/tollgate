@@ -2,14 +2,15 @@
 
 `submit` confronta la nota con le letture registrate del task (`lookups.for_task`), salva il testo
 in `tasks.research_note` con l'esito in `tasks.research_ok` e lo copia in
-`.tollgate-run/<N>/research-<k>.md` (già fuori da git, spec 6.3), con una riga finale `esito:`."""
+`.tollgate-run/<N>/research-<k>.md` (già fuori da git, spec 6.3), con una riga finale `esito:`,
+dopo il DB. Un testo oltre il limite non si salva intero. `show` stampa la nota in un recinto."""
 from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
 from typing import NamedTuple
 
-from tollgate_analysis import research
+from tollgate_analysis import brief as briefs, research
 from tollgate_core import clock, config, db, events, git, lookups, sessions, tasks
 from tollgate_core.fsutil import write_atomic
 
@@ -89,24 +90,32 @@ def submit(state, cwd: Path, number: int, text: str, *, now=None) -> SubmitResul
                             "consegna mentre il task è in corso")
         wt = Path(work["worktree"])
         found = [(x.kind, x.target) for x in lookups.for_task(conn, work["id"], number)]
-        problems = research.check_note(research.parse_note(text), found, worktree=str(wt))
+        # le letture sono registrate con il worktree risolto: la nota si confronta con quello
+        problems = research.check_note(research.parse_note(text), found,
+                                       worktree=str(wt.resolve()))
         ok = not problems
-        path = note_path(wt, work["issue"], number)
-        body = text if text.endswith("\n") else text + "\n"
-        try:
-            write_atomic(path, f"{body}{VALID if ok else NOT_VALID}\n")
-        except (OSError, ValueError) as e:
-            return _refused(f"nota non scritta in {path}: {e}")
-        lookups.set_note(conn, work["id"], number, text=text, ok=ok)
+        stored = text[:research.MAX_NOTE_CHARS]   # oltre il limite il testo intero non si salva
+        lookups.set_note(conn, work["id"], number, text=stored, ok=ok)
         events.record_event(conn, "research_note",
                             {"task": number, "ok": ok, "problems": problems}, now=now,
                             work=work["id"])
+        # la copia su file (con la riga «esito») dopo il DB, che è la fonte della nota
+        path = note_path(wt, work["issue"], number)
+        body = stored if stored.endswith("\n") else stored + "\n"
+        unwritten = []
+        try:
+            write_atomic(path, f"{body}{VALID if ok else NOT_VALID}\n")
+        except (OSError, ValueError) as e:
+            unwritten = [f"nota non scritta in {path}: {e} (la consegna è registrata)"]
+            path = None
         if ok:
-            return SubmitResult(OK, [f"nota di ricerca valida (task {number}): {path}"], path)
+            where = f": {path}" if path else ""
+            return SubmitResult(OK, [f"nota di ricerca valida (task {number}){where}", *unwritten],
+                                path)
         return SubmitResult(INVALID, [f"nota di ricerca salvata ma non valida (task {number}):",
                                       *(f"- {p}" for p in problems),
                                       "Correggi (o leggi quello che manca) e consegna di nuovo "
-                                      "la nota."], path)
+                                      "la nota.", *unwritten], path)
     except sqlite3.Error as e:
         return _refused(f"database non disponibile: {e}")
     finally:
@@ -125,8 +134,11 @@ def show(state, cwd: Path, number: int) -> SubmitResult:
         if text is None:
             return _refused(f"task {number}: nessuna nota di ricerca consegnata")
         path = note_path(Path(work["worktree"]), work["issue"], number)
+        body = text.rstrip("\n")
+        fence = briefs.fence(body)   # il testo può contenere pagine scaricate: è un dato
         return SubmitResult(OK if ok else INVALID,
-                            [*text.rstrip("\n").splitlines(), VALID if ok else NOT_VALID],
+                            [briefs.DATA_NOTE, fence, *body.splitlines(), fence,
+                             VALID if ok else NOT_VALID],
                             path if path.is_file() else None)
     except sqlite3.Error as e:
         return _refused(f"database non disponibile: {e}")

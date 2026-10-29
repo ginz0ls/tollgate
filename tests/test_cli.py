@@ -14,6 +14,7 @@ from pathlib import Path
 from tests.flowkit import SESSION, FlowLab
 from tests.helpers import BIN, ROOT, TempState, git, make_repo
 from tests.hookkit import sample
+from tollgate_analysis import research
 from tollgate_core import clock, db, events, paths, phases, tasks
 
 T0 = clock.parse("2026-10-08T10:00:00.000000Z")
@@ -372,6 +373,14 @@ class ResearchCliTest(unittest.TestCase):
         self.assertEqual(shown.returncode, 1)
         self.assertIn("niente di strano", shown.stdout)
         self.assertTrue(shown.stdout.rstrip().endswith("esito: non valida"))
+
+    def test_research_submit_reads_a_bounded_stdin(self):
+        big = "## Cosa ho trovato\n" + "x" * (50 * research.MAX_NOTE_CHARS)
+        r = self.run_research("submit", "1", stdin=big)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn(f"nota oltre {research.MAX_NOTE_CHARS} caratteri", r.stderr)
+        self.assertEqual(len(tasks.get_task(self.fl.conn, self.fl.work, 1)["research_note"]),
+                         research.MAX_NOTE_CHARS)
 
     def test_research_submit_refused_exit_2(self):
         r = self.run_research("submit", "9", stdin="x")

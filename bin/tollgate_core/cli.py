@@ -384,9 +384,12 @@ def main(argv: list[str]) -> int:
                 return 1
             return 0
         if args.cmd == "research":
+            from tollgate_analysis import research
             from tollgate_flow import research_cmd
             if args.research_cmd == "submit":
-                res = research_cmd.submit(state, Path.cwd(), args.number, sys.stdin.read())
+                # al più qualche multiplo del limite: oltre, la nota è comunque «troppo lunga»
+                res = research_cmd.submit(state, Path.cwd(), args.number,
+                                          sys.stdin.read(4 * research.MAX_NOTE_CHARS + 1))
             else:
                 res = research_cmd.show(state, Path.cwd(), args.number)
             shown = res.code == research_cmd.OK or (args.research_cmd == "show"
