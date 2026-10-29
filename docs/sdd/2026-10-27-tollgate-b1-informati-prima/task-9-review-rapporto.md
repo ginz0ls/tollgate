@@ -46,7 +46,7 @@ Nessuno.
 
 4. **Avvisi di `start` non riportati.** L'uscita finale del passo 1 (`claude.jsonl` passo1, riga 161) riporta due avvisi: impostazioni di GitHub Actions non leggibili e protezione del ramo non leggibile. `fakegh.log` mostra le chiamate (`actions/permissions`, `branches/main/protection`). Con il `gh` finto sono attesi, ma la sezione «avvisi e rifiuti» li omette.
 
-5. **Anonimizzazione: restano due identificatori della macchina.** L'host `panino` (campo `host` in `events.jsonl` e `eventi-ricerca.jsonl`) e, nelle intestazioni di `comandi-modello.txt` (righe 1 e 7), il percorso `/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b1/…`, che rivela la struttura delle cartelle di lavoro. Non sono segreti e `USER` è già sostituito, quindi minor.
+5. **Anonimizzazione: restano due identificatori della macchina.** L'host `HOST` (campo `host` in `events.jsonl` e `eventi-ricerca.jsonl`) e, nelle intestazioni di `comandi-modello.txt` (righe 1 e 7), il percorso `/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b1/…`, che rivela la struttura delle cartelle di lavoro. Non sono segreti e `USER` è già sostituito, quindi minor.
 
 6. **Due affermazioni non riscontrabili nelle evidenze.** Il tetto di 2400 s (non c'è in `argv.txt` né in `esito.txt`) e «dentro l'abbonamento (nessuna spesa in più)»: `modelUsage` riporta `costBasis: "list"`, cioè prezzo di listino, e nulla prova come sia fatturata la sessione. Riformulare come «costo di listino stimato, 0,91 USD».
 
