@@ -103,7 +103,7 @@ worktree_lavoro() { # il worktree del ramo tg/1-*, sempre sotto la radice
 
 prompt_passo2() {
   cat <<TESTO
-Per l'issue #$ISSUE, nel worktree del lavoro: scrivi il piano con lo strumento Write nel file $PLAN_REL, con esattamente il testo tra i marcatori <<<PIANO e PIANO>>> (i marcatori esclusi). Poi committalo con git (git add e git commit). Poi esegui /tollgate:execute fino alla chiusura di tutti i task. Non lanciare /tollgate:finish.
+Per l'issue #$ISSUE, nel worktree del lavoro: se un piano non è già scritto e committato in docs/superpowers/plans/, scrivilo con lo strumento Write nel file $PLAN_REL, con esattamente il testo tra i marcatori <<<PIANO e PIANO>>> (i marcatori esclusi), e committalo con git (git add e git commit); se c'è già, non scriverne un altro. Poi esegui /tollgate:execute fino alla chiusura di tutti i task. Non lanciare /tollgate:finish.
 <<<PIANO
 $(cat "$PLAN_SRC")
 PIANO>>>
