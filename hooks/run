@@ -48,14 +48,21 @@ json_str() {
 # Le letture (PostToolUse di Read, Grep, WebFetch, WebSearch, mcp__*) si registrano solo per i
 # subagenti (B1, decisione 5): senza agent_id Python non deve partire. UNNAMED_TOOLS rispecchia
 # research.ATTRIBUTE_UNNAMED_TOOLS (separati da spazio): quegli strumenti passano anche senza agent_id.
+# READONLY_TYPES: i tipi di sola lettura di tollgate (config review.readonly_agents con prefisso
+# tollgate:, e agents/ senza Edit né Write; un test li confronta): le loro letture non
+# appartengono a nessun task e Python non deve partire. Elenco fisso, mai per prefisso: un tipo
+# sconosciuto passa da Python.
 UNNAMED_TOOLS=""
+READONLY_TYPES="tollgate:task-reviewer tollgate:final-reviewer tollgate:finding-verifier tollgate:plan-adversary tollgate:spec-adversary tollgate:spec-auditor"
 if [ "$EVENT" = "PostToolUse" ]; then
   TOOL="$(json_str tool_name)"
   case "$TOOL" in
     Read|Grep|WebFetch|WebSearch|mcp__*)
       case " $UNNAMED_TOOLS " in
         *" $TOOL "*) ;;
-        *) [ -n "$(json_str agent_id)" ] || exit 0 ;;
+        *) [ -n "$(json_str agent_id)" ] || exit 0
+           AGENT_TYPE="$(json_str agent_type)"
+           [ -z "$AGENT_TYPE" ] || case " $READONLY_TYPES " in *" $AGENT_TYPE "*) exit 0 ;; esac ;;
       esac ;;
   esac
 fi

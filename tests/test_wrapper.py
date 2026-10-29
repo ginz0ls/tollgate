@@ -225,6 +225,50 @@ class WrapperTest(unittest.TestCase):
                 r = self.post(tool, agent_id="a1", agent_type="tollgate:implementer")
                 self.assertEqual((r.returncode, r.stdout.strip()), (0, "OUT"))
 
+    def wrapper_readonly_types(self):
+        text = (ROOT / "hooks" / "run").read_text()
+        m = re.search(r'^READONLY_TYPES="([^"]*)"$', text, re.M)
+        self.assertIsNotNone(m)
+        return m.group(1).split()
+
+    def test_readonly_tollgate_subagent_read_exits_early(self):
+        for agent_type in self.wrapper_readonly_types():
+            for tool in ("Read", "WebFetch"):
+                with self.subTest(agent_type=agent_type, tool=tool):
+                    r, _ = self.run_wrapper("PostToolUse", {
+                        "hook_event_name": "PostToolUse", "session_id": "s1",
+                        "cwd": str(self.repo), "tool_input": {"file_path": "a.txt"},
+                        "tool_name": tool, "agent_id": "a1", "agent_type": agent_type}, mode="7")
+                    self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "", ""))
+
+    def test_other_agent_types_reach_python(self):
+        """Niente esclusione per prefisso: un tipo non in elenco passa da Python."""
+        for agent_type in ("tollgate:implementer", "tollgate:reviewer-web", "tollgate:futuro",
+                           "tollgate:", "Explore", "general-purpose", ""):
+            with self.subTest(agent_type=agent_type):
+                r = self.post("Read", agent_id="a1", agent_type=agent_type)
+                self.assertEqual((r.returncode, r.stdout.strip()), (0, "OUT"))
+        self.assertEqual(self.post("Read", agent_id="a1").stdout.strip(), "OUT")
+
+    def test_readonly_list_matches_config_and_agents(self):
+        from tollgate_core import config
+        listed = sorted(self.wrapper_readonly_types())
+        in_config = sorted(t for t in config.DEFAULTS["review"]["readonly_agents"]
+                           if t.startswith("tollgate:"))
+        self.assertEqual(listed, in_config)
+        readonly = []
+        for path in sorted((ROOT / "agents").glob("*.md")):
+            fm = {}
+            for line in path.read_text().split("\n")[1:]:
+                if line == "---":
+                    break
+                key, _, value = line.partition(": ")
+                fm[key] = value
+            tools = {t.strip() for t in fm["tools"].split(",")}
+            if not tools & {"Edit", "Write", "NotebookEdit"}:
+                readonly.append(f"tollgate:{fm['name']}")
+        self.assertEqual(listed, sorted(readonly))
+
     def test_other_post_tools_without_agent_id_still_reach_python(self):
         for tool in ("Bash", "Edit"):
             with self.subTest(tool=tool):
