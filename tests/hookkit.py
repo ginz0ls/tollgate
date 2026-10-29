@@ -67,8 +67,9 @@ def sample_b1(name, phase="post", **changes):
 class Lab:
     def __init__(self, *, level="L1", phase="execution", toml=DEFAULT_TOML, files=None,
                  bind=True, work=True, session=SESSION, issue=7, origin_url=None,
-                 worktree=True, research: bool = False):
+                 worktree=True, research: bool = False, plugin_root=ROOT):
         self.session = session
+        self.plugin_root = plugin_root
         self.ts = TempState()
         self.tmp = Path(tempfile.mkdtemp(prefix="tollgate lab "))
         self.main, self.origin, self.base = make_origin_repo(self.tmp, files or DEFAULT_FILES,
@@ -106,7 +107,7 @@ class Lab:
     def hook(self, payload, now=None):
         self.now = now or (self.now + timedelta(seconds=1))
         return runner.run_hook(payload["hook_event_name"], json.dumps(payload),
-                               env=self.ts.env(), now=self.now, plugin_root=ROOT)
+                               env=self.ts.env(), now=self.now, plugin_root=self.plugin_root)
 
     def _base(self, name, agent_id, cwd, **kw):
         extra = {"session_id": self.session, "cwd": str(cwd or self.wt)}

@@ -5,9 +5,6 @@ radice pertinente, una sessione legata non scrive nel worktree di un altro lavor
 worktree non si possono elencare si nega con un messaggio, i percorsi fuori dai repo passano."""
 from __future__ import annotations
 
-import glob
-import itertools
-import os
 import re
 from pathlib import Path
 
@@ -16,92 +13,17 @@ from tollgate_analysis.protected import REPO_PROTECTED
 from tollgate_core import git
 from tollgate_hooks.model import deny
 
-from ._common import (_inside, governing_work, in_main_checkout, is_docs_md, is_protected_path,
-                      orphan_next, orphan_tg, output_excludes, path_forms, repo_key_of)
+from ._common import (_braces, _expand, _inside, _write_paths, governing_work,  # noqa: F401
+                      in_main_checkout, is_docs_md, is_protected_path, orphan_next, orphan_tg,
+                      output_excludes, path_forms, repo_key_of)
 
 CHECK = {"api": 1, "events": ["pre_bash"], "component": None, "order": 20}
-_SUBST = "_TG_SUBST_"
 # `TOLLGATE_X=1; cmd`: l'assegnazione da sola non lascia traccia nei comandi letti.
 _TOLLGATE_ASSIGN = re.compile(r"(?:^|[\s;&|(])TOLLGATE_\w*=")
 
 
 # Un percorso concreto per ogni pattern protetto: serve a vedere se una cartella ne contiene.
 _PROBES = [pat.replace("**", "x").replace("*", "x").lstrip("/") for pat in REPO_PROTECTED]
-
-
-def _abs(c: bash.Cmd, target: str) -> Path | None:
-    """Percorso assoluto e normalizzato di un bersaglio, con i collegamenti NON risolti: la
-    protezione per nome li valuta tutti (`path_forms`). None per il segnaposto delle
-    sostituzioni."""
-    if _SUBST in target:
-        return None
-    return Path(os.path.normpath(os.path.join(c.cwd, os.path.expanduser(target))))
-
-
-_GLOB_CHARS = "*?["
-_GLOB_CAP = 5000
-_BRACE_CAP = 1000
-
-
-def _braces(t: str) -> list[str]:
-    """`{a,b}` -> due bersagli (annidate comprese). Senza virgola o sbilanciate restano come sono."""
-    i = t.find("{")
-    while i >= 0:
-        depth, parts, start, end = 0, [], i + 1, -1
-        for j in range(i, len(t)):
-            ch = t[j]
-            if ch == "{":
-                depth += 1
-            elif ch == "}":
-                depth -= 1
-                if depth == 0:
-                    parts.append(t[start:j])
-                    end = j
-                    break
-            elif ch == "," and depth == 1:
-                parts.append(t[start:j])
-                start = j + 1
-        if end < 0:
-            return [t]
-        if len(parts) > 1:
-            out = [x for part in parts for x in _braces(t[:i] + part + t[end + 1:])]
-            return out[:_BRACE_CAP]
-        i = t.find("{", i + 1)
-    return [t]
-
-
-def _expand(c: bash.Cmd, raw: str) -> tuple[list[Path], list[Path]]:
-    """Percorsi che un bersaglio può toccare: il testo stesso, le graffe e i glob espansi (anche
-    i file nascosti). In più la cartella che precede il primo carattere glob: serve quando il
-    glob non trova nulla o i file nascono dopo."""
-    paths, ancestors = [], []
-    for t in _braces(raw):
-        p = _abs(c, t)
-        if p is None:
-            continue
-        paths.append(p)
-        if not any(ch in t for ch in _GLOB_CHARS):
-            continue
-        pattern = os.path.join(glob.escape(c.cwd), os.path.expanduser(t))
-        found = glob.iglob(pattern, recursive=True, include_hidden=True)
-        paths += [Path(os.path.normpath(m)) for m in itertools.islice(found, _GLOB_CAP)]
-        first = min(i for i, ch in enumerate(t) if ch in _GLOB_CHARS)
-        ancestors.append(_abs(c, t[:first][:t[:first].rfind("/") + 1] or "."))
-    return paths, ancestors
-
-
-def _write_paths(c: bash.Cmd, edir: Path, repo: Path | None) -> list[tuple[str, Path]]:
-    """Ciò che il comando scrive: redirect e comandi di file, e il file di `git config`."""
-    out = [(t, p) for t in bash.write_targets(c) for p in _expand(c, t)[0]]
-    cfg = bash.git_config_write(c)
-    if cfg == "local" and repo is not None:
-        try:
-            out.append(("git config", git.common_dir(repo) / "config"))
-        except git.GitError:
-            out.append(("git config", repo / ".git" / "config"))
-    elif cfg and cfg != "local" and (p := _abs(c, cfg)) is not None:
-        out.append((cfg, p))
-    return out
 
 
 def _removes_protected(ctx, p: Path) -> bool:

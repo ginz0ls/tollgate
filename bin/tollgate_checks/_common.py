@@ -1,11 +1,13 @@
 """Aiuti condivisi dai controlli (non è un controllo: il registro salta i nomi con _)."""
 from __future__ import annotations
 
+import glob
+import itertools
 import json
 import os
 from pathlib import Path
 
-from tollgate_analysis import level as lv, prref, profiles as prof
+from tollgate_analysis import bash, level as lv, prref, profiles as prof
 from tollgate_analysis.protected import is_protected
 from tollgate_core import audits, config, git, lookups, reviews, subagents, violations
 from tollgate_core.paths import program_command, repo_key
@@ -188,6 +190,24 @@ def orphan_next(ctx, repo, n: int) -> tuple[str, str]:
     return "senza lavoro nel DB", f"/tollgate:adopt #{n}"
 
 
+def work_events(ctx, work: int, type_: str) -> list[dict]:
+    """I `data` degli eventi `type_` del lavoro successivi all'ultimo `plan_reset` (dopo
+    `reopen plan` i task si rinumerano: gli eventi di prima non parlano dei nuovi). Lettura in
+    sola lettura dal DB del contesto; il filtro su `data` lo fa il chiamante in Python."""
+    row = ctx.db.execute("SELECT max(seq) FROM events WHERE work = ? AND type = 'plan_reset'",
+                         (work,)).fetchone()
+    out = []
+    for r in ctx.db.execute("SELECT data FROM events WHERE work = ? AND type = ? AND seq > ? "
+                            "ORDER BY seq", (work, type_, row[0] or 0)):
+        try:
+            data = json.loads(r[0])
+        except ValueError:
+            continue
+        if isinstance(data, dict):
+            out.append(data)
+    return out
+
+
 def lookup_owner(ctx, event) -> tuple[int, int] | None:
     """`(lavoro, task)` a cui appartiene una lettura (decisione 5 di B1), o None. La regola è in
     `lookups.owner`; qui in più un subagente di sola lettura non possiede mai letture."""
@@ -332,4 +352,82 @@ def budget_cut_records(ctx, agent_id: str, tokens=None) -> list:
                                   f"Proposta: dividere il task")]
     out.append(inject("tollgate: il subagente ha esaurito maxTurns. Il task è bloccato con "
                       "needs_you: non riprenderlo con SendMessage."))
+    return out
+
+
+_SUBST = "_TG_SUBST_"
+
+
+def _abs(c: bash.Cmd, target: str) -> Path | None:
+    """Percorso assoluto e normalizzato di un bersaglio, con i collegamenti NON risolti: la
+    protezione per nome li valuta tutti (`path_forms`). None per il segnaposto delle
+    sostituzioni."""
+    if _SUBST in target:
+        return None
+    return Path(os.path.normpath(os.path.join(c.cwd, os.path.expanduser(target))))
+
+
+_GLOB_CHARS = "*?["
+_GLOB_CAP = 5000
+_BRACE_CAP = 1000
+
+
+def _braces(t: str) -> list[str]:
+    """`{a,b}` -> due bersagli (annidate comprese). Senza virgola o sbilanciate restano come sono."""
+    i = t.find("{")
+    while i >= 0:
+        depth, parts, start, end = 0, [], i + 1, -1
+        for j in range(i, len(t)):
+            ch = t[j]
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    parts.append(t[start:j])
+                    end = j
+                    break
+            elif ch == "," and depth == 1:
+                parts.append(t[start:j])
+                start = j + 1
+        if end < 0:
+            return [t]
+        if len(parts) > 1:
+            out = [x for part in parts for x in _braces(t[:i] + part + t[end + 1:])]
+            return out[:_BRACE_CAP]
+        i = t.find("{", i + 1)
+    return [t]
+
+
+def _expand(c: bash.Cmd, raw: str) -> tuple[list[Path], list[Path]]:
+    """Percorsi che un bersaglio può toccare: il testo stesso, le graffe e i glob espansi (anche
+    i file nascosti). In più la cartella che precede il primo carattere glob: serve quando il
+    glob non trova nulla o i file nascono dopo."""
+    paths, ancestors = [], []
+    for t in _braces(raw):
+        p = _abs(c, t)
+        if p is None:
+            continue
+        paths.append(p)
+        if not any(ch in t for ch in _GLOB_CHARS):
+            continue
+        pattern = os.path.join(glob.escape(c.cwd), os.path.expanduser(t))
+        found = glob.iglob(pattern, recursive=True, include_hidden=True)
+        paths += [Path(os.path.normpath(m)) for m in itertools.islice(found, _GLOB_CAP)]
+        first = min(i for i, ch in enumerate(t) if ch in _GLOB_CHARS)
+        ancestors.append(_abs(c, t[:first][:t[:first].rfind("/") + 1] or "."))
+    return paths, ancestors
+
+
+def _write_paths(c: bash.Cmd, edir: Path, repo: Path | None) -> list[tuple[str, Path]]:
+    """Ciò che il comando scrive: redirect e comandi di file, e il file di `git config`."""
+    out = [(t, p) for t in bash.write_targets(c) for p in _expand(c, t)[0]]
+    cfg = bash.git_config_write(c)
+    if cfg == "local" and repo is not None:
+        try:
+            out.append(("git config", git.common_dir(repo) / "config"))
+        except git.GitError:
+            out.append(("git config", repo / ".git" / "config"))
+    elif cfg and cfg != "local" and (p := _abs(c, cfg)) is not None:
+        out.append((cfg, p))
     return out
