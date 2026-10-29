@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 import getpass
-import os
 
 from pathlib import Path
 
 from tollgate_analysis import approvals, auditrules, brief, profiles as prof
 from tollgate_core import (acts, audits, effects, events, git, lookups, phases, reviews, scope,
                            sessions, subagents, tasks, violations)
+from tollgate_core.fsutil import write_atomic
 
 REPORT_MAX_CHARS = 60000
 
@@ -122,22 +122,6 @@ def _finding_verify(conn, state, ctx, d):
         reviews.verifier_incomplete(conn, state, wid, n, now=ctx.now, session=ctx.event.session)
 
 
-def _write_atomic(path: Path, text: str) -> None:
-    """Scrive `path` con un file temporaneo accanto e `os.replace`; `OSError` o `ValueError` (testo
-    non codificabile) se non riesce, e in ogni caso il temporaneo non resta."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.tmp")
-    try:
-        tmp.write_text(text, encoding="utf-8")
-        os.replace(tmp, path)
-    except (OSError, ValueError):
-        try:
-            tmp.unlink()
-        except OSError:
-            pass
-        raise
-
-
 def _report_body(title: str, msg: str, extra: list[str]) -> str:
     """Corpo del report: i rilievi meccanici e il messaggio dell'agente (testo non fidato, in
     un recinto, troncato a `REPORT_MAX_CHARS`)."""
@@ -201,7 +185,7 @@ def _audit_report(conn, state, ctx, d):
     try:
         if wt is None or not wt.is_dir():
             raise FileNotFoundError("worktree assente")
-        _write_atomic(wt / rel, approvals.render_report(
+        write_atomic(wt / rel, approvals.render_report(
             fields, _report_body(title, d["body"], d.get("extra") or [])))
     except (OSError, ValueError) as e:
         _audit_veto(conn, ctx, wid, f"report non scritto: {e}")
@@ -215,7 +199,7 @@ def _audit_report(conn, state, ctx, d):
             lens, issue=work["issue"], cap=ctx.cfg("spec_audit.spec_audit_cycles"),
             suspended=kind in audits.suspended(conn, wid))
         try:
-            _write_atomic(wt / approvals.REVIEWS_DIR / str(work["issue"]) / "spec-lens-stato.md",
+            write_atomic(wt / approvals.REVIEWS_DIR / str(work["issue"]) / "spec-lens-stato.md",
                           text)
         except (OSError, ValueError) as e:
             _audit_veto(conn, ctx, wid, f"stato delle lenti non scritto: {e}")

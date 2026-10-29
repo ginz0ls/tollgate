@@ -5,13 +5,13 @@ in `tasks.research_note` con l'esito in `tasks.research_ok` e lo copia in
 `.tollgate-run/<N>/research-<k>.md` (già fuori da git, spec 6.3), con una riga finale `esito:`."""
 from __future__ import annotations
 
-import os
 import sqlite3
 from pathlib import Path
 from typing import NamedTuple
 
 from tollgate_analysis import research
 from tollgate_core import clock, config, db, events, git, lookups, sessions, tasks
+from tollgate_core.fsutil import write_atomic
 
 OK, INVALID, REFUSED = 0, 1, 2
 RUN_DIR = ".tollgate-run"
@@ -31,22 +31,6 @@ def note_path(worktree: Path, issue: int, number: int) -> Path:
 
 def _refused(*lines: str) -> SubmitResult:
     return SubmitResult(REFUSED, list(lines), None)
-
-
-def _write_atomic(path: Path, text: str) -> None:
-    """File temporaneo accanto e `os.replace`, come `apply._write_atomic` (lo strato `flow` non
-    importa `hooks`); in ogni caso il temporaneo non resta."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.tmp")
-    try:
-        tmp.write_text(text, encoding="utf-8")
-        os.replace(tmp, path)
-    except (OSError, ValueError):
-        try:
-            tmp.unlink()
-        except OSError:
-            pass
-        raise
 
 
 def _component_on(state, work) -> bool:
@@ -91,7 +75,8 @@ def submit(state, cwd: Path, number: int, text: str, *, now=None) -> SubmitResul
             return _refused("lavoro iniziato prima del passo informati prima: non richiede "
                             "la nota di ricerca")
         try:
-            if not _component_on(state, work):
+            on = _component_on(state, work)
+            if not research.active(work["research"], on):
                 return _refused("componente research_note spento: non richiede la nota di "
                                 "ricerca")
         except (config.ConfigError, git.GitError) as e:
@@ -109,7 +94,7 @@ def submit(state, cwd: Path, number: int, text: str, *, now=None) -> SubmitResul
         path = note_path(wt, work["issue"], number)
         body = text if text.endswith("\n") else text + "\n"
         try:
-            _write_atomic(path, f"{body}{VALID if ok else NOT_VALID}\n")
+            write_atomic(path, f"{body}{VALID if ok else NOT_VALID}\n")
         except (OSError, ValueError) as e:
             return _refused(f"nota non scritta in {path}: {e}")
         lookups.set_note(conn, work["id"], number, text=text, ok=ok)

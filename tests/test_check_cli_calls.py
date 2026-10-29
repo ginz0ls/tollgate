@@ -208,9 +208,6 @@ class CliCallsTest(unittest.TestCase):
         self.assertIn("modo letterale", r.stderr)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class ResearchSubcommandTest(unittest.TestCase):
     """`research submit` è dell'implementatore (decisione 12); `research show` no."""
@@ -297,3 +294,7 @@ class ResearchSubcommandTest(unittest.TestCase):
                              env=lab.ts.env(), cwd=str(lab.wt), timeout=60)
         self.assertIn("non valida", run.stdout + run.stderr)
         self.assertEqual(tasks.get_task(lab.conn, lab.work, 1)["research_note"], note)
+
+
+if __name__ == "__main__":
+    unittest.main()

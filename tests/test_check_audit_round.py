@@ -8,7 +8,7 @@ import tests.test_audit_prepare as tap
 from tests.flowkit import SESSION, SPEC, round_message
 from tests.hookkit import DEFAULT_TOML, sample
 from tollgate_analysis import approvals, auditrules
-from tollgate_core import audits, clock, subagents
+from tollgate_core import audits, clock, fsutil, subagents
 from tollgate_flow import audit
 from tollgate_hooks import apply
 
@@ -393,9 +393,9 @@ class WriteFailureTest(RoundCase):
         fl = self.open_adv()
         target = fl.wt / "docs" / "superpowers" / "reviews" / "7" / "x.md"
         with self.assertRaises(ValueError):
-            apply._write_atomic(target, "\udcff")
+            fsutil.write_atomic(target, "\udcff")
         self.assertEqual([p.name for p in target.parent.iterdir()], [])
-        apply._write_atomic(target, "ok\n")
+        fsutil.write_atomic(target, "ok\n")
         self.assertEqual([p.name for p in target.parent.iterdir()], ["x.md"])
 
     def test_audit_report_ignores_round_no_longer_open(self):

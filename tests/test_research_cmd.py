@@ -1,10 +1,11 @@
 """Comando `research` (B1, Task 6): consegna e lettura della nota di ricerca."""
 import unittest
+from unittest import mock
 
 from tests.flowkit import FlowLab
 from tests.hookkit import DEFAULT_TOML
 from tollgate_analysis import research
-from tollgate_core import lookups, tasks
+from tollgate_core import config, lookups, tasks
 from tollgate_flow import research_cmd
 
 URL = "https://docs.example.com/guide"
@@ -116,6 +117,26 @@ class SubmitTest(ResearchCase):
         self.assertEqual(r.code, research_cmd.REFUSED)
         self.assertIn("componente research_note spento", " ".join(r.lines))
         self.assertIsNone(self.row()["research_note"])
+
+    def test_unreadable_config_refused(self):
+        self.make()
+        with mock.patch.object(research_cmd.config, "load_config",
+                               side_effect=config.ConfigError("TOML rotto")):
+            r = self.submit()
+        self.assertEqual(r.code, research_cmd.REFUSED)
+        self.assertIn("configurazione non leggibile: TOML rotto", " ".join(r.lines))
+        self.assertIsNone(self.row()["research_note"])
+
+    def test_note_file_write_failure_refused(self):
+        self.make()
+        self.read_all()
+        with mock.patch.object(research_cmd, "write_atomic", side_effect=OSError("disco pieno")):
+            r = self.submit()
+        self.assertEqual(r.code, research_cmd.REFUSED)
+        self.assertIn("nota non scritta", " ".join(r.lines))
+        self.assertIn("disco pieno", " ".join(r.lines))
+        self.assertIsNone(self.row()["research_note"])
+        self.assertEqual(self.events(), [])
 
     def test_refused_task_not_running(self):
         self.make(start=False)
