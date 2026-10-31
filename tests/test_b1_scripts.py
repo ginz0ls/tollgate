@@ -545,6 +545,8 @@ class FlowScriptTest(unittest.TestCase):
         self.assertFalse(Path("/tmp/fuori-da-tollgate-b1").exists())
 
     def test_flow_rules_base_only_in_copy(self):
+        repo_skill = ROOT / "skills" / "rules-base" / "SKILL.md"
+        repo_skill_before = repo_skill.read_bytes()
         r = self.b.prepara()
         self.assertIn("plan-check: ok", r.stdout)
         skill = self.b.plugin / "skills" / "rules-base" / "SKILL.md"
@@ -552,7 +554,8 @@ class FlowScriptTest(unittest.TestCase):
         self.assertRegex(text, r"(?m)^name: rules-base$")
         self.assertRegex(text, r"(?m)^approved: prova-b1$")
         self.assertIn("Regole di prova della prova reale di B1: non sono le regole di B2", text)
-        self.assertFalse((ROOT / "skills" / "rules-base").exists(), "il repo non deve cambiare")
+        self.assertNotEqual(text.encode(), repo_skill_before, "la copia tiene la rules-base di prova")
+        self.assertEqual(repo_skill.read_bytes(), repo_skill_before, "il repo non deve cambiare")
         self.assertFalse(list(self.b.plugin.rglob("APPROVED")))
         self.assertFalse(list(self.b.plugin.rglob("__pycache__")))
         # la copia è il plugin intero meno i dati di sviluppo; ogni percorso che plugin.json cita esiste

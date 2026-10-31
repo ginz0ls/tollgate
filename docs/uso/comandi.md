@@ -144,6 +144,10 @@ Con tollgate spento non gira nessun guardrail locale, e `start` e gli atti non f
 
 Riaccende tollgate su questa macchina. Solo l'utente. Nessun argomento.
 
+### `/tollgate:rules-base`
+
+Le regole di base del passo «informati prima»: leggere i file e la documentazione ufficiale prima di scrivere, citare dove si è cercato, provare ciò che si dichiara. Le caricano gli agenti di tollgate che scrivono o rivedono codice, quindi non serve lanciarla a mano. Per ora è una bozza: finché non è approvata il blocco del passo non è acceso.
+
 ## La CLI
 
 La CLI è `bin/tollgate` e si lancia con `python3` davanti al percorso, tra virgolette se contiene spazi. Quasi tutti i sottocomandi li chiamano le skill. Quelli che puoi usare direttamente:
