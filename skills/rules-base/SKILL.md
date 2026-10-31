@@ -38,13 +38,7 @@ Fonte: progetto di B (docs/superpowers/specs/2026-10-27-tollgate-b-profili-desig
 
 ## Mentre lavori
 
-R-BASE-10 [blocca] La correzione di un difetto porta un test che lo riproduce, rosso prima della correzione e verde dopo. Se non si può, il report dice perché.
-Fonte: superpowers 7.0.0 (Jesse Vincent, MIT), skills/systematic-debugging/SKILL.md, «The Iron Law» e «Phase 4: Implementation» (punto 1)
-
-R-BASE-11 Se la documentazione ufficiale non si trova o si contraddice, la nota o il report lo dicono in chiaro con la parola «non verificato» e dicono dove si è cercato.
-Fonte: agent-skills 0.6.9 (Addy Osmani, MIT), skills/source-driven-development/SKILL.md, «Step 2: Fetch Official Documentation» (fonti in conflitto) e «Step 4: Cite Your Sources» (blocco UNVERIFIED)
-
-R-BASE-12 Il report dichiara funzionante solo ciò che un comando eseguito nel task prova, e riporta il comando con il suo esito.
+R-BASE-10 Il report dichiara funzionante solo ciò che un comando eseguito nel task prova, e riporta il comando con il suo esito.
 Fonte: superpowers 7.0.0 (Jesse Vincent, MIT), skills/verification-before-completion/SKILL.md, «The Iron Law»
 
 ## Fonti

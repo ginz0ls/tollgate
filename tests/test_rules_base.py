@@ -8,6 +8,8 @@ from tests.helpers import ROOT
 from tollgate_analysis import research
 
 SKILL = ROOT / "skills" / "rules-base" / "SKILL.md"
+PAGE = ROOT / "docs" / "profili" / "base.md"
+SOURCES = ROOT / "docs" / "profili" / "verifiche" / "base-fonti.md"
 DESCRIPTION = ("Regole di base di tollgate per ogni implementatore e revisore: le caricano in "
                "automatico gli agenti di tollgate, non serve invocarla.")
 RULE = re.compile(r"^(R-BASE-\d{2})( \[blocca\])? (\S.*)$")
@@ -94,6 +96,63 @@ class RulesBaseTest(unittest.TestCase):
         fonti = skill_text().split("\n## Fonti", 1)[1]
         self.assertIn("LICENSES/agent-skills-MIT.txt", fonti)
         self.assertIn("LICENSES/superpowers-MIT.txt", fonti)
+
+
+ID = re.compile(r"R-BASE-\d{2}")
+
+
+def table_rows(text: str) -> list[list[str]]:
+    """Le righe di dati delle tabelle: le celle senza spazi ai bordi; intestazioni e filetti esclusi."""
+    rows = []
+    for line in text.split("\n"):
+        if line.startswith("|") and not re.match(r"^\|[\s:|-]+\|$", line):
+            rows.append([c.strip() for c in line.strip().strip("|").split("|")])
+    return rows[1:] if rows else rows
+
+
+class RulesBasePageTest(unittest.TestCase):
+    """Il rapporto delle fonti e la pagina per l'utente (B2, Task 4)."""
+
+    def skill_ids(self) -> list[str]:
+        return [r[0] for r in rules(skill_text())]
+
+    def test_sources_report_covers_every_rule(self):
+        text = SOURCES.read_text(encoding="utf-8")
+        main, _, removed = text.partition("\n## Regole tolte")
+        self.assertTrue(removed, "manca la sezione «Regole tolte»")
+        self.assertFalse(ID.search(removed), "le regole tolte non usano id R-BASE-")
+        ok, named = set(), set()
+        for cells in table_rows(main):
+            found = ID.findall(cells[0])
+            named.update(found)
+            if cells[-1].split(":")[0].strip() == "ok":
+                ok.update(found)
+        self.assertEqual(named - set(self.skill_ids()), set())
+        self.assertEqual(set(self.skill_ids()) - ok, set())
+
+    def test_page_lists_every_rule(self):
+        ids = [ID.search(cells[0]).group(0) for cells in table_rows(PAGE.read_text(encoding="utf-8"))
+               if ID.search(cells[0])]
+        self.assertEqual(ids, self.skill_ids())
+
+    def test_page_blocca_matches_skill(self):
+        blocca = {r[0]: r[1] for r in rules(skill_text())}
+        seen = {}
+        for cells in table_rows(PAGE.read_text(encoding="utf-8")):
+            m = ID.search(cells[0])
+            if m:
+                self.assertIn(cells[2].lower(), ("sì", "no"))
+                seen[m.group(0)] = cells[2].lower() == "sì"
+        self.assertEqual(seen, blocca)
+
+    def test_page_explains_what_changes(self):
+        text = " ".join(PAGE.read_text(encoding="utf-8").split()).lower()
+        for needle in ("in l1 e l2 la prima modifica senza una nota valida viene rifiutata",
+                       "in l0 resta il solo avviso",
+                       "anche nei lavori già in corso e nei task già avvisati",
+                       "nei lavori veri vale da quando la versione unita su main arriva al plugin installato"):
+            with self.subTest(needle=needle):
+                self.assertIn(needle, text)
 
 
 if __name__ == "__main__":
