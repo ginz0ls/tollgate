@@ -46,6 +46,14 @@ class EnforcedTest(unittest.TestCase):
                 self.assertFalse(r.enforced(f"---\nname: x\napproved: {v}\n---\n"))
         self.assertTrue(r.enforced("---\napproved: '2026-11-02'\n---\n"))
 
+    def test_enforced_refuses_no_off_n(self):
+        for v in ("no", "NO", "off", "Off", "n", '"no"', "'off'", '"false"'):
+            with self.subTest(value=v):
+                self.assertFalse(r.enforced(f"---\nname: x\napproved: {v}\n---\n"))
+        for v in ("2026-10-29", "prova-b1"):
+            with self.subTest(value=v):
+                self.assertTrue(r.enforced(f"---\nname: x\napproved: {v}\n---\n"))
+
     def test_active(self):
         self.assertTrue(r.active(1, True))
         self.assertFalse(r.active(0, True))

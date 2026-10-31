@@ -127,11 +127,21 @@ class RulesEnforcedTest(unittest.TestCase):
         self.assertFalse(lookups.rules_enforced(self.root("---\nname: rules-base\n---\n")))
         self.assertFalse(lookups.rules_enforced(self.root()))
 
-    def test_unreadable_is_off_for_now(self):
-        """Il comportamento su un `OSError` diverso da «assente» è rinviato a B2 (deferred 31)."""
+    def test_switch_missing_is_silent_off(self):
+        self.assertEqual(lookups.rules_switch(self.root()), (False, None))
+
+    def test_switch_unreadable_reports_error(self):
         d = self.root()
         (d / "skills/rules-base/SKILL.md").mkdir(parents=True)   # una cartella: IsADirectoryError
+        enforced, error = lookups.rules_switch(d)
+        self.assertFalse(enforced)
+        self.assertIsInstance(error, str)
+        self.assertTrue(error.startswith("IsADirectoryError"))
         self.assertFalse(lookups.rules_enforced(d))
+
+    def test_switch_approved(self):
+        self.assertEqual(lookups.rules_switch(
+            self.root("---\nname: rules-base\napproved: 2026-10-29\n---\n")), (True, None))
 
 
 class PruneTest(LookupsCase):

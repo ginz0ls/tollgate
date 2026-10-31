@@ -291,6 +291,44 @@ class NotEnforcedTest(Base):
         self.assertEqual(self.lab.events("research_reminder"), [{"task": 1}])
 
 
+class UnreadableSwitchTest(Base):
+    """L'interruttore illeggibile avvisa soltanto e lascia una traccia (decisione 5)."""
+    approved = False
+
+    def setUp(self):
+        super().setUp()
+        skill = self.root / "skills/rules-base/SKILL.md"
+        skill.unlink()
+        skill.mkdir()   # una cartella: IsADirectoryError
+
+    def test_unreadable_switch_warns_and_logs_once(self):
+        r = edit_and_post(self.lab, "src/app.py", agent_id="a1")
+        self.assertEqual(r.exit, 0)
+        self.assertIn("non si legge", r.stdout)
+        self.assertIn(WARNING, r.stdout)
+        self.assertIn("research submit 1", r.stdout)
+        found = self.lab.events("research_switch_unreadable")
+        self.assertEqual(len(found), 1)
+        self.assertTrue(found[0]["error"].startswith("IsADirectoryError"))
+        self.assertEqual(edit_and_post(self.lab, "src/app.py", agent_id="a1").exit, 0)
+        self.assertEqual(len(self.lab.events("research_switch_unreadable")), 1)
+
+    def test_unreadable_switch_logged_with_valid_note(self):
+        self.note(True)
+        r = edit_and_post(self.lab, "src/app.py", agent_id="a1")
+        self.assertEqual(r.exit, 0)
+        self.assertNotIn("non si legge", r.stdout)
+        self.assertNotIn("informati prima", r.stdout)
+        self.assertEqual(len(self.lab.events("research_switch_unreadable")), 1)
+
+    def test_missing_switch_no_unreadable_event(self):
+        (self.root / "skills/rules-base/SKILL.md").rmdir()
+        r = edit_and_post(self.lab, "src/app.py", agent_id="a1")
+        self.assertIn(WARNING, r.stdout)
+        self.assertNotIn("non si legge", r.stdout)
+        self.assertEqual(self.lab.events("research_switch_unreadable"), [])
+
+
 class L2Test(unittest.TestCase):
     """Un lavoro L2 in execution ha lo stesso blocco di L1 (decisione 3)."""
 

@@ -34,7 +34,7 @@ DOC_MCP_TOOLS: tuple[str, ...] = (
 _LIBRARY_PARAMS = ("libraryId", "context7CompatibleLibraryID")
 
 # Valori YAML che non sono una data di approvazione.
-_YAML_EMPTY = {"null", "~", "|", ">", "|-", ">-", "|+", ">+", "false"}
+_YAML_EMPTY = {"null", "~", "|", ">", "|-", ">-", "|+", ">+", "false", "no", "off", "n"}
 _DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
@@ -56,9 +56,8 @@ def enforced(skill_text: str | None) -> bool:
         m = re.match(r"approved\s*:(.*)$", line)
         if m:
             raw = m.group(1).split(" #")[0].strip()
-            if raw.lower() in _YAML_EMPTY:
-                return False
-            return raw.strip("'\"").strip() != ""
+            value = raw.strip("'\"").strip()
+            return value != "" and value.lower() not in _YAML_EMPTY
     return False
 
 

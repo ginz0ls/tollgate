@@ -167,14 +167,22 @@ def detach_tasks(conn, work: int) -> None:
                      (work,))
 
 
-def rules_enforced(root) -> bool:
-    """L'interruttore del blocco (decisione 8): `rules-base` della radice del plugin è approvata.
-    Un file illeggibile vale «spento» (la distinzione tra assente e illeggibile è di B2)."""
+def rules_switch(root) -> tuple[bool, str | None]:
+    """L'interruttore del blocco (decisione 8): `(acceso, errore)`. Acceso se `rules-base` della
+    radice del plugin è approvata. File assente: `(False, None)`, spento in silenzio. Ogni altro
+    `OSError`: `(False, "<classe>: <messaggio>")`, spento ma con la traccia da riportare."""
     try:
         text = (Path(root) / research.RULES_BASE).read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return False
-    return research.enforced(text)
+    except FileNotFoundError:
+        return False, None
+    except OSError as e:
+        return False, f"{type(e).__name__}: {e}"
+    return research.enforced(text), None
+
+
+def rules_enforced(root) -> bool:
+    """Il gate unico di `research_gate` e `task review`: vero se l'interruttore è acceso."""
+    return rules_switch(root)[0]
 
 
 def set_note(conn, work: int, task: int, *, text: str, ok: bool) -> None:

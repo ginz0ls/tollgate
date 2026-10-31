@@ -19,6 +19,9 @@ from ._common import (_write_paths, edit_target, governing_work, is_docs_md, out
 CHECK = {"api": 1, "events": ["pre_edit", "pre_bash", "post_edit", "post_bash"],
          "component": "research_note", "order": 25}
 _PRE = ("pre_edit", "pre_bash")
+_UNREADABLE = ("tollgate: l'interruttore delle regole base (skills/rules-base/SKILL.md) non si "
+               "legge ({error}): il passo «informati prima» avvisa soltanto, non blocca. "
+               "Controlla il file.")
 
 
 def _counts(ctx, rel: str) -> bool:
@@ -74,7 +77,8 @@ def _reminded(ctx, work, task: int | None) -> bool:
 
 
 def _verdict(event, ctx):
-    """`(esito, lavoro, task)`: esito `deny` o `remind`, o None se non c'è niente da dire."""
+    """`(esito, lavoro, task, errore)`: esito `deny`, `remind` o None (nessun avviso, ma con
+    `errore` dell'interruttore da registrare); None se non c'è niente da dire."""
     is_bash = event.kind in ("pre_bash", "post_bash")
     if is_bash and not event.agent_id:
         return None
@@ -87,7 +91,7 @@ def _verdict(event, ctx):
     if work["level"] == "L0":
         if event.agent_id or _reminded(ctx, work, None):
             return None
-        return "remind", work, None
+        return "remind", work, None, None
     if not event.agent_id or ctx.readonly(event.agent_type):
         return None
     owner = lookups.owner(ctx.db, agent_id=event.agent_id, tool=event.tool_name,
@@ -95,11 +99,13 @@ def _verdict(event, ctx):
     if owner is None:
         return None
     task = owner[1]
+    enforced, error = lookups.rules_switch(ctx.plugin_root)
     if lookups.note(ctx.db, work["id"], task)[1]:
-        return None
-    if lookups.rules_enforced(ctx.plugin_root):
-        return "deny", work, task
-    return ("remind", work, task) if not _reminded(ctx, work, task) else None
+        return (None, work, task, error) if error else None
+    if enforced:
+        return "deny", work, task, None
+    outcome = "remind" if not _reminded(ctx, work, task) else None
+    return (outcome, work, task, error) if outcome or error else None
 
 
 def _refusal(ctx, work, task: int) -> str:
@@ -126,10 +132,22 @@ def decide(event, ctx):
     v = _verdict(event, ctx)
     if v is None:
         return []
-    outcome, work, task = v
+    outcome, work, task, error = v
     if outcome == "deny":
         return [deny(_refusal(ctx, work, task), rule="research_gate")] \
             if event.kind in _PRE else []
     if event.kind in _PRE:
-        return [inject(_warning(ctx, task))]
-    return [record("event", type="research_reminder", data={"task": task}, work=work["id"])]
+        if outcome is None:
+            return []
+        text = _warning(ctx, task)
+        if error:
+            text = f"{_UNREADABLE.format(error=error)}\n{text}"
+        return [inject(text)]
+    out = []
+    if error and not work_events(ctx, work["id"], "research_switch_unreadable"):
+        out.append(record("event", type="research_switch_unreadable", data={"error": error},
+                          work=work["id"]))
+    if outcome:
+        out.append(record("event", type="research_reminder", data={"task": task},
+                          work=work["id"]))
+    return out

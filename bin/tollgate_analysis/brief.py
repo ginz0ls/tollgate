@@ -211,7 +211,7 @@ def _review_research(b: ReviewBrief) -> list[str]:
             out.append("La nota non è valida: trattala come mancante.")
     else:
         out.append("(nessuna nota consegnata)")
-    if b.no_changes and not has_note:
+    if b.no_changes and not usable:
         out.append("Il task non ha modifiche: la nota non era richiesta, nessun rilievo sulla "
                    "nota.")
         return out

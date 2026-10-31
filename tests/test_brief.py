@@ -224,6 +224,15 @@ class ReviewResearchTest(unittest.TestCase):
         self.assertNotIn("rule", section)
         self.assertIn("non era richiesta", section)
 
+    def test_review_brief_no_changes_invalid_note_asks_nothing(self):
+        section = self.research_section(research_enforced=True, no_changes=True,
+                                        research_valid=False, research_problems=self.PROBLEMS,
+                                        research_note="## Cosa ho trovato\nx",
+                                        research_note_path=self.NOTE_PATH)
+        self.assertNotIn("`major`", section)
+        self.assertNotIn("missing", section)
+        self.assertIn("non era richiesta", section)
+
     def test_review_brief_legacy_has_no_section(self):
         out = brief.review_brief(review(research=False, research_enforced=True,
                                         research_note="x", research_note_path="/p"))
