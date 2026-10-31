@@ -150,7 +150,7 @@ class RulesBasePageTest(unittest.TestCase):
         for needle in ("in l1 e l2 la prima modifica senza una nota valida viene rifiutata",
                        "in l0 resta il solo avviso",
                        "anche nei lavori già in corso e nei task già avvisati",
-                       "nei lavori veri vale da quando la versione unita su main arriva al plugin installato"):
+                       "nei lavori veri vale da quando la nuova versione, una volta unita al ramo principale (main), viene installata sul tuo computer"):
             with self.subTest(needle=needle):
                 self.assertIn(needle, text)
 
