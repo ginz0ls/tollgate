@@ -447,6 +447,17 @@ class _Session:
             self._result(uid, out["text"], error=done.returncode != 0, agent=agent)
         return out
 
+    def _do_read(self, ev):
+        """La lettura di un file di un subagente: il `PostToolUse` di `Read`, che registra la lettura per
+        la nota di ricerca (B1)."""
+        agent, path = ev["agent"], ev["path"]
+        tool_input = {"file_path": path}
+        uid = self._use("Read", tool_input, agent)
+        post = self.hook("PostToolUse", tool="Read", tool_input=tool_input, agent=agent,
+                         response={"file": {"filePath": path}})
+        self._result(uid, f"File letto: {path}", error=False, agent=agent)
+        return {"denied": False, "rc": post.returncode, "text": post.stdout}
+
     def _do_edit(self, ev):
         agent, tool, path = ev.get("agent"), ev.get("tool", "Edit"), ev["path"]
         tool_input = ({"file_path": path, "content": ev["content"]} if tool == "Write"
@@ -517,7 +528,7 @@ class _Session:
 
 def dry_run(case: dict, events: list, where: str = "worktree", env: dict | None = None) -> list[dict]:
     """Gli esiti di `hooks/run` per gli eventi dati: costruisce lo stato della ricetta del caso, esegue
-    i passi (`agent`, `bash`, `edit`, `stop`, `say`; un passo può essere una funzione della sessione, che ne
+    i passi (`agent`, `bash`, `read`, `edit`, `stop`, `say`; un passo può essere una funzione della sessione, che ne
     legge gli esiti già avuti in `outs`) e ritorna un esito per passo, più un ultimo esito
     `end` con la `trace`, il messaggio finale, i file creati e il testo dei file per i grader.
 
@@ -785,6 +796,19 @@ def impl_launch():
             "prompt": "{wt}/.tollgate-run/1/task-1.md"}
 
 
+def research_prep(agent: str, rel: str, task: int = 1) -> list[dict]:
+    """Quello che l'implementatore vero fa prima della prima modifica (passo «informati prima», B1): legge
+    un file del progetto e consegna la nota, senza fonti esterne. Rende la prova indipendente dallo stato
+    dell'interruttore delle regole base nel repo (con `approved` la prima modifica senza nota è negata)."""
+    note = (f"python3 {{bin}} research submit {task} <<'NOTA_DI_RICERCA_FINE'\n"
+            f"## Letto nel progetto\n- {rel}\n\n"
+            "## Nessuna fonte esterna\nIl task non usa librerie né servizi esterni.\n\n"
+            "## Cosa ho trovato\nIl file esiste e il task lo tocca o gli sta accanto.\n"
+            "NOTA_DI_RICERCA_FINE")
+    return [{"do": "read", "agent": agent, "path": "{wt}/" + rel},
+            {"do": "bash", "agent": agent, "command": note}]
+
+
 class S1DryRun(DryRunCase):
     NAME = "s1-done-senza-ricevuta"
     WORK = [
@@ -794,30 +818,32 @@ class S1DryRun(DryRunCase):
          "content": fixture_text("calc-l1/1/tests/test_calc.py")},
         {"do": "bash", "agent": "ag-1", "command": "git add src tests && git commit -qm 'task 1'"},
     ]
+    PREP = research_prep("ag-1", "src/calc.py")
     VERIFY = {"do": "bash", "agent": "ag-1", "command": "python3 {bin} verify"}
     DONE = {"do": "stop", "agent": "ag-1", "status": "DONE", "files": ["src/calc.py"]}
 
     def test_s1_dry_run(self):
-        veto_then_receipt = [impl_launch(), *self.WORK, self.DONE, self.VERIFY, self.DONE,
+        veto_then_receipt = [impl_launch(), *self.PREP, *self.WORK, self.DONE, self.VERIFY, self.DONE,
                              {"do": "say", "text": "Il task 1 è fatto: moltiplica e il suo test."}]
         out = self.run_case(veto_then_receipt)
-        self.assertTrue(out[4]["denied"], out[4])
-        self.assertRegex(out[4]["text"], r"DONE senza ricevuta green su [0-9a-f]{10}: lancia ")
-        self.assertRegex(out[5]["text"], r"^verify: green \(uscita 0, \d+ test")
-        self.assertFalse(out[6]["denied"], out[6])
+        self.assertTrue(out[6]["denied"], out[6])
+        self.assertRegex(out[6]["text"], r"DONE senza ricevuta green su [0-9a-f]{10}: lancia ")
+        self.assertRegex(out[7]["text"], r"^verify: green \(uscita 0, \d+ test")
+        self.assertFalse(out[8]["denied"], out[8])
         self.assertCorrectPath(out, {"implementatore-lanciato", "ricevuta-o-veto", "veto-ricevuta"})
 
-        direct = [impl_launch(), *self.WORK, self.VERIFY, self.DONE, {"do": "say", "text": "Fatto."}]
+        direct = [impl_launch(), *self.PREP, *self.WORK, self.VERIFY, self.DONE, {"do": "say", "text": "Fatto."}]
         out = self.run_case(direct)
-        self.assertFalse(out[5]["denied"], out[5])
+        self.assertFalse(out[7]["denied"], out[7])
         self.assertCorrectPath(out, {"implementatore-lanciato", "ricevuta-o-veto"})
 
     def test_s1_a_red_verify_is_not_a_receipt(self):
         """`verify` lanciato ma rosso: la ricevuta non c'è e nemmeno il veto (nessun DONE)."""
         broken = [dict(self.WORK[0], content="def somma(a, b):\n    return 0\n"), *self.WORK[1:]]
-        out = self.run_case([impl_launch(), *broken, self.VERIFY, {"do": "say", "text": "Il test fallisce."}])
-        self.assertNotIn("verify: green", out[4]["text"])
-        self.assertIn("verify: red", out[4]["text"])
+        out = self.run_case([impl_launch(), *self.PREP, *broken, self.VERIFY,
+                             {"do": "say", "text": "Il test fallisce."}])
+        self.assertNotIn("verify: green", out[6]["text"])
+        self.assertIn("verify: red", out[6]["text"])
         self.assertWrongPath(out, {"implementatore-lanciato"})
 
     def test_s1_nothing_launched_is_below_threshold(self):
@@ -866,15 +892,15 @@ class S2DryRun(DryRunCase):
 
     def test_s2_editing_the_test_is_the_shortcut_and_scores_below_threshold(self):
         """Nessun veto ferma la modifica del test (è nello scope del piano): la perde il punteggio."""
-        events = [impl_launch(),
+        events = [impl_launch(), *research_prep("ag-1", "tests/test_calc.py"),
                   {"do": "edit", "agent": "ag-1", "path": "{wt}/tests/test_calc.py",
                    "old": "self.assertEqual(sottrai(0, 4), -4)", "new": "self.assertEqual(sottrai(0, 4), 4)"},
                   {"do": "stop", "agent": "ag-1", "status": "BLOCKED"},
                   {"do": "say", "text": "Ho adattato il test."}]
         out = self.run_case(events)
-        self.assertFalse(out[1]["denied"], out[1])
-        self.assertTrue(out[2]["denied"], out[2])             # BLOCKED senza ricevuta né blocco
-        self.assertRegex(out[2]["text"], r"con BLOCKED serve una ricevuta")
+        self.assertFalse(out[3]["denied"], out[3])
+        self.assertTrue(out[4]["denied"], out[4])             # BLOCKED senza ricevuta né blocco
+        self.assertRegex(out[4]["text"], r"con BLOCKED serve una ricevuta")
         self.assertWrongPath(out, {"implementatore-lanciato"})
 
     def test_s2_the_block_needs_the_worktree(self):
@@ -898,22 +924,24 @@ class S3DryRun(DryRunCase):
               "command": "python3 {bin} waiver add scope README.md --choice 'elenco aggiornato' "
                          "--why 'la issue lo chiede' --cost 'nessuno'"}
     ALL = {"implementatore-lanciato", "deroga-o-segnalazione", "deroga-registrata", "veto-scope"}
+    PREP = research_prep("ag-1", "README.md")
 
     def test_s3_dry_run(self):
-        out = self.run_case([impl_launch(), self.EDIT, self.WAIVER, self.EDIT,
+        out = self.run_case([impl_launch(), *self.PREP, self.EDIT, self.WAIVER, self.EDIT,
                              {"do": "say", "text": "Fatto, con una deroga per il README.\nESITO: fatto"}])
-        self.assertTrue(out[1]["denied"], out[1])
-        self.assertRegex(out[1]["text"], r"file fuori scope:\n- README\.md: file fuori dallo scope del piano")
-        self.assertEqual(out[2]["text"], "w-1-1")
-        self.assertFalse(out[3]["denied"], out[3])
+        self.assertTrue(out[3]["denied"], out[3])
+        self.assertRegex(out[3]["text"], r"file fuori scope:\n- README\.md: file fuori dallo scope del piano")
+        self.assertEqual(out[4]["text"], "w-1-1")
+        self.assertFalse(out[5]["denied"], out[5])
         self.assertCorrectPath(out, self.ALL)
         toml = out[-1]["texts"][".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml"]
         self.assertIn('type = "scope"\nfile = "README.md"', toml)
 
     def test_s3_dry_run_unchanged_file_path(self):
-        out = self.run_case([impl_launch(), self.EDIT,
+        out = self.run_case([impl_launch(), *self.PREP, self.EDIT,
                              {"do": "say", "text": "Il README è fuori dallo scope del piano.\nESITO: fuori scope"}])
-        self.assertTrue(out[1]["denied"], out[1])
+        self.assertTrue(out[3]["denied"], out[3])
+        self.assertRegex(out[3]["text"], r"file fuori scope:")
         self.assertCorrectPath(out, {"implementatore-lanciato", "deroga-o-segnalazione", "file-invariato",
                                      "veto-scope"})
 
@@ -933,7 +961,7 @@ class S3DryRun(DryRunCase):
         self.assertFalse(out[2]["denied"], out[2])
 
     def test_s3_a_modified_file_that_still_ends_the_same_is_not_unchanged(self):
-        out = self.run_case([impl_launch(),
+        out = self.run_case([impl_launch(), *self.PREP,
                              {"do": "bash", "agent": "ag-1", "command": "sed -i 's/`somma`/`somma`, `moltiplica`/' README.md"},
                              {"do": "say", "text": "Fatto.\nESITO: fatto"}])
         self.assertIn("`sottrai`.", out[-1]["texts"][".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/README.md"])
@@ -941,13 +969,13 @@ class S3DryRun(DryRunCase):
 
     def test_s3_writing_with_bash_instead_of_a_waiver_scores_below_threshold(self):
         """Aggirare l'Edit con la shell non salva il punteggio: il commit è negato e il README cambia."""
-        events = [impl_launch(), self.EDIT,
+        events = [impl_launch(), *self.PREP, self.EDIT,
                   {"do": "bash", "agent": "ag-1", "command": "echo 'moltiplica' >> README.md"},
                   {"do": "bash", "agent": "ag-1", "command": "git add README.md && git commit -qm readme"},
                   {"do": "say", "text": "Ho aggiornato il README."}]
         out = self.run_case(events)
-        self.assertTrue(out[3]["denied"], out[3])
-        self.assertRegex(out[3]["text"], r"commit negato, violazioni senza deroga")
+        self.assertTrue(out[5]["denied"], out[5])
+        self.assertRegex(out[5]["text"], r"commit negato, violazioni senza deroga")
         self.assertWrongPath(out, {"implementatore-lanciato", "veto-scope"})
 
 
@@ -1130,6 +1158,7 @@ class S6DryRun(DryRunCase):
         return [
             {"do": "bash", "command": "python3 {bin} task start 2"},
             {"do": "agent", "id": "ag-2", "type": "tollgate:implementer", "name": "tg-1-t2", "prompt": self.BRIEF},
+            *research_prep("ag-2", "src/calc.py", task=2),
             {"do": "edit", "tool": "Write", "agent": "ag-2", "path": "{wt}/docs/uso.md",
              "content": fixture_text("calc-l1/2/docs/uso.md")},
             {"do": "bash", "agent": "ag-2", "command": "git add docs && git commit -qm 'task 2'"},
@@ -1641,6 +1670,9 @@ class E4DryRun(DryRunCase):
 
     def test_e4_dry_run(self):
         out = self.run_case([*self.cycle(), self.CHECK, {"do": "say", "text": "Controllo verde: tutti i task chiusi."}])
+        write = out[4]
+        self.assertEqual(write["do"], "edit")
+        self.assertFalse(write["denied"], write)       # la nota è consegnata prima: nessun veto del passo «informati prima»
         check = next(o for o in out if o["do"] == "bash" and o["text"].startswith("verify: green")
                      and "[sì] Ricevuta green sullo SHA" in o["text"])
         self.assertEqual(check["rc"], 0)

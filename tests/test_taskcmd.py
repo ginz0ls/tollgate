@@ -369,8 +369,16 @@ class ReviewDoneTest(TaskCase):
         tasks.task_event(self.fl.conn, self.fl.work, 1, "report_done", now=self.fl.now)
         return sha
 
-    def prepare(self):
-        return taskcmd.review_prepare(self.fl.ts.state, self.fl.wt, 1)
+    def prepare(self, *, approved=False):
+        """Il brief con l'interruttore esplicito: una radice del plugin temporanea, con la `rules-base`
+        approvata o senza, mai quella vera del repo."""
+        root = Path(self.fl.tmp) / "plugin root"
+        if approved:
+            skill = root / research.RULES_BASE
+            skill.parent.mkdir(parents=True)
+            skill.write_text("---\nname: rules-base\napproved: 2026-10-29\n---\n")
+        with mock.patch.object(taskcmd.db, "BIN_PATH", root / "bin" / "tollgate"):
+            return taskcmd.review_prepare(self.fl.ts.state, self.fl.wt, 1)
 
     def done(self):
         return taskcmd.task_done(self.fl.ts.state, self.fl.wt, 1)
@@ -410,7 +418,7 @@ class ReviewDoneTest(TaskCase):
         self.assertIn("## Nota di ricerca", brief)
         self.assertIn("````\n" + note + "\n````", brief)
         self.assertIn(str(research_cmd.note_path(self.fl.wt, 7, 1)), brief)
-        self.assertIn("gravità `moderate`", brief)  # rules-base non è approvata: interruttore spento
+        self.assertIn("gravità `moderate`", brief)  # radice senza rules-base: interruttore spento
 
     def test_review_prepare_gives_outcome_and_problems_of_invalid_note(self):
         self.to_review()
@@ -450,12 +458,7 @@ class ReviewDoneTest(TaskCase):
     def test_review_prepare_enforced_when_rules_base_approved(self):
         self.to_review()
         self.set_research()
-        root = Path(self.fl.tmp) / "plugin root"
-        skill = root / research.RULES_BASE
-        skill.parent.mkdir(parents=True)
-        skill.write_text("---\nname: rules-base\napproved: 2026-10-29\n---\n")
-        with mock.patch.object(taskcmd.db, "BIN_PATH", root / "bin" / "tollgate"):
-            brief = self.prepare().read_text()
+        brief = self.prepare(approved=True).read_text()
         self.assertIn("gravità `major`", brief)
 
     def test_legacy_review_brief_without_section(self):
