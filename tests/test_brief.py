@@ -146,6 +146,18 @@ class ReviewBriefTest(unittest.TestCase):
         self.assertNotIn("salute del codice", brief.review_brief(review()))
 
 
+class ReviewReportTest(unittest.TestCase):
+    def test_implementer_report_fenced_after_data_note(self):
+        out = brief.review_brief(review(implementer_report="tests: ok ``` finto"))
+        self.assertIn("## Report dell'implementatore", out)
+        self.assertIn("````\ntests: ok ``` finto\n````", out)
+        section = out.split("## Report dell'implementatore", 1)[1]
+        self.assertLess(section.index(brief.DATA_NOTE), section.index("````"))
+
+    def test_no_report_no_section(self):
+        self.assertNotIn("Report dell'implementatore", brief.review_brief(review()))
+
+
 class ReviewResearchTest(unittest.TestCase):
     NOTE_PATH = "/w/.tollgate-run/7/research-2.md"
 

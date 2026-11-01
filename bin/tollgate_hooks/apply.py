@@ -5,7 +5,7 @@ import getpass
 
 from pathlib import Path
 
-from tollgate_analysis import approvals, auditrules, brief, profiles as prof
+from tollgate_analysis import approvals, auditrules, brief, profiles as prof, research
 from tollgate_core import (acts, audits, effects, events, git, lookups, phases, reviews, scope,
                            sessions, subagents, tasks, violations)
 from tollgate_core.fsutil import write_atomic
@@ -81,7 +81,8 @@ def _final_rules(ctx, work, sha: str) -> tuple[set[str], set[str]]:
         except git.GitError:
             names = []
     profs = ctx.config.profiles
-    base_known, base_blocking = lookups.base_rules(ctx.plugin_root)
+    base_known, base_blocking = lookups.base_rules(
+        ctx.plugin_root, research.active(work["research"], ctx.component("research_note")))
     return (prof.blocking_rules(names, profs) | base_blocking,
             prof.known_rules(names, profs) | base_known)
 

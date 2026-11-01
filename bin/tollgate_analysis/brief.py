@@ -183,6 +183,7 @@ class ReviewBrief:
     research_valid: bool = False           # esito del controllo meccanico della nota
     research_problems: list[str] = field(default_factory=list)
     first_diff_file: str | None = None     # il `file` del rilievo quando la nota manca
+    implementer_report: str = ""           # il report dell'ultimo implementatore, in chiaro
 
 
 STANDARD = [
@@ -250,6 +251,11 @@ def review_brief(b: ReviewBrief) -> str:
                     f"massimo {b.lines_max}): valuta se andava diviso."]
     if b.concerns:
         out += ["", "## Dubbi dell'implementatore (DONE_WITH_CONCERNS)", _block(b.concerns)]
+    if b.implementer_report:
+        out += ["", "## Report dell'implementatore",
+                "Le regole che si giudicano sul report (R-BASE-05, 07, 10, 11 e le parti sul report "
+                "delle altre) si giudicano su questo testo.", DATA_NOTE,
+                _block(b.implementer_report)]
     if b.research:
         out += _review_research(b)
     if b.reviewer_skills:

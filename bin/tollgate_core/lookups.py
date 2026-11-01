@@ -180,20 +180,22 @@ def rules_switch(root) -> tuple[bool, str | None]:
     return research.enforced(text), None
 
 
-def base_rules(root) -> tuple[set[str], set[str]]:
-    """Le regole di `rules-base` per il verdetto: `(note, bloccanti)`. Le `[blocca]` bloccano solo
-    con l'interruttore acceso; spento, le `R-BASE-…` sono note e nessuna blocca. Se la pagina non
-    si legge, `(vuoto, vuoto)`: una `R-BASE-…` resta ignota e blocca (fail-closed)."""
+def base_rules(root, active: bool) -> tuple[set[str], set[str]]:
+    """Le regole di `rules-base` per il verdetto: `(note, bloccanti)`. `active`: il lavoro ha il
+    passo di ricerca (`research.active`). Le `[blocca]` bloccano solo con l'interruttore acceso e
+    il passo attivo; altrimenti le `R-BASE-…` sono note e nessuna blocca. Se la pagina non si
+    legge, `(vuoto, vuoto)`: una `R-BASE-…` resta ignota e blocca (fail-closed)."""
     try:
         text = (Path(root) / research.RULES_BASE).read_text(encoding="utf-8", errors="replace")
     except OSError:
         return set(), set()
     known, blocking = research.base_rules(text)
-    return known, (blocking if research.enforced(text) else set())
+    return known, (blocking if active and research.enforced(text) else set())
 
 
 def rules_enforced(root) -> bool:
-    """Il gate unico di `research_gate` e `task review`: vero se l'interruttore è acceso."""
+    """Vero se l'interruttore è acceso. Lo usa `taskcmd.review_prepare`; il gate (`research_gate`)
+    usa `rules_switch`, per distinguere l'illeggibile."""
     return rules_switch(root)[0]
 
 

@@ -257,12 +257,33 @@ def _ensure_clean(state, work, wt: Path, hint: str) -> None:
         raise TaskError(hint)
 
 
-def _concerns(conn, work, row) -> str:
-    """Dubbi dell'ultimo implementatore del task, solo se il report dice DONE_WITH_CONCERNS."""
+def _last_report(conn, work, row) -> str | None:
+    """Il report dell'ultimo implementatore del task, come registrato."""
     last = conn.execute("SELECT report FROM subagents WHERE work = ? AND task = ? AND type = ? "
                         "ORDER BY coalesce(started, last_seen) DESC LIMIT 1",
                         (work["id"], row["number"], row["agent_type"])).fetchone()
-    rep = report.parse_report(last["report"] if last else None)
+    return last["report"] if last else None
+
+
+def _implementer_report(conn, work, row) -> str:
+    """Il report dell'ultimo implementatore in chiaro, per il revisore: i campi del report di
+    18.5 (senza `concerns`, che ha la sua sezione), oppure, se non si legge, la coda del testo
+    registrato. Vuoto se non c'è un report."""
+    text = _last_report(conn, work, row)
+    if not text or not text.strip():
+        return ""
+    rep = report.parse_report(text)
+    if not rep.data:
+        return text.strip()[-report.MAX_SCAN_CHARS:]
+    fields = {"status": rep.status, **{k: v for k, v in rep.data.items()
+                                       if k not in ("status", "concerns", "v")}}
+    return "\n".join(f"{k}: {', '.join(map(str, v)) if isinstance(v, list) else v}"
+                     for k, v in fields.items())
+
+
+def _concerns(conn, work, row) -> str:
+    """Dubbi dell'ultimo implementatore del task, solo se il report dice DONE_WITH_CONCERNS."""
+    rep = report.parse_report(_last_report(conn, work, row))
     concerns = rep.data.get("concerns")
     if rep.status != "DONE_WITH_CONCERNS" or not isinstance(concerns, str):
         return ""
@@ -357,7 +378,8 @@ def _review_prepare(state, conn, cwd: Path, number: int) -> Path:
         research_valid=note_ok,
         research_problems=lookups.last_problems(conn, work["id"], number)
         if note_text is not None and not note_ok else [],
-        first_diff_file=changes[0].path if changes else None))
+        first_diff_file=changes[0].path if changes else None,
+        implementer_report=_implementer_report(conn, work, row)))
     try:
         run_dir.mkdir(parents=True, exist_ok=True)
         diff_path.write_text(_diff_text(wt, base, head), encoding="utf-8", errors="replace")

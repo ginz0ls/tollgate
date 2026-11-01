@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tollgate_analysis import profiles as prof, report, verdicts
+from tollgate_analysis import profiles as prof, report, research, verdicts
 from tollgate_core import git, lookups, subagents
 from tollgate_hooks.model import deny, record
 
@@ -51,7 +51,8 @@ def decide(event, ctx):
     msg = event.raw.get("last_assistant_message") or row["report"]
     profs = ctx.config.profiles
     active = prof.active_profiles(_task_files(work, task), profs, ctx.cfg("profiles.active"))
-    base_known, base_blocking = lookups.base_rules(ctx.plugin_root)
+    base_known, base_blocking = lookups.base_rules(
+        ctx.plugin_root, research.active(work["research"], ctx.component("research_note")))
     v = verdicts.parse_task_verdict(msg, task=task["number"], sha=task["review_sha"],
                                     code=task["review_code"],
                                     standard=ctx.component("reviewer_standard"),

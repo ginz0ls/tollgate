@@ -32,9 +32,10 @@ class Base(unittest.TestCase):
     toml = DEFAULT_TOML
     level = "L1"
     reviewers = (REVIEWER,)
+    research = False
 
     def setUp(self):
-        self.lab = Lab(level=self.level, phase="review", toml=self.toml)
+        self.lab = Lab(level=self.level, phase="review", toml=self.toml, research=self.research)
         wt = self.lab.wt
         (wt / "src/app.py").write_text("def somma(a, b):\n    return b + a\n")
         git(wt, "add", "-A")
@@ -153,7 +154,8 @@ class ReviewerTest(Base):
         ctx = SimpleNamespace(
             config=config.load_config(self.lab.ts.state, main, "origin/main"),
             now=self.lab.now, event=SimpleNamespace(session=SESSION), plugin_root=ROOT,
-            cfg=lambda k: config.load_config(self.lab.ts.state, main, "origin/main").get(k))
+            cfg=lambda k: config.load_config(self.lab.ts.state, main, "origin/main").get(k),
+            component=lambda name: True)
         apply._review_report(conn, self.lab.ts.state, ctx, {
             "work": self.lab.work, "cycle": 1, "source": REVIEWER, "outcome": "needs_fix",
             "findings": [GOOD], "rejected": []})
@@ -259,8 +261,10 @@ class RulesTest(Base):
 
 
 class BaseRulesTest(Base):
-    """`R-BASE-…` nel verdetto finale: `[blocca]` blocca solo con l'interruttore acceso."""
+    """`R-BASE-…` nel verdetto finale: `[blocca]` blocca solo con l'interruttore acceso e il passo
+    di ricerca attivo nel lavoro."""
     approved = True
+    research = True
 
     def setUp(self):
         super().setUp()
@@ -286,6 +290,20 @@ class BaseRulesSwitchOffTest(BaseRulesTest):
 
     def test_base_rule_blocca_blocks_when_enforced(self):
         self.assertEqual(self.blocking_of("R-BASE-01"), 0)
+
+
+class BaseRulesNoStepTest(BaseRulesTest):
+    """Un lavoro senza il passo (nato prima di B1): nessuna `R-BASE-…` blocca."""
+    research = False
+
+    def test_base_rule_blocca_blocks_when_enforced(self):
+        self.assertEqual(self.blocking_of("R-BASE-01"), 0)
+
+
+class BaseRulesComponentOffTest(BaseRulesNoStepTest):
+    """Lavoro con il passo, ma `research_note = false`."""
+    research = True
+    toml = DEFAULT_TOML + "[components]\nresearch_note = false\n"
 
 
 class VerifierTest(Base):

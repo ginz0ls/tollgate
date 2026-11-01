@@ -29,9 +29,10 @@ def make_base_root(approved: bool) -> Path:
 
 class Base(unittest.TestCase):
     toml = DEFAULT_TOML
+    research = False
 
     def setUp(self):
-        self.lab = Lab(toml=self.toml)
+        self.lab = Lab(toml=self.toml, research=self.research)
         with_scope(self.lab)
         c, w = self.lab.conn, self.lab.work
         tasks.task_event(c, w, 1, "start", now=self.lab.now)
@@ -186,9 +187,10 @@ blocking_rules = ["R-WEB-1"]
 
 
 class BaseRulesTest(Base):
-    """Le `R-BASE-…` di `rules-base`: note sempre, bloccanti solo se `[blocca]` e con l'interruttore
-    acceso."""
+    """Le `R-BASE-…` di `rules-base`: note sempre, bloccanti solo se `[blocca]`, con l'interruttore
+    acceso e il passo di ricerca attivo nel lavoro."""
     approved = True
+    research = True
 
     def setUp(self):
         super().setUp()
@@ -221,6 +223,23 @@ class BaseRulesSwitchOffTest(BaseRulesTest):
 
     def test_base_rule_blocca_blocks_when_enforced(self):
         self.assertEqual(self.outcome("R-BASE-01"), "approved")
+
+
+class BaseRulesNoStepTest(BaseRulesTest):
+    """Un lavoro senza il passo (nato prima di B1): le `R-BASE-…` restano note, nessuna blocca."""
+    research = False
+
+    def test_base_rule_blocca_blocks_when_enforced(self):
+        self.assertEqual(self.outcome("R-BASE-01"), "approved")
+
+    def test_unknown_base_rule_still_blocks(self):
+        self.assertEqual(self.outcome("R-BASE-99"), "changes")
+
+
+class BaseRulesComponentOffTest(BaseRulesNoStepTest):
+    """Lavoro con il passo, ma `research_note = false`: come senza il passo."""
+    research = True
+    toml = DEFAULT_TOML + "[components]\nresearch_note = false\n"
 
 
 class TaskFilesTest(Base):

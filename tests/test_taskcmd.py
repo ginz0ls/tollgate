@@ -7,7 +7,7 @@ from unittest import mock
 from tests.flowkit import PLAN, FlowLab, plan_text
 from tests.helpers import BIN
 from tests.hookkit import DEFAULT_TOML
-from tollgate_analysis import research
+from tollgate_analysis import brief as briefs, research
 from tollgate_core import events, lookups, phases, subagents, tasks
 from tollgate_core.paths import program_command
 from tollgate_flow import research_cmd, taskcmd
@@ -627,6 +627,28 @@ class ReviewDoneTest(TaskCase):
         brief = self.prepare().read_text()
         self.assertIn("Dubbi dell'implementatore", brief)
         self.assertIn("il caso zero è fragile", brief)
+
+    def test_report_reaches_review_brief_even_when_done(self):
+        self.to_review()
+        text = json.dumps({"v": 1, "task": 1, "status": "DONE", "done": "corretto il bug",
+                           "tests": "rosso senza la correzione, verde con\n```", "files": ["src/app.py"],
+                           "concerns": "", "left": ""})
+        subagents.start(self.fl.conn, agent_id="a1", type_="tollgate:implementer",
+                        session="sess-flow", work=self.fl.work, task=1, base_sha=None,
+                        fingerprint=None, now=self.fl.now)
+        subagents.set_report(self.fl.conn, "a1", "Fine.\n" + text)
+        brief = self.prepare().read_text()
+        self.assertIn("## Report dell'implementatore", brief)
+        section = brief.split("## Report dell'implementatore", 1)[1]
+        self.assertLess(section.index(briefs.DATA_NOTE), section.index("````"))
+        self.assertIn("````\nstatus: DONE\n", section)
+        self.assertIn("tests: rosso senza la correzione, verde con\n```\n", section)
+        self.assertIn("files: src/app.py", section)
+        self.assertNotIn("Dubbi dell'implementatore", brief)
+
+    def test_no_report_no_report_section(self):
+        self.to_review()
+        self.assertNotIn("Report dell'implementatore", self.prepare().read_text())
 
     def test_done_report_without_concerns_adds_none(self):
         self.to_review()
