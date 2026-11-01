@@ -6,7 +6,9 @@ Data: 1 novembre 2026. Piano: B2 (regole di base), Task 7. Progetto 5 e piano pr
 - Script: `spikes/run-b1-flow.sh` con `B1_FLOW_RULES=vere` (modi `prepara`, `passo1`, `passo2`, `registra`), progetto di prova `spikes/b1/flow/`, raccolta `spikes/b1/flowreg.py`. Nessun GitHub: `gh` finto (`tests/fakegh.py`) in testa al `PATH`, `origin` nudo locale, stato di prova con la sentinella in `/tmp/tollgate-b1/state`.
 - Interruttore: con `vere` la copia del plugin (`/tmp/tollgate-b1/plugin`) tiene la `skills/rules-base/SKILL.md` del repo, approvata (`approved: 2026-11-01`), senza sostituirla. `prepara` controlla con `lookups.rules_enforced` che l'interruttore sia acceso e altrimenti si ferma. I quattro agenti di codice hanno `skills: [rules-base]`.
 - Comando di ogni passo: `claude -p --plugin-dir /tmp/tollgate-b1/plugin --model sonnet --permission-mode acceptEdits --allowedTools "Bash,Agent,Skill,EnterWorktree,SendMessage,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch"` con `--disallowedTools` per `gh` per percorso, `git push` verso remoti non locali o forzato, `curl` e `wget`, tetto di 2400 s. Argomenti esatti in `argv.txt` di ogni tentativo.
-- Evidenze: `docs/verifiche/evidenze/b2/flusso/` (`validate/validate-1.txt`, `passo1/tentativo-1/`, `passo2/tentativo-1/`, `registro-1/`, `exit-codes.txt`). Anonimizzazione: vedi in fondo.
+- Evidenze della prima corsa: `docs/verifiche/evidenze/b2/flusso/` (`validate/validate-1.txt`, `passo1.prev-20261101-082818-633829/tentativo-1/` e `passo2.prev-20261101-082818-633829/tentativo-1/`, spostate da `prepara` alla seconda corsa e mai cancellate, `registro-1/`, `exit-codes.txt`). Evidenze della seconda: `validate/validate-2.txt`, `passo1/tentativo-2/`, `passo2/tentativo-2/`, `registro-2/`. Anonimizzazione: vedi in fondo.
+
+La prova è stata eseguita due volte: la prima prima della revisione finale, la seconda dopo il suo giro di correzione (sezione «Seconda corsa»). Le sezioni da «Passi e tentativi» a «Limiti» descrivono la prima corsa.
 
 ## Passi e tentativi
 
@@ -68,9 +70,39 @@ Task 1 `done`, verdetto `approved`, nessun rilievo (`spec_compliance` vuoto). Il
 - I permessi di `WebFetch` e `WebSearch` sono concessi con `--allowedTools`: in una sessione interattiva `WebFetch` chiede un permesso per dominio e la prova non lo rappresenta.
 - Un solo lavoro, piccolo, con un solo task e una sola libreria: la prova mostra il percorso completo con la regola vera, non la tenuta su un lavoro grande, né il rifiuto del blocco dal vivo.
 - I divieti di `--disallowedTools` sono a prefisso e non chiudono ogni forma; `Write` ed `Edit` valgono per qualsiasi percorso. Il modello è stato cooperativo: `comandi-rischiosi.txt` è vuoto. Elenco completo in `registro-1/limiti.txt`.
-- La prova gira con gli altri plugin dell'utente attivi: nel passo 1 la sessione principale ha invocato `superpowers:writing-plans`. Il testo di quella skill (plugin pubblico, licenza MIT, versione 7.0.0) è caricato in `passo1/tentativo-1/claude.jsonl` (riga 68 circa) e resta nelle evidenze, perché è già pubblico.
+- La prova gira con gli altri plugin dell'utente attivi: nel passo 1 la sessione principale ha invocato `superpowers:writing-plans`. Il testo di quella skill (plugin pubblico, licenza MIT, versione 7.0.0) è caricato in `passo1.prev-20261101-082818-633829/tentativo-1/claude.jsonl` (riga 68 circa) e resta nelle evidenze, perché è già pubblico.
 - La prova di precaricamento sta in un file scritto a mano dal controller, non raccolto dallo script.
 - L'uscita di `prepara` non è salvata dallo script.
+
+## Seconda corsa, dopo la revisione finale
+
+**Perché.** Il giro di correzione della revisione finale ha cambiato due cose che il passo 2 della prima corsa aveva provato: il brief del revisore (ora contiene anche il report dell'implementatore, in un recinto) e il verdetto sulle regole `R-BASE-…`. Il controller ha quindi rilanciato `prepara`, `passo1`, `passo2` e `registra` sul commit `7c8deb4` del plugin, il 1 novembre 2026. Il passo 2 da solo non si può ripetere: ha bisogno del lavoro in `execution` creato dal passo 1.
+
+**Passi e tentativi.** Secondo tentativo di `passo1` e di `passo2` (tetto 3 su tutta la prova); `prepara` ha spostato la prima corsa in `passo1.prev-20261101-082818-633829/` e `passo2.prev-20261101-082818-633829/`. Ogni passo è riuscito al primo colpo: l'esito **non è composito**.
+
+| Passo | Esito | Durata | Consumo stimato |
+|---|---|---|---|
+| `passo1`: `validate --strict` | «Validation passed» (`validate/validate-2.txt`) | — | nessuno |
+| `passo1`: `/tollgate:start #1 L1` | piano di un task scritto e committato, fase `execution`; un solo `veto`, quello di `coordinator` sull'heredoc del piano | 64 s | 0,41 USD |
+| `passo2`: `/tollgate:execute` | task 1 `done`, verdetto `approved`, commit `8ffda85` | 79 s | 0,54 USD |
+
+Totale della seconda corsa 0,95 USD; delle due corse circa 1,87 USD stimati, dentro l'abbonamento. Token di tollgate: implementatore 53.213, revisore del task 31.425, totale 84.638. Claude Code `2.1.314`.
+
+**Letture del task 1** (`registro-2/lookups.txt`), tutte con l'`agent_id` dell'implementatore: `read` del brief, `bash_read` di `config.toml`, `fetch` di `https://docs.python.org/3/library/tomllib.html`, `read` di `tests/test_smoke.py`, `src/__init__.py`, `tollgate.toml` e `config.toml`. Nessun `Grep`.
+
+**Nota.** Come nella prima corsa: prima consegna (`seq` 10) non valida, con tre file nella nota (`tests/test_smoke.py`, `src/__init__.py`, `tollgate.toml`) non ancora aperti con `Read`; dopo la lettura, seconda consegna (`seq` 11, sette secondi dopo) valida, `research_ok = 1` (`registro-2/research-1.md`).
+
+**Veti.** `coordinator` 1; nessun `plan_check` e **nessun veto di `research_gate`**: la nota valida è arrivata prima di ogni modifica, quindi anche qui il rifiuto dal vivo non si è visto (prova deterministica: Task 5).
+
+**Verdetto.** `approved`, `spec_compliance` vuoto, un solo rilievo `minor` (`os.chdir` ridondante con `addCleanup` in `tests/test_config.py`, riga 88), segnalato con `R-BASE-07` nel testo e con la regola «Task 1, passo 1» nel JSON; non blocca. Il revisore ha anche accettato come completo il comando con l'esito di `unittest` nel report (`R-BASE-11`).
+
+**Il report dell'implementatore nel brief del revisore.** Il brief (`review-1.md`, visibile nel flusso di `passo2/tentativo-2/claude.jsonl`) ha la sezione «Report dell'implementatore» con l'avvertenza che le regole sul report si giudicano su quel testo, poi il report (`status: DONE`, `tests`, `files`, `must_have`…) in un recinto, poi la «Nota di ricerca» in un altro recinto. Il revisore ha giudicato il report: il rilievo sopra cita proprio una sua omissione (la funzione da cui ci si è ispirati) e ne valuta il comando di test.
+
+**Precaricamento** (`registro-2/precarico.txt` dice di nuovo «indizio», per la stessa ragione; la prova è in `registro-2/precarico-trascrizioni.txt`, del controller). Il messaggio `isMeta` con la skill è alla riga 2 nella trascrizione del revisore e alla riga 4 in quella dell'implementatore; il primo turno dell'assistente è alla riga 15 e alla riga 18. Nessuna riga nomina `rules-base/SKILL.md`. Il messaggio precede ogni turno dell'assistente: non viene da una chiamata `Skill` o `Read` dell'agente.
+
+**Difetti trovati.** Nessuno nel prodotto e nessuno nello script.
+
+**Anonimizzazione della seconda corsa.** Come per la prima, sui file nuovi: `/home/USER`, `USER`, `HOST`, due id di sessione `SESSION-ID`; dagli stream-json tolte altre 24 righe (2 `init` e 22 eventi di `SessionStart` degli altri plugin). Gli stessi grep (nome utente, host, prefissi di token) su `evidenze/b2` e sul rapporto sono vuoti.
 
 ## Anonimizzazione delle evidenze
 

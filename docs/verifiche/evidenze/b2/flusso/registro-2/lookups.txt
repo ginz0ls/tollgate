@@ -1,0 +1,27 @@
+# lookups: id, work, task, agent_id, kind, target, at
+1	1	1	a6c62ba1f473300c3	read	.tollgate-run/1/task-1.md	2026-11-01T07:29:46.771439Z
+2	1	1	a6c62ba1f473300c3	bash_read	config.toml	2026-11-01T07:29:49.011392Z
+3	1	1	a6c62ba1f473300c3	fetch	https://docs.python.org/3/library/tomllib.html	2026-11-01T07:29:55.800846Z
+4	1	1	a6c62ba1f473300c3	read	tests/test_smoke.py	2026-11-01T07:30:02.301356Z
+5	1	1	a6c62ba1f473300c3	read	src/__init__.py	2026-11-01T07:30:02.572511Z
+6	1	1	a6c62ba1f473300c3	read	tollgate.toml	2026-11-01T07:30:03.046435Z
+7	1	1	a6c62ba1f473300c3	read	config.toml	2026-11-01T07:30:03.230334Z
+# per tipo
+bash_read: 1
+fetch: 1
+read: 5
+# task: work, number, state, research_ok
+1	1	done	1
+# nota salvata, lavoro 1 task 1
+## Letto nel progetto
+- config.toml
+- tests/test_smoke.py
+- src/__init__.py
+- tollgate.toml
+
+## Documentazione
+- https://docs.python.org/3/library/tomllib.html — tomllib.load(fp) vuole un file binario ("rb"); TOMLDecodeError su TOML invalido; modulo dalla 3.11. Libreria standard, Python 3.13.5 locale.
+
+## Cosa ho trovato
+config.toml in radice contiene [app] nome = "prova-b1". Il percorso predefinito va calcolato da __file__ (Path(__file__).resolve().parent.parent / "config.toml") per funzionare con cwd diversa. Open in "rb"; KeyError e FileNotFoundError si propagano naturalmente. Schema test: unittest come test_smoke.py; comando test in tollgate.toml.
+

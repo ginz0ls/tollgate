@@ -1,0 +1,5 @@
+Prova del precaricamento raccolta dal controller (seconda corsa, 01/11/2026, dopo il giro di correzione della revisione finale): lo stream-json di passo2 non contiene agent_transcript_path, quindi flowreg.py precarico ha usato l'indizio.
+Trascrizioni dei due subagenti del passo 2: ~/.claude/projects/-tmp-tollgate-b1-flow--claude-worktrees-tg-1-leggi-il-nome-dell-app-da-config-toml/SESSION-ID/subagents/.
+agent-a2ec93eeca39d5289.jsonl: prima riga con il titolo=2 (type=user isMeta=True); primo turno dell'assistente alla riga 15; righe con rules-base/SKILL.md=0
+agent-a6c62ba1f473300c3.jsonl: prima riga con il titolo=4 (type=user isMeta=True); primo turno dell'assistente alla riga 18; righe con rules-base/SKILL.md=0
+agent-a6c62ba1f473300c3 è l'implementatore (stesso agent_id di lookups.txt); agent-a2ec93eeca39d5289 è il revisore del task.
