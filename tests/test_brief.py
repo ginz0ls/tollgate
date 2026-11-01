@@ -186,13 +186,22 @@ class ReviewResearchTest(unittest.TestCase):
         self.assertIn(f"`file` `{self.NOTE_PATH}`", out)
 
     def test_review_note_section_names_base_rules_and_single_report(self):
-        for kw in (dict(research_enforced=True), dict(research_enforced=False),
-                   dict(research_enforced=True, research_note="## Cosa ho trovato\nx",
-                        research_note_path=self.NOTE_PATH, research_valid=True)):
+        usable = dict(research_enforced=True, research_note="## Cosa ho trovato\nx",
+                      research_note_path=self.NOTE_PATH, research_valid=True)
+        unusable = (dict(research_enforced=True),
+                    dict(research_enforced=True, research_note="## Cosa ho trovato\nx",
+                         research_note_path=self.NOTE_PATH, research_valid=False,
+                         research_problems=["il file src/x.py non risulta letto"]))
+        for kw in unusable:
             with self.subTest(kw=kw):
                 section = self.research_section(**kw)
-                self.assertIn("R-BASE-", section)
-                self.assertIn("una volta sola", section)
+                self.assertIn("una volta sola, con `rule` `nota di ricerca`", section)
+                self.assertIn("nessun rilievo `R-BASE-…` in più", section)
+        section = self.research_section(**usable)
+        self.assertIn("con la regola `R-BASE-…` che viola", section)
+        self.assertIn("oppure con `rule` `nota di ricerca`", section)
+        self.assertIn("una volta sola", section)
+        self.assertNotIn("in più", section)
 
     PROBLEMS = ["il file src/x.py non risulta letto", "la fonte https://a.example/``` non risulta aperta"]
 

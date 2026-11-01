@@ -180,6 +180,18 @@ def rules_switch(root) -> tuple[bool, str | None]:
     return research.enforced(text), None
 
 
+def base_rules(root) -> tuple[set[str], set[str]]:
+    """Le regole di `rules-base` per il verdetto: `(note, bloccanti)`. Le `[blocca]` bloccano solo
+    con l'interruttore acceso; spento, le `R-BASE-…` sono note e nessuna blocca. Se la pagina non
+    si legge, `(vuoto, vuoto)`: una `R-BASE-…` resta ignota e blocca (fail-closed)."""
+    try:
+        text = (Path(root) / research.RULES_BASE).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return set(), set()
+    known, blocking = research.base_rules(text)
+    return known, (blocking if research.enforced(text) else set())
+
+
 def rules_enforced(root) -> bool:
     """Il gate unico di `research_gate` e `task review`: vero se l'interruttore è acceso."""
     return rules_switch(root)[0]

@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 from tollgate_analysis import profiles as prof, report, verdicts
-from tollgate_core import git, subagents
+from tollgate_core import git, lookups, subagents
 from tollgate_hooks.model import deny, record
 
 from . import _common
@@ -51,11 +51,13 @@ def decide(event, ctx):
     msg = event.raw.get("last_assistant_message") or row["report"]
     profs = ctx.config.profiles
     active = prof.active_profiles(_task_files(work, task), profs, ctx.cfg("profiles.active"))
+    base_known, base_blocking = lookups.base_rules(ctx.plugin_root)
     v = verdicts.parse_task_verdict(msg, task=task["number"], sha=task["review_sha"],
                                     code=task["review_code"],
                                     standard=ctx.component("reviewer_standard"),
-                                    blocking_rules=prof.blocking_rules(active, profs),
-                                    known_rules=prof.known_rules(active, profs))
+                                    blocking_rules=(prof.blocking_rules(active, profs)
+                                                    | base_blocking),
+                                    known_rules=prof.known_rules(active, profs) | base_known)
     if v.valid:
         return [record("task_verdict", work=work["id"], number=task["number"],
                        outcome=v.outcome, findings=v.findings, dropped=v.dropped),

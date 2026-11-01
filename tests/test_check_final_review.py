@@ -1,11 +1,12 @@
 import json
+import shutil
 import unittest
 from datetime import timedelta
 from types import SimpleNamespace
 
-from tests.helpers import git
+from tests.helpers import ROOT, git
 from tests.hookkit import DEFAULT_TOML, SESSION, Lab, sample
-from tests.test_check_task_verdict import CODE as TASK_CODE
+from tests.test_check_task_verdict import CODE as TASK_CODE, make_base_root
 from tests.test_verdicts import GOOD
 from tollgate_core import config, git as tg_git, reviews, subagents, tasks
 from tollgate_hooks import apply
@@ -151,7 +152,7 @@ class ReviewerTest(Base):
         main = tg_git.main_worktree(self.lab.wt)
         ctx = SimpleNamespace(
             config=config.load_config(self.lab.ts.state, main, "origin/main"),
-            now=self.lab.now, event=SimpleNamespace(session=SESSION),
+            now=self.lab.now, event=SimpleNamespace(session=SESSION), plugin_root=ROOT,
             cfg=lambda k: config.load_config(self.lab.ts.state, main, "origin/main").get(k))
         apply._review_report(conn, self.lab.ts.state, ctx, {
             "work": self.lab.work, "cycle": 1, "source": REVIEWER, "outcome": "needs_fix",
@@ -255,6 +256,36 @@ class RulesTest(Base):
                               (self.sha, self.lab.work))
         self.lab.conn.commit()
         self.assertEqual(self.blocking_of("R-SEC-2"), 1)          # fail-closed
+
+
+class BaseRulesTest(Base):
+    """`R-BASE-…` nel verdetto finale: `[blocca]` blocca solo con l'interruttore acceso."""
+    approved = True
+
+    def setUp(self):
+        super().setUp()
+        self.root = make_base_root(self.approved)
+        self.lab.plugin_root = self.root
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+
+    def blocking_of(self, rule):
+        self.stop(text=self.verdict(findings=[dict(GOOD, rule=rule)]))
+        (row,) = self.lab.conn.execute("SELECT blocking FROM findings WHERE work = ?",
+                                       (self.lab.work,)).fetchall()
+        return row[0]
+
+    def test_base_rule_not_blocca_does_not_block(self):
+        self.assertEqual(self.blocking_of("R-BASE-07"), 0)
+
+    def test_base_rule_blocca_blocks_when_enforced(self):
+        self.assertEqual(self.blocking_of("R-BASE-01"), 1)
+
+
+class BaseRulesSwitchOffTest(BaseRulesTest):
+    approved = False
+
+    def test_base_rule_blocca_blocks_when_enforced(self):
+        self.assertEqual(self.blocking_of("R-BASE-01"), 0)
 
 
 class VerifierTest(Base):

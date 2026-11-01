@@ -1,5 +1,8 @@
 import json
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
 
 from tests.helpers import git
 from tests.hookkit import DEFAULT_TOML, SESSION, Lab, sample
@@ -10,6 +13,18 @@ from tollgate_core import git as tg_git, subagents, tasks
 IMPL = "tollgate:implementer"
 REVIEWER = "tollgate:task-reviewer"
 CODE = "c0de1234"
+
+
+def make_base_root(approved: bool) -> Path:
+    """Radice del plugin temporanea con una `rules-base` di prova: R-BASE-01 `[blocca]`,
+    R-BASE-07 no; approvata o no. Mai la radice vera."""
+    root = Path(tempfile.mkdtemp(prefix="tollgate root "))
+    skill = root / "skills/rules-base/SKILL.md"
+    skill.parent.mkdir(parents=True)
+    skill.write_text("---\nname: rules-base\n" + ("approved: 2026-10-27\n" if approved else "")
+                     + "---\n\n## Prima di scrivere\n\nR-BASE-01 [blocca] Prima regola.\n"
+                     "Fonte: x\n\nR-BASE-07 Seconda regola.\n")
+    return root
 
 
 class Base(unittest.TestCase):
@@ -168,6 +183,44 @@ blocking_rules = ["R-WEB-1"]
         f = dict(GOOD, rule="R-WEB-1")
         self.stop(text=self.verdict(outcome="approved", findings=[f]))
         self.assertEqual(self.task()["verdict"], "changes")
+
+
+class BaseRulesTest(Base):
+    """Le `R-BASE-…` di `rules-base`: note sempre, bloccanti solo se `[blocca]` e con l'interruttore
+    acceso."""
+    approved = True
+
+    def setUp(self):
+        super().setUp()
+        self.root = make_base_root(self.approved)
+        self.lab.plugin_root = self.root
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+
+    def outcome(self, rule):
+        self.stop(text=self.verdict(outcome="approved", findings=[dict(GOOD, rule=rule)]))
+        return self.task()["verdict"]
+
+    def test_base_rule_not_blocca_does_not_block(self):
+        self.assertEqual(self.outcome("R-BASE-07"), "approved")
+
+    def test_base_rule_blocca_blocks_when_enforced(self):
+        self.assertEqual(self.outcome("R-BASE-01"), "changes")
+
+    def test_unknown_base_rule_blocks(self):
+        self.assertEqual(self.outcome("R-BASE-99"), "changes")
+
+
+class BaseRulesUnreadableTest(BaseRulesTest):
+    def test_missing_skill_keeps_old_behaviour(self):
+        (self.root / "skills/rules-base/SKILL.md").unlink()
+        self.assertEqual(self.outcome("R-BASE-07"), "changes")      # ignota: fail-closed
+
+
+class BaseRulesSwitchOffTest(BaseRulesTest):
+    approved = False
+
+    def test_base_rule_blocca_blocks_when_enforced(self):
+        self.assertEqual(self.outcome("R-BASE-01"), "approved")
 
 
 class TaskFilesTest(Base):

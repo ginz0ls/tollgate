@@ -70,8 +70,9 @@ def _effect_execute(conn, state, ctx, d):
 
 
 def _final_rules(ctx, work, sha: str) -> tuple[set[str], set[str]]:
-    """Regole `[blocca]` e note dei profili attivi sul diff del ciclo (decisione 8). Se il diff
-    non si legge, nessun profilo è attivo: ogni `R-…` blocca (fail-closed)."""
+    """Regole `[blocca]` e note dei profili attivi sul diff del ciclo, più quelle di `rules-base`
+    (decisione 8). Se il diff non si legge, nessun profilo è attivo: ogni `R-…` di profilo blocca
+    (fail-closed)."""
     wt = Path(work["worktree"]) if work["worktree"] else None
     names: list[str] = []
     if wt is not None and wt.is_dir():
@@ -80,7 +81,9 @@ def _final_rules(ctx, work, sha: str) -> tuple[set[str], set[str]]:
         except git.GitError:
             names = []
     profs = ctx.config.profiles
-    return prof.blocking_rules(names, profs), prof.known_rules(names, profs)
+    base_known, base_blocking = lookups.base_rules(ctx.plugin_root)
+    return (prof.blocking_rules(names, profs) | base_blocking,
+            prof.known_rules(names, profs) | base_known)
 
 
 def _review_report(conn, state, ctx, d):

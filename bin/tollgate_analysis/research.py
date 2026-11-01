@@ -61,6 +61,15 @@ def enforced(skill_text: str | None) -> bool:
     return False
 
 
+_BASE_RULE = re.compile(r"^(R-BASE-\d{2})( \[blocca\])? \S", re.M)
+
+
+def base_rules(skill_text: str) -> tuple[set[str], set[str]]:
+    """Gli id `R-BASE-NN` della pagina `rules-base` e, a parte, quelli marcati `[blocca]`."""
+    found = _BASE_RULE.findall(skill_text)
+    return {r for r, _ in found}, {r for r, mark in found if mark}
+
+
 def is_doc_tool(name: str) -> bool:
     return any(fnmatch.fnmatchcase(name, p) for p in DOC_MCP_TOOLS)
 
