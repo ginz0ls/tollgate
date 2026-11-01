@@ -3,6 +3,7 @@ import re
 import unittest
 
 from tests.helpers import ROOT
+from tollgate_core import events
 
 SPEC = ROOT / "docs" / "superpowers" / "specs" / "2026-10-08-tollgate-nucleo-design.md"
 USO = ROOT / "docs" / "uso"
@@ -133,6 +134,12 @@ class DocsTest(unittest.TestCase):
         self.assertIn("gate/workflows/PINS", text)
         self.assertIn("init --update", text)
         self.assertTrue((ROOT / "gate" / "workflows" / "PINS").is_file())
+
+    def test_spec_event_types_match_registry(self):
+        """L'elenco «Tipi:» di 18.4 nomina esattamente i tipi di `events.EVENT_TYPES`."""
+        line = next(l for l in SPEC.read_text(encoding="utf-8").splitlines()
+                    if l.startswith("**Tipi:**"))
+        self.assertEqual(set(re.findall(r"`([a-z_]+)`", line)), set(events.EVENT_TYPES))
 
 
 if __name__ == "__main__":
