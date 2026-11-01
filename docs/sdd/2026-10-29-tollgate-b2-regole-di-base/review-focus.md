@@ -1,0 +1,8 @@
+## Review Focus
+
+1. **Interruttore assente contro illeggibile.** Il file assente resta silenzioso; una cartella al suo posto dà l'avviso con l'errore e un solo evento per lavoro, anche con la nota valida, mai un rifiuto. Test: Task 1 `test_switch_unreadable_reports_error`, `test_unreadable_switch_warns_and_logs_once`, `test_unreadable_switch_logged_with_valid_note`, `test_missing_switch_no_unreadable_event`.
+2. **Test e prove a secco che presumono l'interruttore spento.** Con la `rules-base` vera approvata nel repo, la suite resta verde, anche nei test che lanciano `hooks/run` o `bin/tollgate` in un sottoprocesso. Test: Task 2 (misura con il file di prova); Task 5, Step 3 (suite completa dopo l'accensione).
+3. **Regole e pagina che divergono dopo le correzioni dell'utente.** Una regola tolta, aggiunta o cambiata deve risultare uguale nella skill, nella pagina e nel rapporto delle fonti, con numeri senza buchi. Test: Task 3 `test_rule_ids_consecutive`, Task 4 `test_page_lists_every_rule`, `test_sources_report_covers_every_rule`, `test_page_blocca_matches_skill`.
+4. **Task senza modifiche con il blocco acceso.** Una nota consegnata ma non valida non deve dare un `major`. Test: Task 1 `test_review_brief_no_changes_invalid_note_asks_nothing`.
+5. **Precaricamento che diventa un veto o un doppio rilievo.** `rules-base` non deve finire in `skills_required` né in «Skill da usare»; gli agenti di spec e piano non la caricano; un difetto della nota non dà due rilievi. Test: Task 6 `test_rules_base_not_required`, `test_code_agents_preload_rules_base`, `test_other_agents_do_not_preload`, `test_review_standard_names_base_rules`.
+

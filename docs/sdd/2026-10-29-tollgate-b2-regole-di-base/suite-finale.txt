@@ -1,0 +1,3 @@
+corsa 1 su a4742a4: rc=0 secs=2886 unclosed=0 == Python 3.11.16 Ran 3238 tests in 1449.106s OK (skipped=2) == Python 3.13.5 Ran 3238 tests in 1435.461s OK 
+corsa 2 su a4742a4: rc=0 secs=2921 unclosed=0 == Python 3.11.16 Ran 3238 tests in 1454.226s OK (skipped=2) == Python 3.13.5 Ran 3238 tests in 1465.343s OK 
+corsa 3 su a4742a4: rc=0 secs=2972 unclosed=0 == Python 3.11.16 Ran 3238 tests in 1535.286s OK (skipped=2) == Python 3.13.5 Ran 3238 tests in 1434.853s OK 
