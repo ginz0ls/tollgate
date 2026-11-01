@@ -84,9 +84,9 @@
         "//tmp/claude-eval-xUpQvI/home/pyrightconfig.json"
       ],
       "denyRead": [
-        "//home/crucco",
+        "//home/USER",
         "//home",
-        "//home/crucco/.claude",
+        "//home/USER/.claude",
         "//tmp/tollgate-p5",
         "//tmp/tollgate-p5/sonda-dep/evals",
         "//tmp",
@@ -113,13 +113,13 @@
         "//tmp/claude-eval-xUpQvI/home",
         "//tmp/claude-eval-xUpQvI/tmp",
         "//tmp/tollgate-p5/sonda-dep",
-        "//home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-bin",
-        "//home/crucco/.opencode/bin",
-        "//home/crucco/.kimi-code/bin",
-        "//home/crucco/.pyenv/shims",
-        "//home/crucco/.pyenv/bin",
-        "//home/crucco/.local/bin",
-        "//home/crucco/.nvm/versions/node/v22.20.0/bin"
+        "//home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-bin",
+        "//home/USER/.opencode/bin",
+        "//home/USER/.kimi-code/bin",
+        "//home/USER/.pyenv/shims",
+        "//home/USER/.pyenv/bin",
+        "//home/USER/.local/bin",
+        "//home/USER/.nvm/versions/node/v22.20.0/bin"
       ]
     },
     "credentials": {

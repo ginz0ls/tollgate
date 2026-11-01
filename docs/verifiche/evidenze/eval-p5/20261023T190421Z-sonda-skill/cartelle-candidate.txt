@@ -1,6 +1,6 @@
 /.claude/worktrees/p5/docs/verifiche/evidenze/eval-p5/20261023T190421Z-sonda-skill/report.html
 /.claude/worktrees/p5/docs/verifiche/evidenze/eval-p5/20261023T190421Z-sonda-skill/result.json
-/home/crucco/MEGA/BIZ/VIBE/Plugin
+/home/USER/MEGA/BIZ/VIBE/Plugin
 /tmp/claude-eval-aAxqaU
 /tmp/claude-eval-aAxqaU:
 /tmp/claude-eval-aAxqaU/sealed

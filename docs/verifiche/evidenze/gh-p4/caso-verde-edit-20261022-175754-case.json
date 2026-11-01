@@ -15,7 +15,7 @@
       "branch": "tg/80-edit",
       "base": "main",
       "title": "prova P4: verde-edit",
-      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-175754-body-tg-80-edit.md"
+      "body_file": "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-175754-body-tg-80-edit.md"
     },
     {
       "op": "wait",
@@ -24,7 +24,7 @@
     {
       "op": "edit",
       "branch": "tg/80-edit",
-      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-175754-body-edit.md"
+      "body_file": "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-175754-body-edit.md"
     },
     {
       "op": "wait_count",

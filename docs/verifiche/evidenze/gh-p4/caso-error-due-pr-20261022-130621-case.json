@@ -15,7 +15,7 @@
       "branch": "tg/69-due-pr",
       "base": "main",
       "title": "prova P4: error-due-pr (A)",
-      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-due-pr-20261022-130621-body-a.md"
+      "body_file": "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-due-pr-20261022-130621-body-a.md"
     },
     {
       "op": "push",
@@ -28,7 +28,7 @@
       "branch": "tg/69-due-pr-bis",
       "base": "main",
       "title": "prova P4: error-due-pr (B)",
-      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-due-pr-20261022-130621-body-b.md"
+      "body_file": "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-due-pr-20261022-130621-body-b.md"
     }
   ],
   "expect": [

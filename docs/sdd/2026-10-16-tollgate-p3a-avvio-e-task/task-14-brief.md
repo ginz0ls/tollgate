@@ -37,4 +37,4 @@
 git add tests/test_criteria_p3a.py docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md docs/superpowers/plans/2026-10-08-tollgate-nucleo-piano-principale.md
 git commit -m "tollgate P3a: prove dei criteri, spec rev 22, piano principale"
 ```
-wrote /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p3a/.superpowers/sdd/2026-10-16-tollgate-p3a-avvio-e-task/task-14-brief.md: 39 lines
+wrote /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p3a/.superpowers/sdd/2026-10-16-tollgate-p3a-avvio-e-task/task-14-brief.md: 39 lines

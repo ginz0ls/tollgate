@@ -82,7 +82,7 @@
             "durationSeconds": 51,
             "startedAt": "2026-10-25T22:21:49.221Z",
             "error": null,
-            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-PYc7Pa/out/trace.jsonl",
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-PYc7Pa/out/trace.jsonl",
             "skippedPaidGraders": false,
             "graders": [
               {
@@ -128,7 +128,7 @@
             "durationSeconds": 53,
             "startedAt": "2026-10-25T22:22:39.975Z",
             "error": null,
-            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-cQhp4P/out/trace.jsonl",
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-cQhp4P/out/trace.jsonl",
             "skippedPaidGraders": false,
             "graders": [
               {
@@ -174,7 +174,7 @@
             "durationSeconds": 49,
             "startedAt": "2026-10-25T22:23:32.865Z",
             "error": null,
-            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-WbXlnh/out/trace.jsonl",
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-WbXlnh/out/trace.jsonl",
             "skippedPaidGraders": false,
             "graders": [
               {

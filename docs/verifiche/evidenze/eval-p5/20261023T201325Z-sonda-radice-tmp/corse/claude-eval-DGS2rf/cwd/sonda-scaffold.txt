@@ -1,7 +1,7 @@
-PWD=/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-DGS2rf/home/cwd
-HOME=/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-DGS2rf/home
+PWD=/home/USER/.cache/tollgate-p5-eval-tmp/claude-eval-DGS2rf/home/cwd
+HOME=/home/USER/.cache/tollgate-p5-eval-tmp/claude-eval-DGS2rf/home
 CLAUDE_CONFIG_DIR=UNSET
-TMPDIR=/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-DGS2rf/tmp
+TMPDIR=/home/USER/.cache/tollgate-p5-eval-tmp/claude-eval-DGS2rf/tmp
 BASH_SOURCE_0=/tmp/tollgate-eval-target-sonda/evals/skill/scaffold.sh
 DOLLAR_0=/tmp/tollgate-eval-target-sonda/evals/skill/scaffold.sh
 SCRIPT_DIR=/tmp/tollgate-eval-target-sonda/evals/skill

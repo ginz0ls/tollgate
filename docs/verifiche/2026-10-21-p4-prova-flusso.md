@@ -72,7 +72,7 @@ Esito atteso: PR aperta dal flusso, `tollgate/guard` e `tollgate/verdict` `succe
 
 ## PATH del tool Bash
 
-Uscita del tool Bash per `command -v gh` nel passo `shim`: `/tmp/tollgate-p4/flow/shim/gh`; confronto con lo shim: uguale a `/tmp/tollgate-p4/flow/shim/gh` (`shim-esito.txt`; vincolo P3c (4): il `gh` risolto dal tool Bash è lo shim messo in testa dal chiamante). `echo "$PATH"` nel tool Bash (`shim.jsonl`): `/tmp/tollgate-p4/flow/shim:/home/crucco/.opencode/bin:/home/crucco/.kimi-code/bin:/home/crucco/.pyenv/shims:/home/crucco/.pyenv/bin:/home/crucco/.local/bin:/home/crucco/.local/bin:/home/crucco/.nvm/versions/node/v22.20.0/bin:/home/crucco/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/usr/local/sbin:/usr/sbin:/sbin:/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin`. La cartella `bin` del plugin è in coda al `PATH`, la testa resta quella del chiamante.
+Uscita del tool Bash per `command -v gh` nel passo `shim`: `/tmp/tollgate-p4/flow/shim/gh`; confronto con lo shim: uguale a `/tmp/tollgate-p4/flow/shim/gh` (`shim-esito.txt`; vincolo P3c (4): il `gh` risolto dal tool Bash è lo shim messo in testa dal chiamante). `echo "$PATH"` nel tool Bash (`shim.jsonl`): `/tmp/tollgate-p4/flow/shim:/home/USER/.opencode/bin:/home/USER/.kimi-code/bin:/home/USER/.pyenv/shims:/home/USER/.pyenv/bin:/home/USER/.local/bin:/home/USER/.local/bin:/home/USER/.nvm/versions/node/v22.20.0/bin:/home/USER/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/usr/local/sbin:/usr/sbin:/sbin:/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin`. La cartella `bin` del plugin è in coda al `PATH`, la testa resta quella del chiamante.
 
 ## Difetti e osservazioni
 

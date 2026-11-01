@@ -2,7 +2,7 @@
 
 RED registrato (prima delle correzioni): 10 fallimenti e 5 errori su 167 test dei tre file toccati
 (`tests.test_audit_prepare tests.test_l2acts tests.test_check_audit_round`), copia in
-`/tmp/claude-1000/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow/7559b7f5-d4d4-4aa4-9695-4b6c2897bf5d/scratchpad/red.txt`.
+`/tmp/claude-1000/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow/7559b7f5-d4d4-4aa4-9695-4b6c2897bf5d/scratchpad/red.txt`.
 
 ## I-1 ricerca unica dell'approvazione della spec
 - Modifica: `l2tree.spec_approval` (`bin/tollgate_flow/l2tree.py:31-52`) cerca con lo `sha` attuale e

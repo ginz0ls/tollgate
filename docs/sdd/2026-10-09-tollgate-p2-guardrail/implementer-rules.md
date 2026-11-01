@@ -10,7 +10,7 @@ Leggi il brief del tuo task (è i tuoi requisiti, con i valori esatti da usare a
 2. Segui il TDD dove il task lo indica: test che fallisce (RED), poi codice (GREEN).
 3. Mentre lavori lancia i test mirati; prima del commit lancia `tests/run` (python3.11 e python3) una volta: deve essere verde e con output pulito.
 4. Committa (mai amend, mai `--no-verify`). Il messaggio di commit finisce, dopo una riga vuota, con la riga `Co-Authored-By:` indicata dal tuo promemoria di sessione (quella del tuo modello).
-5. Lavora solo nel worktree `/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p2-guardrail` (ramo `p2-guardrail`). Mai nel checkout principale.
+5. Lavora solo nel worktree `/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p2-guardrail` (ramo `p2-guardrail`). Mai nel checkout principale.
 6. Nessun `__pycache__` nel repo (usa `python3 -B`).
 
 ## Non lanci subagenti

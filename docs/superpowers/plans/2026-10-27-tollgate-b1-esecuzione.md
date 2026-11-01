@@ -76,7 +76,7 @@ Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincol
 **Commit e lingua**
 - Un commit dopo ogni task, con la riga `Co-Authored-By` del modello. Prima di ogni commit `tests/run` deve passare con `python3.11` e con `python3`.
 - Nessun `__pycache__` nel commit: controlla `git status` prima di `git add`.
-- Lavora solo nel worktree `/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b1` (ramo `b1-informati-prima`), mai nel checkout principale né su `main`. Il percorso contiene spazi: virgolette sempre.
+- Lavora solo nel worktree `/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b1` (ramo `b1-informati-prima`), mai nel checkout principale né su `main`. Il percorso contiene spazi: virgolette sempre.
 - Risposte e messaggi in italiano; identificatori in inglese.
 
 **Tempi della suite**
@@ -112,5 +112,5 @@ Il resto si decide con una `Ruling:`. Miglioramenti utili, compatibili e a basso
    - push di `main` (eccezione 4) e attesa della CI verde su `main`;
    - copia il registro dal worktree in `docs/sdd/2026-10-27-tollgate-b1-informati-prima/` con un `README.md`, come per P5, e committalo su `main` (e push);
    - aggiorna la memoria del progetto (`plugin-workflow-decisioni.md`): esito di B1, ripieghi scattati, prossimo passo (scrivere il piano di B2);
-   - **trascrizioni**: se una sessione del lavoro è partita dalla cartella del worktree, spostane i `.jsonl` (e le cartelle `<id>/`) con `mv -n` da `~/.claude/projects/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow--claude-worktrees-b1/` a `~/.claude/projects/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow/`, mai il file della sessione attiva mentre è in uso. Se tutte le sessioni sono partite dalla radice, non c'è nulla da spostare: dillo. Non dire mai che le trascrizioni stanno dentro `.claude/worktrees/`;
+   - **trascrizioni**: se una sessione del lavoro è partita dalla cartella del worktree, spostane i `.jsonl` (e le cartelle `<id>/`) con `mv -n` da `~/.claude/projects/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow--claude-worktrees-b1/` a `~/.claude/projects/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow/`, mai il file della sessione attiva mentre è in uso. Se tutte le sessioni sono partite dalla radice, non c'è nulla da spostare: dillo. Non dire mai che le trascrizioni stanno dentro `.claude/worktrees/`;
    - chiedi all'utente se rimuovere il worktree e il ramo `b1-informati-prima` ormai uniti.

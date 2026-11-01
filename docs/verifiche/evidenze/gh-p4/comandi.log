@@ -15,15 +15,15 @@
 2026-10-21T15:55:50Z gh run watch 39630136045 --repo ginz0ls/tollgate-p4-protected --exit-status
 2026-10-21T15:56:02Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-target.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
 2026-10-21T15:56:03Z gh run view 39630136045 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
-2026-10-21T15:56:04Z gh run download 39630136045 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v1-target-artifacts-39630136045
+2026-10-21T15:56:04Z gh run download 39630136045 --repo ginz0ls/tollgate-p4-protected -D /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v1-target-artifacts-39630136045
 2026-10-21T15:56:06Z gh run watch 39630136017 --repo ginz0ls/tollgate-p4-protected --exit-status
 2026-10-21T15:56:07Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-run.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
 2026-10-21T15:56:08Z gh run view 39630136017 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
-2026-10-21T15:56:09Z gh run download 39630136017 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v1-run-artifacts-39630136017
+2026-10-21T15:56:09Z gh run download 39630136017 --repo ginz0ls/tollgate-p4-protected -D /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v1-run-artifacts-39630136017
 2026-10-21T15:56:12Z gh run watch 39630168903 --repo ginz0ls/tollgate-p4-protected --exit-status
 2026-10-21T15:56:23Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-verdict.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
 2026-10-21T15:56:27Z gh run view 39630168903 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
-2026-10-21T15:56:29Z gh run download 39630168903 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v1-verdict-artifacts-39630168903
+2026-10-21T15:56:29Z gh run download 39630168903 --repo ginz0ls/tollgate-p4-protected -D /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v1-verdict-artifacts-39630168903
 2026-10-21T15:56:30Z gh pr list --repo ginz0ls/tollgate-p4-protected --state all --limit 100 --json number,headRefName,headRefOid,mergedAt,isCrossRepository,mergeStateStatus
 2026-10-21T15:56:31Z gh pr view 1 --repo ginz0ls/tollgate-p4-protected --json comments
 2026-10-21T15:56:32Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/1/comments
@@ -44,12 +44,12 @@
 2026-10-21T15:57:40Z gh run watch 39630394922 --repo ginz0ls/tollgate-p4-protected --exit-status
 2026-10-21T15:57:48Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-run.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
 2026-10-21T15:57:49Z gh run view 39630394922 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
-2026-10-21T15:57:50Z gh run download 39630394922 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4-run-artifacts-39630394922
+2026-10-21T15:57:50Z gh run download 39630394922 --repo ginz0ls/tollgate-p4-protected -D /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4-run-artifacts-39630394922
 2026-10-21T15:57:53Z git -C protected push origin main
 2026-10-21T15:58:06Z gh run watch 39630455929 --repo ginz0ls/tollgate-p4-protected --exit-status
 2026-10-21T15:58:13Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-base.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
 2026-10-21T15:58:14Z gh run view 39630455929 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
-2026-10-21T15:58:15Z gh run download 39630455929 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4-base-artifacts-39630455929
+2026-10-21T15:58:15Z gh run download 39630455929 --repo ginz0ls/tollgate-p4-protected -D /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4-base-artifacts-39630455929
 2026-10-21T15:58:17Z gh pr close 4 --repo ginz0ls/tollgate-p4-protected
 2026-10-21T15:58:23Z git -C protected push -u origin p4-v5-merge-20261021-175823
 2026-10-21T15:58:25Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head p4-v5-merge-20261021-175823 --title sonda v5-merge --body sonda tollgate P4 (v5-merge), da chiudere
@@ -92,12 +92,12 @@
 2026-10-21T16:02:19Z gh run watch 39631102348 --repo ginz0ls/tollgate-p4-detect --exit-status
 2026-10-21T16:02:26Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow probe-fetch.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
 2026-10-21T16:02:27Z gh run view 39631102348 --repo ginz0ls/tollgate-p4-detect --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
-2026-10-21T16:02:29Z gh run download 39631102348 --repo ginz0ls/tollgate-p4-detect -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v3b-fetch-artifacts-39631102348
+2026-10-21T16:02:29Z gh run download 39631102348 --repo ginz0ls/tollgate-p4-detect -D /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v3b-fetch-artifacts-39631102348
 2026-10-21T16:02:30Z gh pr close 1 --repo ginz0ls/tollgate-p4-detect
 2026-10-21T16:02:32Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39630136017/artifacts
-2026-10-21T16:02:33Z gh run download 39630136017 --repo ginz0ls/tollgate-p4-protected -n probe-run-dotdot-out -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v8-dl-probe-run-dotdot-out-39630136017
-2026-10-21T16:02:33Z gh run download 39630136017 --repo ginz0ls/tollgate-p4-protected -n probe-run-dotdot-in -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v8-dl-probe-run-dotdot-in-39630136017
-2026-10-21T16:02:34Z gh run download 39630136017 --repo ginz0ls/tollgate-p4-protected -n probe-run-symlink -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v8-dl-probe-run-symlink-39630136017
+2026-10-21T16:02:33Z gh run download 39630136017 --repo ginz0ls/tollgate-p4-protected -n probe-run-dotdot-out -D /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v8-dl-probe-run-dotdot-out-39630136017
+2026-10-21T16:02:33Z gh run download 39630136017 --repo ginz0ls/tollgate-p4-protected -n probe-run-dotdot-in -D /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v8-dl-probe-run-dotdot-in-39630136017
+2026-10-21T16:02:34Z gh run download 39630136017 --repo ginz0ls/tollgate-p4-protected -n probe-run-symlink -D /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v8-dl-probe-run-symlink-39630136017
 2026-10-21T16:02:36Z gh api repos/ginz0ls/tollgate-p4-protected/actions/permissions
 2026-10-21T16:02:36Z gh api repos/ginz0ls/tollgate-p4-detect/actions/permissions
 2026-10-21T16:22:50Z gh auth status
@@ -109,17 +109,17 @@
 2026-10-21T16:23:09Z gh run watch 39634261988 --repo ginz0ls/tollgate-p4-protected --exit-status
 2026-10-21T16:23:15Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-base.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
 2026-10-21T16:23:16Z gh run view 39634261988 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
-2026-10-21T16:23:18Z gh run download 39634261988 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4b-base-artifacts-39634261988
+2026-10-21T16:23:18Z gh run download 39634261988 --repo ginz0ls/tollgate-p4-protected -D /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4b-base-artifacts-39634261988
 2026-10-21T16:23:19Z git -C protected push -u origin p4-v4b-20261021-182256
 2026-10-21T16:23:21Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head p4-v4b-20261021-182256 --title sonda v4b --body sonda tollgate P4 (v4b), da chiudere
 2026-10-21T16:23:35Z gh run watch 39634329631 --repo ginz0ls/tollgate-p4-protected --exit-status
 2026-10-21T16:23:37Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-run.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
 2026-10-21T16:23:38Z gh run view 39634329631 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
-2026-10-21T16:23:39Z gh run download 39634329631 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4b-run-artifacts-39634329631
+2026-10-21T16:23:39Z gh run download 39634329631 --repo ginz0ls/tollgate-p4-protected -D /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4b-run-artifacts-39634329631
 2026-10-21T16:23:43Z gh run watch 39634363221 --repo ginz0ls/tollgate-p4-protected --exit-status
 2026-10-21T16:23:54Z gh run list --repo ginz0ls/tollgate-p4-protected --workflow probe-verdict.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
 2026-10-21T16:23:55Z gh run view 39634363221 --repo ginz0ls/tollgate-p4-protected --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
-2026-10-21T16:23:56Z gh run download 39634363221 --repo ginz0ls/tollgate-p4-protected -D /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4b-verdict-artifacts-39634363221
+2026-10-21T16:23:56Z gh run download 39634363221 --repo ginz0ls/tollgate-p4-protected -D /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/v4b-verdict-artifacts-39634363221
 2026-10-21T16:23:57Z gh pr close 8 --repo ginz0ls/tollgate-p4-protected
 2026-10-21T16:24:01Z gh run view 39634261988 --repo ginz0ls/tollgate-p4-protected --log (controller, a mano)
 2026-10-21T16:24:03Z gh run view 39634329631 --repo ginz0ls/tollgate-p4-protected --log (controller, a mano)
@@ -190,8 +190,8 @@
 2026-10-22T10:26:10Z gh issue close 2 --repo ginz0ls/tollgate-p4-detect
 2026-10-22T10:26:41Z [controller] (detect) gh issue create --repo ginz0ls/tollgate-p4-detect --title prova criterio 11: start in detect --body issue di prova del criterio 11 (tollgate P4)
 2026-10-22T10:26:42Z gh issue create --repo ginz0ls/tollgate-p4-detect --title prova criterio 11: start in detect --body issue di prova del criterio 11 (tollgate P4)
-2026-10-22T10:26:52Z [controller] (detect) python3 -B /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate start 3
-2026-10-22T10:28:04Z [controller] (detect) python3 -B /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate start 3
+2026-10-22T10:26:52Z [controller] (detect) python3 -B /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate start 3
+2026-10-22T10:28:04Z [controller] (detect) python3 -B /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate start 3
 2026-10-22T10:28:05Z gh auth status
 2026-10-22T10:28:06Z gh api repos/ginz0ls/tollgate-p4-detect/issues/3
 2026-10-22T10:28:07Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/pulls?state=all&per_page=100 --jq .[] | {number, headRefName: .head.ref, state: (if .merged_at then "MERGED" else (.state | ascii_upcase) end), url: .html_url}
@@ -239,7 +239,7 @@
 2026-10-22T10:30:57Z gh api --method PUT repos/ginz0ls/tollgate-p4-protected/branches/main/protection --input /tmp/tollgate-p4/gh/crit11/senza-strict.json
 2026-10-22T10:31:04Z [controller] (protected) gh issue create --repo ginz0ls/tollgate-p4-protected --title prova criterio 11: start con la protezione incompleta --body issue di prova del criterio 11 (tollgate P4)
 2026-10-22T10:31:04Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova criterio 11: start con la protezione incompleta --body issue di prova del criterio 11 (tollgate P4)
-2026-10-22T10:31:05Z [controller] (protected) python3 -B /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate start 10
+2026-10-22T10:31:05Z [controller] (protected) python3 -B /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate start 10
 2026-10-22T10:31:05Z gh auth status
 2026-10-22T10:31:06Z gh api repos/ginz0ls/tollgate-p4-protected/issues/10
 2026-10-22T10:31:07Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/pulls?state=all&per_page=100 --jq .[] | {number, headRefName: .head.ref, state: (if .merged_at then "MERGED" else (.state | ascii_upcase) end), url: .html_url}
@@ -257,7 +257,7 @@
 2026-10-22T10:31:24Z gh issue close 3 --repo ginz0ls/tollgate-p4-detect
 2026-10-22T10:31:44Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: verde-pulita --body issue di prova del gate (tollgate P4, caso verde-pulita), da chiudere
 2026-10-22T10:31:46Z git -C protected push origin 6c2beed8220cc2590edf77b05aebab2d132e6f50:refs/heads/tg/11-pulita
-2026-10-22T10:31:47Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/11-pulita --title prova P4: verde-pulita --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-pulita-20261022-123144-body-tg-11-pulita.md
+2026-10-22T10:31:47Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/11-pulita --title prova P4: verde-pulita --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-pulita-20261022-123144-body-tg-11-pulita.md
 2026-10-22T10:32:34Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/6c2beed8220cc2590edf77b05aebab2d132e6f50/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:32:35Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/12/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:32:35Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/12
@@ -276,7 +276,7 @@
 2026-10-22T10:32:50Z gh issue close 11 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:32:58Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: verde-config --body issue di prova del gate (tollgate P4, caso verde-config), da chiudere
 2026-10-22T10:33:00Z git -C protected push origin 017022a1eb9127625b0d32a7474181931445bc1a:refs/heads/tollgate-config/p4-20261022-123258
-2026-10-22T10:33:02Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tollgate-config/p4-20261022-123258 --title prova P4: verde-config --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-123258-body-tollgate-config-p4-20261022-123258.md
+2026-10-22T10:33:02Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tollgate-config/p4-20261022-123258 --title prova P4: verde-config --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-123258-body-tollgate-config-p4-20261022-123258.md
 2026-10-22T10:33:37Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/017022a1eb9127625b0d32a7474181931445bc1a/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:33:38Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/14/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:33:39Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/14
@@ -295,7 +295,7 @@
 2026-10-22T10:33:53Z gh issue close 13 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:33:55Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: verde-ramo-libero --body issue di prova del gate (tollgate P4, caso verde-ramo-libero), da chiudere
 2026-10-22T10:33:57Z git -C protected push origin 757b4af45760423bf5cff424ea88bf4aa772c666:refs/heads/prova/p4-ramo-libero-20261022-123355
-2026-10-22T10:33:59Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head prova/p4-ramo-libero-20261022-123355 --title prova P4: verde-ramo-libero --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-ramo-libero-20261022-123355-body-prova-p4-ramo-libero-20261022-123355.md
+2026-10-22T10:33:59Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head prova/p4-ramo-libero-20261022-123355 --title prova P4: verde-ramo-libero --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-ramo-libero-20261022-123355-body-prova-p4-ramo-libero-20261022-123355.md
 2026-10-22T10:34:45Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/757b4af45760423bf5cff424ea88bf4aa772c666/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:34:46Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/16/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:34:47Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/16
@@ -314,11 +314,11 @@
 2026-10-22T10:35:03Z gh issue close 15 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:35:05Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: verde-edit --body issue di prova del gate (tollgate P4, caso verde-edit), da chiudere
 2026-10-22T10:35:06Z git -C protected push origin a1d0f1339866f2f2b8cb787656ca77d80d0a0ae4:refs/heads/tg/17-edit
-2026-10-22T10:35:08Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/17-edit --title prova P4: verde-edit --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-123505-body-tg-17-edit.md
-2026-10-22T10:35:44Z gh pr edit 18 --repo ginz0ls/tollgate-p4-protected --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-123505-body-edit.md
+2026-10-22T10:35:08Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/17-edit --title prova P4: verde-edit --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-123505-body-tg-17-edit.md
+2026-10-22T10:35:44Z gh pr edit 18 --repo ginz0ls/tollgate-p4-protected --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-123505-body-edit.md
 2026-10-22T10:35:45Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: rosso-test-tolti --body issue di prova del gate (tollgate P4, caso rosso-test-tolti), da chiudere
 2026-10-22T10:35:47Z git -C protected push origin 726479fbed610076ce09a427b96753e33b4b123c:refs/heads/tg/19-test-tolti
-2026-10-22T10:35:49Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/19-test-tolti --title prova P4: rosso-test-tolti --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-test-tolti-20261022-123545-body-tg-19-test-tolti.md
+2026-10-22T10:35:49Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/19-test-tolti --title prova P4: rosso-test-tolti --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-test-tolti-20261022-123545-body-tg-19-test-tolti.md
 2026-10-22T10:36:25Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/726479fbed610076ce09a427b96753e33b4b123c/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:36:25Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/20/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:36:26Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/20
@@ -337,7 +337,7 @@
 2026-10-22T10:36:49Z gh issue close 19 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:36:51Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: rosso-skip --body issue di prova del gate (tollgate P4, caso rosso-skip), da chiudere
 2026-10-22T10:36:52Z git -C protected push origin 63d5a75ac09023f81edb5d459b7cc74bc6a434a2:refs/heads/tg/21-skip
-2026-10-22T10:36:54Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/21-skip --title prova P4: rosso-skip --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-skip-20261022-123651-body-tg-21-skip.md
+2026-10-22T10:36:54Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/21-skip --title prova P4: rosso-skip --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-skip-20261022-123651-body-tg-21-skip.md
 2026-10-22T10:37:42Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/63d5a75ac09023f81edb5d459b7cc74bc6a434a2/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:37:43Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/22/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:37:43Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/22
@@ -356,7 +356,7 @@
 2026-10-22T10:38:03Z gh issue close 21 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:38:05Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: rosso-fuori-scope --body issue di prova del gate (tollgate P4, caso rosso-fuori-scope), da chiudere
 2026-10-22T10:38:06Z git -C protected push origin 070a520be27c15efce2f78c5b8a7db835288cacd:refs/heads/tg/23-fuori-scope
-2026-10-22T10:38:08Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/23-fuori-scope --title prova P4: rosso-fuori-scope --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-fuori-scope-20261022-123805-body-tg-23-fuori-scope.md
+2026-10-22T10:38:08Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/23-fuori-scope --title prova P4: rosso-fuori-scope --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-fuori-scope-20261022-123805-body-tg-23-fuori-scope.md
 2026-10-22T10:38:44Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/070a520be27c15efce2f78c5b8a7db835288cacd/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:38:45Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/24/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:38:45Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/24
@@ -375,7 +375,7 @@
 2026-10-22T10:39:06Z gh issue close 23 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:39:08Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: rosso-base-id --body issue di prova del gate (tollgate P4, caso rosso-base-id), da chiudere
 2026-10-22T10:39:10Z git -C protected push origin c63514981ba2749809bd9d9adf08d67635b84054:refs/heads/tg/25-base-id
-2026-10-22T10:39:12Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/25-base-id --title prova P4: rosso-base-id --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-base-id-20261022-123908-body-tg-25-base-id.md
+2026-10-22T10:39:12Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/25-base-id --title prova P4: rosso-base-id --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-base-id-20261022-123908-body-tg-25-base-id.md
 2026-10-22T10:39:48Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/c63514981ba2749809bd9d9adf08d67635b84054/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:39:48Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/26/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:39:49Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/26
@@ -394,7 +394,7 @@
 2026-10-22T10:40:10Z gh issue close 25 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:40:12Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: rosso-or-true --body issue di prova del gate (tollgate P4, caso rosso-or-true), da chiudere
 2026-10-22T10:40:14Z git -C protected push origin eb61caf2e22c19d05a5389a684a9112320f0b0ff:refs/heads/tg/27-or-true
-2026-10-22T10:40:16Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/27-or-true --title prova P4: rosso-or-true --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-or-true-20261022-124012-body-tg-27-or-true.md
+2026-10-22T10:40:16Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/27-or-true --title prova P4: rosso-or-true --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-or-true-20261022-124012-body-tg-27-or-true.md
 2026-10-22T10:40:52Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/eb61caf2e22c19d05a5389a684a9112320f0b0ff/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:40:52Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/28/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:40:53Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/28
@@ -413,7 +413,7 @@
 2026-10-22T10:41:15Z gh issue close 27 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:41:17Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: rosso-livello --body issue di prova del gate (tollgate P4, caso rosso-livello), da chiudere
 2026-10-22T10:41:19Z git -C protected push origin 19163c6f392c69035fb6e763bc976e02fd6c2b84:refs/heads/tg/29-livello
-2026-10-22T10:41:21Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/29-livello --title prova P4: rosso-livello --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-livello-20261022-124117-body-tg-29-livello.md
+2026-10-22T10:41:21Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/29-livello --title prova P4: rosso-livello --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-livello-20261022-124117-body-tg-29-livello.md
 2026-10-22T10:41:57Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/19163c6f392c69035fb6e763bc976e02fd6c2b84/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:41:57Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/30/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:41:58Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/30
@@ -432,7 +432,7 @@
 2026-10-22T10:42:20Z gh issue close 29 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:42:22Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: rosso-l2-mancante --body issue di prova del gate (tollgate P4, caso rosso-l2-mancante), da chiudere
 2026-10-22T10:42:24Z git -C protected push origin 45c3917da6c8854f6f2745acf63fa47c15317299:refs/heads/tg/31-l2-mancante
-2026-10-22T10:42:26Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/31-l2-mancante --title prova P4: rosso-l2-mancante --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-l2-mancante-20261022-124222-body-tg-31-l2-mancante.md
+2026-10-22T10:42:26Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/31-l2-mancante --title prova P4: rosso-l2-mancante --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-l2-mancante-20261022-124222-body-tg-31-l2-mancante.md
 2026-10-22T10:43:02Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/45c3917da6c8854f6f2745acf63fa47c15317299/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:43:02Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/32/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:43:03Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/32
@@ -451,7 +451,7 @@
 2026-10-22T10:43:25Z gh issue close 31 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:43:27Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: rosso-deroga-altra-issue --body issue di prova del gate (tollgate P4, caso rosso-deroga-altra-issue), da chiudere
 2026-10-22T10:43:28Z git -C protected push origin 5f1a18003406a672dc917e5a32d041f9a3cca113:refs/heads/tg/33-deroga-altra
-2026-10-22T10:43:30Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/33-deroga-altra --title prova P4: rosso-deroga-altra-issue --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-deroga-altra-issue-20261022-124327-body-tg-33-deroga-altra.md
+2026-10-22T10:43:30Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/33-deroga-altra --title prova P4: rosso-deroga-altra-issue --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-deroga-altra-issue-20261022-124327-body-tg-33-deroga-altra.md
 2026-10-22T10:44:06Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/5f1a18003406a672dc917e5a32d041f9a3cca113/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:44:06Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/34/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:44:07Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/34
@@ -470,7 +470,7 @@
 2026-10-22T10:44:31Z gh issue close 33 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:44:33Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: rosso-zero-test --body issue di prova del gate (tollgate P4, caso rosso-zero-test), da chiudere
 2026-10-22T10:44:34Z git -C protected push origin 631449d73d51fb34db091d32e5d7139b7f7fdaa3:refs/heads/tg/35-zero-test
-2026-10-22T10:44:36Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/35-zero-test --title prova P4: rosso-zero-test --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-zero-test-20261022-124433-body-tg-35-zero-test.md
+2026-10-22T10:44:36Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/35-zero-test --title prova P4: rosso-zero-test --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-zero-test-20261022-124433-body-tg-35-zero-test.md
 2026-10-22T10:45:12Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/631449d73d51fb34db091d32e5d7139b7f7fdaa3/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:45:12Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/36/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:45:13Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/36
@@ -489,7 +489,7 @@
 2026-10-22T10:45:37Z gh issue close 35 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:45:39Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: rosso-piano-file-nuovo --body issue di prova del gate (tollgate P4, caso rosso-piano-file-nuovo), da chiudere
 2026-10-22T10:45:41Z git -C protected push origin 95cb780b3bbd9cae6682086f13a0a2bac2befedc:refs/heads/tg/37-piano-file
-2026-10-22T10:45:43Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/37-piano-file --title prova P4: rosso-piano-file-nuovo --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-piano-file-nuovo-20261022-124539-body-tg-37-piano-file.md
+2026-10-22T10:45:43Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/37-piano-file --title prova P4: rosso-piano-file-nuovo --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-piano-file-nuovo-20261022-124539-body-tg-37-piano-file.md
 2026-10-22T10:46:18Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/95cb780b3bbd9cae6682086f13a0a2bac2befedc/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:46:19Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/38/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:46:20Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/38
@@ -508,7 +508,7 @@
 2026-10-22T10:46:44Z gh issue close 37 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:46:46Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: guard-wf-prt --body issue di prova del gate (tollgate P4, caso guard-wf-prt), da chiudere
 2026-10-22T10:46:47Z git -C protected push origin 4a9a936026d5f00482ba7507eee51b8ef745ff34:refs/heads/tg/39-guard-wf-prt
-2026-10-22T10:46:49Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/39-guard-wf-prt --title prova P4: guard-wf-prt --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-wf-prt-20261022-124646-body-tg-39-guard-wf-prt.md
+2026-10-22T10:46:49Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/39-guard-wf-prt --title prova P4: guard-wf-prt --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-wf-prt-20261022-124646-body-tg-39-guard-wf-prt.md
 2026-10-22T10:47:25Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/4a9a936026d5f00482ba7507eee51b8ef745ff34/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:47:26Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/40/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:47:26Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/40
@@ -527,7 +527,7 @@
 2026-10-22T10:47:52Z gh issue close 39 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:47:54Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: guard-wf-run --body issue di prova del gate (tollgate P4, caso guard-wf-run), da chiudere
 2026-10-22T10:47:55Z git -C protected push origin a836ddf10ce54c659a138699e9de78dbd96cb2ef:refs/heads/tg/41-guard-wf-run
-2026-10-22T10:47:57Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/41-guard-wf-run --title prova P4: guard-wf-run --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-wf-run-20261022-124754-body-tg-41-guard-wf-run.md
+2026-10-22T10:47:57Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/41-guard-wf-run --title prova P4: guard-wf-run --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-wf-run-20261022-124754-body-tg-41-guard-wf-run.md
 2026-10-22T10:48:33Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/a836ddf10ce54c659a138699e9de78dbd96cb2ef/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:48:33Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/42/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:48:34Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/42
@@ -546,7 +546,7 @@
 2026-10-22T10:48:58Z gh issue close 41 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:49:01Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: guard-wf-statuses --body issue di prova del gate (tollgate P4, caso guard-wf-statuses), da chiudere
 2026-10-22T10:49:02Z git -C protected push origin 9e4786b76b5f2ee929679caa4c426295a73e473a:refs/heads/tg/43-guard-wf-statuses
-2026-10-22T10:49:04Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/43-guard-wf-statuses --title prova P4: guard-wf-statuses --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-wf-statuses-20261022-124901-body-tg-43-guard-wf-statuses.md
+2026-10-22T10:49:04Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/43-guard-wf-statuses --title prova P4: guard-wf-statuses --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-wf-statuses-20261022-124901-body-tg-43-guard-wf-statuses.md
 2026-10-22T10:49:40Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/9e4786b76b5f2ee929679caa4c426295a73e473a/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:49:40Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/44/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:49:41Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/44
@@ -565,7 +565,7 @@
 2026-10-22T10:50:06Z gh issue close 43 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:50:10Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: guard-wf-writeall --body issue di prova del gate (tollgate P4, caso guard-wf-writeall), da chiudere
 2026-10-22T10:50:11Z git -C protected push origin 9489a0b1dd691b5b3c297bdbcff49d12fc13e874:refs/heads/tg/45-guard-wf-writeall
-2026-10-22T10:50:13Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/45-guard-wf-writeall --title prova P4: guard-wf-writeall --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-wf-writeall-20261022-125010-body-tg-45-guard-wf-writeall.md
+2026-10-22T10:50:13Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/45-guard-wf-writeall --title prova P4: guard-wf-writeall --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-wf-writeall-20261022-125010-body-tg-45-guard-wf-writeall.md
 2026-10-22T10:50:49Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/9489a0b1dd691b5b3c297bdbcff49d12fc13e874/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:50:49Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/46/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:50:50Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/46
@@ -584,7 +584,7 @@
 2026-10-22T10:51:16Z gh issue close 45 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:51:18Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: guard-wf-ancora --body issue di prova del gate (tollgate P4, caso guard-wf-ancora), da chiudere
 2026-10-22T10:51:20Z git -C protected push origin 004f6f941d84b65f552c10bddc3753458c5813b5:refs/heads/tg/47-guard-wf-ancora
-2026-10-22T10:51:22Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/47-guard-wf-ancora --title prova P4: guard-wf-ancora --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-wf-ancora-20261022-125118-body-tg-47-guard-wf-ancora.md
+2026-10-22T10:51:22Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/47-guard-wf-ancora --title prova P4: guard-wf-ancora --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-wf-ancora-20261022-125118-body-tg-47-guard-wf-ancora.md
 2026-10-22T10:51:57Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/004f6f941d84b65f552c10bddc3753458c5813b5/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:51:58Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/48/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:51:58Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/48
@@ -603,7 +603,7 @@
 2026-10-22T10:52:26Z gh issue close 47 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:52:28Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: guard-toml --body issue di prova del gate (tollgate P4, caso guard-toml), da chiudere
 2026-10-22T10:52:29Z git -C protected push origin c9311bbbec14bd763f3cb1d5defafc0e0ca5143e:refs/heads/tg/49-guard-toml
-2026-10-22T10:52:31Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/49-guard-toml --title prova P4: guard-toml --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-toml-20261022-125228-body-tg-49-guard-toml.md
+2026-10-22T10:52:31Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/49-guard-toml --title prova P4: guard-toml --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-toml-20261022-125228-body-tg-49-guard-toml.md
 2026-10-22T10:53:07Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/c9311bbbec14bd763f3cb1d5defafc0e0ca5143e/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:53:08Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/50/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:53:08Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/50
@@ -622,7 +622,7 @@
 2026-10-22T10:53:37Z gh issue close 49 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:53:39Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: guard-verdict-yml --body issue di prova del gate (tollgate P4, caso guard-verdict-yml), da chiudere
 2026-10-22T10:53:41Z git -C protected push origin d906c73b2311a4ab13edb0bff4fddf788c634ecb:refs/heads/tg/51-guard-verdict
-2026-10-22T10:53:43Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/51-guard-verdict --title prova P4: guard-verdict-yml --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-verdict-yml-20261022-125339-body-tg-51-guard-verdict.md
+2026-10-22T10:53:43Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/51-guard-verdict --title prova P4: guard-verdict-yml --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-guard-verdict-yml-20261022-125339-body-tg-51-guard-verdict.md
 2026-10-22T10:54:18Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/d906c73b2311a4ab13edb0bff4fddf788c634ecb/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:54:19Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/52/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:54:19Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/52
@@ -641,7 +641,7 @@
 2026-10-22T10:54:48Z gh issue close 51 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:54:50Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: verde-workflow-ci --body issue di prova del gate (tollgate P4, caso verde-workflow-ci), da chiudere
 2026-10-22T10:54:52Z git -C protected push origin 9dcf00cdf974d6031c8702e4e80a2e1e3ce8ad78:refs/heads/tg/53-workflow-ci
-2026-10-22T10:54:53Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/53-workflow-ci --title prova P4: verde-workflow-ci --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-125450-body-tg-53-workflow-ci.md
+2026-10-22T10:54:53Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/53-workflow-ci --title prova P4: verde-workflow-ci --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-125450-body-tg-53-workflow-ci.md
 2026-10-22T10:55:30Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/9dcf00cdf974d6031c8702e4e80a2e1e3ce8ad78/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:55:30Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/54/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:55:31Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/54
@@ -660,7 +660,7 @@
 2026-10-22T10:56:00Z gh issue close 53 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:56:02Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: attenzione-deroga-test --body issue di prova del gate (tollgate P4, caso attenzione-deroga-test), da chiudere
 2026-10-22T10:56:09Z git -C protected push origin 5c845380262eae7cf9c12f84cabf392b17f5a9c7:refs/heads/tg/55-deroga-test
-2026-10-22T10:56:10Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/55-deroga-test --title prova P4: attenzione-deroga-test --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-125602-body-tg-55-deroga-test.md
+2026-10-22T10:56:10Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/55-deroga-test --title prova P4: attenzione-deroga-test --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-125602-body-tg-55-deroga-test.md
 2026-10-22T10:56:46Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/5c845380262eae7cf9c12f84cabf392b17f5a9c7/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:56:47Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/56/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:56:47Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/56
@@ -679,7 +679,7 @@
 2026-10-22T10:57:17Z gh issue close 55 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:57:19Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: attenzione-piano-testo --body issue di prova del gate (tollgate P4, caso attenzione-piano-testo), da chiudere
 2026-10-22T10:57:21Z git -C protected push origin 7ea78eb38a2e39b423175a405d2a27f9f3ce526d:refs/heads/tg/57-piano-testo
-2026-10-22T10:57:23Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/57-piano-testo --title prova P4: attenzione-piano-testo --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-piano-testo-20261022-125719-body-tg-57-piano-testo.md
+2026-10-22T10:57:23Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/57-piano-testo --title prova P4: attenzione-piano-testo --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-piano-testo-20261022-125719-body-tg-57-piano-testo.md
 2026-10-22T10:57:59Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/7ea78eb38a2e39b423175a405d2a27f9f3ce526d/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:58:00Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/58/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:58:00Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/58
@@ -698,7 +698,7 @@
 2026-10-22T10:58:31Z gh issue close 57 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:58:33Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: attenzione-tetto-livello --body issue di prova del gate (tollgate P4, caso attenzione-tetto-livello), da chiudere
 2026-10-22T10:58:35Z git -C protected push origin fbeee673b07d4996fbef8a33e9f91c4e8b77b047:refs/heads/tg/59-tetto
-2026-10-22T10:58:36Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/59-tetto --title prova P4: attenzione-tetto-livello --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-tetto-livello-20261022-125833-body-tg-59-tetto.md
+2026-10-22T10:58:36Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/59-tetto --title prova P4: attenzione-tetto-livello --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-tetto-livello-20261022-125833-body-tg-59-tetto.md
 2026-10-22T10:59:12Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/fbeee673b07d4996fbef8a33e9f91c4e8b77b047/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T10:59:13Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/60/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T10:59:13Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/60
@@ -717,7 +717,7 @@
 2026-10-22T10:59:45Z gh issue close 59 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T10:59:48Z gh issue create --repo ginz0ls/tollgate-p4-detect --title prova P4: attenzione-zero-test --body issue di prova del gate (tollgate P4, caso attenzione-zero-test), da chiudere
 2026-10-22T10:59:50Z git -C detect push origin 6d1574c9075fb69966432514c430b4d7d7880005:refs/heads/tg/4-zero-test
-2026-10-22T10:59:52Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tg/4-zero-test --title prova P4: attenzione-zero-test --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-zero-test-20261022-125948-body-tg-4-zero-test.md
+2026-10-22T10:59:52Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tg/4-zero-test --title prova P4: attenzione-zero-test --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-zero-test-20261022-125948-body-tg-4-zero-test.md
 2026-10-22T11:00:31Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/6d1574c9075fb69966432514c430b4d7d7880005/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T11:00:32Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/issues/5/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T11:00:33Z gh api repos/ginz0ls/tollgate-p4-detect/pulls/5
@@ -735,7 +735,7 @@
 2026-10-22T11:00:48Z gh issue close 4 --repo ginz0ls/tollgate-p4-detect
 2026-10-22T11:00:50Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: error-dotdot --body issue di prova del gate (tollgate P4, caso error-dotdot), da chiudere
 2026-10-22T11:00:52Z git -C protected push origin 960b2a35817e242637187ecd088ddcabb99b6c27:refs/heads/tg/61-error-dotdot
-2026-10-22T11:00:53Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/61-error-dotdot --title prova P4: error-dotdot --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-dotdot-20261022-130050-body-tg-61-error-dotdot.md
+2026-10-22T11:00:53Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/61-error-dotdot --title prova P4: error-dotdot --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-dotdot-20261022-130050-body-tg-61-error-dotdot.md
 2026-10-22T11:01:29Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/960b2a35817e242637187ecd088ddcabb99b6c27/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T11:01:30Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/62/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T11:01:31Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/62
@@ -754,7 +754,7 @@
 2026-10-22T11:02:01Z gh issue close 61 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T11:02:03Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: error-entita --body issue di prova del gate (tollgate P4, caso error-entita), da chiudere
 2026-10-22T11:02:05Z git -C protected push origin 6e241b4a5d13ba9d20784a95e200f14cfdd80e50:refs/heads/tg/63-error-entita
-2026-10-22T11:02:07Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/63-error-entita --title prova P4: error-entita --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-entita-20261022-130203-body-tg-63-error-entita.md
+2026-10-22T11:02:07Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/63-error-entita --title prova P4: error-entita --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-entita-20261022-130203-body-tg-63-error-entita.md
 2026-10-22T11:02:42Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/6e241b4a5d13ba9d20784a95e200f14cfdd80e50/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T11:02:43Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/64/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T11:02:44Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/64
@@ -773,7 +773,7 @@
 2026-10-22T11:03:15Z gh issue close 63 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T11:03:18Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: rosso-entita-tools --body issue di prova del gate (tollgate P4, caso rosso-entita-tools), da chiudere
 2026-10-22T11:03:19Z git -C protected push origin f03de8d7ff0924d871eb0fccc7cbd33a0dbfb3ce:refs/heads/tg/65-entita-tools
-2026-10-22T11:03:21Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/65-entita-tools --title prova P4: rosso-entita-tools --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-entita-tools-20261022-130318-body-tg-65-entita-tools.md
+2026-10-22T11:03:21Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/65-entita-tools --title prova P4: rosso-entita-tools --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-rosso-entita-tools-20261022-130318-body-tg-65-entita-tools.md
 2026-10-22T11:03:57Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/f03de8d7ff0924d871eb0fccc7cbd33a0dbfb3ce/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T11:03:58Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/66/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T11:03:59Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/66
@@ -792,7 +792,7 @@
 2026-10-22T11:04:32Z gh issue close 65 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T11:04:34Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: error-sha-superato --body issue di prova del gate (tollgate P4, caso error-sha-superato), da chiudere
 2026-10-22T11:04:35Z git -C protected push origin 33873526d72590ddb442c2a8d064ddcb3053314d:refs/heads/tg/67-sha-superato
-2026-10-22T11:04:37Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/67-sha-superato --title prova P4: error-sha-superato --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-sha-superato-20261022-130434-body-tg-67-sha-superato.md
+2026-10-22T11:04:37Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/67-sha-superato --title prova P4: error-sha-superato --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-sha-superato-20261022-130434-body-tg-67-sha-superato.md
 2026-10-22T11:04:54Z git -C protected push origin 091676fba9ed7aaf9ae8d7e77c46f71a141faa7a:refs/heads/tg/67-sha-superato
 2026-10-22T11:05:08Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/33873526d72590ddb442c2a8d064ddcb3053314d/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T11:05:08Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/68/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
@@ -824,9 +824,9 @@
 2026-10-22T11:06:19Z gh issue close 67 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T11:06:21Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: error-due-pr --body issue di prova del gate (tollgate P4, caso error-due-pr), da chiudere
 2026-10-22T11:06:22Z git -C protected push origin f8152dbf1b613940204cbc76d962134205c99dc5:refs/heads/tg/69-due-pr
-2026-10-22T11:06:24Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/69-due-pr --title prova P4: error-due-pr (A) --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-due-pr-20261022-130621-body-a.md
+2026-10-22T11:06:24Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/69-due-pr --title prova P4: error-due-pr (A) --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-due-pr-20261022-130621-body-a.md
 2026-10-22T11:06:26Z git -C protected push origin f8152dbf1b613940204cbc76d962134205c99dc5:refs/heads/tg/69-due-pr-bis
-2026-10-22T11:06:28Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/69-due-pr-bis --title prova P4: error-due-pr (B) --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-due-pr-20261022-130621-body-b.md
+2026-10-22T11:06:28Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/69-due-pr-bis --title prova P4: error-due-pr (B) --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-due-pr-20261022-130621-body-b.md
 2026-10-22T11:07:03Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/f8152dbf1b613940204cbc76d962134205c99dc5/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T11:07:04Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/70/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T11:07:05Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/70
@@ -851,7 +851,7 @@
 2026-10-22T11:07:49Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: non-applicabile --body issue di prova del gate (tollgate P4, caso non-applicabile), da chiudere
 2026-10-22T11:07:50Z git -C protected push origin 166d7280d480dcda5114a8f076bd69e1e48eca7f:refs/heads/other
 2026-10-22T11:07:52Z git -C protected push origin 09030223e74db3f5e7deba3514ab1b6794fee352:refs/heads/prova/p4-non-applicabile-20261022-130749
-2026-10-22T11:07:54Z gh pr create --repo ginz0ls/tollgate-p4-protected --base other --head prova/p4-non-applicabile-20261022-130749 --title prova P4: non-applicabile --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-non-applicabile-20261022-130749-body-prova-p4-non-applicabile-20261022-130749.md
+2026-10-22T11:07:54Z gh pr create --repo ginz0ls/tollgate-p4-protected --base other --head prova/p4-non-applicabile-20261022-130749 --title prova P4: non-applicabile --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-non-applicabile-20261022-130749-body-prova-p4-non-applicabile-20261022-130749.md
 2026-10-22T11:08:30Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/09030223e74db3f5e7deba3514ab1b6794fee352/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T11:08:30Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/73/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T11:08:31Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/73
@@ -866,7 +866,7 @@
 2026-10-22T11:08:46Z gh issue close 72 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T11:08:48Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: token-personale --body issue di prova del gate (tollgate P4, caso token-personale), da chiudere
 2026-10-22T11:08:49Z git -C protected push origin 0a24f0e7d5fe557fca4063aba64f0ce618c78d99:refs/heads/tg/74-token-personale
-2026-10-22T11:08:51Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/74-token-personale --title prova P4: token-personale --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-token-personale-20261022-130848-body-tg-74-token-personale.md
+2026-10-22T11:08:51Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/74-token-personale --title prova P4: token-personale --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-token-personale-20261022-130848-body-tg-74-token-personale.md
 2026-10-22T11:09:37Z gh api --method POST repos/ginz0ls/tollgate-p4-protected/statuses/0a24f0e7d5fe557fca4063aba64f0ce618c78d99 -f state=success -f context=tollgate/verdict -f description=prova-token-personale-p4
 2026-10-22T11:09:40Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/0a24f0e7d5fe557fca4063aba64f0ce618c78d99/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T11:09:41Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/75/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
@@ -886,7 +886,7 @@
 2026-10-22T11:10:18Z gh issue close 74 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T11:10:21Z gh issue create --repo ginz0ls/tollgate-p4-detect --title prova P4: detect-pulita --body issue di prova del gate (tollgate P4, caso detect-pulita), da chiudere
 2026-10-22T11:10:22Z git -C detect push origin f6274f2f3222137f2e24959a4450c5cec49d8098:refs/heads/tg/6-detect-pulita
-2026-10-22T11:10:24Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tg/6-detect-pulita --title prova P4: detect-pulita --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-detect-pulita-20261022-131021-body-tg-6-detect-pulita.md
+2026-10-22T11:10:24Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tg/6-detect-pulita --title prova P4: detect-pulita --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-detect-pulita-20261022-131021-body-tg-6-detect-pulita.md
 2026-10-22T11:11:00Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/f6274f2f3222137f2e24959a4450c5cec49d8098/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T11:11:00Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/issues/7/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T11:11:01Z gh api repos/ginz0ls/tollgate-p4-detect/pulls/7
@@ -906,7 +906,7 @@
 2026-10-22T11:11:20Z gh issue create --repo ginz0ls/tollgate-p4-detect --title prova P4: detect-closes (chiusa) --body issue di prova, chiusa subito
 2026-10-22T11:11:22Z gh issue close 9 --repo ginz0ls/tollgate-p4-detect
 2026-10-22T11:11:24Z git -C detect push origin f2708119a31daf8581ebde2b596b3ae96da2c787:refs/heads/tg/8-detect-closes
-2026-10-22T11:11:25Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tg/8-detect-closes --title prova P4: detect-closes --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-detect-closes-20261022-131119-body-tg-8-detect-closes.md
+2026-10-22T11:11:25Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tg/8-detect-closes --title prova P4: detect-closes --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-detect-closes-20261022-131119-body-tg-8-detect-closes.md
 2026-10-22T11:12:02Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/f2708119a31daf8581ebde2b596b3ae96da2c787/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T11:12:03Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/issues/10/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T11:12:04Z gh api repos/ginz0ls/tollgate-p4-detect/pulls/10
@@ -934,7 +934,7 @@
 2026-10-22T11:12:56Z gh issue close 12 --repo ginz0ls/tollgate-p4-detect
 2026-10-22T11:12:59Z gh issue create --repo ginz0ls/tollgate-p4-detect --title prova P4: detect-merge-rosso --body issue di prova del gate (tollgate P4, caso detect-merge-rosso), da chiudere
 2026-10-22T11:13:00Z git -C detect push origin ecfa97505820025cc0d1833db011efcbdc9451a6:refs/heads/tg/13-detect-merge-rosso
-2026-10-22T11:13:02Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tg/13-detect-merge-rosso --title prova P4: detect-merge-rosso --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-detect-merge-rosso-20261022-131258-body-tg-13-detect-merge-rosso.md
+2026-10-22T11:13:02Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tg/13-detect-merge-rosso --title prova P4: detect-merge-rosso --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-detect-merge-rosso-20261022-131258-body-tg-13-detect-merge-rosso.md
 2026-10-22T11:13:37Z gh pr view 14 --repo ginz0ls/tollgate-p4-detect --json state,mergedAt
 2026-10-22T11:13:38Z gh pr merge 14 --repo ginz0ls/tollgate-p4-detect --squash
 2026-10-22T11:13:41Z git -C detect fetch -q origin
@@ -961,7 +961,7 @@
 2026-10-22T11:14:14Z gh issue close 15 --repo ginz0ls/tollgate-p4-detect
 2026-10-22T15:25:48Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: verde-config --body issue di prova del gate (tollgate P4, caso verde-config), da chiudere
 2026-10-22T15:25:50Z git -C protected push origin 3ccec30b2a6b944c5532cae77bd5b01600443839:refs/heads/tollgate-config/p4-20261022-172548
-2026-10-22T15:25:57Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tollgate-config/p4-20261022-172548 --title prova P4: verde-config --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-172548-body-tollgate-config-p4-20261022-172548.md
+2026-10-22T15:25:57Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tollgate-config/p4-20261022-172548 --title prova P4: verde-config --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-172548-body-tollgate-config-p4-20261022-172548.md
 2026-10-22T15:41:08Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/3ccec30b2a6b944c5532cae77bd5b01600443839/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T15:41:08Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/77/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T15:41:09Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/77
@@ -980,7 +980,7 @@
 2026-10-22T15:41:54Z gh issue close 76 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T15:41:57Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: verde-ramo-libero --body issue di prova del gate (tollgate P4, caso verde-ramo-libero), da chiudere
 2026-10-22T15:41:58Z git -C protected push origin 57caf744bbbb046cd17d014a79ab2f4be533ee00:refs/heads/prova/p4-ramo-libero-20261022-174157
-2026-10-22T15:42:00Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head prova/p4-ramo-libero-20261022-174157 --title prova P4: verde-ramo-libero --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-ramo-libero-20261022-174157-body-prova-p4-ramo-libero-20261022-174157.md
+2026-10-22T15:42:00Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head prova/p4-ramo-libero-20261022-174157 --title prova P4: verde-ramo-libero --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-ramo-libero-20261022-174157-body-prova-p4-ramo-libero-20261022-174157.md
 2026-10-22T15:57:09Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/57caf744bbbb046cd17d014a79ab2f4be533ee00/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T15:57:09Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/79/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T15:57:10Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/79
@@ -999,8 +999,8 @@
 2026-10-22T15:57:52Z gh issue close 78 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T15:57:55Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: verde-edit --body issue di prova del gate (tollgate P4, caso verde-edit), da chiudere
 2026-10-22T15:57:56Z git -C protected push origin 5d73fc010badb8a7fba90c637d2e33a22df35fb7:refs/heads/tg/80-edit
-2026-10-22T15:57:58Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/80-edit --title prova P4: verde-edit --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-175754-body-tg-80-edit.md
-2026-10-22T16:03:11Z gh api --method PATCH repos/ginz0ls/tollgate-p4-protected/pulls/81 -F body=@/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-175754-body-edit.md
+2026-10-22T15:57:58Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/80-edit --title prova P4: verde-edit --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-175754-body-tg-80-edit.md
+2026-10-22T16:03:11Z gh api --method PATCH repos/ginz0ls/tollgate-p4-protected/pulls/81 -F body=@/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-175754-body-edit.md
 2026-10-22T16:03:47Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/5d73fc010badb8a7fba90c637d2e33a22df35fb7/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T16:03:47Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/81/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T16:03:48Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/81
@@ -1025,7 +1025,7 @@
 2026-10-22T16:04:35Z gh issue close 80 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T16:04:37Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: verde-workflow-ci --body issue di prova del gate (tollgate P4, caso verde-workflow-ci), da chiudere
 2026-10-22T16:04:38Z git -C protected push origin 740580dd44a54815274bfeb2b80951d84c1c7873:refs/heads/tg/82-workflow-ci
-2026-10-22T16:04:40Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/82-workflow-ci --title prova P4: verde-workflow-ci --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-180437-body-tg-82-workflow-ci.md
+2026-10-22T16:04:40Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/82-workflow-ci --title prova P4: verde-workflow-ci --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-180437-body-tg-82-workflow-ci.md
 2026-10-22T16:34:53Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/740580dd44a54815274bfeb2b80951d84c1c7873/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T16:34:54Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/83/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T16:34:55Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/83
@@ -1044,7 +1044,7 @@
 2026-10-22T16:35:36Z gh issue close 82 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T16:35:38Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: attenzione-deroga-test --body issue di prova del gate (tollgate P4, caso attenzione-deroga-test), da chiudere
 2026-10-22T16:35:39Z git -C protected push origin e83f1577861b357c532203afeb864d8dae4401f4:refs/heads/tg/84-deroga-test
-2026-10-22T16:35:42Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/84-deroga-test --title prova P4: attenzione-deroga-test --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-183538-body-tg-84-deroga-test.md
+2026-10-22T16:35:42Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/84-deroga-test --title prova P4: attenzione-deroga-test --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-183538-body-tg-84-deroga-test.md
 2026-10-22T16:50:46Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/e83f1577861b357c532203afeb864d8dae4401f4/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T16:50:47Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/85/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T16:50:47Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/85
@@ -1063,7 +1063,7 @@
 2026-10-22T16:51:36Z gh issue close 84 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T16:51:39Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: attenzione-piano-testo --body issue di prova del gate (tollgate P4, caso attenzione-piano-testo), da chiudere
 2026-10-22T16:51:40Z git -C protected push origin f0cbb4d1d58d3f2e9e4f33af1e0c9a7bbb6bf284:refs/heads/tg/86-piano-testo
-2026-10-22T16:51:43Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/86-piano-testo --title prova P4: attenzione-piano-testo --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-piano-testo-20261022-185139-body-tg-86-piano-testo.md
+2026-10-22T16:51:43Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/86-piano-testo --title prova P4: attenzione-piano-testo --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-piano-testo-20261022-185139-body-tg-86-piano-testo.md
 2026-10-22T16:52:19Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/f0cbb4d1d58d3f2e9e4f33af1e0c9a7bbb6bf284/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T16:52:19Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/87/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T16:52:20Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/87
@@ -1082,7 +1082,7 @@
 2026-10-22T16:53:05Z gh issue close 86 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T16:53:07Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: attenzione-tetto-livello --body issue di prova del gate (tollgate P4, caso attenzione-tetto-livello), da chiudere
 2026-10-22T16:53:09Z git -C protected push origin 03158fa8205f89af03e5e05ca36ca3fcaa0ffa98:refs/heads/tg/88-tetto
-2026-10-22T16:53:12Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/88-tetto --title prova P4: attenzione-tetto-livello --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-tetto-livello-20261022-185307-body-tg-88-tetto.md
+2026-10-22T16:53:12Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/88-tetto --title prova P4: attenzione-tetto-livello --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-tetto-livello-20261022-185307-body-tg-88-tetto.md
 2026-10-22T16:53:48Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/03158fa8205f89af03e5e05ca36ca3fcaa0ffa98/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T16:53:49Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/89/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T16:53:50Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/89
@@ -1099,7 +1099,7 @@
 2026-10-22T16:54:32Z gh pr view 89 --repo ginz0ls/tollgate-p4-protected --json state
 2026-10-22T16:54:32Z gh pr close 89 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T16:54:34Z gh issue close 88 --repo ginz0ls/tollgate-p4-protected
-2026-10-22T18:24:15Z [controller] (protected) python3 -B /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate init --propose --merges-per-month 20
+2026-10-22T18:24:15Z [controller] (protected) python3 -B /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate init --propose --merges-per-month 20
 2026-10-22T18:24:16Z gh api --include repos/ginz0ls/tollgate-p4-protected/branches/main/protection
 2026-10-22T18:24:29Z [controller] (protected) gh api repos/ginz0ls/tollgate-p4-protected/branches/main/protection --jq {strict:.required_status_checks.strict,contexts:.required_status_checks.contexts,checks:.required_status_checks.checks,admins:.enforce_admins.enabled}
 2026-10-22T18:24:30Z gh api repos/ginz0ls/tollgate-p4-protected/branches/main/protection --jq {strict:.required_status_checks.strict,contexts:.required_status_checks.contexts,checks:.required_status_checks.checks,admins:.enforce_admins.enabled}
@@ -1108,7 +1108,7 @@
 2026-10-22T18:24:40Z [controller] (protected) gh --version
 2026-10-22T18:24:40Z gh --version
 2026-10-22T18:24:42Z [controller] (protected) git push origin main (aggiornamento giro 4)
-2026-10-22T18:25:49Z [controller] (protected) python3 -B /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate init --propose --merges-per-month 20
+2026-10-22T18:25:49Z [controller] (protected) python3 -B /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate init --propose --merges-per-month 20
 2026-10-22T18:25:49Z gh api --include repos/ginz0ls/tollgate-p4-protected/branches/main/protection
 2026-10-22T18:25:51Z git -C protected fetch -q origin
 2026-10-22T18:25:52Z bash docs/superpowers/tollgate-init/protect.sh e75adcbadef4df7f474a209ea581b2b00ab5166c (cwd protected)
@@ -1131,7 +1131,7 @@
 2026-10-22T18:26:33Z gh run list -R ginz0ls/tollgate-p4-protected --limit 6 --json workflowName,status,conclusion,headSha
 2026-10-22T18:26:47Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: verde-config --body issue di prova del gate (tollgate P4, caso verde-config), da chiudere
 2026-10-22T18:26:48Z git -C protected push origin 1df8411fdecafa7a5c4c67031b5430d7e74bfac4:refs/heads/tollgate-config/p4-20261022-202647
-2026-10-22T18:26:50Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tollgate-config/p4-20261022-202647 --title prova P4: verde-config --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-202647-body-tollgate-config-p4-20261022-202647.md
+2026-10-22T18:26:50Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tollgate-config/p4-20261022-202647 --title prova P4: verde-config --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-202647-body-tollgate-config-p4-20261022-202647.md
 2026-10-22T18:42:00Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/1df8411fdecafa7a5c4c67031b5430d7e74bfac4/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T18:42:01Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/92/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T18:42:02Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/92
@@ -1150,7 +1150,7 @@
 2026-10-22T18:42:57Z gh issue close 91 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T18:43:00Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: verde-ramo-libero --body issue di prova del gate (tollgate P4, caso verde-ramo-libero), da chiudere
 2026-10-22T18:43:02Z git -C protected push origin bea4372cb3cadf80b2a28ee0596c59474f2e5382:refs/heads/prova/p4-ramo-libero-20261022-204300
-2026-10-22T18:43:05Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head prova/p4-ramo-libero-20261022-204300 --title prova P4: verde-ramo-libero --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-ramo-libero-20261022-204300-body-prova-p4-ramo-libero-20261022-204300.md
+2026-10-22T18:43:05Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head prova/p4-ramo-libero-20261022-204300 --title prova P4: verde-ramo-libero --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-ramo-libero-20261022-204300-body-prova-p4-ramo-libero-20261022-204300.md
 2026-10-22T18:43:41Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/bea4372cb3cadf80b2a28ee0596c59474f2e5382/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T18:43:42Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/94/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T18:43:43Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/94
@@ -1169,8 +1169,8 @@
 2026-10-22T18:44:31Z gh issue close 93 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T18:44:34Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: verde-edit --body issue di prova del gate (tollgate P4, caso verde-edit), da chiudere
 2026-10-22T18:44:35Z git -C protected push origin 0ee64e20cda84fe97d48320e518ac66023ab4a50:refs/heads/tg/95-edit
-2026-10-22T18:44:37Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/95-edit --title prova P4: verde-edit --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-tg-95-edit.md
-2026-10-22T18:45:13Z gh api --method PATCH repos/ginz0ls/tollgate-p4-protected/pulls/96 -F body=@/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-edit.md
+2026-10-22T18:44:37Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/95-edit --title prova P4: verde-edit --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-tg-95-edit.md
+2026-10-22T18:45:13Z gh api --method PATCH repos/ginz0ls/tollgate-p4-protected/pulls/96 -F body=@/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-edit-20261022-204434-body-edit.md
 2026-10-22T18:45:49Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/0ee64e20cda84fe97d48320e518ac66023ab4a50/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T18:45:50Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/96/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T18:45:50Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/96
@@ -1195,7 +1195,7 @@
 2026-10-22T18:46:47Z gh issue close 95 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T18:46:49Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: verde-workflow-ci --body issue di prova del gate (tollgate P4, caso verde-workflow-ci), da chiudere
 2026-10-22T18:46:51Z git -C protected push origin 12869e50390cfa0b2d0fe2f2a12b2125f8309c57:refs/heads/tg/97-workflow-ci
-2026-10-22T18:46:53Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/97-workflow-ci --title prova P4: verde-workflow-ci --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-204649-body-tg-97-workflow-ci.md
+2026-10-22T18:46:53Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/97-workflow-ci --title prova P4: verde-workflow-ci --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-workflow-ci-20261022-204649-body-tg-97-workflow-ci.md
 2026-10-22T18:47:29Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/12869e50390cfa0b2d0fe2f2a12b2125f8309c57/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T18:47:30Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/98/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T18:47:30Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/98
@@ -1214,7 +1214,7 @@
 2026-10-22T18:48:19Z gh issue close 97 --repo ginz0ls/tollgate-p4-protected
 2026-10-22T18:48:21Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: attenzione-deroga-test --body issue di prova del gate (tollgate P4, caso attenzione-deroga-test), da chiudere
 2026-10-22T18:48:23Z git -C protected push origin 88c8da6eb520198e9b2bdb98d9f503110e7e37aa:refs/heads/tg/99-deroga-test
-2026-10-22T18:48:25Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/99-deroga-test --title prova P4: attenzione-deroga-test --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-204821-body-tg-99-deroga-test.md
+2026-10-22T18:48:25Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tg/99-deroga-test --title prova P4: attenzione-deroga-test --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-attenzione-deroga-test-20261022-204821-body-tg-99-deroga-test.md
 2026-10-22T18:49:01Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/88c8da6eb520198e9b2bdb98d9f503110e7e37aa/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T18:49:02Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/100/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T18:49:02Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/100
@@ -1237,12 +1237,12 @@
 2026-10-22T18:50:13Z gh api repos/ginz0ls/tollgate-p4-protected/actions/runs/39831448488/jobs
 2026-10-22T18:50:14Z [controller] (protected) gh api repos/ginz0ls/tollgate-p4-protected/actions/jobs/120008358262/logs
 2026-10-22T18:50:14Z gh api repos/ginz0ls/tollgate-p4-protected/actions/jobs/120008358262/logs
-2026-10-22T19:16:07Z [controller] (protected) python3 -B /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate init --propose --merges-per-month 20
+2026-10-22T19:16:07Z [controller] (protected) python3 -B /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate init --propose --merges-per-month 20
 2026-10-22T19:16:08Z gh api --include repos/ginz0ls/tollgate-p4-protected/branches/main/protection
 2026-10-22T19:16:09Z [controller] (protected) gh api --method DELETE repos/ginz0ls/tollgate-p4-protected/branches/main/protection
 2026-10-22T19:16:09Z gh api --method DELETE repos/ginz0ls/tollgate-p4-protected/branches/main/protection
 2026-10-22T19:16:10Z [controller] (protected) git push origin main (aggiornamento giro 5)
-2026-10-22T19:16:13Z [controller] (protected) python3 -B /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate init --propose --merges-per-month 20
+2026-10-22T19:16:13Z [controller] (protected) python3 -B /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate init --propose --merges-per-month 20
 2026-10-22T19:16:14Z gh api --include repos/ginz0ls/tollgate-p4-protected/branches/main/protection
 2026-10-22T19:16:15Z git -C protected fetch -q origin
 2026-10-22T19:16:15Z bash docs/superpowers/tollgate-init/protect.sh b86dc8d09a7fb905abbedf71eb626169277596b5 (cwd protected)
@@ -1265,7 +1265,7 @@
 2026-10-22T19:16:49Z gh issue close 101 -R ginz0ls/tollgate-p4-protected
 2026-10-22T19:16:57Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova P4: verde-config --body issue di prova del gate (tollgate P4, caso verde-config), da chiudere
 2026-10-22T19:16:58Z git -C protected push origin 343a8275eabf6cae5a5a2c61c983fbbaf589fba8:refs/heads/tollgate-config/p4-20261022-211657
-2026-10-22T19:17:00Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tollgate-config/p4-20261022-211657 --title prova P4: verde-config --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-211657-body-tollgate-config-p4-20261022-211657.md
+2026-10-22T19:17:00Z gh pr create --repo ginz0ls/tollgate-p4-protected --base main --head tollgate-config/p4-20261022-211657 --title prova P4: verde-config --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-verde-config-20261022-211657-body-tollgate-config-p4-20261022-211657.md
 2026-10-22T19:17:36Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/commits/343a8275eabf6cae5a5a2c61c983fbbaf589fba8/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-22T19:17:37Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/issues/103/comments?per_page=100 --jq .[] | {id, user: .user.login, body}
 2026-10-22T19:17:37Z gh api repos/ginz0ls/tollgate-p4-protected/pulls/103
@@ -1546,7 +1546,7 @@
 2026-10-22T19:27:25Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/39631102348/timing
 2026-10-22T20:11:47Z [controller] (protected) gh issue create --repo ginz0ls/tollgate-p4-protected --title prova criterio 11: start con la protezione completa --body issue di prova del criterio 11 (tollgate P4)
 2026-10-22T20:11:47Z gh issue create --repo ginz0ls/tollgate-p4-protected --title prova criterio 11: start con la protezione completa --body issue di prova del criterio 11 (tollgate P4)
-2026-10-22T20:11:48Z [controller] (protected) python3 -B /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate start 106
+2026-10-22T20:11:48Z [controller] (protected) python3 -B /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate start 106
 2026-10-22T20:11:49Z gh auth status
 2026-10-22T20:11:50Z gh api repos/ginz0ls/tollgate-p4-protected/issues/106
 2026-10-22T20:11:51Z gh api --paginate repos/ginz0ls/tollgate-p4-protected/pulls?state=all&per_page=100 --jq .[] | {number, headRefName: .head.ref, state: (if .merged_at then "MERGED" else (.state | ascii_upcase) end), url: .html_url}

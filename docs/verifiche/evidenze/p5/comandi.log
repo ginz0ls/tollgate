@@ -78,7 +78,7 @@
 2026-10-25T19:23:11Z gh api --include repos/ginz0ls/tollgate-p4-detect/branches/main/protection
 2026-10-25T19:23:12Z gh api repos/ginz0ls/tollgate-p4-detect/branches/tollgate-config/0.2.0
 2026-10-25T19:23:13Z git-net dir=/tmp/tollgate-p5/gate-detect push https://github.com/ginz0ls/tollgate-p4-detect.git tollgate-config/0.2.0
-2026-10-25T19:23:15Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tollgate-config/0.2.0 --title tollgate: aggiornamento alla 0.2.0 (prova P5) --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-aggiorna-corpo.md
+2026-10-25T19:23:15Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tollgate-config/0.2.0 --title tollgate: aggiornamento alla 0.2.0 (prova P5) --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-aggiorna-corpo.md
 2026-10-25T19:23:17Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/f6de46341c58d4d2839ad1ff40485650d642f2a6/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-25T19:23:33Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/f6de46341c58d4d2839ad1ff40485650d642f2a6/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-25T19:23:48Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/f6de46341c58d4d2839ad1ff40485650d642f2a6/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
@@ -114,7 +114,7 @@
 2026-10-25T19:25:03Z gh issue list --repo ginz0ls/tollgate-p4-detect --state open --limit 100 --json number,title
 2026-10-25T19:25:04Z gh issue view 18 --repo ginz0ls/tollgate-p4-detect --json number,title,state
 2026-10-25T19:25:05Z git-net dir=/tmp/tollgate-p5/gate-detect push https://github.com/ginz0ls/tollgate-p4-detect.git tg/18-p5-gate-pulita-fissata-20261025-202502
-2026-10-25T19:25:07Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tg/18-p5-gate-pulita-fissata-20261025-202502 --title prova P5: pulita-fissata --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-caso-pulita-fissata-20261025-202502-body-tg-18-detect-pulita.md
+2026-10-25T19:25:07Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tg/18-p5-gate-pulita-fissata-20261025-202502 --title prova P5: pulita-fissata --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-caso-pulita-fissata-20261025-202502-body-tg-18-detect-pulita.md
 2026-10-25T19:25:09Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-guard.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
 2026-10-25T19:25:10Z gh run watch 40225794682 --repo ginz0ls/tollgate-p4-detect --exit-status
 2026-10-25T19:25:11Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-guard.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
@@ -152,7 +152,7 @@
 2026-10-25T19:26:42Z gh issue list --repo ginz0ls/tollgate-p4-detect --state open --limit 100 --json number,title
 2026-10-25T19:26:42Z gh issue view 18 --repo ginz0ls/tollgate-p4-detect --json number,title,state
 2026-10-25T19:26:43Z git-net dir=/tmp/tollgate-p5/gate-detect push https://github.com/ginz0ls/tollgate-p4-detect.git tg/18-p5-gate-rivalutazione-20261025-202640
-2026-10-25T19:26:45Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tg/18-p5-gate-rivalutazione-20261025-202640 --title prova P5: rivalutazione --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-caso-rivalutazione-20261025-202640-body-tg-18-detect-pulita.md
+2026-10-25T19:26:45Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head tg/18-p5-gate-rivalutazione-20261025-202640 --title prova P5: rivalutazione --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-caso-rivalutazione-20261025-202640-body-tg-18-detect-pulita.md
 2026-10-25T19:26:47Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d9e3d60a3cc782dcd12e5e28cfc97a2f3776272b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-25T19:27:03Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d9e3d60a3cc782dcd12e5e28cfc97a2f3776272b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-25T19:27:18Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d9e3d60a3cc782dcd12e5e28cfc97a2f3776272b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
@@ -163,7 +163,7 @@
 2026-10-25T19:27:22Z gh run list --repo ginz0ls/tollgate-p4-detect --workflow tollgate-run.yml --limit 30 --json databaseId,headSha,headBranch,event,status,conclusion,createdAt
 2026-10-25T19:27:23Z gh run view 40226068246 --repo ginz0ls/tollgate-p4-detect --json databaseId,workflowName,event,headSha,headBranch,status,conclusion,createdAt,updatedAt,jobs
 2026-10-25T19:27:24Z gh api repos/ginz0ls/tollgate-p4-detect/actions/runs/40226068246/timing
-2026-10-25T19:27:25Z gh api --method PATCH repos/ginz0ls/tollgate-p4-detect/pulls/20 -F body=@/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-caso-rivalutazione-20261025-202640-corpo-modificato.md
+2026-10-25T19:27:25Z gh api --method PATCH repos/ginz0ls/tollgate-p4-detect/pulls/20 -F body=@/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-caso-rivalutazione-20261025-202640-corpo-modificato.md
 2026-10-25T19:27:26Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d9e3d60a3cc782dcd12e5e28cfc97a2f3776272b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-25T19:27:42Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d9e3d60a3cc782dcd12e5e28cfc97a2f3776272b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-25T19:27:57Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/d9e3d60a3cc782dcd12e5e28cfc97a2f3776272b/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
@@ -174,7 +174,7 @@
 2026-10-25T19:28:13Z git-net dir=/tmp/tollgate-p5/gate-detect clone -q https://github.com/ginz0ls/tollgate-p4-detect.git /tmp/tollgate-p5/gate-detect
 2026-10-25T19:28:14Z gh issue list --repo ginz0ls/tollgate-p4-detect --state open --limit 100 --json number,title
 2026-10-25T19:28:14Z git-net dir=/tmp/tollgate-p5/gate-detect push https://github.com/ginz0ls/tollgate-p4-detect.git p5-gate-skip-ci-base-20261025-202813
-2026-10-25T19:28:16Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head p5-gate-skip-ci-base-20261025-202813 --title prova P5: skip-ci, push controllato --body-file /home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-caso-skip-ci-20261025-202813-corpo.md
+2026-10-25T19:28:16Z gh pr create --repo ginz0ls/tollgate-p4-detect --base main --head p5-gate-skip-ci-base-20261025-202813 --title prova P5: skip-ci, push controllato --body-file /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/docs/verifiche/evidenze/p5/gate-caso-skip-ci-20261025-202813-corpo.md
 2026-10-25T19:28:19Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/fa4eb99abe39dced5cc8a683a64a4cc7c4e6da45/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-25T19:28:35Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/fa4eb99abe39dced5cc8a683a64a4cc7c4e6da45/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}
 2026-10-25T19:28:50Z gh api --paginate repos/ginz0ls/tollgate-p4-detect/commits/fa4eb99abe39dced5cc8a683a64a4cc7c4e6da45/statuses?per_page=100 --jq .[] | {context, state, creator: .creator.login, description, created_at}

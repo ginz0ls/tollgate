@@ -103,7 +103,7 @@
             "durationSeconds": 13,
             "startedAt": "2026-10-25T21:55:57.137Z",
             "error": null,
-            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-icgrbP/out/trace.jsonl",
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-icgrbP/out/trace.jsonl",
             "skippedPaidGraders": false,
             "graders": [
               {
@@ -157,7 +157,7 @@
             "durationSeconds": 14,
             "startedAt": "2026-10-25T21:56:09.898Z",
             "error": null,
-            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-nQPhmZ/out/trace.jsonl",
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-nQPhmZ/out/trace.jsonl",
             "skippedPaidGraders": false,
             "graders": [
               {
@@ -211,7 +211,7 @@
             "durationSeconds": 13,
             "startedAt": "2026-10-25T21:56:23.646Z",
             "error": null,
-            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-qxuwhr/out/trace.jsonl",
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-qxuwhr/out/trace.jsonl",
             "skippedPaidGraders": false,
             "graders": [
               {
@@ -267,7 +267,7 @@
             "durationSeconds": 19,
             "startedAt": "2026-10-25T21:56:36.449Z",
             "error": null,
-            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-iohpn0/out/trace.jsonl",
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-iohpn0/out/trace.jsonl",
             "skippedPaidGraders": false,
             "graders": [
               {
@@ -305,7 +305,7 @@
             "durationSeconds": 17,
             "startedAt": "2026-10-25T21:56:54.997Z",
             "error": null,
-            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-TAKbYs/out/trace.jsonl",
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-TAKbYs/out/trace.jsonl",
             "skippedPaidGraders": false,
             "graders": [
               {
@@ -343,7 +343,7 @@
             "durationSeconds": 16,
             "startedAt": "2026-10-25T21:57:12.090Z",
             "error": null,
-            "tracePath": "/home/crucco/.cache/tollgate-eval-tmp/claude-eval-i0mNKq/out/trace.jsonl",
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-i0mNKq/out/trace.jsonl",
             "skippedPaidGraders": false,
             "graders": [
               {

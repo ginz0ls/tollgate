@@ -15,7 +15,7 @@
       "branch": "tg/67-sha-superato",
       "base": "main",
       "title": "prova P4: error-sha-superato",
-      "body_file": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-sha-superato-20261022-130434-body-tg-67-sha-superato.md"
+      "body_file": "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/docs/verifiche/evidenze/gh-p4/caso-error-sha-superato-20261022-130434-body-tg-67-sha-superato.md"
     },
     {
       "op": "sleep",

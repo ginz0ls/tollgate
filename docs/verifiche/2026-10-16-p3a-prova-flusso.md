@@ -69,7 +69,7 @@ Commit: «tollgate P3a: fix round 2 del Task 13 (programma via python3 nei brief
 
 ### Prova reale ripetuta, con il plugin sul percorso con spazi
 
-Comando: `PLUGIN_REAL_PATH=1 bash spikes/run-p3a-flow.sh tutto` sul codice del commit di questo giro; `--plugin-dir` e `CLAUDE_PLUGIN_ROOT` sono `/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p3a` (spazi). Stessa impostazione di prima (tutto in `/tmp/tollgate-p3a/flow`, stato con sentinella, finto `gh`, `--model sonnet`).
+Comando: `PLUGIN_REAL_PATH=1 bash spikes/run-p3a-flow.sh tutto` sul codice del commit di questo giro; `--plugin-dir` e `CLAUDE_PLUGIN_ROOT` sono `/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p3a` (spazi). Stessa impostazione di prima (tutto in `/tmp/tollgate-p3a/flow`, stato con sentinella, finto `gh`, `--model sonnet`).
 
 | Passo | Esito | Evidenza |
 |---|---|---|

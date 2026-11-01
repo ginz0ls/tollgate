@@ -211,7 +211,7 @@
             "durationSeconds": 12,
             "startedAt": "2026-10-23T20:13:26.503Z",
             "error": null,
-            "tracePath": "/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-DGS2rf/out/trace.jsonl",
+            "tracePath": "/home/USER/.cache/tollgate-p5-eval-tmp/claude-eval-DGS2rf/out/trace.jsonl",
             "skippedPaidGraders": false,
             "graders": [
               {

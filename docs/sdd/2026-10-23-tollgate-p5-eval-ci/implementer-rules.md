@@ -10,7 +10,7 @@ Leggi il brief del tuo task (è i tuoi requisiti, con i valori esatti da usare a
 2. Segui il TDD: test che fallisce (RED), poi codice (GREEN).
 3. Mentre lavori lancia i test mirati (solo i file di test del task); prima del commit lancia `tests/run` (python3.11 e python3) una volta: deve essere verde e con output pulito. La suite completa dura da 19 a 31 minuti: lanciala in background con l'uscita su un file e aspetta l'esito con la notifica o con un ciclo `until` limitato su quel file; non lanciarla più di una volta per giro.
 4. Committa (mai amend, mai `--no-verify`). Il messaggio di commit finisce, dopo una riga vuota, con la riga `Co-Authored-By:` del tuo modello (per esempio `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`).
-5. Lavora solo nel worktree `/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5` (ramo `p5-eval-ci`). Mai nel checkout principale. Il percorso contiene spazi: usa sempre le virgolette.
+5. Lavora solo nel worktree `/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5` (ramo `p5-eval-ci`). Mai nel checkout principale. Il percorso contiene spazi: usa sempre le virgolette.
 6. Nessun `__pycache__` nel repo (usa `python3 -B`); controlla `git status` prima di `git add`.
 
 ## Non lanci subagenti

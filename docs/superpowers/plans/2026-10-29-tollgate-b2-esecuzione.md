@@ -81,7 +81,7 @@ Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincol
 - Un commit dopo ogni task, con la riga `Co-Authored-By` del modello. Prima di ogni commit `tests/run` deve passare con `python3.11` e con `python3`.
 - Nessun `__pycache__` nel commit: controlla `git status` prima di `git add`. Il file di prova del Task 2 (`skills/rules-base/SKILL.md` con `approved: 2026-01-01`) **non si committa mai**.
 - **Mai scrivere `approved` in `skills/rules-base/SKILL.md` fuori dal Task 5**: accenderebbe il blocco senza l'utente.
-- Lavora solo nel worktree `/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b2` (ramo `b2-regole-base`), mai nel checkout principale né su `main`. Il percorso contiene spazi: virgolette sempre.
+- Lavora solo nel worktree `/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b2` (ramo `b2-regole-base`), mai nel checkout principale né su `main`. Il percorso contiene spazi: virgolette sempre.
 - Risposte e messaggi in italiano; identificatori in inglese.
 
 **Tempi della suite**
@@ -117,5 +117,5 @@ Il resto si decide con una `Ruling:`. Miglioramenti utili, compatibili e a basso
    - push di `main` (eccezione 4) e attesa della CI verde su `main`;
    - copia il registro dal worktree in `docs/sdd/2026-10-29-tollgate-b2-regole-di-base/` con un `README.md`, come per B1, dopo il controllo di anonimizzazione, e committalo su `main` (e push);
    - aggiorna la memoria del progetto (`plugin-workflow-decisioni.md`): esito di B2, regole approvate, blocco acceso, prossimo passo (scrivere il piano di B3);
-   - **trascrizioni**: se una sessione del lavoro è partita dalla cartella del worktree, spostane i `.jsonl` (e le cartelle `<id>/`) con `mv -n` da `~/.claude/projects/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow--claude-worktrees-b2/` a `~/.claude/projects/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow/`, mai il file della sessione attiva mentre è in uso. Se tutte le sessioni sono partite dalla radice, non c'è nulla da spostare: dillo;
+   - **trascrizioni**: se una sessione del lavoro è partita dalla cartella del worktree, spostane i `.jsonl` (e le cartelle `<id>/`) con `mv -n` da `~/.claude/projects/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow--claude-worktrees-b2/` a `~/.claude/projects/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow/`, mai il file della sessione attiva mentre è in uso. Se tutte le sessioni sono partite dalla radice, non c'è nulla da spostare: dillo;
    - chiedi all'utente se rimuovere il worktree e il ramo `b2-regole-base` ormai uniti.

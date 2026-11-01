@@ -6,7 +6,7 @@
   "costUsd": 0.12269349999999998,
   "partial": false,
   "suite": {
-    "root": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin",
+    "root": "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin",
     "ablation": "with-without",
     "modelOverride": "claude-sonnet-5-5",
     "caseFilter": "nl-bash",
@@ -16,7 +16,7 @@
       {
         "name": "sonda",
         "version": "0.0.1",
-        "path": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin"
+        "path": "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin"
       }
     ]
   },

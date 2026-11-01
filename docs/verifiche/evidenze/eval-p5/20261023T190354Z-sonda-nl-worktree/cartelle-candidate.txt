@@ -1,6 +1,6 @@
 /.claude/worktrees/p5/docs/verifiche/evidenze/eval-p5/20261023T190354Z-sonda-nl-worktree/report.html
 /.claude/worktrees/p5/docs/verifiche/evidenze/eval-p5/20261023T190354Z-sonda-nl-worktree/result.json
-/home/crucco/MEGA/BIZ/VIBE/Plugin
+/home/USER/MEGA/BIZ/VIBE/Plugin
 /tmp/claude-eval-JUnd0s
 /tmp/claude-eval-JUnd0s:
 /tmp/claude-eval-JUnd0s/sealed

@@ -25,7 +25,7 @@ Commit 6afc140 «tollgate P4: gate evaluate su GitHub (controlli preliminari, st
 RED (verdict.py spostato fuori dal repo, `python3.11 -B -m unittest tests.test_gate_github`):
 ```
     from . import baseids, guard, verdict
-ImportError: cannot import name 'verdict' from 'tollgate_gate' (/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate_gate/__init__.py)
+ImportError: cannot import name 'verdict' from 'tollgate_gate' (/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/bin/tollgate_gate/__init__.py)
 
 
 ----------------------------------------------------------------------

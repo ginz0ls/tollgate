@@ -16,7 +16,7 @@
 ## Verifiche eseguite
 `bash -n spikes/gh-p4/run-p4-checks.sh`: esito 0 (stampa BASH_N_OK).
 
-Corsa `controlla` (cartella: `/tmp/claude-1000/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow/6196ff63-38d8-4a02-ada3-ddb16bd01d50/scratchpad/p4-controlla`, uscita completa in `/tmp/claude-1000/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow/6196ff63-38d8-4a02-ada3-ddb16bd01d50/scratchpad/controlla-uscita.txt`):
+Corsa `controlla` (cartella: `/tmp/claude-1000/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow/6196ff63-38d8-4a02-ada3-ddb16bd01d50/scratchpad/p4-controlla`, uscita completa in `/tmp/claude-1000/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow/6196ff63-38d8-4a02-ada3-ddb16bd01d50/scratchpad/controlla-uscita.txt`):
 ```
 cartella del controllo: <scratchpad>/p4-controlla
 modo prepara: ok
@@ -128,7 +128,7 @@ Note per il controller:
 prepara, v1, v2, **v5b**, v4, v5, (attesa delle probe-base dei push di v5), v6, v3, **v3b**, v7, v8, v9, raccogli, pulisci-sonde. (v5b prima di v5 e di ogni merge; v3b è indipendente e si può lanciare in qualunque momento dopo prepara.)
 
 ## Verifiche
-`bash -n` ok; YAML di `probe-fetch.yml` valido; nessuna `${{ }}` in `run:` (controllato da `controlla`). Corsa `controlla` (14 modi): ok, 102 comandi gh finti, nessuno fuori dai due repo né vietato, tutte le uscite attese presenti, remoti nel banco locale. Uscita in `/tmp/claude-1000/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow/6196ff63-38d8-4a02-ada3-ddb16bd01d50/scratchpad/controlla-uscita2.txt`.
+`bash -n` ok; YAML di `probe-fetch.yml` valido; nessuna `${{ }}` in `run:` (controllato da `controlla`). Corsa `controlla` (14 modi): ok, 102 comandi gh finti, nessuno fuori dai due repo né vietato, tutte le uscite attese presenti, remoti nel banco locale. Uscita in `/tmp/claude-1000/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow/6196ff63-38d8-4a02-ada3-ddb16bd01d50/scratchpad/controlla-uscita2.txt`.
 
 ---
 # Aggiunta: V4b (terzo commit)
@@ -148,7 +148,7 @@ Scrive il tag (data e ora) in `.github/probe-v4b-tag`, commit e push su main; at
 prepara, v1, v2, v5b, v4, **v4b**, v5, (attesa delle probe-base dei push di v5), v6, v3, v3b, v7, v8, v9, raccogli, pulisci-sonde. v4b è indipendente da v1 e v4 (tag nuovo a ogni corsa).
 
 ## Verifiche
-`bash -n` ok; YAML dei quattro workflow valido; nessuna `${{ }}` in `run:`. `controlla` (15 modi): ok, 119 comandi gh finti, nessuno fuori dai due repo né vietato, uscite attese presenti (anche `v4b-pr.env`, `v4b-push.env`, `v4b-riepilogo.txt`). Uscita in `/tmp/claude-1000/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow/6196ff63-38d8-4a02-ada3-ddb16bd01d50/scratchpad/controlla-uscita3.txt`. Limite: nella corsa finta i campi v4b sono `null` (gli artefatti sono finti).
+`bash -n` ok; YAML dei quattro workflow valido; nessuna `${{ }}` in `run:`. `controlla` (15 modi): ok, 119 comandi gh finti, nessuno fuori dai due repo né vietato, uscite attese presenti (anche `v4b-pr.env`, `v4b-push.env`, `v4b-riepilogo.txt`). Uscita in `/tmp/claude-1000/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow/6196ff63-38d8-4a02-ada3-ddb16bd01d50/scratchpad/controlla-uscita3.txt`. Limite: nella corsa finta i campi v4b sono `null` (gli artefatti sono finti).
 
 ---
 # Step 3-4
@@ -175,7 +175,7 @@ Sanità sui dati veri: i 146 comandi `gh` di `comandi.log` (esclusa l'annotazion
 
 **I-2, rapporto.** `docs/verifiche/2026-10-21-p4-verifiche.md:21`: scambiati i commit di pulizia; ora `pulisci-protected.txt` = `a0c1e5f`, `pulisci-detect.txt` = `349020d` (riletti sui file). Controllati anche gli altri SHA del rapporto (`76d561a`, `0fbc78d`, `513f61b`, `5eb103d`, `cea7a38`, `216898c`, `e21bc2c`, `32fb324`, `c03b433`): compaiono nelle evidenze citate.
 
-**Verifiche.** `bash -n spikes/gh-p4/run-p4-checks.sh`: 0. `controlla` (15 modi): ok, 119 comandi finti ammessi, «guard_args: 45 fermati su 45; check_gh_log: 49 violazioni su 45» (alcuni comandi vietati hanno più di una violazione), remoti nel banco, uscite attese presenti (uscita in `/tmp/claude-1000/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow/6196ff63-38d8-4a02-ada3-ddb16bd01d50/scratchpad/controlla-uscita4.txt`). `tests/run`: vedi sotto.
+**Verifiche.** `bash -n spikes/gh-p4/run-p4-checks.sh`: 0. `controlla` (15 modi): ok, 119 comandi finti ammessi, «guard_args: 45 fermati su 45; check_gh_log: 49 violazioni su 45» (alcuni comandi vietati hanno più di una violazione), remoti nel banco, uscite attese presenti (uscita in `/tmp/claude-1000/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow/6196ff63-38d8-4a02-ada3-ddb16bd01d50/scratchpad/controlla-uscita4.txt`). `tests/run`: vedi sotto.
 `tests/run` (python3.11 e python3): exit 0, «Ran 1788 tests in 418.223s, OK», lanciato prima del commit del fix round 1; nessun `__pycache__`.
 Nota: il commit 48b624b conteneva per errore `spikes/gh-p4/__pycache__` (creato da un import senza `-B` nella mia verifica); tolto con un commit nuovo (`git rm`), nessun amend.
 
@@ -192,5 +192,5 @@ Nota: il commit 48b624b conteneva per errore `spikes/gh-p4/__pycache__` (creato 
 - `controlla`: la prova negativa passa da 45 a 71 comandi vietati (aggiunti tutti gli esempi della ri-revisione: `pr view` con URL e con `altro/x#1`, `-Raltro/x`, doppio `--repo`, `--repo=altro/x`, `--body-file`, `-D /etc`, `-D` con `..`, `api …?x=1/../../`, `%2e%2e`, `//`, `./`, `pr merge` senza o con due modalità, `--delete-branch`, `run view --exit-status`, `run download -n ../x`, `repo clone` fuori da `P4_WORK`, ecc.) e una prova positiva (10 comandi legittimi devono passare). Nuovo passo: tutti i comandi veri di `docs/verifiche/evidenze/gh-p4/comandi.log` passano la guardia (138 controllati, 9 righe «(controller…)» escluse); il passo è riproducibile con `python3 -B -I spikes/gh-p4/ghguard.py comandi docs/verifiche/evidenze/gh-p4/comandi.log`.
 - Tutti gli `python3` dello script girano con `-B`; nessun `__pycache__` creato.
 
-**Verifiche.** `bash -n spikes/gh-p4/run-p4-checks.sh`: 0. `controlla` (15 modi): ok; «guard_args: 71 fermati su 71; check_gh_log: 75 violazioni su 71» (alcuni vietati hanno più violazioni), «comandi legittimi ammessi: 10 su 10», 138 comandi veri ammessi, remoti nel banco, uscite attese presenti (uscita: `/tmp/claude-1000/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow/6196ff63-38d8-4a02-ada3-ddb16bd01d50/scratchpad/controlla-uscita5.txt`).
+**Verifiche.** `bash -n spikes/gh-p4/run-p4-checks.sh`: 0. `controlla` (15 modi): ok; «guard_args: 71 fermati su 71; check_gh_log: 75 violazioni su 71» (alcuni vietati hanno più violazioni), «comandi legittimi ammessi: 10 su 10», 138 comandi veri ammessi, remoti nel banco, uscite attese presenti (uscita: `/tmp/claude-1000/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow/6196ff63-38d8-4a02-ada3-ddb16bd01d50/scratchpad/controlla-uscita5.txt`).
 `tests/run` (python3.11 e python3): exit 0, «Ran 1820 tests in 405.567s, OK», lanciato prima del commit del fix round 2.

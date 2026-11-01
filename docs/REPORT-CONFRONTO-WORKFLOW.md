@@ -44,7 +44,7 @@ Il tutto va imposto da hook, con **profili per tipo di progetto** scelti dai fil
 
 | Fonte | Come è stata analizzata | Affidabilità |
 |---|---|---|
-| Orchestratore Goal (`/home/crucco/MEGA/BIZ/VIBE/orchestratore-goal`) | Lettura completa di codice, docs, policy ed evidenze. **Test eseguiti: 102 OK in 10 s** (con fake, senza rete) | Alta |
+| Orchestratore Goal (`/home/USER/MEGA/BIZ/VIBE/orchestratore-goal`) | Lettura completa di codice, docs, policy ed evidenze. **Test eseguiti: 102 OK in 10 s** (con fake, senza rete) | Alta |
 | codex-workflow (`.../Company AgentOS/Hermesz/codex-workflow`) | Lettura completa di codice, prompt e docs. **Test eseguiti: 128 OK in 8 s** | Alta |
 | Flusso Perizie (`.../Commercialista mombello/Piattaforma Perizie`) | Lettura di CLAUDE.md, piani, avvii, audit, todo, registri sdd e memoria. Metriche da `git log` e `wc` | Alta |
 | Plugin installati (superpowers 6.4.1, agent-skills 0.6.9, GSD 1.9.4, plugin ufficiali) | Lettura dei sorgenti in `~/.claude/plugins/cache` e `~/.claude/get-shit-done` | Alta |

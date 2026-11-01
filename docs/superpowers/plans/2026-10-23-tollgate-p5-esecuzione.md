@@ -87,7 +87,7 @@ Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincol
 **Commit e lingua**
 - Un commit dopo ogni task, con la riga `Co-Authored-By` del modello. Prima di ogni commit `tests/run` deve passare con `python3.11` e con `python3`.
 - Nessun `__pycache__` nel commit: controlla `git status` prima di `git add`.
-- Lavora solo nel worktree `/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5` (ramo `p5-eval-ci`), mai nel checkout principale né su `main`. Il percorso contiene spazi: virgolette sempre.
+- Lavora solo nel worktree `/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5` (ramo `p5-eval-ci`), mai nel checkout principale né su `main`. Il percorso contiene spazi: virgolette sempre.
 - Risposte e messaggi in italiano; identificatori in inglese.
 
 ## Quando fermarsi e chiedere
@@ -112,5 +112,5 @@ Il resto si decide con una `Ruling:`. Miglioramenti utili, compatibili e a basso
    - push di `main` su `ginz0ls/tollgate` (non forzato) e attesa della CI verde su `main`;
    - copia il registro dal worktree (`.claude/worktrees/p5/.superpowers/sdd/…`) in `docs/sdd/2026-10-23-tollgate-p5-eval-ci/` con un `README.md`, come per P4, e committalo su `main` (e push);
    - aggiorna la memoria del progetto (`plugin-workflow-decisioni.md`): esito di P5, nucleo chiuso, repo `ginz0ls/tollgate`, detect lasciato all'utente da cancellare, prossimo passo (sotto-progetto B, C o D: lo sceglie l'utente);
-   - **trascrizioni**: solo se questa sessione (o una delle sessioni del lavoro) è partita dalla cartella del worktree, le sue trascrizioni stanno in `~/.claude/projects/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow--claude-worktrees-p5/` e non compaiono in `/resume` dalla radice. Spostale con `mv -n` (i `.jsonl` e le eventuali cartelle `<id>/`) in `~/.claude/projects/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow/`, mai il file della sessione attiva mentre è in uso. Se tutte le sessioni sono partite dalla radice, non c'è nulla da spostare: dillo. Non dire mai che le trascrizioni stanno dentro `.claude/worktrees/`;
+   - **trascrizioni**: solo se questa sessione (o una delle sessioni del lavoro) è partita dalla cartella del worktree, le sue trascrizioni stanno in `~/.claude/projects/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow--claude-worktrees-p5/` e non compaiono in `/resume` dalla radice. Spostale con `mv -n` (i `.jsonl` e le eventuali cartelle `<id>/`) in `~/.claude/projects/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow/`, mai il file della sessione attiva mentre è in uso. Se tutte le sessioni sono partite dalla radice, non c'è nulla da spostare: dillo. Non dire mai che le trascrizioni stanno dentro `.claude/worktrees/`;
    - chiedi all'utente se rimuovere i worktree e i rami `p4-gate` e `p5-eval-ci` ormai uniti.

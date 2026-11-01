@@ -1,6 +1,6 @@
 /.claude/worktrees/p5/docs/verifiche/evidenze/eval-p5/20261023T190444Z-sonda-radice-tmp/report.html
 /.claude/worktrees/p5/docs/verifiche/evidenze/eval-p5/20261023T190444Z-sonda-radice-tmp/result.json
-/home/crucco/MEGA/BIZ/VIBE/Plugin
+/home/USER/MEGA/BIZ/VIBE/Plugin
 /tmp/claude-eval-xC9L1e
 /tmp/claude-eval-xC9L1e:
 /tmp/claude-eval-xC9L1e/sealed

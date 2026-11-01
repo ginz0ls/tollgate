@@ -59,6 +59,6 @@ Data: 23/10/2026. Esecuzione del controller con `spikes/p5/run-p5-checks.sh` (mo
 - Nessun file in `docs/verifiche/evidenze/p5/` e `eval-p5/` contiene forme di token (`gh[pos]_…`, `github_pat_…`, `sk-ant-…`, `AKIA…`, stesso `TOKEN_PATTERN` dello script).
 - I registri degli hook (`sonda-hooks.jsonl`, `hooks.jsonl`: 60 righe) contengono solo le chiavi previste e, in `env`, solo `HOME`, `PATH`, `CLAUDE_CONFIG_DIR`, `CLAUDE_PLUGIN_ROOT`, `PWD`, `TMPDIR`; delle altre variabili solo i nomi.
 - Dimensione: `p5/` 924 KB, `eval-p5/` 2,8 MB; 391 file; nessun file sopra 10 MB (il più grande è `p5/ci-watch.out`, 163 KB).
-- Le evidenze contengono percorsi assoluti dell'utente (`/home/crucco/…`: radice del plugin, `TMPDIR` delle corse); il repo è privato, da ripulire prima di una pubblicazione (decisione 20).
+- Le evidenze contengono percorsi assoluti dell'utente (`/home/USER/…`: radice del plugin, `TMPDIR` delle corse); il repo è privato, da ripulire prima di una pubblicazione (decisione 20).
 - `tests/run` lanciato prima del commit (solo docs/evidenze toccati): 3.11 `Ran 2559 tests … OK (skipped=2)`, python3 (3.13) `Ran 2559 tests … OK`.
 - Correzione del rapporto (I1, M1-M6): `tests/run` rilanciato prima del commit: 3.11 `Ran 2559 tests … OK (skipped=2)`, python3 `Ran 2559 tests … OK`.

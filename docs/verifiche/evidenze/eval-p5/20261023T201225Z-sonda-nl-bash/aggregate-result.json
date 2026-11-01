@@ -6,7 +6,7 @@
   "costUsd": 0.1320965,
   "partial": false,
   "suite": {
-    "root": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin",
+    "root": "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin",
     "ablation": "with-without",
     "modelOverride": "claude-sonnet-5-5",
     "caseFilter": "nl-bash",
@@ -16,7 +16,7 @@
       {
         "name": "sonda",
         "version": "0.0.1",
-        "path": "/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin"
+        "path": "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin"
       }
     ]
   },
@@ -167,7 +167,7 @@
             "durationSeconds": 16,
             "startedAt": "2026-10-23T20:12:25.864Z",
             "error": null,
-            "tracePath": "/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-JGdbCR/out/trace.jsonl",
+            "tracePath": "/home/USER/.cache/tollgate-p5-eval-tmp/claude-eval-JGdbCR/out/trace.jsonl",
             "skippedPaidGraders": false,
             "graders": [
               {
@@ -279,7 +279,7 @@
             "durationSeconds": 16,
             "startedAt": "2026-10-23T20:12:41.814Z",
             "error": null,
-            "tracePath": "/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-3vswfF/out/trace.jsonl",
+            "tracePath": "/home/USER/.cache/tollgate-p5-eval-tmp/claude-eval-3vswfF/out/trace.jsonl",
             "skippedPaidGraders": false,
             "graders": [
               {

@@ -2,7 +2,7 @@
 
 **Status:** DONE
 **Commit:** `82e6e16` tollgate P2: migrazione 2, sessioni, subagenti, assegnazione dei task
-**Ramo:** `p2-guardrail` (worktree `/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p2-guardrail`)
+**Ramo:** `p2-guardrail` (worktree `/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p2-guardrail`)
 
 ## Implementato
 

@@ -1,8 +1,8 @@
-PWD=/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-kBNkCv/home/cwd
-HOME=/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-kBNkCv/home
+PWD=/home/USER/.cache/tollgate-p5-eval-tmp/claude-eval-kBNkCv/home/cwd
+HOME=/home/USER/.cache/tollgate-p5-eval-tmp/claude-eval-kBNkCv/home
 CLAUDE_CONFIG_DIR=UNSET
 DOT_GIT_IS_FILE=yes
-DOT_GIT_CONTENT=gitdir: /home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-kBNkCv/home/proj/.git/worktrees/cwd
+DOT_GIT_CONTENT=gitdir: /home/USER/.cache/tollgate-p5-eval-tmp/claude-eval-kBNkCv/home/proj/.git/worktrees/cwd
 GITDIR_OUTSIDE_WORKSPACE=yes
 BRANCH=tg/1-sonda
 WORKTREE_LIST=2

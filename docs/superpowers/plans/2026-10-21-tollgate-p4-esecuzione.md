@@ -80,7 +80,7 @@ Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincol
 **Commit e lingua**
 - Un commit dopo ogni task, con la riga `Co-Authored-By` del modello. Prima di ogni commit `tests/run` deve passare con `python3.11` e con `python3`.
 - Nessun `__pycache__` nel commit: controlla `git status` prima di `git add`.
-- Lavora solo nel worktree `/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4` (ramo `p4-gate`), mai nel checkout principale né su `main`. Il percorso contiene spazi: virgolette sempre.
+- Lavora solo nel worktree `/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4` (ramo `p4-gate`), mai nel checkout principale né su `main`. Il percorso contiene spazi: virgolette sempre.
 - Risposte e messaggi in italiano; identificatori in inglese.
 
 ## Quando fermarsi e chiedere
@@ -101,5 +101,5 @@ Il resto si decide con una `Ruling:`. Miglioramenti utili, compatibili e a basso
 5. Dopo il merge (con l'OK):
    - copia il registro dal worktree (`.claude/worktrees/p4/.superpowers/sdd/…`) in `docs/sdd/2026-10-21-tollgate-p4-gate/` con un `README.md`, come per P3c, e committalo su `main`;
    - aggiorna la memoria del progetto (`plugin-workflow-decisioni.md`): esito di P4, repo di prova lasciati all'utente da cancellare (`ginz0ls/tollgate-p4-protected`, `ginz0ls/tollgate-p4-detect`), prossimo passo (P5);
-   - **trascrizioni**: solo se questa sessione (o una delle sessioni del lavoro) è partita dalla cartella del worktree, le sue trascrizioni stanno in `~/.claude/projects/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow--claude-worktrees-p4/` e non compaiono in `/resume` dalla radice. Spostale con `mv -n` (i `.jsonl` e le eventuali cartelle `<id>/`) in `~/.claude/projects/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow/`, mai il file della sessione attiva mentre è in uso. Se tutte le sessioni sono partite dalla radice, non c'è nulla da spostare: dillo. Non dire mai che le trascrizioni stanno dentro `.claude/worktrees/`;
+   - **trascrizioni**: solo se questa sessione (o una delle sessioni del lavoro) è partita dalla cartella del worktree, le sue trascrizioni stanno in `~/.claude/projects/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow--claude-worktrees-p4/` e non compaiono in `/resume` dalla radice. Spostale con `mv -n` (i `.jsonl` e le eventuali cartelle `<id>/`) in `~/.claude/projects/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow/`, mai il file della sessione attiva mentre è in uso. Se tutte le sessioni sono partite dalla radice, non c'è nulla da spostare: dillo. Non dire mai che le trascrizioni stanno dentro `.claude/worktrees/`;
    - i repo di prova restano su GitHub: ricorda all'utente che li cancella lui.

@@ -10,7 +10,7 @@ Leggi il brief del tuo task (è i tuoi requisiti, con i valori esatti da usare a
 2. Segui il TDD: test che fallisce (RED), poi codice (GREEN).
 3. Mentre lavori lancia i test mirati; prima del commit lancia `tests/run` (python3.11 e python3) una volta: deve essere verde e con output pulito.
 4. Committa (mai amend, mai `--no-verify`). Il messaggio di commit finisce, dopo una riga vuota, con la riga `Co-Authored-By:` del tuo modello (per esempio `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`).
-5. Lavora solo nel worktree `/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p3c` (ramo `p3c-percorso-l2`). Mai nel checkout principale. Il percorso contiene spazi: usa sempre le virgolette.
+5. Lavora solo nel worktree `/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p3c` (ramo `p3c-percorso-l2`). Mai nel checkout principale. Il percorso contiene spazi: usa sempre le virgolette.
 6. Nessun `__pycache__` nel repo (usa `python3 -B`); controlla `git status` prima di `git add`.
 
 ## Non lanci subagenti

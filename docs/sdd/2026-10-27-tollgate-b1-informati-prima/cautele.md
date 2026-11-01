@@ -19,7 +19,7 @@
 **Commit e lingua**
 - Un commit dopo ogni task, con la riga `Co-Authored-By` del modello. Prima di ogni commit `tests/run` deve passare con `python3.11` e con `python3`.
 - Nessun `__pycache__` nel commit: controlla `git status` prima di `git add`.
-- Lavora solo nel worktree `/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b1` (ramo `b1-informati-prima`), mai nel checkout principale né su `main`. Il percorso contiene spazi: virgolette sempre.
+- Lavora solo nel worktree `/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b1` (ramo `b1-informati-prima`), mai nel checkout principale né su `main`. Il percorso contiene spazi: virgolette sempre.
 - Risposte e messaggi in italiano; identificatori in inglese.
 
 **Tempi della suite**

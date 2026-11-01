@@ -65,7 +65,7 @@ Ordine di `eval-sonda` (6 invocazioni, tetto 3 USD ciascuna o il residuo): `sond
 Prima: Step 0 (precondizioni). Poi, dalla radice del worktree (percorso con spazi: virgolette):
 
 ```
-R="/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5"; cd "$R"
+R="/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5"; cd "$R"
 bash spikes/p5/run-p5-checks.sh controlla          # già verde; nessuna rete
 ```
 1. `bash spikes/p5/run-p5-checks.sh eval-sonda` - 6 invocazioni di `claude plugin eval` (costo atteso pochi USD; ognuna max 3 USD). Guardare: `docs/verifiche/evidenze/eval-p5/budget.tsv`, in ogni cartella `<ora>-<etichetta>/`: `result.json` (VE8: campi costo/durata/token), `aggregate-result.json`, `report.html`, `stderr.txt` (rifiuti: `not granted`, errori di caricamento di `EnterWorktree`), `files/…` (esiti.txt, sonda-hooks.jsonl, sonda-scaffold.txt, hooks.jsonl sotto `.local/state/sonda`). `sonda-ve1-dependencies` = VE1; `sonda-radice-tmp` vs `sonda-skill` = D10. Se compare `COSTO-IGNOTO.txt` non lanciare altro.

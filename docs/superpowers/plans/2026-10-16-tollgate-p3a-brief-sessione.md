@@ -54,4 +54,4 @@ Il lavoro è finito quando:
 
 - `main` è a `e454611` (piano P3a scritto e committato). La suite su `main` ha 692 test verdi.
 - I worktree e i rami di P0, P1 e P2 sono stati rimossi. `.claude/worktrees/` è in `.gitignore`.
-- La memoria del progetto (`~/.claude/projects/-home-crucco-MEGA-BIZ-VIBE-Plugin-IT-workflow/memory/`) contiene le decisioni (`plugin-workflow-decisioni.md`, compresa quella su P3), il feedback sulle domande e i rinviati di P1.
+- La memoria del progetto (`~/.claude/projects/-home-USER-MEGA-BIZ-VIBE-Plugin-IT-workflow/memory/`) contiene le decisioni (`plugin-workflow-decisioni.md`, compresa quella su P3), il feedback sulle domande e i rinviati di P1.

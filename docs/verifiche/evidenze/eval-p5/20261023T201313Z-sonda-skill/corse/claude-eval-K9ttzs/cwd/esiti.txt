@@ -1,12 +1,12 @@
 PYTHON3=ok 3.13.5
 GIT=ok git version 2.47.3
 PLUGIN_ROOT_READABLE=yes
-PLUGIN_ROOT_FROM_FILE=/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin
+PLUGIN_ROOT_FROM_FILE=/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p5/spikes/p5/probe-plugin
 ENV_CLAUDE_PLUGIN_ROOT=UNSET
 ENV_CLAUDE_PLUGIN_ROOT_EQUALS_FILE_ROOT=unset
-HOME=/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-K9ttzs/home
-CLAUDE_CONFIG_DIR=/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-K9ttzs/config
-CWD=/home/crucco/.cache/tollgate-p5-eval-tmp/claude-eval-K9ttzs/home/cwd
+HOME=/home/USER/.cache/tollgate-p5-eval-tmp/claude-eval-K9ttzs/home
+CLAUDE_CONFIG_DIR=/home/USER/.cache/tollgate-p5-eval-tmp/claude-eval-K9ttzs/config
+CWD=/home/USER/.cache/tollgate-p5-eval-tmp/claude-eval-K9ttzs/home/cwd
 STATE_MKDIR=ok
 STATE_WRITE=ok
 STATE_READ=ok

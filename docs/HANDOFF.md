@@ -5,14 +5,14 @@ Stato: **analisi conclusa, nessuna implementazione avviata**. Tre decisioni dell
 Destinatario: un agente nuovo, con contesto pulito, che riprende da qui.
 
 > **Documento storico.** Stato all'8 ottobre 2026 (mattina). Le decisioni della sezione 6 sono state prese e il progetto è un repository git. Le decisioni in vigore sono in `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (revisione 18); per riprendere il lavoro si parte da quella e dal piano principale `docs/superpowers/plans/2026-10-08-tollgate-nucleo-piano-principale.md`.
-Sede del progetto (decisione dell'utente, 08/10): `/home/crucco/MEGA/BIZ/VIBE/Plugin IT workflow`, cartella autonoma. Non è ancora un repository git. L'analisi è nata in una sessione della Piattaforma Perizie. I percorsi assoluti dei tre progetti stanno nella sezione 2; nel resto del documento i percorsi relativi si riferiscono alla cartella del progetto di cui si parla.
+Sede del progetto (decisione dell'utente, 08/10): `/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow`, cartella autonoma. Non è ancora un repository git. L'analisi è nata in una sessione della Piattaforma Perizie. I percorsi assoluti dei tre progetti stanno nella sezione 2; nel resto del documento i percorsi relativi si riferiscono alla cartella del progetto di cui si parla.
 
 ## 1. Cosa ha chiesto l'utente
 
 In una sola conversazione, in quest'ordine:
 
-1. Confrontare l'**Orchestratore Goal** (`/home/crucco/MEGA/BIZ/VIBE/orchestratore-goal`) con il flusso usato per la **Piattaforma Perizie** (questo repository): approccio migliore, pro e contro.
-2. Aggiungere al confronto **codex-workflow** (`/home/crucco/MEGA/BIZ/VIBE/Company AgentOS/Hermesz/codex-workflow`). È nato per Hermes con Jira, ma va valutato pensando a **un plugin generico, non solo per Hermes, costruito da noi come skill**.
+1. Confrontare l'**Orchestratore Goal** (`/home/USER/MEGA/BIZ/VIBE/orchestratore-goal`) con il flusso usato per la **Piattaforma Perizie** (questo repository): approccio migliore, pro e contro.
+2. Aggiungere al confronto **codex-workflow** (`/home/USER/MEGA/BIZ/VIBE/Company AgentOS/Hermesz/codex-workflow`). È nato per Hermes con Jira, ma va valutato pensando a **un plugin generico, non solo per Hermes, costruito da noi come skill**.
 3. Un parere sul metodo di Perizie: **prima il piano generale, poi un piano dettagliato per ogni fetta**.
 4. Questo documento.
 
@@ -22,7 +22,7 @@ Il documento non autorizza lavoro: il prossimo passo lo decide l'utente.
 
 ### Cartelle dei tre progetti (percorsi assoluti)
 
-**Orchestratore Goal**: `/home/crucco/MEGA/BIZ/VIBE/orchestratore-goal` (repository git locale, senza remoto)
+**Orchestratore Goal**: `/home/USER/MEGA/BIZ/VIBE/orchestratore-goal` (repository git locale, senza remoto)
 - `goal_orchestrator/`: controller (`controller.py`, `workflow.py`, `audit.py`, `native.py`, `rpc.py`, `store.py`, `workspace.py`, `models.py`…)
 - `tests/`: suite `unittest`
 - `docs/`: PRD, decisioni, mancanze, ricerca sulle alternative, handoff d'origine; `docs/audit/` con i rapporti dell'audit
@@ -34,7 +34,7 @@ Il documento non autorizza lavoro: il prossimo passo lo decide l'utente.
 - `.runs/`: run di prova sulle fixture sintetiche (`native-e2e/`, `local-simple-proof/`)
 - `.tools/codex-0.161.0/`: runtime Codex locale
 
-**codex-workflow (Hermes)**: `/home/crucco/MEGA/BIZ/VIBE/Company AgentOS/Hermesz/codex-workflow` (sottocartella del repository git `/home/crucco/MEGA/BIZ/VIBE/Company AgentOS`, remoto `ginz0ls/company-agentos`)
+**codex-workflow (Hermes)**: `/home/USER/MEGA/BIZ/VIBE/Company AgentOS/Hermesz/codex-workflow` (sottocartella del repository git `/home/USER/MEGA/BIZ/VIBE/Company AgentOS`, remoto `ginz0ls/company-agentos`)
 - `workflow_bridge/`: ponte (`coordinator.py`, `worker.py`, `workflow.py`, `transitions.py`, `reviews.py`, `specialists.py`, `hierarchy.py`, `adapters.py`, `codex.py`, `worktree.py`, `security.py`, `server.py`, `store.py`, `reconciliation.py`…)
 - `prompts/`: un prompt per ruolo (`sol-planner`, `terra-developer`, `sol-reviewer`, `security-`, `testing-`, `docs-specialist`)
 - `tests/`: suite `unittest`
@@ -44,7 +44,7 @@ Il documento non autorizza lavoro: il prossimo passo lo decide l'utente.
 - `config.example.json`, `config.evminmax.example.json`: configurazioni d'esempio, senza segreti
 - Accanto, non letti: `../REPORT-HERMES.md`, `../docs/`, `../sales-department/` (pacchetto separato, vedi `docs/canonical-source.md`)
 
-**Piattaforma Perizie**: `/home/crucco/MEGA/BIZ/VIBE/Commercialista mombello/Piattaforma Perizie` (repository git, remoto `ginz0ls/piattaforma-perizie`)
+**Piattaforma Perizie**: `/home/USER/MEGA/BIZ/VIBE/Commercialista mombello/Piattaforma Perizie` (repository git, remoto `ginz0ls/piattaforma-perizie`)
 - `CLAUDE.md`: regole del progetto e lezioni di tutte le fette
 - `docs/superpowers/specs/`: specifica (fonte di verità)
 - `docs/superpowers/plans/`: due piani generali (`2026-09-24-modulo-perizie-piano-generale.md`, `2026-10-07-assistente-operativo-piano-generale.md`) e i piani delle fette A–O
@@ -54,7 +54,7 @@ Il documento non autorizza lavoro: il prossimo passo lo decide l'utente.
 - `docs/misure/`, `docs/valutazioni/`: misure e valutazioni dei modelli
 - `tasks/todo.md`: stato, ruling e rilievi di ogni fetta
 - `.superpowers/sdd/`: registri di `subagent-driven-development` (fuori da git)
-- Memoria di Claude Code: `/home/crucco/.claude/projects/-home-crucco-MEGA-BIZ-VIBE-Commercialista-mombello-Piattaforma-Perizie/memory/`
+- Memoria di Claude Code: `/home/USER/.claude/projects/-home-USER-MEGA-BIZ-VIBE-Commercialista-mombello-Piattaforma-Perizie/memory/`
 - Skill globali usate dal flusso: `~/.claude/skills/` (`prd-audit` e altre) e i plugin `superpowers` e `agent-skills`
 
 ### File letti (da rileggere se serve un dettaglio)
