@@ -497,6 +497,23 @@ class FlowBench(Bench):
     def claude_p(self):
         return [c for c in self.calls() if c["args"][:1] == ["-p"]]
 
+    def src_repo(self, *, approved=True):
+        """Un piccolo repo git che traccia `bin/` del repo e una `skills/rules-base/SKILL.md`: la radice sorgente (`B1_FLOW_SRC`)."""
+        src = self.dir / "src"
+        (src / "skills" / "rules-base").mkdir(parents=True)
+        tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z", "--", "bin"], capture_output=True, check=True).stdout
+        for rel in filter(None, tracked.decode().split("\0")):
+            (src / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / rel, src / rel)
+        head = "---\nname: rules-base\ndescription: Regole di prova della sorgente finta.\nversion: 1\n"
+        (src / "skills" / "rules-base" / "SKILL.md").write_text(
+            head + ("approved: 2026-11-01\n" if approved else "") + "---\n# Regole di base (versione 1)\n\nUna regola di prova.\n")
+        git = ["git", "-C", str(src), "-c", "user.name=prova", "-c", "user.email=prova@example.com", "-c", "commit.gpgsign=false"]
+        subprocess.run([*git, "init", "-q", "-b", "main"], check=True, capture_output=True, env=self.env())
+        subprocess.run([*git, "add", "-A"], check=True, capture_output=True, env=self.env())
+        subprocess.run([*git, "commit", "-qm", "sorgente"], check=True, capture_output=True, env=self.env())
+        return src
+
 
 class FlowScriptTest(unittest.TestCase):
     def setUp(self):
@@ -592,6 +609,83 @@ class FlowScriptTest(unittest.TestCase):
         self.b.prepara()
         self.assertFalse((self.b.plugin / stray.name).exists())
         self.assertTrue((self.b.plugin / "bin" / "tollgate").is_file())
+
+    def test_flow_rules_vere_keeps_real_rules_base(self):
+        src = self.b.src_repo()
+        r = self.b.run("prepara", B1_FLOW_RULES="vere", B1_FLOW_SRC=str(src))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        copy = self.b.plugin / "skills" / "rules-base" / "SKILL.md"
+        self.assertEqual(copy.read_bytes(), (src / "skills" / "rules-base" / "SKILL.md").read_bytes())
+        self.assertNotIn("prova-b1", copy.read_text())
+        self.assertFalse(list(self.b.plugin.rglob("__pycache__")))
+
+    def test_flow_rules_vere_refuses_unapproved(self):
+        src = self.b.src_repo(approved=False)
+        r = self.b.run("prepara", B1_FLOW_RULES="vere", B1_FLOW_SRC=str(src))
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("interruttore", r.stderr)
+        self.assertFalse((self.b.flow / ".git").exists(), "ci si ferma prima di creare il progetto")
+        self.assertEqual(self.b.calls(), [])
+
+    def test_flow_rules_vere_out_dir(self):
+        for rules, expected in (("vere", "docs/verifiche/evidenze/b2/flusso"), ("prova", "docs/verifiche/evidenze/b1/flusso"), (None, "docs/verifiche/evidenze/b1/flusso")):
+            with self.subTest(rules=rules):
+                extra = {} if rules is None else {"B1_FLOW_RULES": rules}
+                r = subprocess.run(["bash", str(FLOW_SCRIPT), "controlla"], capture_output=True, text=True, env=clean_env(**extra), timeout=120)
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+                self.assertIn("CONTROLLA: ok", r.stdout)
+                self.assertIn(f"B1_FLOW_RULES: {rules or 'prova'}", r.stdout)
+                self.assertIn(f"cartella delle uscite: {ROOT}/{expected}", r.stdout)
+                self.assertIn(f"radice sorgente: {ROOT}", r.stdout)
+                self.assertEqual(r.stderr, "")
+
+    def test_flow_rules_unknown_value(self):
+        for mode in ("controlla", "prepara", "passo1", "passo2", "registra"):
+            with self.subTest(mode=mode):
+                r = self.b.run(mode, B1_FLOW_RULES="altro")
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn("B1_FLOW_RULES", r.stderr)
+        self.assertEqual(self.b.calls(), [])
+        self.assertFalse(self.b.root.exists())
+
+    def test_flow_src_only_in_check_mode(self):
+        for mode in ("controlla", "prepara"):
+            with self.subTest(mode=mode):
+                r = self.b.run(mode, B1_FLOW_CHECK="0", B1_FLOW_SRC=str(self.b.dir / "src"))
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn("B1_FLOW_SRC", r.stderr)
+        self.assertFalse(self.b.root.exists())
+
+    def test_flow_copy_fails_on_missing_tracked_file(self):
+        src = self.b.src_repo()
+        (src / "bin" / "tollgate").unlink()
+        r = self.b.run("prepara", B1_FLOW_RULES="vere", B1_FLOW_SRC=str(src))
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("copia del plugin non riuscita", r.stderr)
+
+    def test_flowreg_precarico(self):
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-b2-flowreg-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        sub_ok = tmp / "agent-uno.jsonl"
+        sub_ok.write_text(json.dumps({"message": {"content": "# Regole di base (versione 1)\n- R-BASE-01 ..."}}) + "\n")
+        sub_no = tmp / "agent-due.jsonl"
+        sub_no.write_text(json.dumps({"message": {"content": "niente"}}) + "\n")
+        stream = tmp / "claude.jsonl"
+        lines = [{"type": "system", "hook_event_name": "SubagentStop", "agent_transcript_path": str(p)} for p in (sub_ok, sub_no, tmp / "manca.jsonl")]
+        lines.append({"type": "assistant", "message": {"content": [{"type": "text", "text": "ho letto R-BASE-03"}]}})
+        stream.write_text("".join(json.dumps(x) + "\n" for x in lines))
+        out = subprocess.run([sys.executable, "-B", str(FLOW_REG), "precarico", str(stream)], capture_output=True, text=True, check=True).stdout
+        self.assertIn("metodo: trascrizioni", out)
+        self.assertIn("titolo trovato in 1 di 2 trascrizioni", out)
+        self.assertIn("agent-uno.jsonl: titolo trovato", out)
+        self.assertIn("agent-due.jsonl: titolo assente", out)
+        self.assertNotIn(str(tmp), out)
+        # senza percorsi nelle uscite: solo l'indizio delle righe con R-BASE-
+        bare = tmp / "bare.jsonl"
+        bare.write_text(json.dumps({"type": "assistant", "message": {"content": "R-BASE-01"}}) + "\nnon json\n" + json.dumps({"x": "niente"}) + "\n")
+        out = subprocess.run([sys.executable, "-B", str(FLOW_REG), "precarico", str(bare)], capture_output=True, text=True, check=True).stdout
+        self.assertIn("metodo: indizio", out)
+        self.assertIn("righe con R-BASE-: 1", out)
 
     def test_flow_requires_plugin_dir(self):
         self.b.prepara()

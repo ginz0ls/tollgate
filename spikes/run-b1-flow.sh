@@ -4,9 +4,14 @@
 # Modo `controlla`: nessuna rete, nessun `claude`, nessuna scrittura: stampa i passi e i comandi.
 # Uso: run-b1-flow.sh controlla | prepara | passo1 | passo2 | registra
 #
+# B1_FLOW_RULES: `prova` (il predefinito: la rules-base di prova di B1) oppure `vere` (B2, decisione 12: la copia tiene la
+# rules-base vera e approvata e le uscite vanno in docs/verifiche/evidenze/b2/flusso). B1_FLOW_SRC: la radice da copiare
+# (solo con B1_FLOW_CHECK=1, nei test; altrimenti è la radice del repo).
+#
 #   controlla  stampa i passi e i comandi `claude`, controlla i file (nessuna scrittura)
 #   prepara    copia il plugin in /tmp/tollgate-b1/plugin e vi aggiunge SOLO NELLA COPIA skills/rules-base/SKILL.md con
-#              `approved: prova-b1` (l'interruttore di B1 acceso, decisione 8); crea il progetto di prova in
+#              `approved: prova-b1` (l'interruttore di B1 acceso, decisione 8; con B1_FLOW_RULES=vere tiene invece la
+#              rules-base della copia e si ferma se non accende l'interruttore); crea il progetto di prova in
 #              /tmp/tollgate-b1/flow (repo con origin nudo locale), lo stato con la sentinella in /tmp/tollgate-b1/state e
 #              il gh finto in testa al PATH; controlla il piano di prova con plan-check
 #   passo1     `claude plugin validate --strict` sulla copia (senza modello; se fallisce il passo si ferma), poi
@@ -15,7 +20,7 @@
 #   registra   versione di claude, righe di `lookups` e nota salvata, `.tollgate-run/1/research-*.md`, eventi research_note,
 #              research_reminder e veto, stato dei task (`status --json`), comandi Bash del modello, conto dei Grep
 #
-# Uscite in docs/verifiche/evidenze/b1/flusso/: mai cancellate. Ogni tentativo di un passo è una sottocartella nuova
+# Uscite in docs/verifiche/evidenze/b1/flusso/ (b2/flusso con B1_FLOW_RULES=vere): mai cancellate. Ogni tentativo di un passo è una sottocartella nuova
 # (<passo>/tentativo-N) con argv, uscita JSONL, errori e l'esito; oltre 3 tentativi per passo lo script rifiuta. Ciò che esiste
 # già si rinomina in <nome>.prev-<tempo>.
 #
@@ -30,9 +35,12 @@ MODE="${1:-}"
 DEFAULT_TMP=/tmp/tollgate-b1
 CHECK="${B1_FLOW_CHECK:-0}"                              # 1 solo nei test: permette un'altra radice
 TMP="${B1_FLOW_ROOT:-$DEFAULT_TMP}"
+RULES="${B1_FLOW_RULES:-prova}"                          # prova (B1) | vere (B2, decisione 12)
+SRC="$root"                                              # la radice da copiare; un'altra solo nei test
 OUT="$root/docs/verifiche/evidenze/b1/flusso"
+[ "$RULES" = vere ] && OUT="$root/docs/verifiche/evidenze/b2/flusso"
 PLUGIN="$TMP/plugin"
-[ "$CHECK" = 1 ] && { OUT="${B1_FLOW_OUT:-$OUT}"; PLUGIN="${B1_FLOW_PLUGIN-$PLUGIN}"; }
+[ "$CHECK" = 1 ] && { OUT="${B1_FLOW_OUT:-$OUT}"; PLUGIN="${B1_FLOW_PLUGIN-$PLUGIN}"; SRC="${B1_FLOW_SRC:-$SRC}"; }
 REPO="$TMP/flow"
 BARE="$TMP/origin.git"
 STATE="$TMP/state"
@@ -57,6 +65,9 @@ Bash(git push -f:*),Bash(git push --mirror:*),Bash(git push --delete:*),\
 Bash(curl:*),Bash(wget:*),Bash(*/curl:*),Bash(*/wget:*)"
 
 die() { echo "ERRORE: $*" >&2; exit 1; }
+
+case "$RULES" in prova|vere) ;; *) die "B1_FLOW_RULES vale '$RULES': i valori ammessi sono prova e vere" ;; esac
+[ "$CHECK" = 1 ] || [ -z "${B1_FLOW_SRC:-}" ] || die "B1_FLOW_SRC vale solo con B1_FLOW_CHECK=1"
 
 # rot <percorso...>: se esiste lo rinomina in <percorso>.prev-<tempo> (mai cancellare)
 rot() {
@@ -115,8 +126,15 @@ TESTO
 modo_controlla() {
   local rc=0 f
   echo "radice di lavoro: $DEFAULT_TMP"
+  echo "B1_FLOW_RULES: $RULES"
+  echo "radice sorgente: $SRC"
+  echo "cartella delle uscite: $OUT"
   echo "--- i passi"
-  echo "  prepara   copia del plugin in $DEFAULT_TMP/plugin con skills/rules-base/SKILL.md (approved: prova-b1) solo nella copia; progetto in $DEFAULT_TMP/flow"
+  if [ "$RULES" = vere ]; then
+    echo "  prepara   copia del plugin in $DEFAULT_TMP/plugin con la skills/rules-base/SKILL.md vera (si ferma se non accende l'interruttore); progetto in $DEFAULT_TMP/flow"
+  else
+    echo "  prepara   copia del plugin in $DEFAULT_TMP/plugin con skills/rules-base/SKILL.md (approved: prova-b1) solo nella copia; progetto in $DEFAULT_TMP/flow"
+  fi
   echo "  passo1    claude plugin validate --strict sulla copia, poi claude -p \"/tollgate:start #$ISSUE L1\" dal checkout"
   echo "  passo2    dal worktree: Write del piano, commit, poi /tollgate:execute"
   echo "  registra  lookups, nota, eventi research_note/research_reminder/veto, stato dei task, comandi Bash, conto dei Grep"
@@ -148,11 +166,21 @@ modo_prepara() {
   mkdir -p "$PLUGIN" "$REPO" "$STATE" "$GHBIN" || die "cartelle di lavoro non create"
   # la copia del plugin: solo i file tracciati da git (mai un file ignorato o non tracciato della radice,
   # come un futuro .env), senza i dati di sviluppo; evals e LICENSES restano, li cita plugin.json
-  ( cd "$root" && git ls-files -z -- . ':!.github' ':!.claude' ':!.superpowers' ':!docs' ':!spikes' ':!tests' \
+  ( cd "$SRC" && git ls-files -z -- . ':!.github' ':!.claude' ':!.superpowers' ':!docs' ':!spikes' ':!tests' \
       | tar --null -T - -cf - ) \
     | ( cd "$PLUGIN" && tar -xf - ) || die "copia del plugin non riuscita"
-  mkdir -p "$PLUGIN/skills/rules-base"
-  cat > "$PLUGIN/skills/rules-base/SKILL.md" <<'TESTO'
+  if [ "$RULES" = vere ]; then
+    # la rules-base della copia è quella vera: l'interruttore deve essere acceso, altrimenti la prova non proverebbe nulla
+    python3 -B - "$PLUGIN" <<'PY' || die "la rules-base della copia non accende l'interruttore (approved mancante o file assente): la prova con le regole vere non ha senso"
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1] + "/bin")
+from tollgate_core import lookups
+sys.exit(0 if lookups.rules_enforced(Path(sys.argv[1])) else 1)
+PY
+  else
+    mkdir -p "$PLUGIN/skills/rules-base"
+    cat > "$PLUGIN/skills/rules-base/SKILL.md" <<'TESTO'
 ---
 name: rules-base
 description: Regole di prova della prova reale di B1.
@@ -161,6 +189,7 @@ approved: prova-b1
 
 Regole di prova della prova reale di B1: non sono le regole di B2.
 TESTO
+  fi
   : > "$STATE/.tollgate-test"
   printf '#!/bin/sh\nexec python3 "%s" "$@"\n' "$root/tests/fakegh.py" > "$GHBIN/gh" && chmod +x "$GHBIN/gh" || die "gh finto non scritto"
   # il progetto di prova (senza l'issue e il piano, che stanno nei dati del gh finto e nel prompt)
@@ -326,6 +355,13 @@ modo_registra() {
     python3 -B "$here/b1/flowreg.py" comandi "${files[@]}" > "$d/comandi-modello.txt" 2> "$d/comandi-modello.err"; fallisce comandi-modello $?
   fi
   python3 -B "$here/b1/flowreg.py" grep "$d/comandi-modello.txt" "$d/lookups.txt" > "$d/grep-non-registrati.txt" 2>&1
+  if [ "$RULES" = vere ]; then # prova del precaricamento (o indizio) della rules-base negli agenti
+    if [ "${#files[@]}" -gt 0 ]; then
+      python3 -B "$here/b1/flowreg.py" precarico "${files[@]}" > "$d/precarico.txt" 2> "$d/precarico.err"; fallisce precarico $?
+    else
+      echo "nessun flusso di claude -p da esaminare" > "$d/precarico.txt"
+    fi
+  fi
   grep -E '^bash.*(git[^|;&]*push|gh |curl|wget)' "$d/comandi-modello.txt" > "$d/comandi-rischiosi.txt" 2>&1
   wt="$(worktree_lavoro 2>/dev/null)" && {
     git -C "$wt" log --format='%h %s' > "$d/git-log-worktree.txt" 2>&1
