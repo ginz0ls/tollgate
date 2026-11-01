@@ -2,7 +2,9 @@
 
 L0, sessione principale: un avviso per lavoro. L1 e L2, implementatore del task: nessuna decisione
 con la nota valida; senza, rifiuto se l'interruttore è acceso (`approved` in `rules-base`),
-altrimenti un avviso per task. L'avviso è un `inject` a `pre_*` e si registra (`research_reminder`)
+altrimenti un avviso per task. Se l'interruttore non si legge (`rules_switch` dà un errore) vale
+come spento, ma l'avviso lo dice e un `post_*` registra, una volta per piano, l'evento
+`research_switch_unreadable`. L'avviso è un `inject` a `pre_*` e si registra (`research_reminder`)
 a `post_*`, solo se la modifica è riuscita: un rifiuto di un altro controllo non lo consuma."""
 from __future__ import annotations
 

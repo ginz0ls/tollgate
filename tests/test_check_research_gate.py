@@ -306,11 +306,14 @@ class UnreadableSwitchTest(Base):
         self.assertEqual(r.exit, 0)
         self.assertIn("non si legge", r.stdout)
         self.assertIn(WARNING, r.stdout)
+        self.assertLess(r.stdout.index("non si legge"), r.stdout.index(WARNING))
         self.assertIn("research submit 1", r.stdout)
         found = self.lab.events("research_switch_unreadable")
         self.assertEqual(len(found), 1)
         self.assertTrue(found[0]["error"].startswith("IsADirectoryError"))
-        self.assertEqual(edit_and_post(self.lab, "src/app.py", agent_id="a1").exit, 0)
+        again = edit_and_post(self.lab, "src/app.py", agent_id="a1")
+        self.assertEqual(again.exit, 0)
+        self.assertNotIn("non si legge", again.stdout)
         self.assertEqual(len(self.lab.events("research_switch_unreadable")), 1)
 
     def test_unreadable_switch_logged_with_valid_note(self):

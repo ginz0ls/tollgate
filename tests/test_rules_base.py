@@ -54,6 +54,11 @@ class RulesBaseTest(unittest.TestCase):
         self.assertRegex(fm["approved"].strip("'\""), r"^\d{4}-\d{2}-\d{2}$")
         self.assertTrue(research.enforced(text))
 
+    def test_base_rules_of_research_match_rules(self):
+        parsed = rules(skill_text())
+        self.assertEqual(research.base_rules(skill_text()),
+                         ({r[0] for r in parsed}, {r[0] for r in parsed if r[1]}))
+
     def test_real_rules_base_is_approved(self):
         self.assertTrue(lookups.rules_enforced(ROOT))
 
@@ -133,6 +138,12 @@ class RulesBasePageTest(unittest.TestCase):
                 ok.update(found)
         self.assertEqual(named - set(self.skill_ids()), set())
         self.assertEqual(set(self.skill_ids()) - ok, set())
+
+    def test_page_approval_date_matches_skill(self):
+        m = re.search(r"^Approvata dall'utente il (\d{4}-\d{2}-\d{2})\.$",
+                      PAGE.read_text(encoding="utf-8"), re.M)
+        self.assertIsNotNone(m, "manca la riga «Approvata dall'utente il …»")
+        self.assertEqual(m.group(1), frontmatter(skill_text())["approved"].strip("'\""))
 
     def test_page_lists_every_rule(self):
         ids = [ID.search(cells[0]).group(0) for cells in table_rows(PAGE.read_text(encoding="utf-8"))
