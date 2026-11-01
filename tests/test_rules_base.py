@@ -1,11 +1,12 @@
-"""La skill `rules-base` (B2, Task 3): la bozza delle regole di base, ognuna con la sua fonte.
-`rules()` è riusata dai test dell'approvazione (Task 4 e 5)."""
+"""La skill `rules-base` (B2, Task 3 e 5): le regole di base approvate, ognuna con la sua fonte.
+`rules()` è riusata dai test della pagina (Task 4 e 5)."""
 import re
 import unittest
 from pathlib import Path
 
 from tests.helpers import ROOT
 from tollgate_analysis import research
+from tollgate_core import lookups
 
 SKILL = ROOT / "skills" / "rules-base" / "SKILL.md"
 PAGE = ROOT / "docs" / "profili" / "base.md"
@@ -50,8 +51,11 @@ class RulesBaseTest(unittest.TestCase):
         self.assertEqual(fm["name"], "rules-base")
         self.assertEqual(fm["description"], DESCRIPTION)
         self.assertEqual(fm["version"], "1")
-        self.assertNotIn("approved", fm)
-        self.assertFalse(research.enforced(text))
+        self.assertRegex(fm["approved"].strip("'\""), r"^\d{4}-\d{2}-\d{2}$")
+        self.assertTrue(research.enforced(text))
+
+    def test_real_rules_base_is_approved(self):
+        self.assertTrue(lookups.rules_enforced(ROOT))
 
     def test_has_title(self):
         body = skill_text().split("\n---\n", 1)[1].lstrip("\n")

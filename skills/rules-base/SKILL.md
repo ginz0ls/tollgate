@@ -2,6 +2,7 @@
 name: rules-base
 description: Regole di base di tollgate per ogni implementatore e revisore: le caricano in automatico gli agenti di tollgate, non serve invocarla.
 version: 1
+approved: 2026-11-01
 ---
 # Regole di base (versione 1)
 
@@ -38,9 +39,12 @@ Fonte: progetto di B (docs/superpowers/specs/2026-10-27-tollgate-b-profili-desig
 
 ## Mentre lavori
 
-R-BASE-10 Il report dichiara funzionante solo ciò che un comando eseguito nel task prova, e riporta il comando con il suo esito.
+R-BASE-10 [blocca] La correzione di un difetto porta un test che lo riproduce: il report mostra che il test fallisce senza la correzione e passa con la correzione.
+Fonte: superpowers 7.0.0 (Jesse Vincent, MIT), skills/verification-before-completion/SKILL.md, «Key Patterns» («Regression tests (TDD Red-Green)»)
+
+R-BASE-11 Il report dichiara funzionante solo ciò che un comando eseguito nel task prova, e riporta il comando con il suo esito.
 Fonte: superpowers 7.0.0 (Jesse Vincent, MIT), skills/verification-before-completion/SKILL.md, «The Iron Law»
 
 ## Fonti
 
-Le regole sono scritte con parole nostre a partire da due raccolte di metodo con licenza MIT e dalle correzioni dell'utente raccolte nel progetto di B. Le licenze sono in `LICENSES/agent-skills-MIT.txt` (agent-skills, Addy Osmani) e in `LICENSES/superpowers-MIT.txt` (Superpowers, Jesse Vincent). Le regole sono una bozza finché la pagina per l'utente non è approvata.
+Le regole sono scritte con parole nostre a partire da due raccolte di metodo con licenza MIT e dalle correzioni dell'utente raccolte nel progetto di B. Le licenze sono in `LICENSES/agent-skills-MIT.txt` (agent-skills, Addy Osmani) e in `LICENSES/superpowers-MIT.txt` (Superpowers, Jesse Vincent). Le regole sono state approvate dall'utente il 2026-11-01.

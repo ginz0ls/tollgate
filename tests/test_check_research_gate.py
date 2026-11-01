@@ -353,6 +353,25 @@ class L2Test(unittest.TestCase):
         self.assertEqual(self.lab.pre_edit(self.app, agent_id="a1").exit, 0)
 
 
+class RealRulesBaseTest(unittest.TestCase):
+    """La `rules-base` vera del plugin è approvata: il blocco è acceso (B2, Task 5)."""
+
+    def check(self, level, **kw):
+        lab = Lab(level=level, research=True, plugin_root=ROOT, **kw)
+        self.addCleanup(lab.close)
+        plan(lab)
+        start_agent(lab, "a1", 1)
+        r = lab.pre_edit(lab.wt / "src/app.py", agent_id="a1")
+        self.assertEqual(r.exit, 2)
+        self.assertIn(REFUSAL + " 1", r.stderr)
+
+    def test_real_rules_base_blocks_l1(self):
+        self.check("L1")
+
+    def test_real_rules_base_blocks_l2(self):
+        self.check("L2", phase="execution")
+
+
 class L0Test(Base):
     level = "L0"
 

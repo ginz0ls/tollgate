@@ -146,7 +146,7 @@ Riaccende tollgate su questa macchina. Solo l'utente. Nessun argomento.
 
 ### `/tollgate:rules-base`
 
-Le regole di base del passo «informati prima»: leggere i file e la documentazione ufficiale prima di scrivere, citare dove si è cercato, provare ciò che si dichiara. Le caricano gli agenti di tollgate che scrivono o rivedono codice, quindi non serve lanciarla a mano. Per ora è una bozza: finché non è approvata il blocco del passo non è acceso.
+Le regole di base del passo «informati prima»: leggere i file e la documentazione ufficiale prima di scrivere, citare dove si è cercato, provare ciò che si dichiara. Le caricano gli agenti di tollgate che scrivono o rivedono codice, quindi non serve lanciarla a mano. Le regole sono approvate dall'utente (2026-11-01): il blocco del passo è acceso.
 
 ## La CLI
 
