@@ -46,6 +46,7 @@ Task 1 `done`, verdetto `approved`, nessun rilievo (`spec_compliance` vuoto). Il
 
 - `registro-1/precarico.txt`: `flowreg.py precarico` ha dato **«indizio»** (3 righe con `R-BASE-` nel flusso), perché lo stream-json di `claude -p` **non contiene `agent_transcript_path`**: nessuna trascrizione leggibile dai percorsi delle uscite.
 - **Prova** raccolta dal controller a mano, in `registro-1/precarico-trascrizioni.txt`: le trascrizioni dei due subagenti del passo 2 (`~/.claude/projects/<cartella della prova>/<sessione>/subagents/`) contengono il titolo `# Regole di base (versione 1)`. In entrambe la skill entra come messaggio utente di tipo `isMeta`, in testa alla trascrizione (riga 2 del revisore, riga 4 dell'implementatore), con `<command-name>rules-base</command-name>`, e **nessuna riga nomina `rules-base/SKILL.md`**: nessun agente l'ha aperta con `Read`.
+- L'argomento più forte: in entrambe le trascrizioni il messaggio `isMeta` con la skill precede ogni turno dell'assistente, quindi non può venire da una chiamata `Skill` o `Read` dell'agente.
 - Cosa dice la prova e cosa no: il titolo da solo non distingue un precaricamento da una lettura con `Read`; lo distingue l'assenza di letture di `rules-base/SKILL.md` insieme al messaggio `isMeta` iniziale. Quindi la skill è caricata dal campo `skills:` degli agenti, non dalla loro iniziativa. Il revisore, che applica le regole, l'ha ricevuta come l'implementatore.
 
 ## Esito rispetto all'atteso del Task 7
@@ -67,6 +68,7 @@ Task 1 `done`, verdetto `approved`, nessun rilievo (`spec_compliance` vuoto). Il
 - I permessi di `WebFetch` e `WebSearch` sono concessi con `--allowedTools`: in una sessione interattiva `WebFetch` chiede un permesso per dominio e la prova non lo rappresenta.
 - Un solo lavoro, piccolo, con un solo task e una sola libreria: la prova mostra il percorso completo con la regola vera, non la tenuta su un lavoro grande, né il rifiuto del blocco dal vivo.
 - I divieti di `--disallowedTools` sono a prefisso e non chiudono ogni forma; `Write` ed `Edit` valgono per qualsiasi percorso. Il modello è stato cooperativo: `comandi-rischiosi.txt` è vuoto. Elenco completo in `registro-1/limiti.txt`.
+- La prova gira con gli altri plugin dell'utente attivi: nel passo 1 la sessione principale ha invocato `superpowers:writing-plans`. Il testo di quella skill (plugin pubblico, licenza MIT, versione 7.0.0) è caricato in `passo1/tentativo-1/claude.jsonl` (riga 68 circa) e resta nelle evidenze, perché è già pubblico.
 - La prova di precaricamento sta in un file scritto a mano dal controller, non raccolto dallo script.
 - L'uscita di `prepara` non è salvata dallo script.
 
