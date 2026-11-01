@@ -132,6 +132,11 @@ class ReviewBriefTest(unittest.TestCase):
         self.assertIn("AVVISO DIMENSIONE", out)
         self.assertNotIn("AVVISO DIMENSIONE", brief.review_brief(review(lines=50)))
 
+    def test_review_standard_names_base_rules(self):
+        self.assertIn("regole dei profili e di base", "\n".join(brief.STANDARD))
+        out = brief.review_brief(review(standard=True))
+        self.assertIn("regole dei profili e di base", out)
+
     def test_concerns_fenced_and_standard(self):
         out = brief.review_brief(review(concerns="dubbio ``` qui", standard=True,
                                         reviewer_skills=["axe"]))
@@ -179,6 +184,15 @@ class ReviewResearchTest(unittest.TestCase):
                                         research_note_path=self.NOTE_PATH,
                                         first_diff_file="src/app.py"))
         self.assertIn(f"`file` `{self.NOTE_PATH}`", out)
+
+    def test_review_note_section_names_base_rules_and_single_report(self):
+        for kw in (dict(research_enforced=True), dict(research_enforced=False),
+                   dict(research_enforced=True, research_note="## Cosa ho trovato\nx",
+                        research_note_path=self.NOTE_PATH, research_valid=True)):
+            with self.subTest(kw=kw):
+                section = self.research_section(**kw)
+                self.assertIn("R-BASE-", section)
+                self.assertIn("una volta sola", section)
 
     PROBLEMS = ["il file src/x.py non risulta letto", "la fonte https://a.example/``` non risulta aperta"]
 

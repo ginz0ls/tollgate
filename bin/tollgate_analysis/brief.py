@@ -188,8 +188,8 @@ class ReviewBrief:
 STANDARD = [
     "Standard della revisione (8.6):",
     "- Approva se il cambiamento migliora la salute del codice, anche se non è perfetto.",
-    "- Chiedono modifiche solo i rilievi `blocker` e `major`; per le regole dei profili solo "
-    "quelle marcate `[blocca]`. `moderate` e `minor` sono note.",
+    "- Chiedono modifiche solo i rilievi `blocker` e `major`; per le regole dei profili e di "
+    "base solo quelle marcate `[blocca]`. `moderate` e `minor` sono note.",
     "- Cerca difetti, non confermare il lavoro: controlla anche test indeboliti e casi speciali.",
     "- Ogni rilievo cita una prova: file e riga, e la regola violata (`R-…`) o il passo del "
     "piano. Senza, non vale.",
@@ -223,10 +223,17 @@ def _review_research(b: ReviewBrief) -> list[str]:
     else:
         severity = ("gravità `moderate`, che non ferma il task (l'interruttore delle regole base "
                     "è spento), e niente in `spec_compliance`")
-    out.append("Controlla che la nota esista, che le fonti riguardino le librerie e i servizi del "
-               f"diff e che il motivo di «{research.SECTION_NONE}» sia vero. Altrimenti segnala "
-               f"un rilievo con `rule` `nota di ricerca`, {severity}, `file` `{where}` e "
-               "`line` 1.")
+    where_rule = f"`file` `{where}` e `line` 1"
+    if not usable:
+        out.append("Controlla che la nota esista. Se manca o non è valida, la mancanza si "
+                   f"segnala una volta sola, con `rule` `nota di ricerca`, {severity}, "
+                   f"{where_rule}; nessun rilievo `R-BASE-…` in più.")
+        return out
+    out.append("Controlla che le fonti riguardino le librerie e i servizi del diff e che il "
+               f"motivo di «{research.SECTION_NONE}» sia vero. Un difetto della nota si segnala "
+               "una volta sola: con la regola `R-BASE-…` che viola, se ce n'è una (`blocker` o "
+               "`major` solo se la regola è `[blocca]` e l'interruttore è acceso; altrimenti "
+               f"`moderate`), oppure con `rule` `nota di ricerca`, {severity}, {where_rule}.")
     return out
 
 

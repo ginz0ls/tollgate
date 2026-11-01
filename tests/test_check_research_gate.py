@@ -394,6 +394,27 @@ class L0Test(Base):
         self.assertNotIn(WARNING, self.lab.bash("sed -i s/a/b/ src/app.py").stdout)
 
 
+class WarningNamesRulesBaseTest(unittest.TestCase):
+    def check(self, level):
+        root = make_root(False)
+        lab = Lab(level=level, research=True, plugin_root=root)
+        try:
+            if level != "L0":
+                plan(lab)
+                start_agent(lab, "a1", 1)
+            r = edit_and_post(lab, "src/app.py", agent_id="a1" if level != "L0" else None)
+            self.assertIn(WARNING, r.stdout)
+            self.assertIn("tollgate:rules-base", r.stdout)
+        finally:
+            lab.close()
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_warning_names_rules_base(self):
+        for level in ("L0", "L1"):
+            with self.subTest(level=level):
+                self.check(level)
+
+
 class ComponentOffTest(unittest.TestCase):
     def test_component_off(self):
         root = make_root(True)

@@ -192,6 +192,18 @@ class TaskStartTest(TaskCase):
         self.assertIn("model: inherit", summary)
         self.assertNotIn("sonnet", summary)
 
+    def test_rules_base_not_required(self):
+        """Guardia (decisione 2): `rules-base` si precarica, non è una skill da usare."""
+        self.make()
+        root = Path(self.fl.tmp) / "plugin root"
+        skill = root / research.RULES_BASE
+        skill.parent.mkdir(parents=True)
+        skill.write_text("---\nname: rules-base\napproved: 2026-10-29\n---\n")
+        with mock.patch.object(taskcmd.db, "BIN_PATH", root / "bin" / "tollgate"):
+            path, _ = self.start()
+        self.assertEqual(json.loads(self.row()["skills_required"]), [])
+        self.assertNotIn("rules-base", path.read_text())
+
     def test_absent_skill_removed_from_required(self):
         self.make(toml=WEB_TOML, plan=plan_text("- Create: `web/page.tsx`"))
         # registrazione del piano: i primi 3 dei profili

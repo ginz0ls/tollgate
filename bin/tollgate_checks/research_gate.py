@@ -121,7 +121,8 @@ def _refusal(ctx, work, task: int) -> str:
 
 def _warning(ctx, task: int | None) -> str:
     base = ("tollgate: informati prima di modificare. Leggi i file del progetto che tocchi e, "
-            "se usi librerie o servizi esterni, la loro documentazione.")
+            "se usi librerie o servizi esterni, la loro documentazione. "
+            "Le regole di base sono nella skill `tollgate:rules-base`.")
     if task is None:
         return base
     return (f"{base} Poi consegna la nota di ricerca del task {task}:\n"
