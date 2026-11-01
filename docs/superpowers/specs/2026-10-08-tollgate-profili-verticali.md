@@ -22,6 +22,7 @@ Fonti: tre ricerche dell'8 ottobre 2026 (catalogo di 1.015 skill e 644 agenti su
 **Skill comuni, fuori dal tetto.**
 - Ogni implementatore: `superpowers:test-driven-development`, `superpowers:systematic-debugging`, `superpowers:verification-before-completion`.
 - Ogni revisore: `agent-skills:code-review-and-quality`.
+- Ogni implementatore e ogni revisore di codice, generici e per area: `rules-base` (B2), la skill di regole del profilo `base`, nostra e approvata dall'utente. Non si chiede nel brief: la precaricano gli agenti con `skills: [rules-base]` nel frontmatter (spec del nucleo 6.3, rev 28), quindi non conta nel tetto di 3 né in `skills_required`.
 
 ---
 
@@ -145,7 +146,10 @@ Fonti: frontend-design (Anthropic, Apache-2.0), frontend-ui-engineering (Addy Os
 | `rules-copy`, `rules-docs` | `humanizer` (licenza da verificare), `documentation-and-adrs` (MIT). Idee: Vercel writing-guidelines (senza licenza) |
 | `rules-mobile`, `rules-analytics` | Da scrivere quasi da zero: nessuna fonte adatta trovata. Si scrivono solo quando un progetto reale le usa |
 | `rules-performance` | `performance-optimization` (MIT), `web-perf` (Cloudflare, Apache-2.0) |
+| `rules-base` (B2, approvata il 2026-11-01) | `agent-skills` 0.6.9 (Addy Osmani, MIT: `source-driven-development`, `context-engineering`) e `superpowers` 7.0.0 (Jesse Vincent, MIT: `verification-before-completion`), più le correzioni dell'utente raccolte nel progetto di B (sezioni 1 e 3.6: nomi dei modelli, «non esiste», fonti non aperte). Le fonti sono copie locali; il rapporto per regola è `docs/profili/verifiche/base-fonti.md` |
 | `rules-ci` | `ci-cd-and-automation` (MIT), `gha-security-review` di getsentry (Apache-2.0, da leggere). Idee: Trail of Bits `agentic-actions-auditor` (CC-BY-SA). Regole minime: `permissions` esplicito e minimo, azioni fissate a uno SHA, nessun segreto in `pull_request` da fork, nessun `pull_request_target` con checkout del codice della PR |
+
+**Forma reale (B2).** Il frontmatter ha anche `version: 1` e, dopo l'approvazione, `approved: <AAAA-MM-GG>`: la data è l'interruttore del blocco (spec del nucleo 8.1). Ogni regola ha sotto la riga `Fonte:` e il rapporto della verifica delle fonti dice, regola per regola, se la fonte regge. La pagina per l'utente è `docs/profili/<area>.md`.
 
 **Processo per ogni `rules-<area>`.** Bozza distillata dalle fonti, con la fonte di ogni regola → revisione dell'utente → versione 1 nel plugin. Le regole cambiano con una PR, come il resto del plugin.
 
