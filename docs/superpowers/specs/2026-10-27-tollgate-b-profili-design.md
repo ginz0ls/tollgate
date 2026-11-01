@@ -173,3 +173,12 @@ Le regole si rivedono un profilo alla volta, lungo il lavoro: in tutto 6 pagine,
 
 - Tutti i vincoli del nucleo restano: CLI Python solo con la libreria standard, test su python3.11 e python3, niente segreti nei file, regole di cautela per GitHub e per le operazioni distruttive.
 - Il passo «informati prima» non deve rompere i lavori già in corso con la versione precedente: un lavoro iniziato prima di B continua con le regole con cui era partito.
+
+## 9. Aggiunte dell'utente del 1° novembre 2026: il profilo `ai` e i modelli che cambiano
+
+Decise con l'utente prima di scrivere il piano di B3, dopo una ricerca sulle pagine ufficiali di Anthropic e Google.
+
+- **L'ultimo modello, subito (utente).** I modelli escono spesso e l'utente vuole usare il più recente della famiglia appena esce, senza aspettare che quello in uso venga ritirato.
+- **Regole di `rules-ai` (utente, da scrivere con le fonti e approvare come le altre):** il nome del modello sta in un solo punto del progetto, con l'indirizzo della pagina ufficiale e la data della verifica; chi sceglie o tocca un modello usa il più recente della famiglia indicato sulla pagina ufficiale, e se ne usa uno più vecchio lo scrive con il motivo; prima di cambiare modello legge le note di migrazione ufficiali, perché un modello nuovo può rifiutare parametri accettati dal precedente; il codice dà un errore chiaro quando un modello non è più disponibile; un alias che cambia da solo (per esempio i `*-latest` di Gemini) si usa solo se il report lo dichiara.
+- **Sentinella dei modelli (utente): sul computer dell'utente, quando lavora.** Un controllo che confronta i modelli usati nel progetto con l'elenco ufficiale del fornitore (Anthropic `GET /v1/models`, con stato e date di ritiro; Gemini `models.list`) e avvisa se c'è un modello più nuovo della stessa famiglia o se uno in uso sta per essere ritirato. Gira all'avvio di un lavoro, con la chiave API già presente nell'ambiente; niente segreti su GitHub e niente job programmati. Gli hook restano senza rete (spec del nucleo 3.2).
+- **Ordine (utente):** B3 porta l'infrastruttura dei profili, il profilo `ai` con le sue regole e i suoi agenti; la sentinella è una fetta a parte, **B3-bis**, subito dopo B3.
