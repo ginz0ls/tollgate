@@ -7,9 +7,9 @@ Questa sessione parte con il contesto pulito. Qui c'è quello che serve per eseg
 Esegui il piano `docs/superpowers/plans/2026-11-01-tollgate-b3-profilo-ai.md` con `superpowers:subagent-driven-development`, seguendo **alla lettera** `docs/superpowers/plans/2026-11-01-tollgate-b3-esecuzione.md`: ramo `b3-profilo-ai`, worktree `.claude/worktrees/b3`, sessione avviata dalla radice del repo.
 
 Il lavoro è finito quando:
-- tutti i 9 task sono `complete` nel ledger, ognuno con la revisione pulita;
+- tutti gli 11 task sono `complete` nel ledger, ognuno con la revisione pulita;
 - la pagina `docs/profili/ai.md` è approvata dall'utente e `skills/rules-ai/SKILL.md` ha `approved` con la data;
-- la prova reale del Task 8 è riuscita, oppure il rapporto dice con chiarezza perché no;
+- la prova reale del Task 10 è riuscita, oppure il rapporto dice con chiarezza perché no;
 - la revisione finale (opus) è chiusa, con i rilievi `critical` e `important` corretti e ri-revisionati;
 - la suite è verde tre volte su `python3.11` e `python3`, con `PYTHONWARNINGS=error::ResourceWarning`;
 - il rapporto all'utente è consegnato, in parole semplici, con la richiesta dell'OK per il merge.
@@ -19,7 +19,7 @@ Il lavoro è finito quando:
 ## Da leggere, in quest'ordine
 
 1. `docs/superpowers/plans/2026-11-01-tollgate-b3-esecuzione.md`: le istruzioni.
-2. Il piano B3: per intero «Decisioni di questo piano» (16 decisioni), «Review Focus», la tabella delle regole del Task 4 e «Copertura».
+2. Il piano B3: per intero «Decisioni di questo piano» (17 decisioni), «Review Focus», la tabella delle regole del Task 5 e «Copertura».
 3. Il progetto di B, `docs/superpowers/specs/2026-10-27-tollgate-b-profili-design.md`, per intero, **sezione 9 compresa**: è l'autorità.
 4. Il piano principale di B, `docs/superpowers/plans/2026-10-27-tollgate-b-piano-principale.md`: sezioni 1, 2, 3 e 9.
 5. La spec del nucleo rev 28, sezioni 6.3, 7.3, 11.2, 11.4, 18.4.
@@ -51,10 +51,10 @@ Il lavoro è finito quando:
 - **`init` non cambia il nucleo a runtime.** Il profilo vive nel `tollgate.toml` del progetto, che l'utente copia dalla proposta. L'approvazione si legge solo quando `init` propone (decisione 4).
 - **Il testo dell'utente in `tollgate.toml` non si riscrive mai**: i blocchi si aggiungono in coda, un profilo già dichiarato resta com'è (decisione 7).
 - **`rules` e `blocking_rules` del profilo si calcolano dalla skill**, mai a mano (decisione 3): una `R-AI-NN` ignota al verdetto bloccherebbe sempre.
-- **Gli agenti `-ai` si scrivono dopo l'approvazione** (Task 7 dopo il Task 6) e copiano i generici già corretti nel Task 1; il test di deriva lo controlla.
-- **Dopo il Task 6 `init` propone `ai` per davvero**: i test di `init` devono usare una radice del plugin esplicita, altrimenti cambiano esito (come l'accensione di B2).
-- **Le fonti sono pagine ufficiali, non testo MIT**: si citano i fatti, nessun testo copiato, citazioni di al più una riga nel rapporto. Il controller le scarica con l'eccezione 1, prima del Task 4.
-- **La prova del Task 8** usa un progetto di prova nuovo (`spikes/b3/flow/`) con `B1_FLOW_CASE=ai`; il precaricamento si prova sulle trascrizioni dei subagenti.
+- **Gli agenti `-ai` si scrivono dopo l'approvazione** (Task 8 dopo il Task 7) e copiano i generici già corretti nel Task 1; il test di deriva lo controlla.
+- **Dopo il Task 7 `init` propone `ai` per davvero**: i test nuovi di `init` passano un plugin temporaneo a `propose(..., profiles_root=…)`; quelli esistenti restano sulla radice vera, e `test_flowlab_tree_lights_no_real_profile` garantisce che il loro albero non accenda nessun profilo vero (come l'accensione di B2).
+- **Le fonti sono pagine ufficiali, non testo MIT**: si citano i fatti, nessun testo copiato, citazioni di al più una riga nel rapporto. Il controller le scarica con l'eccezione 1, prima del Task 5.
+- **La prova dei Task 9 e 10** usa un progetto di prova nuovo (`spikes/b3/flow/`) con `B1_FLOW_CASE=ai`; il precaricamento si prova sulle trascrizioni dei subagenti.
 
 ## Stato al momento di questo brief
 
