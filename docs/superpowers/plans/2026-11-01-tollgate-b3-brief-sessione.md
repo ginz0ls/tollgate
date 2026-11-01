@@ -52,7 +52,7 @@ Il lavoro è finito quando:
 - **Il testo dell'utente in `tollgate.toml` non si riscrive mai**: i blocchi si aggiungono in coda, un profilo già dichiarato resta com'è (decisione 7).
 - **`rules` e `blocking_rules` del profilo si calcolano dalla skill**, mai a mano (decisione 3): una `R-AI-NN` ignota al verdetto bloccherebbe sempre.
 - **Gli agenti `-ai` si scrivono dopo l'approvazione** (Task 8 dopo il Task 7) e copiano i generici già corretti nel Task 1; il test di deriva lo controlla.
-- **Dopo il Task 7 `init` propone `ai` per davvero**: i test nuovi di `init` passano un plugin temporaneo a `propose(..., profiles_root=…)`; quelli esistenti restano sulla radice vera, e `test_flowlab_tree_lights_no_real_profile` garantisce che il loro albero non accenda nessun profilo vero (come l'accensione di B2).
+- **Dopo il Task 7 `init` propone `ai` per davvero**: i test nuovi di `init` passano un plugin temporaneo a `propose(..., profiles_root=…)`; quelli esistenti restano sulla radice vera, e `test_real_trees_light_no_profile` garantisce che né l'albero di `FlowLab` né quello installato (con `.github/tollgate/`) accendano un profilo vero (come l'accensione di B2).
 - **Le fonti sono pagine ufficiali, non testo MIT**: si citano i fatti, nessun testo copiato, citazioni di al più una riga nel rapporto. Il controller le scarica con l'eccezione 1, prima del Task 5.
 - **La prova dei Task 9 e 10** usa un progetto di prova nuovo (`spikes/b3/flow/`) con `B1_FLOW_CASE=ai`; il precaricamento si prova sulle trascrizioni dei subagenti.
 
