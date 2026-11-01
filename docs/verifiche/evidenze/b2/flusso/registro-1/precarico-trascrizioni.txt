@@ -1,0 +1,15 @@
+Prova del precaricamento raccolta dal controller (01/11/2026): lo stream-json di passo2 non contiene agent_transcript_path, quindi flowreg.py precarico ha usato l'indizio.
+Le trascrizioni dei due subagenti del passo 2 sono nella cartella delle sessioni di Claude Code: ~/.claude/projects/-tmp-tollgate-b1-flow--claude-worktrees-tg-1-leggi-il-nome-dell-app-da-config-toml/SESSION-ID/subagents/.
+Per ciascuna: riga del titolo, tipo del messaggio, numero di righe con il titolo, numero di righe che nominano rules-base/SKILL.md (una lettura con Read lo nominerebbe).
+agent-a4668639a198502bc.jsonl: prima riga con il titolo=2 (type=user isMeta=True); righe con il titolo=2; righe con rules-base/SKILL.md=0
+agent-ae75e2b139ac5a408.jsonl: prima riga con il titolo=4 (type=user isMeta=True); righe con il titolo=2; righe con rules-base/SKILL.md=0
+agent-ae75e2b139ac5a408 è l'implementatore (stesso agent_id di lookups.txt); agent-a4668639a198502bc è il revisore del task.
+Contenuto del messaggio (estratto, uguale nei due file):
+<command-message>rules-base</command-message>
+<command-name>rules-base</command-name>
+<skill-format>true</skill-format>
+Base directory for this skill: /tmp/tollgate-b1/plugin/skills/rules-base
+
+# Regole di base (versione 1)
+
+Sono le regole del passo «informati prima», comuni a ogni lavoro e a ogni area. Chi scrive codice le segue prima di toccare un file. Chi rivede le applica guardando il diff, la nota di ricerca o il report, e per ognuna risponde sì o no. Le regole segnate `[blocca]` sono quelle per cui un no è u

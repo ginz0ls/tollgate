@@ -1,0 +1,12 @@
+Limiti della prova reale del Task 9 (da citare nel rapporto)
+- I divieti di --disallowedTools sono a prefisso (Bash(<comando>:*)) e non chiudono ogni forma: restano aperti `git -C x push ...`,
+  `git push --force-with-lease`, `git remote set-url` seguito da un push, `env gh`, `bash -c '...'`. Il modello è cooperativo; lo
+  script non lo impedisce: lo rileva a posteriori in comandi-rischiosi.txt (git ... push, gh, curl, wget nei comandi Bash).
+- Write ed Edit nudi in --allowedTools valgono per qualsiasi percorso: acceptEdits non limita il modello alla cartella di lavoro.
+- I Grep dell'implementatore non sono registrati in lookups (B1-V6): vedi grep-non-registrati.txt.
+- Gli eventi research_note, research_reminder e veto sono tutti in eventi-ricerca.jsonl, non separati per passo: si distinguono
+  con `at` e `seq` e con inizio e fine di ogni tentativo (esito.txt).
+- La colonna «di cui da subagenti» di comandi-modello.txt si basa su parent_tool_use_id dello stream-json, non verificato: se il
+  campo manca, il valore è 0.
+- Il tetto di 3 tentativi vale per tutta la prova (anche i tentativi spostati da prepara in <passo>.prev-*); registra legge solo i
+  tentativi della preparazione corrente.

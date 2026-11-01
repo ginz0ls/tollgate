@@ -1,0 +1,27 @@
+# lookups: id, work, task, agent_id, kind, target, at
+1	1	1	ae75e2b139ac5a408	read	.tollgate-run/1/task-1.md	2026-11-01T04:41:03.952263Z
+2	1	1	ae75e2b139ac5a408	bash_read	config.toml	2026-11-01T04:41:06.352705Z
+3	1	1	ae75e2b139ac5a408	fetch	https://docs.python.org/3/library/tomllib.html	2026-11-01T04:41:10.344345Z
+4	1	1	ae75e2b139ac5a408	read	src/__init__.py	2026-11-01T04:41:16.616210Z
+5	1	1	ae75e2b139ac5a408	read	tests/test_smoke.py	2026-11-01T04:41:17.262353Z
+6	1	1	ae75e2b139ac5a408	read	tests/__init__.py	2026-11-01T04:41:17.385271Z
+7	1	1	ae75e2b139ac5a408	read	config.toml	2026-11-01T04:41:19.116268Z
+# per tipo
+bash_read: 1
+fetch: 1
+read: 5
+# task: work, number, state, research_ok
+1	1	done	1
+# nota salvata, lavoro 1 task 1
+## Letto nel progetto
+- config.toml
+- src/__init__.py
+- tests/test_smoke.py
+- tests/__init__.py
+
+## Documentazione
+- https://docs.python.org/3/library/tomllib.html — tomllib.load vuole un file binario (open "rb"), restituisce dict; TOMLDecodeError sottoclasse di ValueError; modulo aggiunto in Python 3.11 (qui Python 3.13.5, solo libreria standard).
+
+## Cosa ho trovato
+config.toml ha [app] nome = "prova-b1". I test usano unittest con package tests/ e src/. Creo src/config.py con DEFAULT_CONFIG_PATH calcolato da __file__ (indipendente dalla cwd) e app_name(path) che apre in "rb", tomllib.load, restituisce data["app"]["nome"]; KeyError, FileNotFoundError e TOMLDecodeError si propagano. Nuovo modulo: nessun modulo simile esistente da imitare.
+
