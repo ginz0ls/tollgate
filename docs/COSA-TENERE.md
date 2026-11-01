@@ -1,5 +1,7 @@
 # tollgate: cosa teniamo, cosa modifichiamo, cosa scartiamo
 
+> «Alfa» è il nome di comodo di un progetto privato di un cliente: il nome vero e i percorsi locali sono stati tolti il 01/11/2026.
+
 Data: 8 ottobre 2026.
 Fonte: `docs/REPORT-CONFRONTO-WORKFLOW.md`, sezioni 0-10 e 13.
 Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre, incluse le H del gruppo 7, aspettano la tua revisione. Per cambiarne una basta citarne il numero. 
@@ -21,7 +23,7 @@ Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre, incluse 
 | Obblighi imposti dagli hook | Niente «fatto» senza ricevute; test non indebolibili; effetti esterni solo con la tua conferma; scope limitato ai file del piano |
 | Deroghe | L'agente le registra e prosegue. **Oltre 2 per fetta si ferma e chiede a te**. Tutte compaiono nella PR |
 | Livelli | L0 rapido, L1 standard, L2 alto. Li sceglie uno script, possono solo salire e tu puoi alzarli |
-| Piano principale | Come in Perizie: si crea solo se il lavoro non sta in una fetta *Superato da: fette e piano principale dei lavori nel sotto-progetto C; nel nucleo solo il contratto minimo (`--spec`, «Fette previste»).* |
+| Piano principale | Come in Alfa: si crea solo se il lavoro non sta in una fetta *Superato da: fette e piano principale dei lavori nel sotto-progetto C; nel nucleo solo il contratto minimo (`--spec`, «Fette previste»).* |
 | Kanban | Ibrida: SQLite locale per il lavoro in corso, GitHub Issues e Projects per il lavoro deciso e accettato |
 | Dashboard | Dopo la v1 |
 | Profili v1 | Base, frontend, backend (Supabase edge, Cloudflare Worker, server locale), database, sicurezza, AI/LLM, bugfix *Superato da: catalogo `docs/superpowers/specs/2026-10-08-tollgate-profili-verticali.md` (13 verticali + 2 trasversali), regole e agenti nel sotto-progetto B.* |
@@ -45,20 +47,20 @@ Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre, incluse 
 | 8 | Blocco della chiusura senza prove, per sessione | ralph-loop | **Modificare** | Hook `SubagentStop` che blocca **solo i subagenti che hanno prodotto commit senza una ricevuta verde su quel commit**. Il criterio è un fatto, non il nome: Superpowers lancia implementatore e revisore entrambi come `general-purpose`, quindi il tipo di agente non basta a distinguerli. Verificato sulla documentazione (vedi sotto) *Superato da: con `tollgate:execute` implementatori e revisori sono agenti propri, quindi la premessa su `general-purpose` non vale più.* |
 | 9 | Blocco del codice se prima non c'è un test che fallisce | tdd-guard | **Modificare** | Solo per i bugfix: test di riproduzione rosso → verde, con ricevuta di entrambi. Ovunque costa circa 3 volte i token senza migliorare la qualità |
 | 10 | Blocco dei comandi distruttivi (force push, `reset --hard`, `--no-verify`, `rm -rf`) | cc-safety-net | **Tenere** | Coincide con le regole del CLAUDE.md globale |
-| 11 | CI del ramo base verde prima di partire | lezione di Perizie (notturna rossa) | **Tenere** | Si controlla a `start` |
+| 11 | CI del ramo base verde prima di partire | lezione di Alfa (notturna rossa) | **Tenere** | Si controlla a `start` |
 | 12 | Niente rete né credenziali quando l'agente legge testo non fidato | lethal trifecta | **Rimandare** | Nella v1 le issue le scrivi tu. Diventa obbligatorio con l'avvio automatico da GitHub |
 
 ## 2. Piani e decisioni
 
 | # | Pezzo | Da | Proposta | Motivo |
 |---|---|---|---|---|
-| 13 | Piano magro: Fatti verificati, Decisioni con costo, Interfacce, Punti di arresto, Rischi | Perizie | **Modificare** | `writing-plans` resta com'è. Quando il piano viene salvato, un hook lo controlla e lo rimanda indietro se mancano queste sezioni |
-| 14 | Ruling e deroghe | Perizie | **Già deciso** | Tetto di 2 per fetta, poi decidi tu |
-| 15 | Punti di arresto P1-P4 e P-D | Perizie | **Modificare** | Si riducono a meccanismi che esistono già. P1 = approvazione del piano in L2. P2 = merge tuo. P3 = deroga. P4 e P-D = effetti esterni con conferma |
-| 16 | Una sola scala di gravità, tarata sul progetto | Perizie, prd-audit | **Tenere** | Bloccante, grave, rilevante, minore, con le definizioni in `tollgate.toml` |
-| 17 | Revisione avversariale del piano senza le motivazioni dell'autore | Perizie | **Tenere in L2** | Subagente in sola lettura |
-| 18 | Scansione delle interfacce prima di partire | Perizie | **Tenere** | Diventa la sezione «Fatti verificati» all'inizio di ogni fetta |
-| 19 | Fatti in un posto solo, CLAUDE.md piccolo | lezione di Perizie | **Tenere** | Avviso se CLAUDE.md supera una soglia di dimensione |
+| 13 | Piano magro: Fatti verificati, Decisioni con costo, Interfacce, Punti di arresto, Rischi | Alfa | **Modificare** | `writing-plans` resta com'è. Quando il piano viene salvato, un hook lo controlla e lo rimanda indietro se mancano queste sezioni |
+| 14 | Ruling e deroghe | Alfa | **Già deciso** | Tetto di 2 per fetta, poi decidi tu |
+| 15 | Punti di arresto P1-P4 e P-D | Alfa | **Modificare** | Si riducono a meccanismi che esistono già. P1 = approvazione del piano in L2. P2 = merge tuo. P3 = deroga. P4 e P-D = effetti esterni con conferma |
+| 16 | Una sola scala di gravità, tarata sul progetto | Alfa, prd-audit | **Tenere** | Bloccante, grave, rilevante, minore, con le definizioni in `tollgate.toml` |
+| 17 | Revisione avversariale del piano senza le motivazioni dell'autore | Alfa | **Tenere in L2** | Subagente in sola lettura |
+| 18 | Scansione delle interfacce prima di partire | Alfa | **Tenere** | Diventa la sezione «Fatti verificati» all'inizio di ogni fetta |
+| 19 | Fatti in un posto solo, CLAUDE.md piccolo | lezione di Alfa | **Tenere** | Avviso se CLAUDE.md supera una soglia di dimensione |
 | 20 | Verifica dal risultato atteso a ritroso: esiste, è sostanziale, è collegato | GSD | **Tenere** | Un verificatore a `finish` controlla i must-have del piano |
 | 21 | Specifiche incrementali (delta spec) | OpenSpec, Spec Kit | **Scartare per la v1** | Basta la spec di Superpowers |
 | 22 | Lezioni scritte per il ciclo successivo | Compound Engineering | **Deciso: dopo la v1** | Con un tetto di dimensione, per non gonfiare il contesto |
@@ -82,7 +84,7 @@ Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre, incluse 
 | 30 | Prima di creare una PR si cerca se ne esiste già una | codex-workflow | **Tenere** | Stessa ragione |
 | 31 | SQLite in modalità WAL con scrittura sicura | Orchestratore | **Tenere** | Più sessioni in parallelo senza corrompere il DB |
 | 32 | Presa in carico con scadenza, blocchi tipizzati, dipendenze | Hermes | **Tenere nel sotto-progetto C** | — |
-| 33 | Registro dei task di Superpowers | Superpowers | **Tenere com'è** | Il riepilogo versionato va nella descrizione della PR, non in un file ignorato da git come in Perizie |
+| 33 | Registro dei task di Superpowers | Superpowers | **Tenere com'è** | Il riepilogo versionato va nella descrizione della PR, non in un file ignorato da git come in Alfa |
 | 34 | Adattatore del tracker | codex-workflow | **Modificare** | Nella v1 solo GitHub, dietro un'interfaccia sottile: Jira si aggiunge dopo |
 | 35 | Webhook, worker e coda sempre attivi | codex-workflow | **Scartare** | Per l'avvio automatico useremo GitHub Action o Routines |
 | 36 | Eval contro Claude Code senza plugin | `claude plugin eval` | **Tenere nel sotto-progetto D** | È la prova che tollgate migliora davvero il risultato |
@@ -105,7 +107,7 @@ Stato: **proposta da rivedere**. Le voci 22 e 28 sono decise; le altre, incluse 
 | 37 | La sessione principale coordina e basta | GSD | Non legge codice né log. Lavora solo con stato (DB), brief e report su file, così il suo contesto resta piccolo per tutta la fetta |
 | 38 | Ogni attività parte con un subagente nuovo | Superpowers (subagent-driven), Orchestratore (un thread per fase) | Task, review, verifica e revisione avversariale ricevono un brief su file e restituiscono un report su file. Nella sessione principale torna solo un riepilogo di poche righe *Il principio resta; l'esecuzione è di `tollgate:execute` (spec rev. 13).* |
 | 39 | L'output dei comandi va su file | Superpowers `task-done` | `tollgate verify` salva i log completi e mostra solo l'esito e le ultime righe |
-| 40 | Una fetta per sessione | Anthropic (sessioni lunghe), lezione di Perizie | A fine fetta `finish` salva lo stato e suggerisce `/clear`. Il `start` successivo riparte dal DB. Lo stesso vale tra spec approvata e piano |
+| 40 | Una fetta per sessione | Anthropic (sessioni lunghe), lezione di Alfa | A fine fetta `finish` salva lo stato e suggerisce `/clear`. Il `start` successivo riparte dal DB. Lo stesso vale tra spec approvata e piano |
 | 41 | Avvio con il minimo indispensabile | evidenze ICLR 2026 e Vercel | Nessuna meta-skill caricata a ogni sessione. All'avvio entrano solo poche righe: issue, fase, livello, prossimo passo |
 | 42 | Guardia sulla dimensione del contesto | nuova | **Modificata dopo la verifica.** Nessun hook riceve la percentuale di contesto; la riceve solo la statusline (`context_window.used_percentage`). Si fa così: **la statusline è quella dell'utente, importata in `statusline/statusline.sh`**. Legge già `used_percentage` e ha la soglia di autocompact all'85%. Le si aggiunge una sola cosa: scrivere la percentuale su un file per sessione. Un hook `PreToolUse` sullo strumento Agent legge quel file e, sopra soglia, nega l'avvio di nuovi task chiedendo checkpoint e `/clear`. Un hook non può lanciare `/clear` da solo. Senza statusline la guardia si spegne con un avviso, perché le voci 37-41 tengono già piccola la sessione principale |
 
@@ -115,7 +117,7 @@ Unica eccezione: il **brainstorming** si fa nella sessione principale, perché �
 
 ## 7. Hermes Agent
 
-Fonte: analisi in sola lettura di `~/.hermes/hermes-agent` (NousResearch/hermes-agent, commit `057dcdf2`) e di `Company AgentOS/Hermesz/REPORT-HERMES.md`, fatta l'8 ottobre 2026. I riferimenti file:riga sono del repo di Hermes. Le voci hanno prefisso H per non confonderle con le 1-42.
+Fonte: analisi in sola lettura di `~/.hermes/hermes-agent` (NousResearch/hermes-agent, commit `057dcdf2`) e di un rapporto privato su Hermes, fatta l'8 ottobre 2026. I riferimenti file:riga sono del repo di Hermes. Le voci hanno prefisso H per non confonderle con le 1-42.
 
 **La scoperta principale.** Hermes ha già due pezzi molto vicini a tollgate, ma entrambi solo «morbidi»:
 - un **registro delle verifiche in SQLite** (H40), che però considera scaduta una verifica in base all'orario dell'ultima modifica;

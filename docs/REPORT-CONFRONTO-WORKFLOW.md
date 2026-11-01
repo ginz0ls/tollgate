@@ -1,5 +1,7 @@
 # Report: workflow di sviluppo ad agenti, confronto completo e base per il plugin
 
+> «Alfa» è il nome di comodo di un progetto privato di un cliente: il nome vero e i percorsi locali sono stati tolti il 01/11/2026.
+
 Data: 8 ottobre 2026.
 Input: `HANDOFF.md` (stessa cartella).
 Stato: analisi. Nessun codice del plugin scritto: le decisioni aperte (sezione 12) restano dell'utente.
@@ -21,11 +23,11 @@ Stato: analisi. Nessun codice del plugin scritto: le decisioni aperte (sezione 1
    - Compound Engineering sulla conoscenza che si accumula;
    - codex-workflow sui controlli git deterministici e sul gate umano in PR;
    - l'Orchestratore Goal sulle ricevute dei comandi legate alla revisione dei file;
-   - il flusso Perizie sulla qualità di piani, ruling e revisioni in un progetto reale in produzione.
+   - il flusso Alfa sulla qualità di piani, ruling e revisioni in un progetto reale in produzione.
 2. **Il buco comune è l'imposizione delle regole.** Tutti i plugin pubblici più usati (Superpowers, agent-skills, GSD, BMAD, Spec Kit) impongono le regole **solo con il prompt**. Il loro unico hook è un `SessionStart` che inietta testo. Le evidenze dicono che non basta:
    - con l'istruzione «non barare» il reward hacking resta al 70-80% sul task testato da METR;
    - le skill non partono nel 56% dei casi nei test di Vercel;
-   - nel flusso Perizie la notturna è rimasta rossa per giorni senza che nessuno se ne accorgesse.
+   - nel flusso Alfa la notturna è rimasta rossa per giorni senza che nessuno se ne accorgesse.
    Claude Code oggi ha oltre 30 eventi hook, con blocco tramite exit 2. Quasi nessuno li usa per i gate.
 3. **Il secondo buco è la prova di efficacia.** Nessun concorrente dimostra con eval ripetibili che il suo workflow migliora il risultato rispetto a Claude Code senza plugin. Esiste `claude plugin eval`, che confronta con una baseline: è un vantaggio competitivo diretto.
 4. **Il terzo buco è l'adattamento al tipo di progetto.** I workflow pubblici applicano lo stesso rituale a un bugfix, a una migrazione DB e a un prototipo. Le evidenze su TDD imposto, piani lunghi e revisioni multiple dicono che il rigore va proporzionato al rischio del cambiamento e ai percorsi toccati.
@@ -33,7 +35,7 @@ Stato: analisi. Nessun codice del plugin scritto: le decisioni aperte (sezione 1
 **Raccomandazione.** Costruire un plugin che sia **un harness di gate**, non un'altra collezione di skill. Il modello riprende:
 - da codex-workflow: controlli git, verdetto a riga leggibile da macchina, gate PR con merge umano;
 - dall'Orchestratore: ricevute legate all'hash, tetto di revisioni, scope per task verificato;
-- da Perizie: piano magro, ruling con costo, punti di arresto, criterio di gravità, revisione avversariale;
+- da Alfa: piano magro, ruling con costo, punti di arresto, criterio di gravità, revisione avversariale;
 - da Superpowers e GSD: ledger su disco, contesto fresco per subagente, verifica goal-backward.
 
 Il tutto va imposto da hook, con **profili per tipo di progetto** scelti dai file toccati e una suite di eval che ne misuri l'effetto. Dettaglio nella sezione 10.
@@ -44,9 +46,9 @@ Il tutto va imposto da hook, con **profili per tipo di progetto** scelti dai fil
 
 | Fonte | Come è stata analizzata | Affidabilità |
 |---|---|---|
-| Orchestratore Goal (`/home/USER/MEGA/BIZ/VIBE/orchestratore-goal`) | Lettura completa di codice, docs, policy ed evidenze. **Test eseguiti: 102 OK in 10 s** (con fake, senza rete) | Alta |
-| codex-workflow (`.../Company AgentOS/Hermesz/codex-workflow`) | Lettura completa di codice, prompt e docs. **Test eseguiti: 128 OK in 8 s** | Alta |
-| Flusso Perizie (`.../Commercialista mombello/Piattaforma Perizie`) | Lettura di CLAUDE.md, piani, avvii, audit, todo, registri sdd e memoria. Metriche da `git log` e `wc` | Alta |
+| Orchestratore Goal (`orchestratore-goal`) | Lettura completa di codice, docs, policy ed evidenze. **Test eseguiti: 102 OK in 10 s** (con fake, senza rete) | Alta |
+| codex-workflow (`codex-workflow`) | Lettura completa di codice, prompt e docs. **Test eseguiti: 128 OK in 8 s** | Alta |
+| Flusso Alfa | Lettura di CLAUDE.md, piani, avvii, audit, todo, registri sdd e memoria. Metriche da `git log` e `wc` | Alta |
 | Plugin installati (superpowers 6.4.1, agent-skills 0.6.9, GSD 1.9.4, plugin ufficiali) | Lettura dei sorgenti in `~/.claude/plugins/cache` e `~/.claude/get-shit-done` | Alta |
 | Stato dell'arte online | WebSearch e WebFetch su fonti primarie (API GitHub, README, docs ufficiali) al 08/10/2026 | Media-alta. Le fonti secondarie sono segnalate |
 | Evidenze empiriche (METR, Anthropic, arXiv, Fowler) | Lettura delle fonti primarie dove possibile | Media. Alcune cifre 2026 vengono da riassunti: le segnalo con **[S]** |
@@ -63,8 +65,8 @@ Convenzioni: **[V]** = fonte primaria letta; **[S]** = fonte secondaria non veri
 | codex-workflow, isolamento | Non indicato | Codex gira con `--sandbox danger-full-access` (`codex.py:73-75`). Il confinamento è solo un controllo del `cwd` |
 | codex-workflow, tetto | 10 bocciature | Corretto nel codice (`reviews.py:8`). `docs/troubleshooting.md:13` dice 5: la documentazione è incoerente |
 | Orchestratore, test | «Le evidenze dichiarano 102 test» | Eseguiti: 102 OK |
-| Perizie, `CLAUDE.md` | «enorme» | 193 righe ma **59.888 byte**, circa 18-20k token caricati a ogni sessione e in ogni subagente |
-| Perizie, disciplina | Non quantificata | La notturna di `main` è fallita ogni notte dal 30/09 (pgTAP `21_relazione`), senza far girare app e Playwright. Scoperta solo in M2 (`CLAUDE.md:92`). La regola «nessun test esistente cambia» è stata derogata 6 volte nelle ultime 3 fette |
+| Alfa, `CLAUDE.md` | «enorme» | 193 righe ma **59.888 byte**, circa 18-20k token caricati a ogni sessione e in ogni subagente |
+| Alfa, disciplina | Non quantificata | La notturna di `main` è fallita ogni notte dal 30/09 (pgTAP `21_relazione`), senza far girare app e Playwright. Scoperta solo in M2 (`CLAUDE.md:92`). La regola «nessun test esistente cambia» è stata derogata 6 volte nelle ultime 3 fette |
 
 ---
 
@@ -161,7 +163,7 @@ Convenzioni: **[V]** = fonte primaria letta; **[S]** = fonte secondaria non veri
 
 **Peso dell'infrastruttura.** Circa 1.330 righe servono all'avvio da evento (webhook, firma, config, adattatori, riconciliazione) e circa 1.450 al workflow vero. In un plugin la prima metà sparisce: **si riutilizzano circa 400 righe di logica** (worktree, reviews, verdetto, idempotenza).
 
-### 2.3 Flusso Perizie
+### 2.3 Flusso Alfa
 
 **Cos'è.** Una metodologia, non un software: spec → piano generale → piano di fetta → prd-audit → revisione avversariale → P1 → `subagent-driven-development` → revisione finale → verifica completa → dry-run → deploy → merge ff-only → P2. **È l'unico dei tre in produzione**:
 - 390 commit in 14,7 giorni;
@@ -500,7 +502,7 @@ Le date senza anno sono del 2026.
 ### 5.8 Cosa cambia il censimento nelle conclusioni
 
 1. **L'enforcement con hook esiste, ma solo in pezzi singoli.** Lo fanno tdd-guard, cc-safety-net e i gate TRUST 5 di moai-adk (questi ultimi non verificati nel codice). **Nessun workflow completo spec → PR lo usa come spina dorsale.** La tesi della sezione 0 regge e si rafforza: si possono comporre pezzi già provati.
-2. **OpenSpec (71k) va aggiunto ai riferimenti per le spec.** Le *delta spec* risolvono il problema brownfield che Spec Kit ha (sezione 4.1) e che Perizie ha affrontato a mano con i «Fatti verificati».
+2. **OpenSpec (71k) va aggiunto ai riferimenti per le spec.** Le *delta spec* risolvono il problema brownfield che Spec Kit ha (sezione 4.1) e che Alfa ha affrontato a mano con i «Fatti verificati».
 3. **Il revisore di un altro motore è un pattern ufficiale.** OpenAI pubblica `codex-plugin-cc` per usare Codex come revisore dentro Claude Code (34k). claudex-loop e claude-review-loop fanno lo stesso. Coerente con «revisore con modello diverso» (sezione 10) e con la decisione aperta sul motore.
 4. **Ticket → run isolata ha ormai una spec pubblica** (OpenAI Symphony, 28k). Se la v1 dovrà avere autonomia da tracker, conviene allinearsi a quel contratto invece di reinventare la coda di codex-workflow.
 5. **La categoria più affollata è l'orchestrazione parallela** (Orca, vibe-kanban, agent-orchestrator, Gas Town). **Non conviene competere lì**: il plugin deve funzionare *dentro* questi strumenti, perché ogni agente in un worktree può avere i nostri hook.
@@ -514,7 +516,7 @@ Le date senza anno sono del 2026.
 
 Voti da ★ a ★★★★★. Sono un giudizio dell'analista, motivato dalle sezioni sopra.
 
-| Dimensione | Orchestratore | codex-workflow | Perizie | Superpowers | agent-skills | GSD | Spec Kit | Kiro |
+| Dimensione | Orchestratore | codex-workflow | Alfa | Superpowers | agent-skills | GSD | Spec Kit | Kiro |
 |---|---|---|---|---|---|---|---|---|
 | Imposizione delle regole con codice | ★★★★★ | ★★★★ | ★ | ★★ | ★ | ★ | ★ | ★★★ |
 | Qualità di piani e specifiche | ★★ | ★ | ★★★★★ | ★★★★ | ★★★ | ★★★★ | ★★★★ | ★★★ |
@@ -532,21 +534,21 @@ Voti da ★ a ★★★★★. Sono un giudizio dell'analista, motivato dalle se
 
 **Lettura.**
 - Le colonne «codice» (Orchestratore, codex-workflow) vincono su imposizione e ripresa, ma non sono mai state in produzione.
-- Le colonne «metodologia» (Perizie, Superpowers, GSD) vincono su qualità e maturità, ma si reggono sulla disciplina.
+- Le colonne «metodologia» (Alfa, Superpowers, GSD) vincono su qualità e maturità, ma si reggono sulla disciplina.
 - **Nessuno ha cinque stelle su «prova di efficacia» né su «adattamento al tipo di progetto».** È lo spazio libero.
 
 ### 6.2 Chi è il migliore, caso per caso
 
 | Caso | Migliore disponibile oggi | Perché | Cosa gli manca |
 |---|---|---|---|
-| Progetto full-stack in produzione con DB, Docker, deploy (tipo Perizie) | **Flusso Perizie** (Superpowers SDD con prd-audit e ruling) | L'unico provato su uno stack reale con dry-run e deploy ordinato | Hook, monitor della CI, contesto snello |
+| Progetto full-stack in produzione con DB, Docker, deploy (tipo Alfa) | **Flusso Alfa** (Superpowers SDD con prd-audit e ruling) | L'unico provato su uno stack reale con dry-run e deploy ordinato | Hook, monitor della CI, contesto snello |
 | Libreria o pacchetto puro | **Orchestratore Goal** (concettualmente), Superpowers in pratica | Ricevute legate all'hash e scope verificato sono ideali per test isolati | Diff dell'API pubblica, mutation testing |
 | Team con tracker e revisione in PR | **codex-workflow** come modello, Copilot agent e Code Review nativo come prodotti | Il gate umano sta dove il team guarda già | Test eseguiti, piano passato agli agenti |
 | Sessioni lunghe e progetti a fasi | **GSD Core** | Contesto fresco, `STATE.md`, wave | Isolamento, enforcement |
 | Specifiche condivise con più agenti o IDE | **Spec Kit** | Standard di fatto, flussi bug e idea | Verbosità, nessun gate eseguito |
 | Bugfix | **Spec Kit (bugfix)** o Superpowers `systematic-debugging` | Verdetto `verified/partial/failed`, test di riproduzione | Blocco reale contro la cancellazione dei test |
 | Prototipo e hackathon | **Nessun workflow** (Claude Code nudo) o `gsd:quick` | Ogni cerimonia costa più di quanto rende | Salire di profilo quando il prototipo diventa prodotto |
-| Apprendimento cumulativo del team | **Compound Engineering** | `/ce-compound` scrive le lezioni dove servono | Verifica di cosa si scrive (rischio di gonfiare il contesto, come in Perizie) |
+| Apprendimento cumulativo del team | **Compound Engineering** | `/ce-compound` scrive le lezioni dove servono | Verifica di cosa si scrive (rischio di gonfiare il contesto, come in Alfa) |
 | Frontend e UI | Nessuno specifico. Playwright Test Agents più Chrome DevTools MCP | Verifica visuale reale | Gate visuale nel workflow, baseline protette |
 | IaC e DB in produzione | Nessuno specifico | — | `plan` come gate, apply solo umano, hook di blocco |
 
@@ -622,12 +624,12 @@ Le regole di passaggio sono queste:
 ## 9. Dove nessuno arriva: le opportunità
 
 1. **Gate imposti da hook che eseguono davvero** test, build e browser, e li legano allo SHA o all'hash dell'albero. L'Orchestratore lo fa solo per Codex, codex-workflow non esegue niente e i plugin di workflow pubblici lo chiedono solo nel prompt. Esistono hook isolati (tdd-guard, cc-safety-net, sezione 5.6), ma nessun workflow completo è costruito sopra di essi.
-2. **Guardia anti-reward-hacking.** Test, soglie, CI e baseline visive sono in sola lettura per l'implementatore. Ogni deroga diventa un ruling tipizzato con contatore, e oltre una soglia scatta lo stop. Perizie ha mostrato che la deroga «invariato» senza freno diventa la norma.
+2. **Guardia anti-reward-hacking.** Test, soglie, CI e baseline visive sono in sola lettura per l'implementatore. Ogni deroga diventa un ruling tipizzato con contatore, e oltre una soglia scatta lo stop. Alfa ha mostrato che la deroga «invariato» senza freno diventa la norma.
 3. **Profilo composito per i percorsi toccati.** Nessun concorrente lo fa: BMAD e Superpowers v6.3 scalano solo sulla «dimensione».
 4. **Eval del plugin contro la baseline** con `claude plugin eval` e pass^k. Nessun concorrente dimostra di funzionare: sarebbe l'argomento più forte per dire «il migliore».
 5. **Un solo stato, una sola scala di gravità, un solo coordinatore.** È la conclusione dell'Orchestratore e il problema dei plugin installati insieme.
-6. **Contesto minimo e vivo.** Indice sempre caricato di pochi KB, regole per modulo con `globs`, ruling e fatti in un'unica fonte con controllo dei duplicati. Contrasta l'anti-pattern `CLAUDE.md` di 60 KB di Perizie e lo studio ICLR.
-7. **Monitor della salute del ramo base.** Se la CI o la notturna di `main` è rossa, la fetta successiva non parte. Avrebbe evitato i giorni di notturna rotta in Perizie.
+6. **Contesto minimo e vivo.** Indice sempre caricato di pochi KB, regole per modulo con `globs`, ruling e fatti in un'unica fonte con controllo dei duplicati. Contrasta l'anti-pattern `CLAUDE.md` di 60 KB di Alfa e lo studio ICLR.
+7. **Monitor della salute del ramo base.** Se la CI o la notturna di `main` è rossa, la fetta successiva non parte. Avrebbe evitato i giorni di notturna rotta in Alfa.
 8. **Piano passato davvero e verificato** (correzione del difetto di codex-workflow), con `must_haves` che scendono fino al verificatore (GSD).
 
 ---
@@ -642,9 +644,9 @@ Le regole di passaggio sono queste:
 
 | Strato | Contenuto | Origine |
 |---|---|---|
-| Skill (`SKILL.md` più `references/` per ruolo) | Grafo delle fasi, prompt ricchi per ruolo (pianificatore, implementatore, revisore, avversario, verificatore), template del piano magro, formato dei ruling, criterio di gravità | Perizie, Superpowers, GSD |
+| Skill (`SKILL.md` più `references/` per ruolo) | Grafo delle fasi, prompt ricchi per ruolo (pianificatore, implementatore, revisore, avversario, verificatore), template del piano magro, formato dei ruling, criterio di gravità | Alfa, Superpowers, GSD |
 | Hook | `PreToolUse`: blocca push, `gh pr create` e deploy senza ricevuta valida; blocca la modifica di test, CI e soglie fuori ruling; blocca `apply`, `destroy` e `db push` senza P-D. `SubagentStop` / `TaskCompleted`: verifica git e scope prima di accettare il lavoro. `Stop`: rifiuta «fatto» senza ricevute verdi sullo SHA corrente. `PostToolUse` su Bash: registra le ricevute. `SessionStart`: indice di pochi KB | Orchestratore (ricevute, scope), codex-workflow (git), `ralph-loop`, `security-guidance` |
-| Script (`bin/`) | `verify-git`, `receipt`, `scope-check`, `plan-lint` (sezioni obbligatorie, tetto di righe, niente codice fuori dalle sezioni «fissato»), `profile-detect`, `ledger`, `drift-check` (firme esportate contro quelle dichiarate), `base-health` (CI di main) | codex-workflow `worktree.py`, Orchestratore `workspace.py`/`audit.py`, Perizie P3 |
+| Script (`bin/`) | `verify-git`, `receipt`, `scope-check`, `plan-lint` (sezioni obbligatorie, tetto di righe, niente codice fuori dalle sezioni «fissato»), `profile-detect`, `ledger`, `drift-check` (firme esportate contro quelle dichiarate), `base-health` (CI di main) | codex-workflow `worktree.py`, Orchestratore `workspace.py`/`audit.py`, Alfa P3 |
 | Subagenti | Implementatore con `isolation: worktree`; revisore e avversario con soli tool di lettura e **modello diverso dall'implementatore** quando possibile; verificatore che esegue i gate | Superpowers, Orchestratore |
 | Orchestrazione | Livello L2: dynamic workflow (piano nel codice, output a schema, verifica avversariale). L0 e L1: inline | Funzione nativa |
 | Stato | Una cartella (es. `.workflow/`) con `ledger.md`, `receipts.jsonl`, `rulings.md`, `profile.json`. **Versionata** in forma compatta, non git-ignored | Superpowers, GSD, Anthropic harness |
@@ -675,16 +677,16 @@ L2  come L1 + spec + audit/avversario sul piano + P1 obbligatorio + esecuzione p
 | Scope per task e piano con copertura e DAG | Orchestratore | `reports.py:99-105`, `workspace.py:31-71` |
 | Tetto revisioni non azzerabile, finding chiuso solo da chi l'ha aperto | Orchestratore | `audit.py:9-14, 106-112` |
 | Nessuna autorità concessa in automatico | Orchestratore | `controller.py:129-134` |
-| Piano magro, Fatti verificati, Decisioni con costo | Perizie | piano O, sezioni `:48`, `:89` |
-| Ruling, punti di arresto P1-P4/P-D | Perizie | `tasks/todo.md`, piano O `:484-495` |
-| Criterio di gravità del progetto | Perizie, prd-audit | `docs/audit/...-fetta-m-stato.md:5` |
-| Revisione avversariale senza le motivazioni dell'autore | Perizie | `docs/audit/...revisione-avversariale-fetta-m.md` |
+| Piano magro, Fatti verificati, Decisioni con costo | Alfa | piano O, sezioni `:48`, `:89` |
+| Ruling, punti di arresto P1-P4/P-D | Alfa | `tasks/todo.md`, piano O `:484-495` |
+| Criterio di gravità del progetto | Alfa, prd-audit | `docs/audit/...-fetta-m-stato.md:5` |
+| Revisione avversariale senza le motivazioni dell'autore | Alfa | `docs/audit/...revisione-avversariale-fetta-m.md` |
 | Ledger con chiusura solo a test verdi | Superpowers | `executing-plans/scripts/task-done` |
 | Brief, report e diff su file | Superpowers | `subagent-driven-development` |
 | Verifica goal-backward a tre livelli | GSD | `agents/gsd-verifier.md` |
 | Filtro di confidenza ≥80 | plugin `code-review` | `commands/code-review.md:20-26` |
 | GO/NO-GO con rollback, regola di salto | agent-skills `/ship` | `ship.toml:71` |
-| Compound (lezioni scritte dove servono) | Compound Engineering | con un tetto di dimensione, per non ripetere il `CLAUDE.md` gonfio di Perizie |
+| Compound (lezioni scritte dove servono) | Compound Engineering | con un tetto di dimensione, per non ripetere il `CLAUDE.md` gonfio di Alfa |
 
 ### 10.4 Cosa NON fare
 
@@ -702,7 +704,7 @@ L2  come L1 + spec + audit/avversario sul piano + P1 obbligatorio + esecuzione p
 | Rischio | Probabilità | Mitigazione |
 |---|---|---|
 | Hook troppo rigidi che bloccano lavoro legittimo | Alta | Ogni blocco ha una via d'uscita tracciata (ruling con costo e contatore) e test sugli hook |
-| Costo in token come Perizie | Media | Livelli L0, L1, L2 scelti da script. Revisore e panel solo dove serve. Modelli per ruolo |
+| Costo in token come Alfa | Media | Livelli L0, L1, L2 scelti da script. Revisore e panel solo dove serve. Modelli per ruolo |
 | Multi-motore: gli hook valgono solo per Claude Code | Certa | Le skill sono condivise (`~/.agents/skills`). Gli script in `bin/` sono richiamabili anche da Codex. Gli hook Codex esistono ma con un'API diversa: serve un adattatore |
 | Rilevamento del profilo sbagliato | Media | Profilo mostrato all'avvio, correggibile, può solo salire |
 | Funzioni native in preview (workflows, routines, code review) che cambiano | Media | Dipendere solo da hook e subagenti, stabili. Il resto è opzionale |
@@ -721,7 +723,7 @@ Nuove, emerse da questa analisi:
 4. **Ambito della v1 per profili**: tutti i profili della sezione 8 o un sottoinsieme? Il mio suggerimento [Inf]: base comune più frontend, backend/API, DB e bugfix, cioè quelli dei vostri progetti reali.
 5. **Rapporto con i plugin esistenti**: il nostro plugin sostituisce Superpowers e agent-skills nel flusso, oppure li richiama come «conoscenza» restando l'unico coordinatore?
 6. **Pubblicazione**: plugin privato o pubblico su marketplace? Cambia il peso da dare a eval, documentazione e multi-motore.
-7. **Correzioni al metodo Perizie** (handoff, sezione 7): applicarle prima a Perizie o incorporarle direttamente nel plugin?
+7. **Correzioni al metodo Alfa** (handoff, sezione 7): applicarle prima ad Alfa o incorporarle direttamente nel plugin?
 
 ---
 
@@ -735,7 +737,7 @@ Nuove, emerse da questa analisi:
   - `workflow_bridge/{worktree,coordinator,workflow,transitions,reviews,specialists,adapters,codex,store,security}.py`
   - `prompts/*.txt`
   - `docs/*.md`
-- Perizie:
+- Alfa:
   - `CLAUDE.md`
   - `docs/superpowers/plans/`
   - `docs/avvio-fetta-o.md`
