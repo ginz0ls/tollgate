@@ -267,18 +267,26 @@ def _last_report(conn, work, row) -> str | None:
 
 def _implementer_report(conn, work, row) -> str:
     """Il report dell'ultimo implementatore in chiaro, per il revisore: i campi del report di
-    18.5 (senza `concerns`, che ha la sua sezione), oppure, se non si legge, la coda del testo
-    registrato. Vuoto se non c'è un report."""
+    18.5 (`concerns` solo se non vuoto e senza una sezione dei dubbi propria), oppure, se
+    non si legge, la coda del testo registrato. Vuoto se non c'è un report."""
     text = _last_report(conn, work, row)
     if not text or not text.strip():
         return ""
     rep = report.parse_report(text)
     if not rep.data:
         return text.strip()[-report.MAX_SCAN_CHARS:]
-    fields = {"status": rep.status, **{k: v for k, v in rep.data.items()
-                                       if k not in ("status", "concerns", "v")}}
-    return "\n".join(f"{k}: {', '.join(map(str, v)) if isinstance(v, list) else v}"
-                     for k, v in fields.items())
+    skipped = {"status", "v"} | ({"concerns"} if rep.status == "DONE_WITH_CONCERNS" else set())
+    fields = {"status": rep.status, **{k: v for k, v in rep.data.items() if k not in skipped}}
+    if not str(fields.get("concerns") or "").strip():
+        fields.pop("concerns", None)
+    return "\n".join(f"{k}: {_render(v)}" for k, v in fields.items())
+
+
+def _render(value) -> str:
+    """Un campo del report in chiaro: `None` è `null`, un elenco è separato da virgole."""
+    if value is None:
+        return "null"
+    return ", ".join(map(_render, value)) if isinstance(value, list) else str(value)
 
 
 def _concerns(conn, work, row) -> str:

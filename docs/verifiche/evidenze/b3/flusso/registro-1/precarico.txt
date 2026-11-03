@@ -1,0 +1,3 @@
+metodo: indizio
+nessuna trascrizione di subagente leggibile nelle uscite: vale solo l'indizio, non è una prova del precaricamento
+righe con R-BASE-: 4

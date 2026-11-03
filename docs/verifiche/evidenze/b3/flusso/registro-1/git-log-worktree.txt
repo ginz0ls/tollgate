@@ -1,0 +1,4 @@
+bc86d6b feat(ai): aggiungi la costante SUMMARY_MODEL
+742bf47 docs: piano per la costante SUMMARY_MODEL (#1)
+31ad748 profilo ai proposto da init
+9ecf35f base

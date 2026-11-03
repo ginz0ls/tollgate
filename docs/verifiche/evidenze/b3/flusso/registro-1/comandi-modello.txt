@@ -1,0 +1,29 @@
+# docs/verifiche/evidenze/b3/flusso/passo1/tentativo-1/claude.jsonl
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" start 1 --level L1
+bash: git ls-files && echo ---- && cat ai/models.py ai/summary.py 2>&1; ls tests 2>&1; cat tollgate.toml 2>&1; ls docs/superpowers/* 2>&1
+grep: {"pattern": "(?i)models|deprecat|retire", "path": "/tmp/claude-1000/bundled-skills/2.1.316/01382414ab02d432e27abbadff77273b/claude-api/shared/live-sources.md", "output_mode": "content"}
+bash: cat tests/test_smoke.py ai/__init__.py config.toml services/notify.py; echo ----; ls /tmp/tollgate-b1/plugin/skills/rules-ai; cat /tmp/tollgate-b1/plugin/skills/rules-ai/SKILL.md
+grep: {"pattern": "Must-have|must.have|Fatti verificati|Punti di arresto", "path": "/tmp/tollgate-b1/plugin", "glob": "*.py", "output_mode": "content", "head_limit": 40}
+grep: {"pattern": "ids_run|classname", "path": "/tmp/tollgate-b1/plugin/bin", "output_mode": "content", "head_limit": 30}
+bash: git add docs/superpowers/plans/2026-11-02-summary-model-constant.md && git commit -q -m "docs: piano per la costante SUMMARY_MODEL (#1) ⏎  ⏎ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>" && git log --oneline -1 && git status --short
+# docs/verifiche/evidenze/b3/flusso/passo2/tentativo-1/claude.jsonl
+bash: ls docs/superpowers/plans/ 2>&1; git log --oneline -3; git status --short
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" status --checkpoint
+bash: cat docs/superpowers/reviews/1/checkpoint.md; git status --short
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" task start 1
+bash (subagente): ls -R ai tests | head -30
+bash (subagente): python3 /tmp/tollgate-b1/plugin/bin/tollgate research submit 1 <<'NOTA_DI_RICERCA_FINE' ⏎ ## Letto nel progetto ⏎ - ai/summary.py ⏎ - .tollgate-run/1/task-1.md ⏎  ⏎ ## Documentazione ⏎ - https://platform.claude.com/docs/en/models/overview — tabella "Compare models": Claude Haiku 5.5 e' un modello corrente, ID API `claude-haiku-5-5` (dateless, snapshot fissato), ritiro non prima del 7 ottobre 2027; Haiku e' la linea per compiti ad alto volume e bassa latenza. ⏎ - https://platform.claude.com/docs/en/about-claude/model-deprecations — tabella "Model status": `claude-haiku-5-5` e' Active, nessuna deprecazione; `claude-haiku-4-5-20251001` Active ma piu' vecchio. ⏎  ⏎ ## Cosa ho trovato ⏎ Il progetto non usa librerie nel nuovo file: ai/models.py contiene solo una costante stringa (nessun file delle dipendenze toccato). L'ultimo Haiku stabile e' claude-haiku-5-5 (Active), quindi lo uso. L'ID non ha data a 8 cifre, coerente col test. Nel file metto l'indirizzo della pagina modelli e la data 2026-11-02 accanto alla costante, e la docstring di modulo nello stile di ai/summary.py. Il codice esistente (riassumi) riceve il modello come parametro e non cambia. ⏎ NOTA_DI_RICERCA_FINE
+bash (subagente): python3 -m unittest tests.test_models -v 2>&1 | tail -5
+bash (subagente): python3 -m unittest discover -s tests -t . -v 2>&1 | tail -8 && git add ai/models.py tests/test_models.py && git commit -q -m "feat(ai): aggiungi la costante SUMMARY_MODEL ⏎  ⏎ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>" && python3 /tmp/tollgate-b1/plugin/bin/tollgate verify 2>&1 | tail -8
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" task review-prepare 1
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" task done 1; python3 "/tmp/tollgate-b1/plugin/bin/tollgate" status --checkpoint | tail -2; git status --short
+# strumenti del modello (totale, di cui da subagenti)
+Agent: 2 (0)
+Bash: 14 (4)
+EnterWorktree: 1 (0)
+Grep: 3 (0)
+Read: 8 (5)
+Skill: 3 (0)
+ToolSearch: 2 (0)
+WebFetch: 4 (3)
+Write: 3 (2)

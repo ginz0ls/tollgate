@@ -6,17 +6,19 @@ l'albero da copiare e, in `protected`, `protection.json` e `protect.sh`. Non scr
 e non tocca i file di tollgate del repo: li copia l'utente. Codici: 0 fatto, 1 rifiuto."""
 from __future__ import annotations
 
+import fnmatch
 import json
 import math
 import re
 import shlex
 import shutil
 import sqlite3
-from dataclasses import dataclass, field
+import tomllib
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 
-from tollgate_analysis import prbody, workflows
-from tollgate_core import VERSION, clock, config, db, git
+from tollgate_analysis import globs, prbody, profiles as route, tomlout, workflows
+from tollgate_core import VERSION, clock, config, db, fragments, git
 from tollgate_core.paths import State, repo_key
 from tollgate_gate import install, protection
 
@@ -29,6 +31,17 @@ TEMPLATE = PLUGIN_ROOT / "templates" / "tollgate.toml"
 FREE_MINUTES = "2.000"                  # GitHub Free, repo privati (9.5)
 RECEIPT_SOURCES = ("finish", "verify")
 MODE_PLACEHOLDER = "__MODE__"
+# Cartelle i cui file non accendono un profilo (decisione 5): gli agenti e le skill di progetto,
+# la copia di tollgate di ogni progetto e la proposta di `init`, che ne contiene un'altra copia.
+EXCLUDED_PREFIXES = (".claude/", install.INSTALL_DIR + "/", FOLDER + "/")
+SHOWN_FILES = 10
+# Decisione 6: il rilevamento per contenuto guarda solo i file sorgente, non i test, non i grandi.
+SOURCE_EXTENSIONS = ("py", "ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs", "vue", "svelte",
+                     "go", "rb", "java", "kt", "rs", "php", "cs", "swift")
+TEST_DIRS = ("tests", "test", "__tests__")
+TEST_NAMES = ("*.test.*", "*.spec.*", "*_test.*", "test_*.py", "conftest.py")
+MAX_DETECT_BYTES = 256 * 1024
+README_PROFILE_CAP = 4000
 
 _SECTION = re.compile(r"^\s*\[([^\[\]]*)\]\s*(?:#.*)?$")
 _MODE_LINE = re.compile(r'^(\s*mode\s*=\s*)(?:"[^"\n]*"|\'[^\'\n]*\')')
@@ -53,6 +66,16 @@ class _Proposal:
     jest_junit: bool = False
     seconds: float | None = None
     from_template: bool = False
+
+
+@dataclass(frozen=True)
+class ProfileProposal:
+    """Cosa `init` propone sui profili verticali: `text` da aggiungere in coda al
+    `tollgate.toml` (comincia con un a capo), `lines` per il terminale, `readme` per la sezione
+    «Profili proposti» (vuoti se non c'è niente da dire)."""
+    text: str = ""
+    lines: list[str] = field(default_factory=list)
+    readme: str = ""
 
 
 def _refuse(*lines: str) -> InitResult:
@@ -160,6 +183,238 @@ def _jest(main, ref: str) -> tuple[bool, bool]:
     return ("jest" in deps or "jest" in data), "jest-junit" in deps
 
 
+_FOLDER_PATTERN = re.compile(r"\*\*/([^/]+)/\*\*")
+_AGENT_NAME = re.compile(r"[a-z0-9-]+")
+
+
+def _toml_item(value: str) -> str:
+    """`value` come stringa TOML da copiare in una lista."""
+    line = tomlout.table("t", {"v": [value]}).splitlines()[1]
+    return line[len("v = ["):-1]
+
+
+def _toml_items(values) -> str:
+    return ", ".join(_toml_item(v) for v in values)
+
+
+def _shown(files: list[str]) -> str:
+    more = f" e altri {len(files) - SHOWN_FILES}" if len(files) > SHOWN_FILES else ""
+    return ", ".join(_plain(f) for f in files[:SHOWN_FILES]) + more
+
+
+def _names(fragment) -> set[str]:
+    """I nomi di cartella dei pattern `**/<cartella>/**` del frammento."""
+    return {m.group(1) for p in fragment.profile["paths"] if (m := _FOLDER_PATTERN.fullmatch(p))}
+
+
+def _folder_prefix(path: str, names: set[str]) -> str | None:
+    """Il percorso fino alla prima cartella (compresa) il cui nome è in `names`."""
+    parts = path.split("/")
+    for i, part in enumerate(parts[:-1]):
+        if part in names:
+            return "/".join(parts[:i + 1])
+    return None
+
+
+def _concrete_paths(names: set[str], files) -> list[str]:
+    """Decisione 5: per ogni file sotto una cartella di `names`, `<prefisso>/**` con
+    l'escape; un prefisso già coperto da uno più corto si toglie."""
+    prefixes = {pre for f in files if (pre := _folder_prefix(f, names))}
+    kept = [p for p in prefixes if not any(p != q and p.startswith(q + "/") for q in prefixes)]
+    return sorted(globs.escape(p) + "/**" for p in kept)
+
+
+def _is_detectable(path: str, size: int | None) -> bool:
+    """Decisione 6: un file sorgente fuori dalle cartelle escluse, dai test e dai grandi."""
+    if size is None or size > MAX_DETECT_BYTES or path.startswith(EXCLUDED_PREFIXES):
+        return False
+    parts = path.split("/")
+    name = parts[-1]
+    if not name.endswith(tuple("." + e for e in SOURCE_EXTENSIONS)):
+        return False
+    return not (any(d in TEST_DIRS for d in parts[:-1])
+                or any(fnmatch.fnmatchcase(name, pat) for pat in TEST_NAMES))
+
+
+def detect_files(repo, ref: str, frags, sizes: dict[str, int],
+                 warnings: list[str] | None = None) -> dict[str, list[str]]:
+    """Decisione 6: per area, i file sorgente di `ref` che contengono un marcatore del frammento.
+    Un `git grep` per frammento che ha marcatori; se fallisce (tetto di tempo compreso) l'area
+    non ha file rilevati e la riga di avviso va in `warnings`: init prosegue senza rilevamento."""
+    pathspecs = [f":(glob)**/*.{e}" for e in SOURCE_EXTENSIONS]
+    found: dict[str, list[str]] = {}
+    for fragment in frags:
+        if not fragment.detect:
+            continue
+        try:
+            hits = git.grep_files_at(repo, ref, list(fragment.detect), pathspecs)
+        except git.GitError as e:
+            found[fragment.area] = []
+            if warnings is not None:
+                warnings.append(f"profilo {fragment.area}: rilevamento per contenuto non "
+                                f"riuscito ({_plain(str(e))}): proseguo senza file rilevati")
+            continue
+        found[fragment.area] = sorted(f for f in hits if _is_detectable(f, sizes.get(f)))
+    return found
+
+
+def _with_warnings(found: ProfileProposal, warnings: list[str]) -> ProfileProposal:
+    if not warnings:
+        return found
+    readme = found.readme.rstrip("\n") or "## Profili da controllare"
+    readme += "\n\n### Avvisi sul rilevamento\n\n" + _fenced(warnings) + "\n"
+    return replace(found, lines=[*warnings, *found.lines], readme=readme)
+
+
+def _agent_exists(plugin_root: Path, agent: str) -> bool:
+    name = agent.partition(":")[2]
+    return bool(_AGENT_NAME.fullmatch(name)) and (plugin_root / "agents" / f"{name}.md").is_file()
+
+
+def _declared_profiles(text: str) -> tuple[dict[str, dict], list]:
+    """I profili dichiarati in `text` e `[profiles] active`; testo illeggibile: nessuno."""
+    try:
+        section = tomllib.loads(text).get("profiles", {})
+    except tomllib.TOMLDecodeError:
+        return {}, []
+    if not isinstance(section, dict):
+        return {}, []
+    active = section.get("active", [])
+    return ({k: v for k, v in section.items() if k != "active" and isinstance(v, dict)},
+            active if isinstance(active, list) else [])
+
+
+def _drift(area: str, decl: dict, fragment, rules: tuple[list[str], list[str]],
+           lighting: list[str], detected: list[str], plugin_root: Path) -> list[str]:
+    """Decisione 7: le righe esatte da cambiare in un profilo già dichiarato."""
+    head = f"profilo {area}: [profiles.{area}]"
+    out = []
+    prefix = f"R-{area.upper()}-"
+    for key, wanted in zip(("rules", "blocking_rules"), rules):
+        have = [r for r in decl.get(key, []) if isinstance(r, str)] \
+            if isinstance(decl.get(key, []), list) else []
+        if (add := [r for r in wanted if r not in have]):
+            out.append(f"{head} {key}: aggiungi {_toml_items(add)}")
+        if (drop := [r for r in have if r.startswith(prefix) and r not in wanted]):
+            out.append(f"{head} {key}: togli {_toml_items(drop)}")
+    paths = decl.get("paths")
+    if isinstance(paths, list) and all(isinstance(p, str) for p in paths):
+        negations = [p[1:] for p in paths if p.startswith("!")]
+        uncovered = [f for f in lighting if not globs.match_any(paths, f)
+                     and not any(globs.match(n, f) for n in negations)]
+        uncovered_detected = [f for f in detected if f not in uncovered
+                              and not globs.match_any(paths, f)
+                              and not any(globs.match(n, f) for n in negations)]
+        proposed = sorted({*_concrete_paths(_names(fragment), uncovered),
+                           *(globs.escape(f) for f in uncovered_detected)})
+        for pattern in proposed:
+            count = sum(1 for f in [*uncovered, *uncovered_detected] if globs.match(pattern, f))
+            out.append(f"{head} paths: aggiungi {_toml_item(pattern)} ({count} file)")
+    for key in config.AGENT_FORMS:
+        value = fragment.profile.get(key)
+        if value and key not in decl and _agent_exists(plugin_root, value):
+            out.append(f"{head} {key}: aggiungi {key} = {_toml_item(value)}")
+    return out
+
+
+def profile_blocks(files: dict[str, int], current_text: str, plugin_root: Path, *,
+                   detected: dict[str, list[str]] | None = None) -> ProfileProposal:
+    """Decisioni 4, 5, 7, 12: i profili approvati del plugin che hanno file nel repo.
+    `files` viene da `git.tree_sizes_at`, `detected` (area -> file) dal rilevamento di
+    contenuto. Pura sui dati: legge solo i frammenti, le skill e gli agenti di `plugin_root`.
+    Un profilo già dichiarato in `current_text` non si tocca: solo righe sulla differenza."""
+    plugin_root = Path(plugin_root)
+    declared, active = _declared_profiles(current_text)
+    try:
+        effective = config.load_config_text(current_text).profiles
+    except config.ConfigError:
+        effective = declared
+    candidates = sorted(f for f in files if not f.startswith(EXCLUDED_PREFIXES))
+    text, lines, other, sections = "", [], [], []
+    for fragment in fragments.load(plugin_root):
+        if not fragments.approved(fragment):
+            continue
+        area = fragment.area
+        names = _names(fragment)
+        lighting = [f for f in candidates if _folder_prefix(f, names)]
+        found = sorted({f for f in (detected or {}).get(area, [])
+                        if not f.startswith(EXCLUDED_PREFIXES)} - set(lighting))
+        rules = fragments.rules(fragment)
+        if area in declared:
+            drift = _drift(area, declared[area], fragment, rules, lighting, found, plugin_root)
+            lines += drift
+            other += drift
+            continue
+        concrete = _concrete_paths(names, lighting)
+        paths = sorted({*concrete, *(globs.escape(f) for f in found
+                                     if not globs.match_any(concrete, f))})
+        if not paths:
+            lines.append(f"profilo {area}: nessun file del repo corrisponde ai suoi percorsi: "
+                         "non proposto")
+            other.append(lines[-1])
+            continue
+        own = []
+        values = {}
+        for key, value in fragment.profile.items():
+            if key == "paths":
+                continue
+            if key in config.AGENT_FORMS and value and not _agent_exists(plugin_root, value):
+                own.append(f"profilo {area}: {key} «{_plain(value)}» non proposto: manca "
+                           f"agents/{_plain(value.partition(':')[2])}.md nel plugin (si usa "
+                           "l'agente generico)")
+                continue
+            values[key] = value
+        values = {"paths": paths, **values, "rules": rules[0], "blocking_rules": rules[1]}
+        source = f"templates/profiles/{fragment.source.name}"
+        text += f"\n# profilo {area} da {source}\n" + tomlout.table(f"profiles.{area}", values)
+        lit = sorted({f for f in candidates if globs.match_any(paths, f)} | set(found))
+        own.insert(0, f"profilo {area}: proposto con paths = [{_toml_items(paths)}]; lo "
+                      f"accendono {len(lit)} file: {_shown(lit)}")
+        if area in active:
+            own.append(f"profilo {area}: [profiles] active contiene «{_plain(area)}»: con il "
+                       "blocco proposto il profilo si accenderebbe su ogni task")
+        vertical = {n: p for n, p in effective.items() if p.get("kind", "vertical") == "vertical"}
+        merged = {**vertical, area: {"kind": "vertical", "paths": paths}}
+        overlaps = [(f, route.vertical_for(f, vertical)) for f in lit]
+        overlaps = [(f, declared_one) for f, declared_one in overlaps if declared_one]
+        for f, declared_one in overlaps[:SHOWN_FILES]:
+            own.append(f"profilo {area}: {_plain(f)} corrisponde anche a «{_plain(declared_one)}»: "
+                       f"vince {_plain(route.vertical_for(f, merged))}")
+        if len(overlaps) > SHOWN_FILES:
+            own.append(f"profilo {area}: sovrapposizioni con profili già dichiarati: altri "
+                       f"{len(overlaps) - SHOWN_FILES} file")
+        lines += own
+        sections.append(_profile_section(area, source, own))
+    return ProfileProposal(text, lines, _profiles_readme(sections, other))
+
+
+def _fenced(lines: list[str]) -> str:
+    """Righe di un repo per il `README.md`: ripulite con `_plain` riga per riga, poi recintate."""
+    return prbody.neutralize("\n".join(_plain(l) for l in lines), max_len=README_PROFILE_CAP)
+
+
+def _profile_section(area: str, source: str, own: list[str]) -> str:
+    start = f"# profilo {area} da {source}"
+    return "\n".join([
+        f"### Profilo `{_plain(area)}`", "",
+        _fenced(own), "",
+        f"Per non adottarlo, prima di copiare cancella da `tollgate.toml` la riga `{start}` e "
+        "le righe che la seguono fino alla riga vuota."])
+
+
+def _profiles_readme(sections: list[str], other: list[str]) -> str:
+    if not sections and not other:
+        return ""
+    out = ["## Profili proposti" if sections else "## Profili da controllare", ""]
+    if sections:
+        out += ["Blocchi `[profiles.<area>]` aggiunti in coda a `tollgate.toml`: il testo che "
+                "c'era non è stato riscritto. Rileggili prima di copiare.", "", *sections, ""]
+    if other:
+        out += ["### Differenze e avvisi", "",
+                _fenced(other), ""]
+    return "\n".join(out)
+
+
 def _quote(value: str) -> str:
     """Sempre tra apici singoli, anche se la shell non lo richiederebbe."""
     return "'" + value.replace("'", "'\\''") + "'"
@@ -239,7 +494,7 @@ def _estimate_lines(seconds: float | None, merges: int) -> list[str]:
 
 
 def _readme(p: _Proposal, *, update: bool, branch: str, merges: int,
-            services: dict[str, str], ports: dict[str, int], now) -> str:
+            services: dict[str, str], ports: dict[str, int], now, profiles: str = "") -> str:
     folder = FOLDER
     out = ["# Proposta di installazione di tollgate", "",
            f"Preparata il {clock.fmt(now)} da tollgate {VERSION}. I file qui sotto sono una "
@@ -284,6 +539,8 @@ def _readme(p: _Proposal, *, update: bool, branch: str, merges: int,
     elif p.mode == "detect":
         out.append(f"{n}. Nessuna protezione da attivare: in `detect` la verifica avviene dopo "
                    "il merge, con `tollgate-sentinel`.")
+    if profiles:
+        out += ["", profiles.rstrip("\n")]
     out += ["", "## Stima dei minuti di Actions", "", *_estimate_lines(p.seconds, merges)]
     if services:
         out += ["", "## Servizi", "",
@@ -347,10 +604,19 @@ def _write(top: Path, readme: str, files: dict[str, bytes], protect: tuple[str, 
     return folder
 
 
+def _not_evaluated(reason: str) -> ProfileProposal:
+    line = f"profili non valutati: {_plain(reason)}"
+    return ProfileProposal("", [line], "## Profili proposti\n\n" + prbody.neutralize(line, 1000)
+                           + "\n")
+
+
 def propose(state: State, cwd: Path, *, update: bool, merges_per_month: int,
-            services: dict[str, str], ports: dict[str, int] | None = None, now=None
-            ) -> InitResult:
+            services: dict[str, str], ports: dict[str, int] | None = None, now=None,
+            profiles_root: Path | None = None) -> InitResult:
+    """`profiles_root`: la radice da cui vengono frammenti, skill e agenti dei profili
+    (predefinita `PLUGIN_ROOT`); `install.files` legge sempre `PLUGIN_ROOT`."""
     now = now or clock.now()
+    profiles_root = Path(profiles_root) if profiles_root else PLUGIN_ROOT
     ports = ports or {}
     try:
         install.validate_services(services, ports)
@@ -391,6 +657,27 @@ def propose(state: State, cwd: Path, *, update: bool, merges_per_month: int,
     except config.ConfigError as e:
         return _refuse(f"tollgate.toml non è valido dopo la scelta della modalità: {e}")
     try:
+        sizes = git.tree_sizes_at(main, ref)
+        warnings: list[str] = []
+        if sizes:
+            approved = [f for f in fragments.load(profiles_root) if fragments.approved(f)]
+            detected = detect_files(main, ref, approved, sizes, warnings)
+            found = _with_warnings(profile_blocks(sizes, toml, profiles_root, detected=detected),
+                                   warnings)
+        else:
+            found = _not_evaluated(f"git non ha elencato nessun file di {ref}")
+    except git.GitError as e:
+        found = _not_evaluated(str(e))
+    except fragments.FragmentError as e:
+        return _refuse(_plain(str(e)))
+    if found.text:
+        try:
+            config.load_config_text(toml + found.text)
+        except config.ConfigError as e:
+            found = _not_evaluated(f"tollgate.toml con i profili proposti non è valido: {e}")
+        else:
+            toml += found.text
+    try:
         tree = install.files(PLUGIN_ROOT, default_branch=default, services=services, ports=ports)
     except ValueError as e:
         return _refuse(str(e))
@@ -411,7 +698,7 @@ def propose(state: State, cwd: Path, *, update: bool, merges_per_month: int,
             lines += [f"protezione incompleta: manca {m}" for m in read.missing]
             if read.missing:
                 lines.append("lancia /tollgate:init --propose per ottenere protect.sh")
-            return InitResult(OK, lines)
+            return InitResult(OK, [*lines, *found.lines])
 
     jest, jest_junit = _jest(main, ref)
     proposal = _Proposal(
@@ -423,7 +710,7 @@ def propose(state: State, cwd: Path, *, update: bool, merges_per_month: int,
         if mode == "protected" and (read.kind == protection.PROTECTED_UNSET or read.missing) \
         else None
     readme = _readme(proposal, update=update, branch=default, merges=merges_per_month,
-                     services=services, ports=ports, now=now)
+                     services=services, ports=ports, now=now, profiles=found.readme)
     folder = _write(Path(top), readme, tree, protect)
 
     shown = folder.relative_to(top).as_posix()
@@ -434,6 +721,7 @@ def propose(state: State, cwd: Path, *, update: bool, merges_per_month: int,
     lines += [f"protezione incompleta: manca {m}" for m in read.missing]
     lines += [f"workflow esistente fuori regola: {_plain(rel)}: {_plain(problem)}"
               for rel, problem in proposal.violations]
+    lines += found.lines
     lines.append(f"proposta scritta in {shown}/ ({len(tree)} file)"
                  + (f"; ramo suggerito tollgate-config/{VERSION}" if update else ""))
     lines.append(f"leggi {shown}/README.md: i passi li fai tu, tollgate non scrive i suoi file "

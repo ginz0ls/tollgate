@@ -158,6 +158,23 @@ class ReviewReportTest(unittest.TestCase):
         self.assertNotIn("Report dell'implementatore", brief.review_brief(review()))
 
 
+class ReviewBaseRulesTest(unittest.TestCase):
+    PHRASE = "in questo lavoro le regole `R-BASE-…` non bloccano"
+
+    def section(self, **kw):
+        out = brief.review_brief(review(implementer_report="status: DONE", **kw))
+        return out.split("## Report dell'implementatore", 1)[1].split("\n## ", 1)[0]
+
+    def test_review_brief_no_research_says_base_rules_do_not_block(self):
+        self.assertIn(self.PHRASE, self.section(research=False))
+
+    def test_review_brief_research_switch_off_says_base_rules_do_not_block(self):
+        self.assertIn(self.PHRASE, self.section(research=True, research_enforced=False))
+
+    def test_review_brief_research_enforced_has_no_phrase(self):
+        self.assertNotIn(self.PHRASE, self.section(research=True, research_enforced=True))
+
+
 class ReviewResearchTest(unittest.TestCase):
     NOTE_PATH = "/w/.tollgate-run/7/research-2.md"
 

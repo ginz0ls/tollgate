@@ -497,17 +497,25 @@ class FlowBench(Bench):
     def claude_p(self):
         return [c for c in self.calls() if c["args"][:1] == ["-p"]]
 
-    def src_repo(self, *, approved=True):
-        """Un piccolo repo git che traccia `bin/` del repo e una `skills/rules-base/SKILL.md`: la radice sorgente (`B1_FLOW_SRC`)."""
+    def src_repo(self, *, approved=True, case="b1", ai_approved=True):
+        """Un piccolo repo git che traccia `bin/` del repo e una `skills/rules-base/SKILL.md`: la radice sorgente (`B1_FLOW_SRC`).
+        Con `case="ai"` copia invece i file veri (e tracciati) che servono a `init --propose`: `bin/`, `templates/`, `gate/`,
+        `agents/`, `skills/rules-base/` e `skills/rules-ai/`; con `ai_approved=False` toglie `approved` da quest'ultima."""
         src = self.dir / "src"
         (src / "skills" / "rules-base").mkdir(parents=True)
-        tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z", "--", "bin"], capture_output=True, check=True).stdout
+        parts = ("bin",) if case == "b1" else ("bin", "templates", "gate", "agents", "skills/rules-base", "skills/rules-ai", ".claude-plugin")
+        tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z", "--", *parts], capture_output=True, check=True).stdout
         for rel in filter(None, tracked.decode().split("\0")):
             (src / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / rel, src / rel)
-        head = "---\nname: rules-base\ndescription: Regole di prova della sorgente finta.\nversion: 1\n"
-        (src / "skills" / "rules-base" / "SKILL.md").write_text(
-            head + ("approved: 2026-11-01\n" if approved else "") + "---\n# Regole di base (versione 1)\n\nUna regola di prova.\n")
+        if case == "ai":
+            if not ai_approved:
+                skill = src / "skills" / "rules-ai" / "SKILL.md"
+                skill.write_text(re.sub(r"(?m)^approved:.*\n", "", skill.read_text()))
+        else:
+            head = "---\nname: rules-base\ndescription: Regole di prova della sorgente finta.\nversion: 1\n"
+            (src / "skills" / "rules-base" / "SKILL.md").write_text(
+                head + ("approved: 2026-11-01\n" if approved else "") + "---\n# Regole di base (versione 1)\n\nUna regola di prova.\n")
         git = ["git", "-C", str(src), "-c", "user.name=prova", "-c", "user.email=prova@example.com", "-c", "commit.gpgsign=false"]
         subprocess.run([*git, "init", "-q", "-b", "main"], check=True, capture_output=True, env=self.env())
         subprocess.run([*git, "add", "-A"], check=True, capture_output=True, env=self.env())
@@ -905,6 +913,119 @@ class FlowScriptTest(unittest.TestCase):
         self.assertEqual(self.b.run("registra").returncode, 0)
         self.assertIn("letture registrate (read): 2", (self.b.out / "registro-2" / "grep-non-registrati.txt").read_text())
 
+    def web_stream(self, size):
+        """Un flusso finto: un WebFetch con un risultato di `size` caratteri (testo di terzi) e un Bash con un risultato corto."""
+        page = "P" * size
+        use = {"type": "assistant", "parent_tool_use_id": None, "message": {"content": [
+            {"type": "tool_use", "id": "tu1", "name": "WebFetch", "input": {"url": "https://example.test/pagina", "prompt": "x"}},
+            {"type": "tool_use", "id": "tu2", "name": "Bash", "input": {"command": "ls"}}]}}
+        res = {"type": "user", "message": {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": "tu1", "content": page}]},
+            "tool_use_result": {"bytes": size, "code": 200, "result": page, "url": "https://example.test/pagina"}}
+        short = {"type": "user", "message": {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": "tu2", "content": "L" * 9000}]}}
+        return [use, res, short]
+
+    def test_flowreg_togli_pagine_replaces_long_web_results(self):
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-b3-flowreg-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        stream = tmp / "claude.jsonl"
+        stream.write_text("".join(json.dumps(x) + "\n" for x in self.web_stream(22794)) + "non json\n")
+        r = subprocess.run([sys.executable, "-B", str(FLOW_REG), "togli-pagine", str(stream)], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        text = stream.read_text()
+        self.assertNotIn("PPPPP", text)
+        self.assertIn("[pagina di terzi tolta dalle evidenze: https://example.test/pagina, 22794 caratteri]", text)
+        lines = text.splitlines()
+        self.assertEqual(lines[-1], "non json")
+        rows = [json.loads(x) for x in lines[:-1]]
+        self.assertEqual(rows[1]["tool_use_result"]["result"], rows[1]["message"]["content"][0]["content"])
+        self.assertEqual(rows[1]["tool_use_result"]["bytes"], 22794)
+        self.assertEqual(rows[2]["message"]["content"][0]["content"], "L" * 9000, "un risultato di Bash non si tocca")
+
+    def skill_stream(self, path, size):
+        text = f"{'Base directory for this skill: ' + path}\n\n" + "S" * size
+        return [{"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": text}]}}]
+
+    def test_flowreg_togli_pagine_replaces_external_skills_but_keeps_tollgate_ones(self):
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-b3-flowreg-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        stream = tmp / "claude.jsonl"
+        rows = (self.skill_stream("/tmp/bundled/claude-api", 109000) + self.skill_stream("/tmp/tollgate-b1/plugin/skills/rules-ai", 20000)
+                + self.skill_stream("/tmp/x/piccola", 100))
+        stream.write_text("".join(json.dumps(x) + "\n" for x in rows))
+        for _ in range(2):
+            subprocess.run([sys.executable, "-B", str(FLOW_REG), "togli-pagine", str(stream)], capture_output=True, text=True, check=True)
+        out = [json.loads(x) for x in stream.read_text().splitlines()]
+        self.assertRegex(out[0]["message"]["content"][0]["text"], r"^\[skill di terzi tolta dalle evidenze: claude-api, 109\d{3} caratteri\]$")
+        self.assertIn("S" * 20000, out[1]["message"]["content"][0]["text"])
+        self.assertIn("S" * 100, out[2]["message"]["content"][0]["text"])
+
+    def test_flow_registra_strips_external_skills_from_the_streams(self):
+        self.b.prepara()
+        self.assertEqual(self.b.run("passo1").returncode, 0)
+        stream = self.b.out / "passo1" / "tentativo-1" / "claude.jsonl"
+        stream.write_text("".join(json.dumps(x) + "\n" for x in self.skill_stream("/tmp/bundled/claude-api", 50000)))
+        self.assertEqual(self.b.run("registra").returncode, 0)
+        self.assertNotIn("SSSSS", stream.read_text())
+
+    def test_flowreg_togli_pagine_keeps_short_results_and_is_idempotent(self):
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-b3-flowreg-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        stream = tmp / "claude.jsonl"
+        stream.write_text("".join(json.dumps(x) + "\n" for x in self.web_stream(1500)))
+        before = stream.read_text()
+        for _ in range(2):
+            subprocess.run([sys.executable, "-B", str(FLOW_REG), "togli-pagine", str(stream)], capture_output=True, text=True, check=True)
+            self.assertEqual(stream.read_text(), before)
+        stream.write_text("".join(json.dumps(x) + "\n" for x in self.web_stream(30000)))
+        for _ in range(2):
+            subprocess.run([sys.executable, "-B", str(FLOW_REG), "togli-pagine", str(stream)], capture_output=True, text=True, check=True)
+        self.assertNotIn("PPPPP", stream.read_text())
+
+    def test_flow_registra_strips_third_party_pages_from_the_streams(self):
+        self.b.prepara()
+        self.assertEqual(self.b.run("passo1").returncode, 0)
+        stream = self.b.out / "passo1" / "tentativo-1" / "claude.jsonl"
+        stream.write_text("".join(json.dumps(x) + "\n" for x in self.web_stream(22794)))
+        r = self.b.run("registra")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertNotIn("PPPPP", stream.read_text())
+        self.assertIn("22794 caratteri", stream.read_text())
+        self.assertEqual((self.b.out / "registro-1" / "fallimenti.txt").read_text(), "")
+
+    def test_committed_evidence_has_no_long_web_results(self):
+        """Nelle evidenze pubbliche un risultato di WebFetch/WebSearch non supera MAX_WEB_RESULT: il testo delle pagine dei fornitori non si pubblica."""
+        sys.path.insert(0, str(B1))
+        try:
+            import flowreg
+        finally:
+            sys.path.remove(str(B1))
+        found = []
+        for path in sorted((ROOT / "docs" / "verifiche" / "evidenze").rglob("*.jsonl")):
+            names = {}
+            for n, line in enumerate(path.read_text(errors="replace").splitlines(), 1):
+                try:
+                    obj = json.loads(line)
+                except ValueError:
+                    continue
+                msg = obj.get("message") if isinstance(obj, dict) else None
+                for block in (msg.get("content") if isinstance(msg, dict) and isinstance(msg.get("content"), list) else []):
+                    if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in flowreg.WEB_TOOLS:
+                        names[block.get("id")] = block.get("name")
+                for _, block, _ in flowreg.web_results(obj, names):
+                    size = len(flowreg._content_text(block.get("content")))
+                    if size > flowreg.MAX_WEB_RESULT:
+                        found.append(f"{path.relative_to(ROOT)}:{n} ({size} caratteri)")
+                for block in (msg.get("content") if isinstance(msg, dict) and isinstance(msg.get("content"), list) else []):
+                    if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str) \
+                            and "evidenze/b3/" in path.as_posix() and flowreg.external_skill(block["text"]):
+                        found.append(f"{path.relative_to(ROOT)}:{n} skill di terzi ({len(block['text'])} caratteri)")
+                res = obj.get("tool_use_result") if isinstance(obj, dict) else None
+                if isinstance(res, dict) and isinstance(res.get("result"), str) and "codeText" in res and len(res["result"]) > flowreg.MAX_WEB_RESULT:
+                    found.append(f"{path.relative_to(ROOT)}:{n} tool_use_result ({len(res['result'])} caratteri)")
+        self.assertEqual(found, [], "pagine di terzi nelle evidenze: lancia flowreg.py togli-pagine")
+
     def test_flow_registra_reports_collection_failures_but_collects_the_rest(self):
         self.b.prepara()
         self.assertEqual(self.b.run("passo1").returncode, 0)
@@ -948,6 +1069,174 @@ class FlowScriptTest(unittest.TestCase):
             self.assertEqual(read_only.execute("SELECT COUNT(*) FROM lookups").fetchone()[0], 2)
         finally:
             read_only.close()
+
+    # ------------------------------------------------------------------ il caso `ai` (B3, Task 9)
+
+    def ai_src(self, **kw):
+        return self.b.src_repo(case="ai", **kw)
+
+    def test_flow_case_ai_out_dir(self):
+        r = self.b.run("controlla", B1_FLOW_CASE="ai", B1_FLOW_RULES="vere", B1_FLOW_OUT="")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("CONTROLLA: ok", r.stdout)
+        self.assertIn("B1_FLOW_CASE: ai", r.stdout)
+        self.assertIn(f"cartella delle uscite: {ROOT}/docs/verifiche/evidenze/b3/flusso", r.stdout)
+        self.assertEqual(r.stderr, "")
+        for case in (None, "b1"):
+            with self.subTest(case=case):
+                extra = {} if case is None else {"B1_FLOW_CASE": case}
+                r = self.b.run("controlla", B1_FLOW_OUT="", **extra)
+                self.assertIn("B1_FLOW_CASE: b1", r.stdout)
+                self.assertIn(f"cartella delle uscite: {ROOT}/docs/verifiche/evidenze/b1/flusso", r.stdout)
+
+    def test_flow_case_ai_requires_real_rules(self):
+        for rules in (None, "prova"):
+            for mode in ("controlla", "prepara", "passo1", "passo2", "registra"):
+                with self.subTest(rules=rules, mode=mode):
+                    extra = {} if rules is None else {"B1_FLOW_RULES": rules}
+                    r = self.b.run(mode, B1_FLOW_CASE="ai", **extra)
+                    self.assertNotEqual(r.returncode, 0)
+                    self.assertIn("B1_FLOW_RULES", r.stderr)
+        self.assertEqual(self.b.calls(), [])
+        self.assertFalse(self.b.root.exists())
+
+    def test_flow_case_unknown_value(self):
+        for mode in ("controlla", "prepara", "passo1", "passo2", "registra"):
+            with self.subTest(mode=mode):
+                r = self.b.run(mode, B1_FLOW_CASE="altro")
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn("B1_FLOW_CASE", r.stderr)
+        self.assertEqual(self.b.calls(), [])
+        self.assertFalse(self.b.root.exists())
+
+    def test_real_flow_case_ai_prepara_proposes_profile(self):
+        src = self.ai_src()
+        r = self.b.run("prepara", B1_FLOW_CASE="ai", B1_FLOW_RULES="vere", B1_FLOW_SRC=str(src))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("plan-check: ok", r.stdout)
+        text = (self.b.flow / "tollgate.toml").read_text()
+        self.assertIn("[profiles.ai]", text)
+        self.assertIn("services/notify.py", text)
+        self.assertIn('mode = "detect"', text)
+        for part in ("ai/summary.py", "services/notify.py", "tests/__init__.py", "tests/test_smoke.py"):
+            self.assertTrue((self.b.flow / part).is_file(), part)
+        self.assertFalse((self.b.flow / "docs" / "superpowers" / "tollgate-init").exists(), "la cartella della proposta si toglie")
+        self.assertTrue(list(self.b.root.glob("tollgate-init.proposta-*")))
+        git = ["git", "-C", str(self.b.flow)]
+        log = subprocess.run([*git, "log", "--format=%s"], capture_output=True, text=True, check=True).stdout.split("\n")
+        self.assertGreaterEqual(len([x for x in log if x]), 2)
+        self.assertEqual(subprocess.run([*git, "status", "--porcelain"], capture_output=True, text=True).stdout, "")
+        self.assertEqual(subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True).stdout,
+                         subprocess.run([*git, "rev-parse", "origin/main"], capture_output=True, text=True).stdout)
+        data = json.loads((self.b.root / "fakegh-data.json").read_text())
+        self.assertIn("SUMMARY_MODEL", data["issues"]["1"]["body"])
+        self.assertIn("repos/{owner}/{repo}/branches/main/protection", data["api_status"])
+        sha = subprocess.run([*git, "rev-parse", "origin/main"], capture_output=True, text=True).stdout.strip()
+        self.assertIn(sha, data["statuses"])
+        self.assertEqual(self.b.calls(), [])
+
+    def test_flow_case_ai_prepara_refuses_without_profile(self):
+        src = self.ai_src(ai_approved=False)
+        r = self.b.run("prepara", B1_FLOW_CASE="ai", B1_FLOW_RULES="vere", B1_FLOW_SRC=str(src))
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("profiles.ai", r.stderr)
+
+    def test_flow_case_ai_project_verifies(self):
+        src = self.ai_src()
+        r = self.b.run("prepara", B1_FLOW_CASE="ai", B1_FLOW_RULES="vere", B1_FLOW_SRC=str(src))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        verify = re.search(r'(?m)^verify = "(.*)"$', (self.b.flow / "tollgate.toml").read_text()).group(1)
+        self.assertIn("unittest", verify)
+        self.assertEqual((ROOT / "spikes" / "b3" / "flow" / "tollgate.toml").read_text(), (B1 / "flow" / "tollgate.toml").read_text())
+        cmd = verify.replace("python3 ", "python3 -B ", 1)
+        v = subprocess.run(cmd, shell=True, cwd=self.b.flow, capture_output=True, text=True, env=clean_env(PATH=os.environ["PATH"]))
+        self.assertEqual(v.returncode, 0, v.stdout + v.stderr)
+        self.assertFalse(list(self.b.flow.rglob("__pycache__")))
+
+    def test_flowreg_project_dir_name(self):
+        sys.path.insert(0, str(B1))
+        self.addCleanup(sys.path.remove, str(B1))
+        import flowreg
+        self.assertEqual(flowreg.project_dir_name("/tmp/tollgate-b1/flow/.claude/worktrees/tg-1-x"),
+                         "-tmp-tollgate-b1-flow--claude-worktrees-tg-1-x")
+        self.assertEqual(flowreg.project_dir_name("/tmp/a b.c/x_y"), "-tmp-a-b-c-x-y")
+
+    def _transcripts(self, home, cwd, session, agents):
+        folder = Path(home) / ".claude" / "projects" / re.sub(r"[^A-Za-z0-9]", "-", cwd) / session / "subagents"
+        folder.mkdir(parents=True)
+        for name, lines in agents.items():
+            (folder / f"agent-{name}.jsonl").write_text("".join(json.dumps(x) + "\n" for x in lines))
+
+    def test_registra_reads_only_matching_lines(self):
+        src = self.ai_src()
+        r = self.b.run("prepara", B1_FLOW_CASE="ai", B1_FLOW_RULES="vere", B1_FLOW_SRC=str(src))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.b.worktree()
+        self.assertEqual(self.b.run("passo1", B1_FLOW_CASE="ai", B1_FLOW_RULES="vere").returncode, 0)
+        self.assertEqual(self.b.run("passo2", B1_FLOW_CASE="ai", B1_FLOW_RULES="vere").returncode, 0)
+        cwd1, cwd2 = "/tmp/prova.uno due/flow", "/tmp/prova.uno due/flow/.claude/worktrees/tg-1-x"
+        for step, cwd, sid in (("passo1", cwd1, "sess-uno"), ("passo2", cwd2, "sess-due")):
+            att = self.b.out / step / "tentativo-1"
+            stream = [{"type": "system", "subtype": "init", "cwd": cwd, "session_id": sid},
+                      {"type": "assistant", "message": {"content": [{"type": "text", "text": "ok"}]}}]
+            (att / "claude.jsonl").write_text("".join(json.dumps(x) + "\n" for x in stream))
+        home = self.b.dir / "home"
+        self._transcripts(home, cwd1, "sess-uno", {"a1": [
+            {"isMeta": True, "message": {"role": "user", "content": "# Regole di base (versione 1)\n- R-BASE-01 ..."}},
+            {"message": {"role": "user", "content": "SEGRETO-DEL-COMPITO nel brief"}}]})
+        self._transcripts(home, cwd2, "sess-due", {"b2": [
+            {"isMeta": True, "message": {"role": "user", "content": [{"type": "text", "text": "intro\n# Regole ai (versione 1)\n- R-AI-01"}]}},
+            {"message": {"role": "assistant", "content": "SEGRETO-DEL-COMPITO risposta"}}]})
+        # una sessione estranea, nella cartella giusta ma col session_id sbagliato, e una cartella estranea: non si leggono
+        self._transcripts(home, cwd2, "sess-altra", {"c3": [{"isMeta": True, "message": {"content": "# Regole ai (versione 1)"}}]})
+        self._transcripts(home, "/tmp/estranea", "sess-uno", {"d4": [{"isMeta": True, "message": {"content": "# Regole ai (versione 1)"}}]})
+        r = self.b.run("registra", B1_FLOW_CASE="ai", B1_FLOW_RULES="vere")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = self.b.out / "registro-1"
+        text = (d / "trascrizioni.txt").read_text()
+        self.assertIn("agent-a1.jsonl", text)
+        self.assertIn("agent-b2.jsonl", text)
+        self.assertIn("# Regole di base (versione 1)", text)
+        self.assertIn("# Regole ai (versione 1)", text)
+        self.assertNotIn("SEGRETO", text)
+        self.assertNotIn("R-AI-01", text)
+        self.assertNotIn("agent-c3", text)
+        self.assertNotIn("agent-d4", text)
+        self.assertNotIn(str(home), text)
+        self.assertIn("agent_type", (d / "tipi-task.txt").read_text())
+        self.assertEqual((d / "fallimenti.txt").read_text(), "")
+        self.assertNotIn("sess-uno", text)
+        self.assertNotIn("sess-due", text)
+        self.assertIn("sessione 1", text)
+        self.assertIn("sessione 2", text)
+        self.assertNotIn("prova", text, "i percorsi fuori da /tmp/tollgate-b1/ non si stampano")
+
+    def test_flowreg_trascrizioni_skips_an_unsafe_session_id(self):
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-b3-flowreg-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / "estranea" / "subagents").mkdir(parents=True)
+        (tmp / "estranea" / "subagents" / "agent-x.jsonl").write_text("")
+        stream = tmp / "claude.jsonl"
+        stream.write_text(json.dumps({"type": "system", "cwd": "/tmp/tollgate-b1/flow", "session_id": "../../estranea"}) + "\n")
+        r = subprocess.run([sys.executable, "-B", str(FLOW_REG), "trascrizioni", str(tmp), str(stream)], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("session_id non valido", r.stdout)
+        self.assertNotIn("estranea", r.stdout)
+        self.assertNotIn("agent-x", r.stdout)
+
+    def test_registra_ai_refuses_an_empty_home(self):
+        src = self.ai_src()
+        r = self.b.run("prepara", B1_FLOW_CASE="ai", B1_FLOW_RULES="vere", B1_FLOW_SRC=str(src))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = self.b.run("registra", B1_FLOW_CASE="ai", B1_FLOW_RULES="vere", HOME="")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("HOME", r.stderr)
+        self.assertFalse((self.b.out / "registro-1").exists(), "si rifiuta prima di creare il registro")
+
+    def test_registra_b1_does_not_look_at_transcripts(self):
+        self.b.prepara()
+        self.assertEqual(self.b.run("registra").returncode, 0)
+        self.assertFalse((self.b.out / "registro-1" / "trascrizioni.txt").exists())
 
 
 if __name__ == "__main__":

@@ -1,0 +1,52 @@
+# Frammento del profilo `ai`: codice che usa modelli AI. `init` lo completa con `rules` e
+# `blocking_rules`, che calcola dalle righe `R-AI-NN` di skills/rules-ai/SKILL.md. Il profilo
+# si propone solo dopo l'approvazione di quella skill (campo `approved`).
+
+[profile]
+kind = "vertical"
+min_level = "L1"
+# Le cartelle tipiche del codice che usa modelli AI; `init` le trasforma nei percorsi concreti
+# del progetto.
+paths = ["**/llm/**", "**/prompts/**", "**/agents/**", "**/ai/**"]
+# Vuoti di proposito: `rules-ai` la precaricano gli agenti dell'area e l'area non aggiunge
+# altre voci alla definizione di fatto.
+skills = []
+reviewer_skills = []
+agent = "tollgate:implementer-ai"
+reviewer = "tollgate:reviewer-ai"
+dod = []
+
+# Codice AI fuori dalle cartelle tipiche. Ogni voce è un pezzo di riga di import
+# o di chiamata che si cerca come testo fisso, mai il solo nome di un fornitore. Nessuna voce
+# è un pezzo di `@anthropic-ai/claude-code`, che compare in bin/tollgate_analysis/bash.py.
+# Le pagine da cui vengono sono quelle ufficiali elencate nella sezione «Fonti» di
+# skills/rules-ai/SKILL.md.
+[detect]
+content = [
+  # Anthropic: SDK Python e TypeScript (la forma `npm:@anthropic-ai/sdk` delle edge function
+  # di Supabase contiene già `@anthropic-ai/sdk`) e host dell'API.
+  "from anthropic import",
+  "import anthropic",
+  "@anthropic-ai/sdk",
+  "api.anthropic.com",
+  # Google (Gemini): Google GenAI SDK per Python, JavaScript e Go, e host dell'API.
+  "from google import genai",
+  "@google/genai",
+  "google.golang.org/genai",
+  "generativelanguage.googleapis.com",
+  # OpenAI: SDK Python e Node (anche con `npm:`) e host dell'API.
+  "from openai import",
+  "import openai",
+  "from 'openai'",
+  "from \"openai\"",
+  "npm:openai",
+  "api.openai.com",
+  # OpenRouter: SDK Python e TypeScript, Agent SDK e base dell'API.
+  "from openrouter import",
+  "@openrouter/sdk",
+  "@openrouter/agent",
+  "openrouter.ai/api/v1",
+  # Agno: classe dell'agente e classi dei modelli dei fornitori.
+  "from agno.agent import",
+  "from agno.models.",
+]

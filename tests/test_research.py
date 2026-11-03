@@ -1,6 +1,8 @@
 import time
 import unittest
 
+from tests.helpers import ROOT
+
 from tollgate_analysis import research as r
 
 WT = "/w"
@@ -289,6 +291,26 @@ class SubmitCommandTest(unittest.TestCase):
     def test_template_is_parsed_with_problems(self):
         body = r.submit_command("p", 1).split("\n", 1)[1].rsplit("\n", 1)[0]
         self.assertTrue(r.parse_note(body).problems)
+
+
+class AreaRulesTest(unittest.TestCase):
+    TEXT = ("R-AI-01 [blocca] Il modello sta in un solo punto.\n"
+            "R-AI-02 Il prompt non si fida dell'input.\n"
+            "R-BASE-01 [blocca] Una regola di base.\n")
+
+    def test_area_rules_extracts_prefix(self):
+        self.assertEqual(r.area_rules(self.TEXT, "ai"), ({"R-AI-01", "R-AI-02"}, {"R-AI-01"}))
+        self.assertEqual(r.area_rules(self.TEXT, "base"), ({"R-BASE-01"}, {"R-BASE-01"}))
+
+    def test_area_rules_ignores_inline_mentions(self):
+        text = "Vedi anche R-AI-03 [blocca] più sotto.\n- R-AI-04 in un elenco\nR-AI-05 vera\n"
+        self.assertEqual(r.area_rules(text, "ai"), ({"R-AI-05"}, set()))
+
+    def test_real_base_rules_unchanged(self):
+        text = (ROOT / "skills" / "rules-base" / "SKILL.md").read_text(encoding="utf-8")
+        known, _ = r.base_rules(text)
+        self.assertTrue(known)
+        self.assertEqual(r.base_rules(text), r.area_rules(text, "BASE"))
 
 
 if __name__ == "__main__":

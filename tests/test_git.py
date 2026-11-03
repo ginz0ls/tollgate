@@ -151,6 +151,25 @@ class GitTest(unittest.TestCase):
         git.is_clean(self.repo, [])
         self.assertEqual((idx.read_bytes(), idx.stat().st_mtime_ns), before)
 
+    def test_tree_sizes_at(self):
+        sizes = git.tree_sizes_at(self.repo, "HEAD")
+        self.assertEqual(sizes, {"src/a.py": len("uno\ndue\n"),
+                                 "tests/test_a.py": len("def test_a():\n    assert 1\n")})
+        self.assertEqual(git.tree_sizes_at(self.repo, "refs/heads/non-esiste"), {})
+        with self.assertRaises(git.GitError):
+            git.tree_sizes_at(self.repo, "--output=x")
+
+    def test_tree_sizes_at_skips_submodules_and_keeps_odd_names(self):
+        g(self.repo, "update-index", "--add", "--cacheinfo",
+          f"160000,{self.base},sub modulo")
+        (self.repo / "con spazi").mkdir()
+        (self.repo / "con spazi" / "è à.py").write_text("x\n")
+        g(self.repo, "add", "-A")
+        g(self.repo, "commit", "-qm", "altri")
+        sizes = git.tree_sizes_at(self.repo, "HEAD")
+        self.assertNotIn("sub modulo", sizes)
+        self.assertEqual(sizes["con spazi/è à.py"], 2)
+
     def test_blob_text_reads_stored_blob_and_none_for_missing(self):
         sha = g(self.repo, "rev-parse", "HEAD:src/a.py")
         self.assertEqual(git.blob_text(self.repo, sha), "uno\ndue\n")
@@ -336,6 +355,46 @@ class LsFilesAtTest(unittest.TestCase):
         g(self.repo, "add", "-A")
         g(self.repo, "commit", "-qm", "accento")
         self.assertIn("docs/è.md", git.ls_files_at(self.repo, "HEAD", "docs/"))
+
+
+class GrepFilesAtTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="tollgate grep "))
+        self.repo = make_repo(self.tmp / "repo con spazi")
+        (self.repo / "src").mkdir()
+        (self.repo / "src" / "x.py").write_text("src/x.py\n")
+        g(self.repo, "add", "-A")
+        g(self.repo, "commit", "-qm", "base")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_grep_files_at(self):
+        (self.repo / "src").mkdir(exist_ok=True)
+        (self.repo / "src" / "uno.py").write_text("import alfa\n")
+        (self.repo / "src" / "due.py").write_text("niente\n")
+        (self.repo / "src" / "bin.py").write_bytes(b"import alfa\0\n")
+        (self.repo / "src" / "è à.py").write_text("from beta import x\n")
+        (self.repo / "altro").mkdir()
+        (self.repo / "altro" / "tre.py").write_text("import alfa\n")
+        g(self.repo, "add", "-A")
+        g(self.repo, "commit", "-qm", "grep")
+        got = git.grep_files_at(self.repo, "HEAD", ["import alfa", "from beta"], ["src/"])
+        self.assertEqual(sorted(got), ["src/uno.py", "src/è à.py"])
+        both = git.grep_files_at(self.repo, "HEAD", ["import alfa"], [":(glob)**/*.py"])
+        self.assertEqual(sorted(both), ["altro/tre.py", "src/uno.py"])
+        self.assertEqual(git.grep_files_at(self.repo, "HEAD", ["mai visto"], ["src/"]), [])
+        self.assertEqual(git.grep_files_at(self.repo, "HEAD", [], ["src/"]), [])
+
+    def test_grep_files_at_errors_are_git_errors(self):
+        with self.assertRaises(git.GitError):
+            git.grep_files_at(self.repo, "--output=x", ["a"], ["src/"])
+        with self.assertRaises(git.GitError):
+            git.grep_files_at(self.repo, "refs/heads/non-esiste", ["a"], ["src/"])
+        slow = subprocess.TimeoutExpired(cmd=["git"], timeout=10)
+        with patch("tollgate_core.git.subprocess.run", side_effect=slow):
+            with self.assertRaises(git.GitError):
+                git.grep_files_at(self.repo, "HEAD", ["a"], ["src/"])
 
 
 class BlobAtTest(unittest.TestCase):

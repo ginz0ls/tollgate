@@ -21,6 +21,16 @@ skills = ["ghost-skill", "present-skill", "s3", "s4"]
 agent = "probe:implementer-web"
 reviewer = "probe:reviewer-web"
 """
+AI_TOML = DEFAULT_TOML + """
+[profiles.ai]
+paths = ["ai/**"]
+skills = []
+reviewer_skills = []
+agent = "tollgate:implementer-ai"
+reviewer = "tollgate:reviewer-ai"
+rules = ["R-AI-01", "R-AI-02"]
+blocking_rules = ["R-AI-01"]
+"""
 
 
 class TaskCase(unittest.TestCase):
@@ -203,6 +213,25 @@ class TaskStartTest(TaskCase):
             path, _ = self.start()
         self.assertEqual(json.loads(self.row()["skills_required"]), [])
         self.assertNotIn("rules-base", path.read_text())
+
+    def test_ai_task_routed_to_area_agents(self):
+        """Un blocco `ai` scritto nel test (regole di una skill finta, non i file veri)."""
+        self.make(toml=AI_TOML, plan=plan_text("- Create: `ai/x.py`"))
+        _, summary = self.start(2)
+        row = self.row(2)
+        self.assertEqual((row["agent_type"], row["reviewer_type"]),
+                         ("tollgate:implementer-ai", "tollgate:reviewer-ai"))
+        self.assertIn("tollgate:implementer-ai", summary)
+        self.assertIn("revisore: tollgate:reviewer-ai", summary)
+
+    def test_rules_ai_not_required(self):
+        """Decisione 9: `rules-ai` si precarica, non è una skill da usare."""
+        self.make(toml=AI_TOML, plan=plan_text("- Create: `ai/x.py`"))
+        path, _ = self.start(2)
+        self.assertEqual(json.loads(self.row(2)["skills_required"]), [])
+        brief = path.read_text()
+        self.assertNotIn("rules-ai", brief)
+        self.assertNotIn("Skill da usare\n\n- ", brief)
 
     def test_absent_skill_removed_from_required(self):
         self.make(toml=WEB_TOML, plan=plan_text("- Create: `web/page.tsx`"))
@@ -650,15 +679,38 @@ class ReviewDoneTest(TaskCase):
         self.to_review()
         self.assertNotIn("Report dell'implementatore", self.prepare().read_text())
 
-    def test_done_report_without_concerns_adds_none(self):
+    def _report_brief(self, **fields):
         self.to_review()
-        text = json.dumps({"v": 1, "task": 1, "status": "DONE", "done": "x", "tests": "t",
-                           "files": [], "concerns": "non deve comparire", "left": ""})
+        data = {"v": 1, "task": 1, "status": "DONE", "done": "x", "tests": "t",
+                "files": [], "concerns": "", "left": ""}
+        data.update(fields)
         subagents.start(self.fl.conn, agent_id="a1", type_="tollgate:implementer",
                         session="sess-flow", work=self.fl.work, task=1, base_sha=None,
                         fingerprint=None, now=self.fl.now)
-        subagents.set_report(self.fl.conn, "a1", text)
-        self.assertNotIn("non deve comparire", self.prepare().read_text())
+        subagents.set_report(self.fl.conn, "a1", json.dumps(data))
+        return self.prepare().read_text()
+
+    def test_report_concerns_shown_with_done(self):
+        brief = self._report_brief(concerns="dubbio sul caso zero")
+        section = brief.split("## Report dell'implementatore", 1)[1]
+        self.assertIn("concerns: dubbio sul caso zero", section)
+        self.assertNotIn("Dubbi dell'implementatore", brief)
+
+    def test_report_empty_concerns_skipped(self):
+        brief = self._report_brief(concerns="")
+        self.assertNotIn("concerns:", brief)
+
+    def test_report_concerns_not_in_report_section_with_done_with_concerns(self):
+        brief = self._report_brief(status="DONE_WITH_CONCERNS", concerns="dubbio unico")
+        report_part = brief.split("## Report dell'implementatore", 1)[1]
+        self.assertNotIn("concerns:", report_part)
+        self.assertEqual(brief.count("dubbio unico"), 1)
+
+    def test_report_null_not_python_none(self):
+        brief = self._report_brief(size_reason=None)
+        section = brief.split("## Report dell'implementatore", 1)[1]
+        self.assertIn("size_reason: null", section)
+        self.assertNotIn("None", section)
 
     def test_size_warning_in_review_brief(self):
         self.to_review(commit=False)

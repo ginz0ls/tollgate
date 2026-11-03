@@ -50,7 +50,7 @@ Se il brief elenca più file, ciascuno con la sua modifica, controlla file per f
 ## Standard del revisore (8.6)
 
 - **Approva** se il cambiamento migliora la salute del codice, anche se non è perfetto.
-- **Solo i rilievi `blocker` e `major` chiedono modifiche** (per le regole dei profili e per le `R-BASE-…` di `rules-base`, che valgono per ogni diff: solo quelle marcate `[blocca]`, e per le `R-BASE-…` solo se il brief non dice che l'interruttore è spento). `moderate` e `minor` sono note che non fermano il task.
+- **Solo i rilievi `blocker` e `major` chiedono modifiche** (per le regole dei profili e per le `R-BASE-…` di `rules-base`, che valgono per ogni diff: solo quelle marcate `[blocca]`, e per le `R-BASE-…` solo se il brief non dice che l'interruttore è spento). Se il brief dice che in questo lavoro le `R-BASE-…` non bloccano, un rilievo su di esse è una nota, mai `blocker` o `major`. `moderate` e `minor` sono note che non fermano il task.
 - **Cerca difetti, non confermare il lavoro.**
 - **Ogni rilievo cita una prova**: `file` e `line`, e `rule`, cioè la regola violata (`R-…` del profilo) o il passo del piano. Un rilievo senza `file`, `line` o `rule` non vale e viene scartato.
 - Calibra la gravità: non tutto è `blocker`. `major` significa che il task non è affidabile finché non è corretto (comportamento errato o fragile, requisito mancato, danno alla manutenibilità per cui bloccheresti un merge: duplicazione letterale di un blocco di logica, errori ingoiati, test che non asserisce nulla). «La copertura potrebbe essere più ampia» e le rifiniture sono `minor`. Se il piano stesso impone qualcosa che questa scala considera un difetto, è comunque un rilievo `major`, indicando che è imposto dal piano.

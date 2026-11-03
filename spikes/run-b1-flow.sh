@@ -7,6 +7,10 @@
 # B1_FLOW_RULES: `prova` (il predefinito: la rules-base di prova di B1) oppure `vere` (B2, decisione 12: la copia tiene la
 # rules-base vera e approvata e le uscite vanno in docs/verifiche/evidenze/b2/flusso). B1_FLOW_SRC: la radice da copiare
 # (solo con B1_FLOW_CHECK=1, nei test; altrimenti è la radice del repo).
+# B1_FLOW_CASE (B3, decisione 16): `b1` (il predefinito: il progetto di spikes/b1/flow) oppure `ai` (il progetto di spikes/b3/flow
+# con il profilo `ai`: richiede B1_FLOW_RULES=vere, le uscite vanno in docs/verifiche/evidenze/b3/flusso; `prepara` lancia
+# `init --propose` sulla copia del plugin e committa il blocco proposto; `registra` cerca i titoli delle regole nelle
+# trascrizioni dei subagenti delle sole due cartelle di sessione della prova, sotto la HOME).
 #
 #   controlla  stampa i passi e i comandi `claude`, controlla i file (nessuna scrittura)
 #   prepara    copia il plugin in /tmp/tollgate-b1/plugin e vi aggiunge SOLO NELLA COPIA skills/rules-base/SKILL.md con
@@ -36,9 +40,11 @@ DEFAULT_TMP=/tmp/tollgate-b1
 CHECK="${B1_FLOW_CHECK:-0}"                              # 1 solo nei test: permette un'altra radice
 TMP="${B1_FLOW_ROOT:-$DEFAULT_TMP}"
 RULES="${B1_FLOW_RULES:-prova}"                          # prova (B1) | vere (B2, decisione 12)
+CASE="${B1_FLOW_CASE:-b1}"                               # b1 | ai (B3, decisione 16)
 SRC="$root"                                              # la radice da copiare; un'altra solo nei test
 OUT="$root/docs/verifiche/evidenze/b1/flusso"
 [ "$RULES" = vere ] && OUT="$root/docs/verifiche/evidenze/b2/flusso"
+[ "$CASE" = ai ] && OUT="$root/docs/verifiche/evidenze/b3/flusso"
 PLUGIN="$TMP/plugin"
 [ "$CHECK" = 1 ] && { OUT="${B1_FLOW_OUT:-$OUT}"; PLUGIN="${B1_FLOW_PLUGIN-$PLUGIN}"; SRC="${B1_FLOW_SRC:-$SRC}"; }
 REPO="$TMP/flow"
@@ -53,8 +59,20 @@ MODEL=sonnet
 STEP_TIMEOUT="${B1_FLOW_TIMEOUT:-2400}"
 MAX_ATTEMPTS=3
 KILL_AFTER="${B1_FLOW_KILL:-60}"       # dopo il tetto, SIGKILL al solo processo claude se ignora SIGTERM
-PLAN_SRC="$here/b1/flow/piano-L1.md"
+PROJ="$here/b1/flow"                                     # il progetto di prova del caso
 PLAN_REL=docs/superpowers/plans/2026-10-27-prova-b1.md
+ISSUE_TITLE="Leggi il nome dell'app da config.toml"
+PROJ_FILES="tollgate.toml config.toml issue-1.md piano-L1.md src/__init__.py tests/__init__.py tests/test_smoke.py .gitignore"
+if [ "$CASE" = ai ]; then
+  PROJ="$here/b3/flow"
+  PLAN_REL=docs/superpowers/plans/2026-11-02-prova-b3.md
+  ISSUE_TITLE="Aggiungi la costante del modello per il riassunto"
+  PROJ_FILES="tollgate.toml config.toml issue-1.md piano-L1.md ai/__init__.py ai/summary.py services/notify.py tests/__init__.py tests/test_smoke.py .gitignore"
+fi
+PLAN_SRC="$PROJ/piano-L1.md"
+# la risposta sulla protezione nei dati del gh finto (solo nel caso `ai`): Free, repo privato, `init` sceglie `detect`
+PROTECTION_KEY='repos/{owner}/{repo}/branches/main/protection'
+DETECT_MSG="Upgrade to GitHub Pro or make this repository public to enable this feature."
 # B1-V2: nessuna voce MCP di context7 (non autenticato). WebFetch e WebSearch servono all'implementatore per informarsi.
 TOOLS="Bash,Agent,Skill,EnterWorktree,SendMessage,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch"
 # Divieti per Claude Code (prefissi `Bash(<comando>:*)`): gh per percorso o dietro un prefisso, git push verso remoti non
@@ -67,6 +85,8 @@ Bash(curl:*),Bash(wget:*),Bash(*/curl:*),Bash(*/wget:*)"
 die() { echo "ERRORE: $*" >&2; exit 1; }
 
 case "$RULES" in prova|vere) ;; *) die "B1_FLOW_RULES vale '$RULES': i valori ammessi sono prova e vere" ;; esac
+case "$CASE" in b1|ai) ;; *) die "B1_FLOW_CASE vale '$CASE': i valori ammessi sono b1 e ai" ;; esac
+[ "$CASE" != ai ] || [ "$RULES" = vere ] || die "B1_FLOW_CASE=ai richiede B1_FLOW_RULES=vere (vale '$RULES'): il profilo ai usa le regole vere"
 [ "$CHECK" = 1 ] || [ -z "${B1_FLOW_SRC:-}" ] || die "B1_FLOW_SRC vale solo con B1_FLOW_CHECK=1"
 
 # rot <percorso...>: se esiste lo rinomina in <percorso>.prev-<tempo> (mai cancellare)
@@ -127,10 +147,13 @@ modo_controlla() {
   local rc=0 f
   echo "radice di lavoro: $DEFAULT_TMP"
   echo "B1_FLOW_RULES: $RULES"
+  echo "B1_FLOW_CASE: $CASE"
   echo "radice sorgente: $SRC"
   echo "cartella delle uscite: $OUT"
   echo "--- i passi"
-  if [ "$RULES" = vere ]; then
+  if [ "$CASE" = ai ]; then
+    echo "  prepara   copia del plugin in $DEFAULT_TMP/plugin (regole vere), progetto di spikes/b3/flow in $DEFAULT_TMP/flow, poi init --propose sulla copia e commit del blocco [profiles.ai]"
+  elif [ "$RULES" = vere ]; then
     echo "  prepara   copia del plugin in $DEFAULT_TMP/plugin con la skills/rules-base/SKILL.md vera (si ferma se non accende l'interruttore); progetto in $DEFAULT_TMP/flow"
   else
     echo "  prepara   copia del plugin in $DEFAULT_TMP/plugin con skills/rules-base/SKILL.md (approved: prova-b1) solo nella copia; progetto in $DEFAULT_TMP/flow"
@@ -148,14 +171,61 @@ modo_controlla() {
   echo "--- i file"
   bash -n "$here/run-b1-flow.sh" || { echo "  bash -n fallito"; rc=1; }
   python3 -B -c "import sys, pathlib; compile(pathlib.Path(sys.argv[1]).read_text(), sys.argv[1], 'exec')" "$here/b1/flowreg.py" || { echo "  non compila: flowreg.py"; rc=1; }
-  for f in tollgate.toml config.toml issue-1.md piano-L1.md src/__init__.py tests/__init__.py tests/test_smoke.py .gitignore; do
-    [ -f "$here/b1/flow/$f" ] || { echo "  manca b1/flow/$f"; rc=1; }
+  for f in $PROJ_FILES; do
+    [ -f "$PROJ/$f" ] || { echo "  manca ${PROJ#"$here"/}/$f"; rc=1; }
   done
   [ "$rc" = 0 ] && echo "CONTROLLA: ok" || echo "CONTROLLA: FALLITO"
   return "$rc"
 }
 
 # ---------------------------------------------------------------- prepara
+
+# scrivi_dati_gh <sha>: i dati del gh finto; con <sha> vuoto senza gli stati. Nel caso `ai` c'è anche la risposta sulla
+# protezione (la chiave letterale con {owner}/{repo}, come la usa tests/fakegh.py), perché `init` determini la modalità
+scrivi_dati_gh() {
+  python3 -B - "$GH_DATA" "$1" "$PROJ/issue-1.md" "$ISSUE_TITLE" "$CASE" "$PROTECTION_KEY" "$DETECT_MSG" <<'PY'
+import json, pathlib, sys
+path, sha, issue, title, case, key, msg = sys.argv[1:8]
+data = {"auth": True,
+        "issues": {"1": {"number": 1, "title": title, "state": "OPEN", "body": pathlib.Path(issue).read_text().strip(),
+                         "labels": [], "author_association": "OWNER"}},
+        "prs": [], "issue_list": []}
+if case == "ai":
+    data["api_status"] = {key: {"status": 403, "message": msg, "body": {"message": msg}}}
+if sha:
+    data["statuses"] = {sha: {"statuses": [{"context": "tollgate/guard", "state": "success"},
+                                           {"context": "tollgate/verdict", "state": "success"}]}}
+pathlib.Path(path).write_text(json.dumps(data))
+PY
+}
+
+# proponi_profilo (caso `ai`): init --propose sulla copia del plugin, col gh finto; il tollgate.toml proposto (con il blocco
+# [profiles.ai]) si copia nel repo, si committa e si spinge; la cartella della proposta si sposta fuori dal repo (start avvisa se resta)
+proponi_profilo() {
+  local out="$TMP/init-propose.txt" prop="$REPO/docs/superpowers/tollgate-init"
+  ( cd "$REPO" && env PATH="$GHBIN:$PATH" TOLLGATE_STATE="$STATE" TOLLGATE_GH="$root/tests/fakegh.py" \
+      TOLLGATE_FAKEGH_DATA="$GH_DATA" TOLLGATE_FAKEGH_LOG="$GH_LOG" \
+      python3 -B "$PLUGIN/bin/tollgate" init --propose < /dev/null ) > "$out" 2>&1 || { cat "$out" >&2; die "init --propose non riuscito"; }
+  cat "$out"
+  [ -f "$prop/files/tollgate.toml" ] || die "init --propose non ha scritto files/tollgate.toml"
+  python3 -B - "$PLUGIN" "$prop/files/tollgate.toml" <<'PY' || die "il tollgate.toml proposto non ha un blocco [profiles.ai] che copra services/notify.py"
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1] + "/bin")
+from tollgate_core import config
+from tollgate_analysis import globs
+cfg = config.load_config_text(Path(sys.argv[2]).read_text())
+ai = cfg.profiles.get("ai")
+sys.exit(0 if ai and globs.match_any(ai["paths"], "services/notify.py") else 1)
+PY
+  cp -- "$prop/files/tollgate.toml" "$REPO/tollgate.toml" || die "tollgate.toml proposto non copiato"
+  mv -- "$prop" "$TMP/tollgate-init.proposta-$(date +%Y%m%d-%H%M%S)-$$" || die "cartella della proposta non spostata"
+  (
+    cd "$REPO" || exit 1
+    git add tollgate.toml && git commit -qm "profilo ai proposto da init" || exit 1
+    git push -q origin main || exit 1
+  ) || die "commit del blocco proposto non riuscito"
+}
 
 modo_prepara() {
   local t sha
@@ -193,7 +263,8 @@ TESTO
   : > "$STATE/.tollgate-test"
   printf '#!/bin/sh\nexec python3 "%s" "$@"\n' "$root/tests/fakegh.py" > "$GHBIN/gh" && chmod +x "$GHBIN/gh" || die "gh finto non scritto"
   # il progetto di prova (senza l'issue e il piano, che stanno nei dati del gh finto e nel prompt)
-  tar -C "$here/b1/flow" --exclude=./issue-1.md --exclude=./piano-L1.md -cf - . | tar -C "$REPO" -xf - || die "progetto non copiato"
+  tar -C "$PROJ" --exclude=./issue-1.md --exclude=./piano-L1.md -cf - . | tar -C "$REPO" -xf - || die "progetto non copiato"
+  [ "$CASE" = ai ] && { scrivi_dati_gh "" || die "dati del gh finto non scritti"; }
   git init -q --bare -b main "$BARE" || die "origin nudo non creato"
   git init -q -b main "$REPO" || die "git init fallito"
   (
@@ -216,18 +287,9 @@ PY
     git config remote.origin.url "$ORIGIN_URL"
     git config "url.$BARE.insteadOf" "$ORIGIN_URL"
   ) || die "repo di prova non creato"
+  [ "$CASE" = ai ] && proponi_profilo
   sha="$(git -C "$REPO" rev-parse origin/main)"
-  python3 -B - "$GH_DATA" "$sha" "$here/b1/flow/issue-1.md" <<'PY' || die "dati del gh finto non scritti"
-import json, pathlib, sys
-path, sha, issue = sys.argv[1:4]
-pathlib.Path(path).write_text(json.dumps(
-    {"auth": True,
-     "issues": {"1": {"number": 1, "title": "Leggi il nome dell'app da config.toml", "state": "OPEN",
-                      "body": pathlib.Path(issue).read_text().strip(), "labels": [], "author_association": "OWNER"}},
-     "prs": [], "issue_list": [],
-     "statuses": {sha: {"statuses": [{"context": "tollgate/guard", "state": "success"},
-                                     {"context": "tollgate/verdict", "state": "success"}]}}}))
-PY
+  scrivi_dati_gh "$sha" || die "dati del gh finto non scritti"
   # il piano di prova deve passare plan-check PRIMA della prova reale
   python3 -B - "$PLUGIN" "$REPO" "$PLAN_SRC" <<'PY' || die "il piano di prova non passa plan-check"
 import sys
@@ -333,6 +395,7 @@ modo_registra() {
   local -a files=()
   verifica_radice
   [ -d "$REPO/.git" ] || die "manca il progetto $REPO: lancia prepara"
+  [ "$CASE" != ai ] || [ -n "${HOME:-}" ] || die "HOME è vuota: non so dove cercare le trascrizioni dei subagenti"
   mkdir -p "$OUT"
   while [ -e "$OUT/registro-$n" ]; do n=$((n + 1)); done
   d="$OUT/registro-$n"
@@ -351,7 +414,8 @@ modo_registra() {
   # una sola chiamata con i flussi di tutti i tentativi e di tutti e due i passi: i conteggi sono somme
   for f in "$OUT"/passo1/tentativo-*/claude.jsonl "$OUT"/passo2/tentativo-*/claude.jsonl; do [ -f "$f" ] && files+=("$f"); done
   : > "$d/comandi-modello.txt"
-  if [ "${#files[@]}" -gt 0 ]; then
+  if [ "${#files[@]}" -gt 0 ]; then # le pagine dei fornitori non restano nelle evidenze (repo pubblico): segnaposto con URL e lunghezza
+    python3 -B "$here/b1/flowreg.py" togli-pagine "${files[@]}" > "$d/togli-pagine.txt" 2> "$d/togli-pagine.err"; fallisce togli-pagine $?
     python3 -B "$here/b1/flowreg.py" comandi "${files[@]}" > "$d/comandi-modello.txt" 2> "$d/comandi-modello.err"; fallisce comandi-modello $?
   fi
   python3 -B "$here/b1/flowreg.py" grep "$d/comandi-modello.txt" "$d/lookups.txt" > "$d/grep-non-registrati.txt" 2>&1
@@ -361,6 +425,14 @@ modo_registra() {
     else
       echo "nessun flusso di claude -p da esaminare" > "$d/precarico.txt"
     fi
+  fi
+  if [ "$CASE" = ai ]; then # B3: i titoli delle regole nelle trascrizioni dei subagenti (solo le cartelle di questa prova) e i tipi dei task
+    if [ "${#files[@]}" -gt 0 ]; then
+      python3 -B "$here/b1/flowreg.py" trascrizioni "$HOME" "${files[@]}" > "$d/trascrizioni.txt" 2> "$d/trascrizioni.err"; fallisce trascrizioni $?
+    else
+      echo "nessun flusso di claude -p da esaminare" > "$d/trascrizioni.txt"
+    fi
+    python3 -B "$here/b1/flowreg.py" tipi "$STATE/tollgate.db" > "$d/tipi-task.txt" 2> "$d/tipi-task.err"; fallisce tipi-task $?
   fi
   grep -E '^bash.*(git[^|;&]*push|gh |curl|wget)' "$d/comandi-modello.txt" > "$d/comandi-rischiosi.txt" 2>&1
   wt="$(worktree_lavoro 2>/dev/null)" && {

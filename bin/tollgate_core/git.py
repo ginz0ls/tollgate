@@ -330,6 +330,45 @@ def ls_files_at(repo, ref: str, prefix: str) -> list[str]:
     return [p for p in r.stdout.decode("utf-8", "surrogateescape").split("\0") if p]
 
 
+def grep_files_at(repo, ref: str, markers: list[str], pathspecs: list[str]) -> list[str]:
+    """I file dell'albero di `ref`, nei `pathspecs`, che contengono almeno un marcatore (testo
+    letterale, un solo `git grep`); i binari non contano. Nessun risultato: `[]`. Ogni altro
+    errore di git, tetto di tempo compreso, è `GitError`. Divide su NUL come `ls_files_at`."""
+    _check_ref(ref)
+    if not markers:
+        return []
+    args = ["grep", "-z", "-I", "-l", "-F"]
+    for marker in markers:
+        args += ["-e", marker]
+    r = _proc(repo, [*args, ref, "--", *pathspecs])
+    if r.returncode == 1 and not r.stdout:
+        return []
+    if r.returncode != 0:
+        raise GitError(f"git grep: {r.stderr.decode('utf-8', 'replace').strip()[:200]}")
+    prefix = f"{ref}:"
+    out = []
+    for entry in r.stdout.decode("utf-8", "surrogateescape").split("\0"):
+        if entry:
+            out.append(entry[len(prefix):] if entry.startswith(prefix) else entry)
+    return out
+
+
+def tree_sizes_at(repo, ref: str) -> dict[str, int]:
+    """Percorso -> dimensione in byte dei file dell'albero di `ref`, ricorsivo; i sottomoduli
+    non contano e un riferimento assente dà `{}`. Divide su NUL: nomi mai citati né spezzati."""
+    _check_ref(ref)
+    r = _proc(repo, ["ls-tree", "-r", "-l", "-z", ref])
+    if r.returncode != 0:
+        return {}
+    sizes: dict[str, int] = {}
+    for entry in r.stdout.decode("utf-8", "surrogateescape").split("\0"):
+        meta, _, name = entry.partition("\t")
+        parts = meta.split()
+        if name and len(parts) == 4 and parts[1] == "blob" and parts[3].isdigit():
+            sizes[name] = int(parts[3])
+    return sizes
+
+
 def blob_at(repo, ref: str, path: str) -> str | None:
     """SHA del blob di `path` nell'albero di `ref`; `None` se manca, se è una cartella o se manca
     il riferimento."""

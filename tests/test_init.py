@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -13,10 +14,12 @@ from unittest import mock
 
 from tests.flowkit import FAKEGH, FlowLab
 from tests.helpers import ROOT, git
-from tests.hookkit import DEFAULT_TOML
+from tests.hookkit import DEFAULT_FILES, DEFAULT_TOML
 from tests.test_gate_workflows import PINNED, uses_of
 from tests.test_protection import DETECT_MSG, PATH as PROTECTION_PATH, good
-from tollgate_core import VERSION, clock, config, phases, receipts
+from tollgate_analysis import globs, research
+from tollgate_core import VERSION, clock, config, fragments, phases, receipts
+from tollgate_core import git as core_git
 from tollgate_flow import init
 from tollgate_gate import install, protection
 
@@ -658,6 +661,540 @@ class ProtectScriptTest(InitCase):
         self.assertNotRegex(script, r"app_id\W+-1")
         self.assertIn("BRANCH='main'", script)
         self.assertIn("JOB='tollgate-base'", script)
+
+
+FRAGMENT_X = """[profile]
+paths = ["**/x/**"]
+min_level = "L1"
+agent = "tollgate:implementer-x"
+reviewer = "tollgate:reviewer-x"
+"""
+SKILL_X = "---\nname: rules-x\napproved: 2026-11-01\n---\n# Regole x\n\n" \
+          "R-X-01 [blocca] uno\n\nR-X-02 due\n"
+BASE_TOML = 'schema_version = 1\n[gate]\nmode = "protected"\n'
+DECLARED_X = ('[profiles.x]\npaths = ["src/x/**"]\nrules = ["R-X-01", "R-X-02"]\n'
+              'blocking_rules = ["R-X-01"]\nagent = "tollgate:implementer-x"\n'
+              'reviewer = "tollgate:reviewer-x"\n')
+
+
+class PluginMixin:
+    """Un plugin temporaneo con il frammento `x`, la sua skill e i suoi agenti."""
+
+    def plugin(self, *, approved=True, agents=("implementer-x", "reviewer-x"),
+               fragment=FRAGMENT_X, skill=SKILL_X) -> Path:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        (root / "templates" / "profiles").mkdir(parents=True)
+        (root / "templates" / "profiles" / "x.toml").write_text(fragment, encoding="utf-8")
+        (root / "skills" / "rules-x").mkdir(parents=True)
+        text = skill if approved else skill.replace("approved: 2026-11-01\n", "")
+        (root / "skills" / "rules-x" / "SKILL.md").write_text(text, encoding="utf-8")
+        (root / "agents").mkdir()
+        for name in agents:
+            (root / "agents" / f"{name}.md").write_text("---\nname: a\n---\n", encoding="utf-8")
+        return root
+
+
+class ProfileBlocksTest(PluginMixin, unittest.TestCase):
+    def blocks(self, files, current=BASE_TOML, root=None, **kw):
+        sizes = {f: 10 for f in files} if isinstance(files, (list, tuple)) else files
+        return init.profile_blocks(sizes, current, root or self.plugin(), **kw)
+
+    def profile(self, got, current=BASE_TOML):
+        return tomllib.loads(current + got.text)["profiles"]["x"]
+
+    def test_approved_profile_with_files_proposed(self):
+        got = self.blocks({"src/x/a.py": 10, "README.md": 3})
+        self.assertIn("[profiles.x]", got.text)
+        self.assertIn("# profilo x da templates/profiles/x.toml", got.text)
+        prof = self.profile(got)
+        self.assertEqual(prof["paths"], ["src/x/**"])
+        self.assertEqual(prof["rules"], ["R-X-01", "R-X-02"])
+        self.assertEqual(prof["blocking_rules"], ["R-X-01"])
+        self.assertEqual(prof["min_level"], "L1")
+        shown = "\n".join(got.lines)
+        self.assertIn("src/x/a.py", shown)
+        self.assertIn("1 file", shown)
+
+    def test_unapproved_profile_not_proposed(self):
+        got = self.blocks(["src/x/a.py"], root=self.plugin(approved=False))
+        self.assertEqual((got.text, got.lines), ("", []))
+
+    def test_profile_without_files_not_proposed(self):
+        got = self.blocks(["README.md", "src/y/a.py"])
+        self.assertEqual(got.text, "")
+        self.assertTrue(any("x" in line and "nessun file" in line for line in got.lines),
+                        got.lines)
+
+    def test_claude_agents_do_not_light_ai(self):
+        self.assertEqual(self.blocks([".claude/x/a.md", ".claude/agents/x/b.md"]).text, "")
+
+    def test_install_dir_does_not_light_profile(self):
+        got = self.blocks([".github/tollgate/bin/x/a.py", "docs/superpowers/tollgate-init/x/b"])
+        self.assertEqual(got.text, "")
+        self.assertEqual(init.EXCLUDED_PREFIXES,
+                         (".claude/", ".github/tollgate/", "docs/superpowers/tollgate-init/"))
+
+    def test_concrete_paths_escaped(self):
+        got = self.blocks(["app/[id]/x/p.ts"])
+        pattern = self.profile(got)["paths"][0]
+        self.assertEqual(pattern, "app/\\[id\\]/x/**")
+        self.assertTrue(globs.match(pattern, "app/[id]/x/p.ts"))
+        self.assertFalse(globs.match(pattern, "app/i/x/p.ts"))
+
+    def test_root_folder_pattern_matches_like_the_folder(self):
+        pattern = self.profile(self.blocks(["x/a.py"]))["paths"][0]
+        self.assertTrue(globs.match(pattern, "x/a.py"))
+        self.assertFalse(globs.match(pattern, "src/x/a.py"))
+
+    def test_nested_dirs_first_match(self):
+        got = self.blocks(["src/x/lib/x/a.py", "src/x/b.py"])
+        self.assertEqual(self.profile(got)["paths"], ["src/x/**"])
+
+    def test_file_named_like_the_folder_is_not_a_folder(self):
+        self.assertEqual(self.blocks(["src/x"]).text, "")
+
+    def test_declared_profile_rules_drift_reported(self):
+        current = BASE_TOML + DECLARED_X.replace('"R-X-01", "R-X-02"', '"R-X-01"')
+        got = self.blocks(["src/x/a.py"], current)
+        self.assertEqual(got.text, "")
+        self.assertEqual(len(got.lines), 1, got.lines)
+        self.assertIn("R-X-02", got.lines[0])
+        self.assertIn("aggiungi", got.lines[0])
+        self.assertIn("rules", got.lines[0])
+
+    def test_declared_profile_blocking_rules_drift_reported(self):
+        current = BASE_TOML + DECLARED_X.replace('blocking_rules = ["R-X-01"]',
+                                                 'blocking_rules = []')
+        got = self.blocks(["src/x/a.py"], current)
+        self.assertEqual(len(got.lines), 1, got.lines)
+        self.assertIn("blocking_rules", got.lines[0])
+        self.assertIn("R-X-01", got.lines[0])
+
+    def test_declared_profile_stale_rule_removal_reported(self):
+        current = BASE_TOML + DECLARED_X.replace(
+            '"R-X-01", "R-X-02"]', '"R-X-01", "R-X-02", "R-X-09", "mia-regola"]')
+        got = self.blocks(["src/x/a.py"], current)
+        self.assertEqual(len(got.lines), 1, got.lines)
+        self.assertIn("togli", got.lines[0])
+        self.assertIn("R-X-09", got.lines[0])
+        self.assertNotIn("mia-regola", got.lines[0])
+
+    def test_declared_profile_new_paths_reported(self):
+        current = BASE_TOML + DECLARED_X.replace(
+            'paths = ["src/x/**"]', 'paths = ["src/x/**", "!src/x/gen/**"]')
+        got = self.blocks(["src/x/a.py", "lib/x/a.py", "lib/x/b.py", "src/x/gen/c.py"], current)
+        self.assertEqual(got.text, "")
+        self.assertEqual(len(got.lines), 1, got.lines)
+        self.assertIn("paths", got.lines[0])
+        self.assertIn('"lib/x/**"', got.lines[0])
+        self.assertIn("2 file", got.lines[0])
+        self.assertNotIn("gen", got.lines[0])
+
+    def test_declared_negation_respected_in_both_orders(self):
+        for paths in ('["!lib/x/gen/**", "lib/x/**"]', '["lib/x/**", "!lib/x/gen/**"]'):
+            with self.subTest(paths=paths):
+                current = BASE_TOML + DECLARED_X.replace('["src/x/**"]', paths)
+                self.assertEqual(self.blocks(["lib/x/gen/a.py", "lib/x/b.py"], current).lines, [])
+
+    def test_declared_profile_agent_now_available(self):
+        current = BASE_TOML + DECLARED_X.replace('agent = "tollgate:implementer-x"\n', "")
+        got = self.blocks(["src/x/a.py"], current)
+        self.assertEqual(len(got.lines), 1, got.lines)
+        self.assertIn("agent", got.lines[0])
+        self.assertIn("tollgate:implementer-x", got.lines[0])
+
+    def test_declared_empty_agent_is_a_choice(self):
+        current = BASE_TOML + DECLARED_X.replace('agent = "tollgate:implementer-x"', 'agent = ""')
+        self.assertEqual(self.blocks(["src/x/a.py"], current).lines, [])
+
+    def test_declared_agent_missing_in_plugin_is_silent(self):
+        current = BASE_TOML + DECLARED_X.replace('agent = "tollgate:implementer-x"\n', "")
+        got = self.blocks(["src/x/a.py"], current, root=self.plugin(agents=("reviewer-x",)))
+        self.assertEqual(got.lines, [])
+
+    def test_declared_profile_same_rules_silent_ok(self):
+        got = self.blocks(["src/x/a.py"], BASE_TOML + DECLARED_X)
+        self.assertEqual((got.text, got.lines), ("", []))
+
+    def test_declared_unapproved_profile_is_silent(self):
+        current = BASE_TOML + DECLARED_X.replace('"R-X-01", "R-X-02"', '"R-X-01"')
+        got = self.blocks(["lib/x/a.py"], current, root=self.plugin(approved=False))
+        self.assertEqual((got.text, got.lines), ("", []))
+
+    def test_paths_shown_neutralized(self):
+        got = self.blocks(["src/x/a\x1b[31mb.py"])
+        self.assertNotIn("\x1b", "\n".join(got.lines))
+        self.assertNotIn("\x1b", got.readme)
+        self.assertIn("## Profili proposti", got.readme)
+        self.assertIn("src/x/**", got.readme)
+
+    def test_readme_keeps_one_line_per_note(self):
+        current = BASE_TOML + '[profiles.web]\npaths = ["src/**"]\n'
+        got = self.blocks(["src/x/a.py"], current,
+                          root=self.plugin(agents=("reviewer-x",)))
+        self.assertNotIn("?profilo", got.readme)
+        self.assertIn("\nprofilo x: src/x/a.py corrisponde anche a «web»", got.readme)
+        self.assertIn("implementer-x", got.readme)
+
+    def test_readme_declared_drift_section(self):
+        current = BASE_TOML + DECLARED_X.replace('"R-X-01", "R-X-02"', '"R-X-01"')
+        got = self.blocks(["src/x/a.py"], current)
+        self.assertIn("## Profili da controllare", got.readme)
+        self.assertIn("\nprofilo x: [profiles.x] rules: aggiungi \"R-X-02\"", got.readme)
+
+    def test_active_lists_new_area_warned(self):
+        current = BASE_TOML + '[profiles]\nactive = ["x"]\n'
+        got = self.blocks(["src/x/a.py"], current)
+        self.assertIn("[profiles.x]", got.text)
+        warned = [line for line in got.lines if "active" in line]
+        self.assertEqual(len(warned), 1, got.lines)
+        self.assertIn("ogni task", warned[0])
+
+    def test_active_without_the_area_is_not_warned(self):
+        current = BASE_TOML + '[profiles]\nactive = ["other"]\n'
+        self.assertFalse([l for l in self.blocks(["src/x/a.py"], current).lines
+                          if "active" in l])
+
+    def test_overlap_with_declared_vertical_shown(self):
+        current = BASE_TOML + '[profiles.web]\npaths = ["src/**"]\n'
+        got = self.blocks(["src/x/a.py"], current)
+        line = next(l for l in got.lines if "«web»" in l)
+        self.assertIn("src/x/a.py", line)
+        self.assertIn("vince x", line)
+        tie = BASE_TOML + '[profiles.web]\npaths = ["src/x/a.*"]\n'
+        line = next(l for l in self.blocks(["src/x/a.py"], tie).lines if "«web»" in l)
+        self.assertIn("vince web", line)
+
+    def test_missing_agent_dropped(self):
+        got = self.blocks(["src/x/a.py"], root=self.plugin(agents=("reviewer-x",)))
+        prof = self.profile(got)
+        self.assertNotIn("agent", prof)
+        self.assertEqual(prof["reviewer"], "tollgate:reviewer-x")
+        self.assertTrue(any("implementer-x" in l for l in got.lines), got.lines)
+
+    def test_proposed_rules_match_skill(self):
+        skill = SKILL_X + "\nR-X-03 [blocca] tre\n\nR-X-10 dieci\n\nvedi R-X-04 a metà riga\n"
+        got = self.blocks(["src/x/a.py"], root=self.plugin(skill=skill))
+        known, blocking = research.area_rules(skill, "x")
+        prof = self.profile(got)
+        self.assertEqual(prof["rules"], sorted(known))
+        self.assertEqual(prof["blocking_rules"], sorted(blocking))
+        self.assertNotIn("R-X-04", prof["rules"])
+
+    def test_proposal_validates(self):
+        got = self.blocks({"src/x/a.py": 1, "lib/x/b.py": 1})
+        cfg = config.load_config_text(BASE_TOML + got.text)
+        self.assertEqual(cfg.warnings, [])
+        self.assertEqual(cfg.profiles["x"]["paths"], ["lib/x/**", "src/x/**"])
+        self.assertEqual(cfg.profiles["x"]["agent"], "tollgate:implementer-x")
+
+    def test_text_appends_to_a_toml_without_final_newline(self):
+        current = BASE_TOML.rstrip("\n")
+        got = self.blocks(["src/x/a.py"], current)
+        self.assertEqual(config.load_config_text(current + got.text).warnings, [])
+
+    def test_detected_files_added_with_exact_path(self):
+        got = self.blocks(["src/x/a.py"], detected={"x": ["edge/fn.ts", "src/x/a.py"]})
+        self.assertEqual(self.profile(got)["paths"], ["edge/fn.ts", "src/x/**"])
+
+    def test_detected_files_alone_light_the_profile(self):
+        got = self.blocks(["README.md"], detected={"x": ["edge/fn.ts"]})
+        self.assertEqual(self.profile(got)["paths"], ["edge/fn.ts"])
+
+    def test_declared_detected_files_reported_unless_covered(self):
+        current = BASE_TOML + DECLARED_X
+        got = self.blocks(["src/x/a.py"], current,
+                          detected={"x": ["edge/fn.ts", "src/x/gen.py"]})
+        self.assertEqual(len(got.lines), 1, got.lines)
+        self.assertIn('"edge/fn.ts"', got.lines[0])
+
+    def test_no_fragments_no_output(self):
+        root = self.plugin()
+        (root / "templates" / "profiles" / "x.toml").unlink()
+        got = self.blocks(["src/x/a.py"], root=root)
+        self.assertEqual((got.text, got.lines, got.readme), ("", [], ""))
+
+    def test_does_not_touch_git_or_network(self):
+        with mock.patch("tollgate_core.git._proc", side_effect=AssertionError("git")):
+            self.assertIn("[profiles.x]", self.blocks(["src/x/a.py"]).text)
+
+    def test_real_trees_light_no_profile(self):
+        """I frammenti veri, con una skill finta approvata ciascuno, non accendono nessun profilo
+        sull'albero che i test di init spingono né su quello installato (`bin/` copiato in
+        `.github/tollgate/`)."""
+        real = fragments.load(ROOT)
+        if not real:
+            self.skipTest("templates/profiles/ non ha ancora frammenti: il test si attiva "
+                          "quando ce n'è uno")
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        (root / "templates" / "profiles").mkdir(parents=True)
+        for fr in real:
+            shutil.copy(fr.source, root / "templates" / "profiles" / fr.source.name)
+            skill = root / "skills" / f"rules-{fr.area}"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text(
+                f"---\napproved: 2026-11-01\n---\nR-{fr.area.upper()}-01 [blocca] x\n",
+                encoding="utf-8")
+        installed = install.files(ROOT, default_branch="main", services={})
+        trees = {"push": {*DEFAULT_FILES, "tollgate.toml"}, "installato": set(installed),
+                 "installato + proposta": {*installed, *(f"{FOLDER}/files/{p}" for p in installed)}}
+        for name, paths in trees.items():
+            with self.subTest(name):
+                got = init.profile_blocks({p: 1 for p in paths}, DEFAULT_TOML, root)
+                self.assertEqual(got.text, "")
+                self.assertFalse([l for l in got.lines if "proposto con" in l], got.lines)
+
+
+class ProfilesProposeTest(PluginMixin, InitCase):
+    def propose(self, root, *, update=False):
+        with mock.patch.dict(os.environ, self.fl.env()):
+            return init.propose(self.fl.ts.state, self.fl.main, update=update,
+                                merges_per_month=10, services={}, profiles_root=root)
+
+    def test_update_appends_and_keeps_user_text(self):
+        text = "# la mia nota\n" + BASE_TOML.replace('mode = "protected"',
+                                                      'mode = "protected"   # misurata')
+        self.make(DETECT, toml=text)
+        self.push({"src/x/a.py": "x\n"})
+        got = self.propose(self.plugin(), update=True)
+        self.assertEqual(got.code, init.OK, got.lines)
+        expected = text.replace('"protected"   #', '"detect"   #')
+        self.assertTrue(self.toml().startswith(expected), self.toml())
+        tail = self.toml()[len(expected):]
+        self.assertIn("# profilo x da templates/profiles/x.toml", tail)
+        self.assertEqual(tomllib.loads(self.toml())["profiles"]["x"]["paths"], ["src/x/**"])
+        self.assertTrue(any("src/x/a.py" in l for l in got.lines), got.lines)
+
+    def test_update_twice_no_duplicate(self):
+        self.make(UNSET, toml=BASE_TOML)
+        self.push({"src/x/a.py": "x\n"})
+        root = self.plugin()
+        self.assertEqual(self.propose(root).code, init.OK)
+        self.assertEqual(self.toml().count("[profiles.x]"), 1)
+        self.push({"tollgate.toml": self.toml()})
+        got = self.propose(root)
+        self.assertEqual(got.code, init.OK, got.lines)
+        self.assertEqual(self.toml().count("[profiles.x]"), 1)
+        self.assertFalse([l for l in got.lines if l.startswith("profilo x")], got.lines)
+
+    def test_drift_lines_survive_nothing_to_update(self):
+        self.make(UNSET)
+        tree = self.install_tree()
+        tree["tollgate.toml"] = BASE_TOML + DECLARED_X.replace('"R-X-01", "R-X-02"', '"R-X-01"')
+        tree["src/x/a.py"] = "x\n"
+        tree["lib/x/b.py"] = "x\n"
+        self.push(tree)
+        got = self.propose(self.plugin(), update=True)
+        text = "\n".join(got.lines)
+        self.assertIn("nulla da aggiornare", text)
+        self.assertIn("R-X-02", text)
+        self.assertIn('"lib/x/**"', text)
+        self.assertFalse((self.folder / "README.md").exists())
+
+    def test_readme_lists_proposed_profiles(self):
+        self.make(UNSET)
+        self.push({"src/x/a.py": "x\n"})
+        self.assertEqual(self.propose(self.plugin()).code, init.OK)
+        readme = self.readme()
+        self.assertIn("## Profili proposti", readme)
+        self.assertIn("src/x/**", readme)
+        self.assertIn("# profilo x da templates/profiles/x.toml", readme)
+        self.assertIn("cancella", readme)
+
+    def test_no_approved_profile_no_section(self):
+        self.make(UNSET)
+        self.push({"src/x/a.py": "x\n"})
+        self.assertEqual(self.propose(self.plugin(approved=False)).code, init.OK)
+        self.assertNotIn("Profili proposti", self.readme())
+        self.assertNotIn("[profiles", self.toml())
+
+    def test_bad_fragment_refuses_init(self):
+        self.make(UNSET)
+        root = self.plugin(fragment="[profile\nbroken")
+        got = self.propose(root)
+        self.assertNotEqual(got.code, init.OK)
+        self.assertIn("x.toml", "\n".join(got.lines))
+        self.assertFalse(self.folder.exists())
+
+    def test_git_error_leaves_the_rest_of_the_proposal(self):
+        self.make(UNSET)
+        boom = core_git.GitError("git ls-tree: boom")
+        for update in (False, True):
+            with self.subTest(update=update), mock.patch(
+                    "tollgate_core.git.tree_sizes_at", side_effect=boom):
+                if update:
+                    self.push({"tollgate.toml": BASE_TOML})
+                got = self.propose(self.plugin(), update=update)
+                self.assertEqual(got.code, init.OK, got.lines)
+                self.assertTrue(any("profili non valutati" in l and "boom" in l
+                                    for l in got.lines), got.lines)
+                self.assertTrue((self.folder / "README.md").exists())
+                self.assertIn("profili non valutati", self.readme())
+                self.assertFalse(update and (self.folder / "files" / "tollgate.toml").exists())
+                if not update:
+                    self.assertNotIn("[profiles", self.toml())
+
+    def test_real_default_root_is_the_plugin(self):
+        self.assertEqual(init.PLUGIN_ROOT, ROOT)
+        self.make(UNSET)
+        seen = []
+        real_load = fragments.load
+        with mock.patch.dict(os.environ, self.fl.env()), mock.patch(
+                "tollgate_core.fragments.load", side_effect=lambda r: (seen.append(r),
+                                                                       real_load(r))[1]):
+            got = init.propose(self.fl.ts.state, self.fl.main, update=False,
+                               merges_per_month=10, services={})
+        self.assertEqual(got.code, init.OK, got.lines)
+        self.assertEqual({Path(r) for r in seen}, {ROOT})
+
+    def test_blocks_failing_validation_are_dropped(self):
+        self.make(UNSET)
+        self.push({"src/x/a.py": "x\n"})
+        bad = init.ProfileProposal("\n[profiles.x]\nrules = 3\n", ["profilo x: finto"], "r")
+        with mock.patch("tollgate_flow.init.profile_blocks", return_value=bad):
+            got = self.propose(self.plugin())
+        self.assertEqual(got.code, init.OK, got.lines)
+        self.assertTrue(any("profili non valutati" in l for l in got.lines), got.lines)
+        self.assertNotIn("profilo x: finto", got.lines)
+        self.assertNotIn("[profiles", self.toml())
+        self.assertIn("profili non valutati", self.readme())
+
+    def test_empty_tree_is_not_a_verdict_on_the_repo(self):
+        self.make(UNSET)
+        with mock.patch("tollgate_core.git.tree_sizes_at", return_value={}):
+            got = self.propose(self.plugin())
+        self.assertEqual(got.code, init.OK, got.lines)
+        self.assertTrue(any("profili non valutati" in l for l in got.lines), got.lines)
+        self.assertFalse(any("corrisponde ai suoi percorsi" in l for l in got.lines), got.lines)
+
+
+FRAGMENT_XD = FRAGMENT_X + '[detect]\ncontent = ["import x_sdk", "npm:@x/sdk"]\n'
+HIT = "import x_sdk\n"
+
+
+class DetectTest(PluginMixin, InitCase):
+    """Decisione 6: il codice che usa l'SDK fuori dalle cartelle tipiche, trovato per contenuto."""
+
+    def setUp(self):
+        self.make(UNSET, toml=BASE_TOML)
+        self.root = self.plugin(fragment=FRAGMENT_XD)
+
+    def detect(self, files: dict) -> list[str]:
+        self.push(files)
+        sizes = core_git.tree_sizes_at(self.fl.main, "origin/main")
+        got = init.detect_files(self.fl.main, "origin/main", fragments.load(self.root), sizes)
+        self.assertEqual(list(got), ["x"])
+        return got["x"]
+
+    def propose(self, *, update=False):
+        with mock.patch.dict(os.environ, self.fl.env()):
+            return init.propose(self.fl.ts.state, self.fl.main, update=update,
+                                merges_per_month=10, services={}, profiles_root=self.root)
+
+    def test_detect_adds_exact_paths(self):
+        self.push({"supabase/functions/notify/index.ts":
+                   'import X from "npm:@x/sdk"\n', "README.md": "x\n"})
+        got = self.propose()
+        self.assertEqual(got.code, init.OK, got.lines)
+        paths = tomllib.loads(self.toml())["profiles"]["x"]["paths"]
+        self.assertEqual(paths, ["supabase/functions/notify/index.ts"])
+        self.assertTrue(any("supabase/functions/notify/index.ts" in l for l in got.lines))
+
+    def test_detect_skips_manifests_docs_and_tests(self):
+        found = self.detect({
+            "package.json": '{"dependencies": {"npm:@x/sdk": "1"}}\n',
+            "README.md": HIT, "tests/test_x.py": HIT, "src/x.test.ts": HIT,
+            "src/x.spec.ts": HIT, "conftest.py": HIT, "pkg/__tests__/a.js": HIT,
+            "pkg/b_test.go": HIT, "src/x.vue": HIT, "src/y.mts": HIT})
+        self.assertEqual(found, ["src/x.vue", "src/y.mts"])
+
+    def test_detect_skips_large_and_binary(self):
+        found = self.detect({
+            "src/big.py": HIT + "#" * (256 * 1024), "src/edge.py": HIT + "#" * (256 * 1024 - 13),
+            "src/bin.py": b"\0" + HIT.encode(), "src/ok.py": HIT})
+        self.assertEqual(found, ["src/edge.py", "src/ok.py"])
+
+    def test_detect_skips_excluded_prefixes(self):
+        found = self.detect({".claude/agents/a.py": HIT, ".github/tollgate/bin/a.py": HIT,
+                             f"{FOLDER}/files/b.py": HIT, "src/ok.py": HIT})
+        self.assertEqual(found, ["src/ok.py"])
+
+    def test_detect_odd_names(self):
+        self.assertEqual(self.detect({"src/è à.py": HIT}), ["src/è à.py"])
+
+    def test_detect_file_already_covered_not_repeated(self):
+        self.push({"src/x/a.py": HIT, "edge/fn.ts": HIT})
+        got = self.propose()
+        self.assertEqual(got.code, init.OK, got.lines)
+        paths = tomllib.loads(self.toml())["profiles"]["x"]["paths"]
+        self.assertEqual(paths, ["edge/fn.ts", "src/x/**"])
+
+    def test_declared_profile_new_detected_file_reported(self):
+        self.make(UNSET, toml=BASE_TOML + DECLARED_X)
+        self.push({"src/x/a.py": "x\n", "edge/fn.ts": HIT})
+        got = self.propose()
+        self.assertEqual(got.code, init.OK, got.lines)
+        lines = [l for l in got.lines if l.startswith("profilo x")]
+        self.assertEqual(len(lines), 1, got.lines)
+        self.assertIn("paths: aggiungi", lines[0])
+        self.assertIn('"edge/fn.ts"', lines[0])
+
+    def test_declared_profile_negation_respected_in_both_orders(self):
+        for paths in ('["!lib/x/gen/**", "lib/x/**"]', '["lib/x/**", "!lib/x/gen/**"]'):
+            with self.subTest(paths=paths):
+                self.make(UNSET, toml=BASE_TOML + DECLARED_X.replace('["src/x/**"]', paths))
+                self.push({"lib/x/gen/a.py": HIT, "lib/x/b.py": HIT})
+                got = self.propose()
+                self.assertFalse([l for l in got.lines if "paths: aggiungi" in l], got.lines)
+
+    def test_detect_timeout_warns(self):
+        self.push({"src/x/a.py": "x\n", "edge/fn.ts": HIT})
+        boom = core_git.GitError("git grep: timeout dopo 10 s")
+        with mock.patch("tollgate_core.git.grep_files_at", side_effect=boom):
+            got = self.propose()
+        self.assertEqual(got.code, init.OK, got.lines)
+        self.assertTrue(any("rilevamento" in l and "timeout" in l for l in got.lines), got.lines)
+        self.assertIn("rilevamento", self.readme())
+        self.assertEqual(tomllib.loads(self.toml())["profiles"]["x"]["paths"], ["src/x/**"])
+
+    def test_failed_grep_of_one_fragment_does_not_stop_the_others(self):
+        self.push({"src/ok.py": "import y_sdk\n"})
+        sizes = core_git.tree_sizes_at(self.fl.main, "origin/main")
+        root = self.plugin(fragment=FRAGMENT_XD)
+        y = root / "templates" / "profiles" / "y.toml"
+        y.write_text(FRAGMENT_XD.replace("import x_sdk", "import y_sdk"), encoding="utf-8")
+        real = core_git.grep_files_at
+
+        def grep(repo, ref, markers, specs):
+            if "import x_sdk" in markers:
+                raise core_git.GitError("git grep: timeout dopo 10 s")
+            return real(repo, ref, markers, specs)
+
+        warnings = []
+        with mock.patch("tollgate_core.git.grep_files_at", side_effect=grep):
+            got = init.detect_files(self.fl.main, "origin/main", fragments.load(root), sizes,
+                                    warnings)
+        self.assertEqual(got, {"x": [], "y": ["src/ok.py"]})
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("profilo x", warnings[0])
+
+    def test_one_grep_per_fragment_with_markers(self):
+        self.push({"src/ok.py": HIT})
+        sizes = core_git.tree_sizes_at(self.fl.main, "origin/main")
+        plain = self.plugin()
+        with mock.patch("tollgate_core.git.grep_files_at", return_value=[]) as grep:
+            init.detect_files(self.fl.main, "origin/main", fragments.load(plain), sizes)
+            grep.assert_not_called()
+            init.detect_files(self.fl.main, "origin/main", fragments.load(self.root), sizes)
+            self.assertEqual(grep.call_count, 1)
+            markers, specs = grep.call_args.args[2:]
+            self.assertEqual(markers, ["import x_sdk", "npm:@x/sdk"])
+            self.assertIn(":(glob)**/*.py", specs)
+            self.assertNotIn(":(glob)**/*.md", specs)
 
 
 if __name__ == "__main__":

@@ -114,6 +114,69 @@ class ManifestTest(unittest.TestCase):
             with self.subTest(agent=name):
                 fm = frontmatter(ROOT / "agents" / f"{name}.md")
                 self.assertEqual(fm.get("skills"), "[rules-base]")
+        for name in ("implementer-ai", "reviewer-ai"):
+            with self.subTest(agent=name):
+                fm = frontmatter(ROOT / "agents" / f"{name}.md")
+                self.assertEqual(fm.get("skills"), "[rules-base, rules-ai]")
+
+    def test_area_agents_derive_from_generic(self):
+        """Decisioni 10 e 11: la copia contiene ogni paragrafo del corpo del generico (dopo la
+        riga di attribuzione), con `model` uguale; `tools` uguali, più `WebFetch` al revisore."""
+        for name, generic, extra in (("implementer-ai", "implementer", []),
+                                     ("reviewer-ai", "task-reviewer", ["WebFetch"])):
+            with self.subTest(agent=name):
+                gpath, apath = ROOT / "agents" / f"{generic}.md", ROOT / "agents" / f"{name}.md"
+                gfm, afm = frontmatter(gpath), frontmatter(apath)
+                self.assertEqual(afm["name"], name)
+                # stesse chiavi del frontmatter: una chiave aggiunta al generico (effort, color,
+                # disallowedTools...) deve arrivare anche nella copia (decisione 10)
+                self.assertEqual(set(afm), set(gfm))
+                self.assertEqual(afm["model"], gfm["model"])
+                self.assertEqual([t.strip() for t in afm["tools"].split(",")],
+                                 [t.strip() for t in gfm["tools"].split(",")] + extra)
+                self.assertEqual(afm.get("maxTurns"), gfm.get("maxTurns"))
+                self.assertNotEqual(afm["description"], gfm["description"])
+                self.assertRegex(afm["description"], r"\bai\b")
+                body = gpath.read_text().split(ATTRIBUTION, 1)[1]
+                copy = apath.read_text()
+                for paragraph in [p for p in body.split("\n\n") if p.strip()]:
+                    self.assertIn(paragraph.strip(), copy)
+
+    def test_area_agents_attribution(self):
+        for name in ("implementer-ai", "reviewer-ai"):
+            with self.subTest(agent=name):
+                self.assertIn(ATTRIBUTION, (ROOT / "agents" / f"{name}.md").read_text())
+
+    def test_area_agents_name_rules_ai(self):
+        """La sezione «Area `ai`» nomina `rules-ai`, `R-AI-` e le regole che si giudicano sul
+        report (quelle che la skill vera segna «Si giudica su: report»); nel revisore, `WebFetch`
+        sugli URL citati e il caso del task senza modifiche (decisione D18)."""
+        skill = (ROOT / "skills" / "rules-ai" / "SKILL.md").read_text()
+        blocks = re.split(r"(?m)^(?=R-AI-\d\d\b)", skill)[1:]
+        on_report = [b[:7] for b in blocks if re.search(r"(?m)^Si giudica su: report$", b)]
+        self.assertTrue(on_report)
+        for name in ("implementer-ai", "reviewer-ai"):
+            with self.subTest(agent=name):
+                text = (ROOT / "agents" / f"{name}.md").read_text()
+                self.assertEqual(text.count("\n## Area `ai`\n"), 1)
+                section = text.split("\n## Area `ai`\n")[1].split("\n## ")[0]
+                section = " ".join(section.split())
+                self.assertIn("rules-ai", section)
+                self.assertIn("R-AI-", section)
+                for rule in on_report:
+                    self.assertIn(rule, section)
+                if name == "reviewer-ai":
+                    self.assertIn("WebFetch", section)
+                    self.assertIn("dati non fidati", section)
+                    self.assertIn("senza modifiche", section)
+                    self.assertIn("si segnala una volta sola", section)
+
+    def test_final_reviewers_leave_report_rules_of_areas(self):
+        for name in ("final-reviewer", "finding-verifier"):
+            with self.subTest(agent=name):
+                text = " ".join((ROOT / "agents" / f"{name}.md").read_text().split()).lower()
+                self.assertIn("regole di un'area che si giudicano sul report sono del revisore "
+                              "del task", text)
 
     def test_other_agents_do_not_preload(self):
         for name in ("spec-auditor", "spec-adversary", "plan-adversary"):
@@ -176,6 +239,21 @@ class ManifestTest(unittest.TestCase):
         from tollgate_analysis import research
         text = (ROOT / "agents" / "implementer.md").read_text()
         self.assertIn(research.submit_command("<programma>", "<k>"), text)
+
+    def test_implementer_reads_listed_files(self):
+        text = " ".join((ROOT / "agents" / "implementer.md").read_text().split())
+        section = text.split("## Informati prima di scrivere", 1)[1].split("## Il lavoro", 1)[0]
+        self.assertIn("i file che elenchi nella nota aprili con `Read`", section)
+
+    def test_implementer_fix_round_repeats_red_green(self):
+        text = " ".join((ROOT / "agents" / "implementer.md").read_text().split())
+        section = text.split("## Report finale", 1)[1]
+        self.assertIn("report di un giro di correzione ripete il riscontro RED/GREEN del "
+                      "difetto corretto", section)
+
+    def test_task_reviewer_says_base_rules_do_not_block_when_brief_says_so(self):
+        text = " ".join((ROOT / "agents" / "task-reviewer.md").read_text().split())
+        self.assertIn("in questo lavoro le `R-BASE-…` non bloccano", text)
 
     def test_implementer_untrusted_pages_phrase_has_an_antecedent(self):
         text = (ROOT / "agents" / "implementer.md").read_text()

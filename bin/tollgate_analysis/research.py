@@ -61,13 +61,17 @@ def enforced(skill_text: str | None) -> bool:
     return False
 
 
-_BASE_RULE = re.compile(r"^(R-BASE-\d{2})( \[blocca\])? \S", re.M)
+def area_rules(skill_text: str, area: str) -> tuple[set[str], set[str]]:
+    """Gli id `R-<AREA>-NN` della pagina `rules-<area>` (a inizio riga) e, a parte, quelli
+    marcati `[blocca]`. Un id citato a metà riga non conta."""
+    pattern = re.compile(rf"^(R-{re.escape(area.upper())}-\d{{2}})( \[blocca\])? \S", re.M)
+    found = pattern.findall(skill_text)
+    return {r for r, _ in found}, {r for r, mark in found if mark}
 
 
 def base_rules(skill_text: str) -> tuple[set[str], set[str]]:
     """Gli id `R-BASE-NN` della pagina `rules-base` e, a parte, quelli marcati `[blocca]`."""
-    found = _BASE_RULE.findall(skill_text)
-    return {r for r, _ in found}, {r for r, mark in found if mark}
+    return area_rules(skill_text, "BASE")
 
 
 def is_doc_tool(name: str) -> bool:

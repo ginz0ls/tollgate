@@ -42,7 +42,7 @@ Prima della prima modifica informati, e consegna una nota che lo dimostra.
 NOTA_DI_RICERCA_FINE
 ```
 
-`<programma>` è la forma esatta indicata nel brief e `<k>` è il numero del task. Ogni file elencato in «Letto nel progetto» e ogni fonte in «Documentazione» deve risultare davvero letto o aperto da te: la consegna li confronta con le letture registrate. Usa «Documentazione» oppure «Nessuna fonte esterna», non tutte e due. La nota sta in 8.000 caratteri al massimo. Se la consegna è rifiutata, il messaggio dice cosa manca: leggi o apri ciò che manca e consegna di nuovo. Se il brief non parla di nota (lavoro di livello L0 o componente spento), non ce n'è e non consegni niente.
+`<programma>` è la forma esatta indicata nel brief e `<k>` è il numero del task. Attenzione: i file che elenchi nella nota aprili con `Read`; un `cat` o un `ls` con glob non registra i file toccati e la consegna verrebbe rifiutata. Ogni file elencato in «Letto nel progetto» e ogni fonte in «Documentazione» deve risultare davvero letto o aperto da te: la consegna li confronta con le letture registrate. Usa «Documentazione» oppure «Nessuna fonte esterna», non tutte e due. La nota sta in 8.000 caratteri al massimo. Se la consegna è rifiutata, il messaggio dice cosa manca: leggi o apri ciò che manca e consegna di nuovo. Se il brief non parla di nota (lavoro di livello L0 o componente spento), non ce n'è e non consegni niente.
 
 ## Il lavoro
 
@@ -106,7 +106,7 @@ Il tuo ultimo messaggio contiene **un solo blocco JSON**, con questi campi alla 
 
 - `v` è sempre 1; `task` è il numero del task nel brief.
 - `status` è uno tra `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, `NEEDS_CONTEXT`. Qualunque altro valore rende il report non valido.
-- `done`: cosa hai implementato (o tentato, se bloccato). `tests`: il comando eseguito e l'esito, con il riscontro RED e GREEN. `files`: i file cambiati. `must_have`: gli identificativi dei must-have soddisfatti. `concerns`: i dubbi, o stringa vuota. `left`: cosa resta da fare, o stringa vuota.
+- `done`: cosa hai implementato (o tentato, se bloccato). `tests`: il comando eseguito e l'esito, con il riscontro RED e GREEN. Il report di un giro di correzione ripete il riscontro RED/GREEN del difetto corretto: il revisore vede solo l'ultimo report, non i precedenti. `files`: i file cambiati. `must_have`: gli identificativi dei must-have soddisfatti. `concerns`: i dubbi, o stringa vuota. `left`: cosa resta da fare, o stringa vuota.
 - `size_reason`: `null`, ma se il task supera `task_lines_max` righe (il brief e `<programma> verify` lo segnalano) è obbligatorio e spiega perché il task non era divisibile.
 - Usa DONE_WITH_CONCERNS se hai finito ma hai dubbi sulla correttezza. Mai consegnare in silenzio un lavoro di cui non sei sicuro.
 - Con BLOCKED o NEEDS_CONTEXT i dettagli stanno nel campo `concerns` e nel testo del messaggio: chi ti ha lanciato agisce su quelli.

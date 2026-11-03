@@ -254,8 +254,11 @@ def review_brief(b: ReviewBrief) -> str:
     if b.implementer_report:
         out += ["", "## Report dell'implementatore",
                 "Le regole che si giudicano sul report (R-BASE-05, 07, 10, 11 e le parti sul report "
-                "delle altre) si giudicano su questo testo.", DATA_NOTE,
-                _block(b.implementer_report)]
+                "delle altre) si giudicano su questo testo."]
+        if not (b.research and b.research_enforced):
+            out.append("Avviso: in questo lavoro le regole `R-BASE-…` non bloccano (il lavoro non "
+                       "ha il passo «informati prima» acceso): un rilievo su di esse è una nota.")
+        out += [DATA_NOTE, _block(b.implementer_report)]
     if b.research:
         out += _review_research(b)
     if b.reviewer_skills:

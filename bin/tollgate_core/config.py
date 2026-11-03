@@ -70,9 +70,10 @@ DEFAULTS: dict = {
     "tasks": {"task_lines_warn": 200, "task_lines_max": 500, "task_files_warn": 8,
               "max_turns": 60, "max_tokens": {"L0": 0, "L1": 400000, "L2": 800000}},
     "review": {
-        "readonly_agents": ["tollgate:task-reviewer", "tollgate:final-reviewer",
-                            "tollgate:finding-verifier", "tollgate:plan-adversary",
-                            "tollgate:spec-adversary", "tollgate:spec-auditor", "Explore"],
+        "readonly_agents": ["tollgate:task-reviewer", "tollgate:reviewer-ai",
+                            "tollgate:final-reviewer", "tollgate:finding-verifier",
+                            "tollgate:plan-adversary", "tollgate:spec-adversary",
+                            "tollgate:spec-auditor", "Explore"],
         "output_dirs": ["reports/", "coverage/"], "max_findings": 15,
         "stale_minutes": 30, "models": {},
     },

@@ -186,6 +186,42 @@ blocking_rules = ["R-WEB-1"]
         self.assertEqual(self.task()["verdict"], "changes")
 
 
+class AiProfileTest(Base):
+    """Il blocco `ai` (regole di una skill finta, scritto nel test): solo le `[blocca]` fermano il
+    task (con il passo di ricerca attivo nel lavoro)."""
+    research = True
+    toml = DEFAULT_TOML + """
+[profiles]
+active = ["ai"]
+[profiles.ai]
+paths = ["**"]
+rules = ["R-AI-01", "R-AI-02", "R-AI-07"]
+blocking_rules = ["R-AI-01"]
+"""
+
+    def outcome(self, rule):
+        self.stop(text=self.verdict(outcome="approved", findings=[dict(GOOD, rule=rule)]))
+        return self.task()["verdict"]
+
+    def test_ai_profile_blocking_rule_changes(self):
+        self.assertEqual(self.outcome("R-AI-01"), "changes")
+
+    def test_ai_profile_non_blocking_rule_approves(self):
+        self.assertEqual(self.outcome("R-AI-07"), "approved")
+
+
+class AiProfileNoStepTest(AiProfileTest):
+    """Senza il passo (nessuna nota) le `[blocca]` di `ai` fermano comunque: si giudicano sul diff
+    o sul report, che ci sono anche senza passo."""
+    research = False
+
+    def test_ai_blocking_rule_without_step(self):
+        self.assertEqual(self.outcome("R-AI-01"), "changes")
+
+    def test_ai_non_blocking_rule_without_step(self):
+        self.assertEqual(self.outcome("R-AI-07"), "approved")
+
+
 class BaseRulesTest(Base):
     """Le `R-BASE-…` di `rules-base`: note sempre, bloccanti solo se `[blocca]`, con l'interruttore
     acceso e il passo di ricerca attivo nel lavoro."""

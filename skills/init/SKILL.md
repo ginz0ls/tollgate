@@ -30,7 +30,7 @@ Con `--update` al posto di `--propose` il comando propone solo i file che differ
 - **0, proposta scritta**: la cartella `docs/superpowers/tollgate-init/` contiene `README.md`, `files/` e, in `protected` con protezione da attivare, `protection.json` e `protect.sh`. Con `--update` e niente di diverso, il comando dice «nulla da aggiornare» ed esce 0 senza scrivere.
 - **1, rifiuto**: righe `tollgate: …` col motivo (nessun repo git, nessun `origin`, nessun ramo predefinito, `tollgate.toml` non valido, servizio non ammesso, modalità non determinata). Riportale così come sono e fermati.
 
-Le righe `avviso:` (per esempio «senza rete») e le righe `workflow esistente fuori regola` vanno sempre mostrate all'utente.
+Le righe `avviso:` (per esempio «senza rete») e le righe `workflow esistente fuori regola` vanno sempre mostrate all'utente. Lo stesso vale per le righe `profilo …` e `profili non valutati: …`, che riguardano i profili verticali (passo 4).
 
 ## 3. Cosa riferire
 
@@ -50,6 +50,8 @@ Prima installazione (`--propose`):
 4. In `detect` non c'è niente da attivare: la verifica avviene dopo il merge.
 
 Aggiornamento (`--update`): l'utente crea il ramo `tollgate-config/<versione>` dal ramo predefinito, copia i file della proposta sopra gli esistenti, cancella i file elencati in «Da cancellare», fa il commit e **apre lui la PR**: contiene solo file di tollgate, `guard` la lascia passare e `attenzione` resta rosso, come previsto.
+
+Se il `README.md` ha la sezione «Profili proposti», riportala all'utente: sono blocchi `[profiles.<area>]` che il comando ha aggiunto **in coda** al `tollgate.toml` proposto, senza riscrivere il testo che c'era. Un profilo si propone solo se la sua pagina di regole è approvata e il repo ha file che lo accendono. Per ogni profilo la sezione dice i percorsi proposti, al più dieci dei file che lo accendono con il totale, le sovrapposizioni con un profilo già dichiarato (e chi vince) e come toglierlo prima di copiare. Per un profilo già dichiarato il comando non tocca niente: le righe `profilo …` dicono cosa aggiungere o togliere a mano (regole, percorsi nuovi, agenti ora disponibili) e compaiono anche con «nulla da aggiornare». Con «profili non valutati: …» il resto della proposta è valido, ma i profili non sono stati calcolati (per esempio git non ha risposto): rilancia più tardi. Se un frammento di profilo del plugin è guasto il comando rifiuta, col nome del file: riportalo e fermati.
 
 Il `README.md` può avere altre sezioni, da riferire se presenti: i servizi messi in `tollgate-run`, i workflow già presenti che violano le regole di `guard` (da valutare, restano fuori dal controllo), la configurazione di `jest-junit` per i repo che usano jest.
 
