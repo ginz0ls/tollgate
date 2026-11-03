@@ -1,0 +1,18 @@
+### Task 9: Prova reale con il profilo `ai`: script e progetto di prova
+
+**Files:**
+- Create: `spikes/b3/flow/` (`tollgate.toml` di base con il comando di verifica dei test, `ai/__init__.py`, `ai/summary.py` senza nome di modello, `services/notify.py` che importa l'SDK di Anthropic, `config.toml`, `issue-1.md`, `piano-L1.md`, `tests/test_smoke.py` che non importa `services/`, `.gitignore`)
+- Modify: `spikes/run-b1-flow.sh`, `spikes/b1/flowreg.py` (ricerca nelle trascrizioni dei subagenti), `tests/test_b1_scripts.py`
+
+**Interfaces:**
+- Consumes: `spikes/run-b1-flow.sh` (modi e variabili di B1 e B2, `B1_FLOW_RULES`, `B1_FLOW_SRC`); `init.propose` (Task 3).
+- Produces: la variabile `B1_FLOW_CASE` (`b1`, il predefinito, oppure `ai`).
+
+- [ ] **Step 1: I test che falliscono** (in `tests/test_b1_scripts.py`, con `B1_FLOW_CHECK=1` e una `HOME` finta): `test_flow_case_ai_out_dir` (`OUT` è `docs/verifiche/evidenze/b3/flusso`); `test_flow_case_ai_requires_real_rules` (`B1_FLOW_RULES` diverso da `vere` → errore); `test_flow_case_unknown_value`; `test_real_flow_case_ai_prepara_proposes_profile` (con `src_repo(case="ai")`, che copia i file veri, cioè una sorgente che traccia `bin/`, `templates/` con `profiles/ai.toml`, `gate/workflows/`, `agents/`, `skills/rules-base/` e `skills/rules-ai/` approvate: dopo `prepara` il `tollgate.toml` del repo di prova ha `[profiles.ai]` e `services/notify.py` nei suoi `paths`); `test_flow_case_ai_prepara_refuses_without_profile` (frammento non approvato nella sorgente → `prepara` esce diverso da 0 e lo dice); `test_registra_reads_only_matching_lines` (trascrizioni finte sotto la `HOME` finta: il file delle evidenze ha solo le righe col titolo delle regole, e i nomi delle cartelle si ricavano dal `cwd` e dal `session_id` dello stream-json); i test di B1 e B2 restano verdi con il predefinito `b1`.
+- [ ] **Step 2: Verifica che falliscano.**
+- [ ] **Step 3: Lo script.** Con `B1_FLOW_CASE=ai`: progetto da `spikes/b3/flow/`; `PLAN_SRC`, `PLAN_REL`, il titolo dell'issue nei dati del gh finto e i file controllati da `controlla` dipendono dal caso; nei dati del gh finto la risposta sulla protezione con la chiave che `tests/fakegh.py` usa alla lettera (`tests/fakegh.py:26`, come `tests/test_protection.py:7`), perché `init` determini la modalità. Ordine in `prepara`: i dati del gh finto con la risposta sulla protezione (lo `sha` per gli stati si aggiunge dopo, come oggi) → commit del progetto con il `tollgate.toml` di base → `git config remote.origin.url` e `insteadOf` come oggi (la protezione si legge da `{owner}/{repo}` dell'URL di `origin`) → push → `init --propose` sulla copia del plugin, con il gh finto nel `PATH` (o `TOLLGATE_GH`) e lo stato con la sentinella → copia di `docs/superpowers/tollgate-init/files/tollgate.toml` nel repo → secondo commit → push → rimozione della cartella della proposta (`start` avvisa se resta) → poi `sha`, stati e `plan-check` come oggi. `prepara` si ferma se il blocco `[profiles.ai]` manca o non copre `services/notify.py`. `registra` cerca `# Regole ai (versione 1)` e `# Regole di base (versione 1)` nelle trascrizioni dei subagenti delle sole due cartelle della prova (passo 1 dal checkout, passo 2 dal worktree), ricavate dal `cwd` e dal `session_id`, e salva solo le righe trovate (rinvio 181); raccoglie `agent_type` e `reviewer_type` del task. Lo script si prova solo con `bash -n`, `controlla` e i test.
+- [ ] **Step 4: Verifica.** `bash -n spikes/run-b1-flow.sh`; `python3 -B -m unittest tests.test_b1_scripts`: PASS. `tests/run`: verde.
+- [ ] **Step 5: Commit** «tollgate B3: prova reale con il profilo ai, script e progetto di prova».
+
+---
+

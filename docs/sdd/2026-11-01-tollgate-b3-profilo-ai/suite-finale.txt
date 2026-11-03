@@ -1,0 +1,27 @@
+# Tre corse finali di PYTHONWARNINGS=error::ResourceWarning tests/run su 7283c73
+## final-fix-2-suite.out
+== Python 3.11.16
+Ran 3394 tests in 1621.008s
+OK (skipped=4)
+== Python 3.13.5
+Ran 3394 tests in 1466.403s
+OK (skipped=2)
+EXIT=0
+## suite-finale-2.out
+== corsa 2 su 7283c73
+== Python 3.11.16
+Ran 3394 tests in 1487.459s
+OK (skipped=4)
+== Python 3.13.5
+Ran 3394 tests in 1461.751s
+OK (skipped=2)
+EXIT=0
+## suite-finale-3.out
+== corsa 3 su 7283c73
+== Python 3.11.16
+Ran 3394 tests in 1492.518s
+OK (skipped=4)
+== Python 3.13.5
+Ran 3394 tests in 1458.931s
+OK (skipped=2)
+EXIT=0
