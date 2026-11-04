@@ -1,13 +1,54 @@
+import contextlib
+import http.client  # noqa: F401
 import os
 import shutil
+import socket
+import ssl  # noqa: F401
 import subprocess
 import tempfile
+import urllib.request  # noqa: F401
 from pathlib import Path
+from unittest import mock
 
 from tollgate_core.paths import SENTINEL, State
 
+# `ssl`, `http.client` e `urllib.request` si importano qui, prima di ogni patch di `socket`: sotto
+# `no_network()` il primo import di `urllib.request` definirebbe classi derivate da un
+# `socket.socket` sostituito (con un finto che fosse una semplice funzione darebbe `TypeError`
+# se `ssl` non fosse già caricato). Così derivano sempre dalla classe vera.
+
 ROOT = Path(__file__).resolve().parents[1]
 BIN = ROOT / "bin"
+
+# Tutte le variabili da cui il controllo dei modelli legge una chiave (B3-bis, decisione 4).
+MODEL_KEY_VARS = (
+    "TOLLGATE_MODELS_ANTHROPIC_KEY", "ANTHROPIC_API_KEY",
+    "TOLLGATE_MODELS_GEMINI_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY",
+    "TOLLGATE_MODELS_OPENAI_KEY", "OPENAI_API_KEY",
+    "TOLLGATE_MODELS_OPENROUTER_KEY", "OPENROUTER_API_KEY",
+)
+
+
+class _NoSocket(socket.socket):
+    def __init__(self, *args, **kwargs):
+        raise AssertionError("rete in un test")
+
+
+def _no_connection(*args, **kwargs):
+    raise AssertionError("rete in un test")
+
+
+@contextlib.contextmanager
+def no_network():
+    """Per i test che toccano il controllo dei modelli: toglie da `os.environ` le variabili delle
+    chiavi e fa fallire ogni socket nuovo e `socket.create_connection`. Vale solo nel processo
+    del test (i processi figli non sono coperti)."""
+    with mock.patch.dict(os.environ), \
+            mock.patch.object(socket, "socket", _NoSocket), \
+            mock.patch.object(socket, "create_connection", _no_connection):
+        for name in MODEL_KEY_VARS:
+            os.environ.pop(name, None)
+        yield
 
 
 class TempState:

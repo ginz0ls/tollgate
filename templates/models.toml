@@ -1,0 +1,40 @@
+# Dati dei fornitori di modelli AI per il controllo dei modelli (tollgate models check).
+# Letto da tollgate_flow/modelsfetch.py; non viene copiato nei progetti.
+# url: l'elenco dei modelli (https, nessuna porta, nessun utente, nessuna chiave nella query).
+# paging: anthropic | gemini | none. auth: bearer oppure il nome dell'intestazione della chiave.
+# env: variabili da cui leggere la chiave, nell'ordine (prima quella dedicata a tollgate).
+# page: la pagina ufficiale citata nelle righe d'avviso.
+# hint: forma dei nomi di modello del fornitore (espressione regolare), vuota se non verificata.
+
+[anthropic]
+url = "https://api.anthropic.com/v1/models?limit=1000"
+paging = "anthropic"
+auth = "bearer"
+headers = { anthropic-version = "2026-10-21" }
+env = ["TOLLGATE_MODELS_ANTHROPIC_KEY", "ANTHROPIC_API_KEY"]
+page = "https://platform.claude.com/docs/en/about-claude/model-deprecations"
+hint = "claude-(?:[a-z0-9]+-)?[0-9][a-z0-9.-]*"
+
+[gemini]
+url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000"
+paging = "gemini"
+auth = "x-goog-api-key"
+env = ["TOLLGATE_MODELS_GEMINI_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"]
+page = "https://ai.google.dev/gemini-api/docs/deprecations"
+hint = "gemini-[0-9][a-z0-9.-]*"
+
+[openai]
+url = "https://api.openai.com/v1/models"
+paging = "none"
+auth = "bearer"
+env = ["TOLLGATE_MODELS_OPENAI_KEY", "OPENAI_API_KEY"]
+page = "https://developers.openai.com/api/docs/deprecations"
+hint = "gpt-[a-z0-9][a-z0-9.-]*"
+
+[openrouter]
+url = "https://openrouter.ai/api/v1/models"
+paging = "none"
+auth = "bearer"
+env = ["TOLLGATE_MODELS_OPENROUTER_KEY", "OPENROUTER_API_KEY"]
+page = "https://openrouter.ai/docs/guides/overview/models.md"
+hint = "(anthropic|google|openai)/[A-Za-z0-9._:~-]+"
