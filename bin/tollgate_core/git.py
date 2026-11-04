@@ -292,6 +292,24 @@ def show(repo, ref: str, path: str) -> bytes | None:
     return r.stdout if r.returncode == 0 else None
 
 
+def object_info_at(repo, ref: str, path: str) -> tuple[str, int] | None:
+    """Tipo (`blob`, `tree`, `commit`) e dimensione in byte di `path` nell'albero di `ref`;
+    `None` se il percorso o il riferimento mancano. Decide dal codice d'uscita di git, mai dal
+    testo di stderr (localizzato). Un link simbolico tracciato è un blob."""
+    _check_ref(ref)
+    spec = f"{ref}:{path}"
+    kind = _proc(repo, ["cat-file", "-t", spec])
+    if kind.returncode != 0:
+        return None
+    size = _proc(repo, ["cat-file", "-s", spec])
+    if size.returncode != 0:
+        return None
+    try:
+        return kind.stdout.decode("ascii").strip(), int(size.stdout.decode("ascii").strip())
+    except ValueError:
+        return None
+
+
 def _text(data: bytes | None) -> str | None:
     """Testo di un blob: None se binario o assente. Se non è UTF-8 si ripiega su Latin-1 (mai un crash)."""
     if data is None or b"\0" in data[:8000]:

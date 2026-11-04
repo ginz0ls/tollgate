@@ -422,6 +422,41 @@ class BlobAtTest(unittest.TestCase):
         self.assertIsNotNone(git.blob_at(self.repo, "HEAD", "d/f.md"))
 
 
+class ObjectInfoAtTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="tollgate info "))
+        self.repo = make_repo(self.tmp / "repo")
+        (self.repo / "a.md").write_text("uno\ndue\n")
+        (self.repo / "d").mkdir()
+        (self.repo / "d" / "f.md").write_text("x\n")
+        (self.repo / "link.md").symlink_to("a.md")
+        g(self.repo, "add", "-A")
+        g(self.repo, "commit", "-qm", "base")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_object_info_at(self):
+        self.assertEqual(git.object_info_at(self.repo, "HEAD", "a.md"), ("blob", 8))
+        self.assertEqual(git.object_info_at(self.repo, "HEAD", "d/f.md"), ("blob", 2))
+        self.assertEqual(git.object_info_at(self.repo, "HEAD", "d")[0], "tree")
+        self.assertIsNone(git.object_info_at(self.repo, "HEAD", "manca.md"))
+        self.assertIsNone(git.object_info_at(self.repo, "origin/main", "a.md"))
+
+    def test_symlink_reads_as_blob(self):
+        self.assertEqual(git.object_info_at(self.repo, "HEAD", "link.md"), ("blob", 4))
+
+    def test_option_like_ref_is_refused(self):
+        with self.assertRaises(git.GitError):
+            git.object_info_at(self.repo, "--help", "a.md")
+
+    def test_decides_from_exit_code_not_from_stderr_text(self):
+        env = {"LC_ALL": "it_IT.UTF-8", "LANGUAGE": "it", "LANG": "it_IT.UTF-8"}
+        with patch.dict(os.environ, env):
+            self.assertIsNone(git.object_info_at(self.repo, "HEAD", "manca.md"))
+            self.assertEqual(git.object_info_at(self.repo, "HEAD", "a.md"), ("blob", 8))
+
+
 class FingerprintTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="tollgate fp "))

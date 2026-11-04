@@ -11,6 +11,9 @@ from pathlib import Path
 from .paths import State, test_env
 
 SCHEMA_VERSION = 1
+MODELS_MAX_FILES = 20
+_MODELS_PATH_CHARS = frozenset(" ._/-@+[]")
+_WARNING_ENTRY_CHARS = 80
 _AREA_READONLY = re.compile(r"^[^:]+:(reviewer|final)-")
 
 
@@ -85,12 +88,13 @@ DEFAULTS: dict = {
     },
     "retention": {"retention_days": 30, "events_days": 180},
     "profiles": {"active": []},
+    "models": {"files": []},
     "components": {k: True for k in (
         "scope_check", "plan_check", "test_guard", "context_guard", "subagent_receipt_gate",
         "single_writer", "readonly_check", "final_review", "spec_adversary", "spec_audit",
         "plan_adversary", "base_test_ids", "sentinel", "task_size", "task_budget",
         "definition_of_done", "must_have_tests", "report_fields", "reviewer_standard",
-        "spec_pitch", "research_note")},
+        "spec_pitch", "research_note", "models_check")},
 }
 
 PROFILE_DEFAULTS: dict = {
@@ -199,6 +203,29 @@ def _merge_profile(name: str, raw, warnings: list[str]) -> dict:
     return prof
 
 
+def _models_path_ok(entry: str) -> bool:
+    """Percorso letterale relativo alla radice del repo (B3-bis, decisione 1): né assoluto, né con
+    segmenti `.`, `..` o vuoti, né con caratteri fuori da lettere, cifre e ` ._/-@+[]`."""
+    if entry.startswith("/") or any(seg in ("", ".", "..") for seg in entry.split("/")):
+        return False
+    return all(c.isalnum() or c in _MODELS_PATH_CHARS for c in entry)
+
+
+def _filter_models_files(files: list[str], warnings: list[str]) -> list[str]:
+    kept = []
+    for entry in files:
+        if _models_path_ok(entry):
+            kept.append(entry)
+        else:
+            warnings.append(f"models.files: voce {entry[:_WARNING_ENTRY_CHARS]!r} non ammessa "
+                            f"(percorso letterale relativo alla radice del repo): tolta")
+    if len(kept) > MODELS_MAX_FILES:
+        warnings.append(f"models.files: al più {MODELS_MAX_FILES} voci, tolte le ultime "
+                        f"{len(kept) - MODELS_MAX_FILES}")
+        kept = kept[:MODELS_MAX_FILES]
+    return kept
+
+
 def load_config_text(text: str, source: str = "tollgate.toml") -> Config:
     try:
         raw = tomllib.loads(text)
@@ -235,6 +262,7 @@ def load_config_text(text: str, source: str = "tollgate.toml") -> Config:
                 _set_key(data[section], key, value, sample, path, path)
             else:
                 warnings.append(f"chiave sconosciuta: {path}")
+    data["models"]["files"] = _filter_models_files(data["models"]["files"], warnings)
     declared = {k for k in data["profiles"] if k != "active"}
     for name in data["profiles"]["active"]:
         if name not in declared:

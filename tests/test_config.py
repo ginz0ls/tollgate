@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -5,7 +6,7 @@ from unittest import mock
 
 from tests.helpers import TempState, git, make_repo
 from tollgate_core.config import (
-    ConfigError, ConfigNotFound, load_config, load_config_at, load_config_text,
+    ConfigError, ConfigNotFound, MODELS_MAX_FILES, load_config, load_config_at, load_config_text,
 )
 
 MIN = 'schema_version = 1\n[gate]\nmode = "detect"\n'
@@ -118,6 +119,65 @@ class LoadTextTest(unittest.TestCase):
             'schema_version = 1\n[gate]\nmode = "protected"\n'
             '[profiles]\nactive = ["web"]\n[profiles.web]\npaths = ["web/**"]\n')
         self.assertEqual(cfg.warnings, [])
+
+class ModelsSectionTest(unittest.TestCase):
+    def test_models_files_default_empty(self):
+        c = load_config_text(MIN)
+        self.assertEqual(c.get("models.files"), [])
+        self.assertEqual(c.warnings, [])
+
+    def test_models_check_component_default_true(self):
+        self.assertTrue(load_config_text(MIN).get("components.models_check"))
+        c = load_config_text(MIN + "[components]\nmodels_check = false\n")
+        self.assertFalse(c.get("components.models_check"))
+
+    def test_models_files_type_checked(self):
+        with self.assertRaisesRegex(ConfigError, "models.files"):
+            load_config_text(MIN + "[models]\nfiles = 3\n")
+        with self.assertRaisesRegex(ConfigError, "models.files"):
+            load_config_text(MIN + '[models]\nfiles = "src/m.py"\n')
+        with self.assertRaisesRegex(ConfigError, "components.models_check"):
+            load_config_text(MIN + '[components]\nmodels_check = "no"\n')
+
+    def test_bad_paths_dropped_with_warning(self):
+        bad = ["/etc/x", "../x", "src/*.py", "a\nb.py", "a;b.py", "src/m?.py", "a/../b.py",
+               "x\x1b[0m.py", "a$b.py"]
+        good = ["src/ai/models.py", "app/[id]/models.ts", "my dir/m.py", "a@b+c/m-1.py"]
+        items = ", ".join(json.dumps(x) for x in bad + good)
+        c = load_config_text(MIN + f"[models]\nfiles = [{items}]\n")
+        self.assertEqual(c.get("models.files"), good)
+        self.assertEqual(len(c.warnings), len(bad))
+        for entry, warning in zip(bad, c.warnings):
+            self.assertNotIn("\n", warning)
+            self.assertIn(repr(entry), warning)
+            self.assertTrue(warning.startswith("models.files:"), warning)
+
+    def test_dot_and_empty_segments_dropped(self):
+        bad = ["./x.py", "a//b.py", "src/", "", ".", "a/./b.py"]
+        items = ", ".join(json.dumps(x) for x in bad + ["ok.py"])
+        c = load_config_text(MIN + f"[models]\nfiles = [{items}]\n")
+        self.assertEqual(c.get("models.files"), ["ok.py"])
+        self.assertEqual(len(c.warnings), len(bad))
+        for entry, warning in zip(bad, c.warnings):
+            self.assertIn(repr(entry), warning)
+
+    def test_models_files_capped(self):
+        items = ", ".join(json.dumps(f"m{i}.py") for i in range(25))
+        c = load_config_text(MIN + f"[models]\nfiles = [{items}]\n")
+        self.assertEqual(c.get("models.files"), [f"m{i}.py" for i in range(MODELS_MAX_FILES)])
+        self.assertEqual(MODELS_MAX_FILES, 20)
+        self.assertEqual(len(c.warnings), 1)
+        self.assertNotIn("\n", c.warnings[0])
+
+    def test_cap_counts_only_valid_entries(self):
+        items = ", ".join(json.dumps(x) for x in ["../a.py"] + [f"m{i}.py" for i in range(20)])
+        c = load_config_text(MIN + f"[models]\nfiles = [{items}]\n")
+        self.assertEqual(len(c.get("models.files")), 20)
+        self.assertEqual(len(c.warnings), 1)
+
+    def test_long_bad_entry_is_shortened_in_warning(self):
+        c = load_config_text(MIN + f'[models]\nfiles = ["{"*" * 5000}"]\n')
+        self.assertLess(len(c.warnings[0]), 300)
 
 
 class ProfileNamesTest(unittest.TestCase):
