@@ -1,13 +1,14 @@
 import json
-import re
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
-from tests.helpers import ROOT, TempState, git as g, make_origin_repo, no_network
+from tests.helpers import BIN, ROOT, TempState, git as g, make_origin_repo, no_network
 from tollgate_analysis import models
 from tollgate_analysis.models import ModelsFormatError
 from tollgate_core import config, git
@@ -24,23 +25,27 @@ DEDICATED = ("TOLLGATE_MODELS_ANTHROPIC_KEY, TOLLGATE_MODELS_GEMINI_KEY, "
              "TOLLGATE_MODELS_OPENAI_KEY, TOLLGATE_MODELS_OPENROUTER_KEY")
 
 
+HINTS = {"anthropic": "claude-(?:[a-z0-9]+-)?[0-9][a-z0-9.-]*", "gemini": "gemini-[0-9][a-z0-9.-]*",
+         "openai": "gpt-[a-z0-9][a-z0-9.-]*", "openrouter": ""}
+ENV = {"anthropic": ["TOLLGATE_MODELS_ANTHROPIC_KEY", "ANTHROPIC_API_KEY"],
+       "gemini": ["TOLLGATE_MODELS_GEMINI_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"],
+       "openai": ["TOLLGATE_MODELS_OPENAI_KEY", "OPENAI_API_KEY"],
+       "openrouter": ["TOLLGATE_MODELS_OPENROUTER_KEY", "OPENROUTER_API_KEY"]}
+AUTH = {"gemini": "x-goog-api-key"}
+PAGING = {"anthropic": "anthropic", "gemini": "gemini"}
+
+
 def providers_toml() -> str:
-    """Il `templates/models.toml` vero, con gli host sostituiti da host `.invalid`."""
-    hosts = {"api.anthropic.com": "anthropic.invalid",
-             "generativelanguage.googleapis.com": "gemini.invalid",
-             "api.openai.com": "openai.invalid", "openrouter.ai": "openrouter.invalid"}
-    out, current = [], None
-    for line in (ROOT / "templates" / "models.toml").read_text(encoding="utf-8").splitlines():
-        section = re.fullmatch(r"\[(\w+)\]", line)
-        if section:
-            current = section.group(1)
-        if line.startswith("url = "):
-            for real, fake in hosts.items():
-                line = line.replace(f"https://{real}", f"https://{fake}")
-        elif line.startswith("page = "):
-            line = f'page = "{PAGE[current]}"'
-        out.append(line)
-    return "\n".join(out) + "\n"
+    """File dei fornitori finto, scritto per intero qui: host `.invalid`, nessun dato del vero."""
+    out = []
+    for name in HINTS:
+        out += [f"[{name}]", f'url = "https://{name}.invalid/v1/models"',
+                f'paging = "{PAGING.get(name, "none")}"', f'auth = "{AUTH.get(name, "bearer")}"',
+                f"env = {json.dumps(ENV[name])}", f'page = "{PAGE[name]}"']
+        if HINTS[name]:
+            out.append(f"hint = {json.dumps(HINTS[name])}")
+        out.append("")
+    return "\n".join(out)
 
 
 def a_model(id, line="sonnet", created="2026-01-01T00:00:00Z", lifecycle="active", retires=None):
@@ -316,6 +321,30 @@ class ProvidersTest(CheckCase):
             models_check.check(self.ts.state, self.main, "origin/main", self.cfg(),
                                environ={"ANTHROPIC_API_KEY": KEY}, now=T0, fetch=fetch)
         self.assertEqual(fetch.calls[0][2], "anthropic.invalid")
+
+    def test_provider_line_recognised_for_openai_and_openrouter(self):
+        self.repo({FILE: 'a = "gpt-5-old"\nb = "openai/gpt-5-old"\nc = "anthropic/claude-x-5"\n'})
+        fetch = FakeFetch(
+            openai=[{"data": [{"id": "gpt-5-old", "shutdown_date": "2027-02-03"}]}],
+            openrouter=[{"data": [{"id": "openai/gpt-5-old", "expiration_date": "2027-03-04"}]}])
+        lines = self.check(self.cfg(), fetch, env={"OPENAI_API_KEY": KEY,
+                                                    "OPENROUTER_API_KEY": KEY})
+        self.assertEqual(lines, [
+            f"modelli: openai: gpt-5-old ({FILE}): ritiro il 2027-02-03 — {PAGE['openai']}",
+            f"modelli: openrouter: openai/gpt-5-old ({FILE}): ritiro il 2027-03-04 — "
+            f"{PAGE['openrouter']}",
+            f"modelli: openai: più nuovo non controllato: l'elenco non lo dà — {PAGE['openai']}",
+            f"modelli: openrouter: più nuovo non controllato: l'elenco non lo dà, guarda la pagina "
+            f"del fornitore originale — {PAGE['openrouter']}"])
+
+    def test_importing_models_check_does_not_load_the_net_client(self):
+        code = ("import sys\n"
+                f"sys.path.insert(0, {str(BIN)!r})\n"
+                "import tollgate_flow.models_check\n"
+                "print('tollgate_flow.modelsfetch' in sys.modules)\n")
+        r = subprocess.run([sys.executable, "-B", "-c", code], capture_output=True, text=True,
+                           timeout=60, cwd=tempfile.gettempdir())
+        self.assertEqual((r.returncode, r.stdout.strip()), (0, "False"), r.stderr)
 
     def test_real_plugin_root_is_the_default(self):
         self.assertEqual(models_check.PLUGIN_ROOT, ROOT)

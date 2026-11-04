@@ -53,6 +53,12 @@ def _norm(name: str) -> str:
     return (name[m.end():] if m else name).removeprefix("models/")
 
 
+def normalize(name: str) -> str:
+    """Nome senza `models/` iniziale e senza prefisso `<fornitore>:`, come lo confrontano
+    `used` e `findings`."""
+    return _norm(name)
+
+
 # --- Lettura degli elenchi -------------------------------------------------------------
 
 def gemini_family(model_id: str) -> tuple[str, tuple[int, ...]] | None:

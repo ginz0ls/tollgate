@@ -16,12 +16,14 @@ from tollgate_analysis import models
 from tollgate_core import git
 from tollgate_core.config import Config
 from tollgate_core.paths import State
-from tollgate_flow import modelsfetch
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[2]
 MAX_LINES = 12
 DEADLINE_S = 20
 MAX_FILE_BYTES = 256 * 1024
+# Le righe per fornitore di `findings` cominciano così; un letterale non ha spazi, quindi quelle
+# per modello (`<fornitore>: <letterale> (<file>): …`) non possono confondersi.
+_NOT_CHECKED = ("ritiro non controllato:", "più nuovo non controllato:")
 _BINARY_HEAD = 8000  # byte esaminati per riconoscere un file binario (come in `git._text`)
 
 
@@ -54,14 +56,14 @@ def _read_files(repo: Path, ref: str, files: list[str]) -> tuple[dict[str, str],
     return texts, lines
 
 
-def _wanted(provider: modelsfetch.Provider, found: set[str]) -> bool:
+def _wanted(provider, found: set[str]) -> bool:
     """Un letterale ha la forma dei nomi del fornitore (`hint`, sul nome già normalizzato)."""
     if not provider.hint:
         return False
-    return any(re.fullmatch(provider.hint, models._norm(lit)) for lit in found)
+    return any(re.fullmatch(provider.hint, models.normalize(lit)) for lit in found)
 
 
-def _provider_lines(state: State, provider: modelsfetch.Provider, key: str, found: set[str],
+def _provider_lines(modelsfetch, state: State, provider, key: str, found: set[str],
                     where: dict[str, str], *, now: datetime, deadline, refresh: bool,
                     show_cache: bool, fetch) -> tuple[list[str], list[str]]:
     """`(righe per modello, righe per fornitore)` di un fornitore con la sua chiave."""
@@ -80,10 +82,10 @@ def _provider_lines(state: State, provider: modelsfetch.Provider, key: str, foun
         per_provider.append(f"modelli: {name}: {cache_line}")
     matches = models.used(found, infos)
     lines = models.findings(name, matches, infos, found, where=where, page=provider.page)
-    # `findings` mette per ultima l'unica riga per fornitore ("non controllato"), se c'è.
-    if matches and name != "anthropic":
-        return lines[:-1], per_provider + lines[-1:]
-    return lines, per_provider
+    prefix = f"modelli: {name}: "
+    own = [l for l in lines if l.startswith(prefix)
+           and l[len(prefix):].startswith(_NOT_CHECKED)]
+    return [l for l in lines if l not in own], per_provider + own
 
 
 def _check(state: State, repo: Path, ref: str, cfg: Config, *, environ: Mapping[str, str],
@@ -91,6 +93,7 @@ def _check(state: State, repo: Path, ref: str, cfg: Config, *, environ: Mapping[
            clock) -> list[str]:
     if not cfg.get("components.models_check"):
         return []
+    from tollgate_flow import modelsfetch  # rete: solo quando serve, mai al solo import
     files = cfg.get("models.files")
     if not files:
         if "ai" in cfg.profiles:
@@ -123,7 +126,7 @@ def _check(state: State, repo: Path, ref: str, cfg: Config, *, environ: Mapping[
                 per_provider.append(f"modelli: {name}: saltato, tempo del controllo finito")
             else:
                 got_model, got_provider = _provider_lines(
-                    state, provider, key, found, where, now=now, deadline=deadline,
+                    modelsfetch, state, provider, key, found, where, now=now, deadline=deadline,
                     refresh=refresh, show_cache=show_cache, fetch=fetch)
                 per_model += got_model
                 per_provider += got_provider

@@ -41,6 +41,15 @@ class LiteralsTest(unittest.TestCase):
         self.assertEqual(models.literals('x = "claude-x-5\ny = claude-y-1"\n'), set())
 
 
+class NormalizeTest(unittest.TestCase):
+    def test_normalize_strips_models_and_provider_prefix(self):
+        for raw, want in (("models/gemini-3.6-flash", "gemini-3.6-flash"),
+                          ("anthropic:claude-x-5", "claude-x-5"),
+                          ("google:models/gemini-3.6-flash", "gemini-3.6-flash"),
+                          ("openai/gpt-x", "openai/gpt-x"), ("claude-x-5", "claude-x-5")):
+            self.assertEqual(models.normalize(raw), want)
+
+
 class ParseTest(unittest.TestCase):
     def test_parse_anthropic(self):
         page = {"data": [
