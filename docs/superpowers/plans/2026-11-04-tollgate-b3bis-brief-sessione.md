@@ -20,7 +20,7 @@ Il lavoro è finito quando:
 ## Da leggere, in quest'ordine
 
 1. `docs/superpowers/plans/2026-11-04-tollgate-b3bis-esecuzione.md`: le istruzioni.
-2. Il piano B3-bis: per intero «Fatti verificati», «Decisioni di questo piano» (12 decisioni), «Review Focus» e «Copertura».
+2. Il piano B3-bis: per intero «Fatti verificati», «Decisioni di questo piano» (13 decisioni), «Review Focus» e «Copertura».
 3. Il progetto di B, `docs/superpowers/specs/2026-10-27-tollgate-b-profili-design.md`, **sezioni 9 e 10**: sono l'autorità.
 4. Il piano principale di B, `docs/superpowers/plans/2026-10-27-tollgate-b-piano-principale.md`: sezioni 1, 2, 3 e 9 (blocco «A B3-bis»).
 5. La spec del nucleo rev 29, sezioni 3, 3.1, 3.2, 6.1, 11.4, 16, 18.4.
@@ -45,12 +45,13 @@ Il lavoro è finito quando:
 - **Fornitori:** Anthropic e Gemini; OpenAI e OpenRouter perché le loro pagine danno un elenco. **Avvisa** se c'è un modello stabile più nuovo della stessa famiglia o se uno in uso sta per essere ritirato; non blocca nulla.
 - **Ciò che l'elenco non dà si salta, e si dice** (progetto 10): niente lettura di pagine web dei fornitori da parte della sentinella.
 - **Una prova vera, una volta**, con le chiavi già nell'ambiente (progetto 10).
-- **Pulizia di `/tmp`** approvata (progetto 10), con i limiti dell'eccezione 2 delle istruzioni.
+- **Pulizia di `/tmp`** approvata (progetto 10), con la regola stretta della decisione 10 e dell'eccezione 2 delle istruzioni.
 - **Il repo `ginz0ls/tollgate` è pubblico:** nei file nuovi niente nomi di progetti privati dell'utente, niente nome utente né nome dell'host, niente chiavi, niente testo intero di pagine o skill di terzi.
 
 ## Punti delicati del piano
 
-- **La chiave non esce mai** (Global Constraints, decisione 5, Review Focus 1). La variabile dedicata `TOLLGATE_MODELS_ANTHROPIC_KEY` esiste perché `ANTHROPIC_API_KEY` nell'ambiente fa usare a Claude Code la chiave al posto dell'abbonamento (fatturazione a consumo).
+- **La chiave non esce mai da tollgate** (Global Constraints, decisione 5, Review Focus 1). La variabile dedicata `TOLLGATE_MODELS_ANTHROPIC_KEY` esiste solo perché `ANTHROPIC_API_KEY` nell'ambiente fa usare a Claude Code la chiave al posto dell'abbonamento (fatturazione a consumo): non protegge la chiave, che resta leggibile da qualunque comando della sessione, e i documenti lo dicono.
+- **La rete ha una scadenza unica** (`DEADLINE_S = 20`) e i test non la raggiungono mai: `tests/helpers.no_network()` toglie le variabili delle chiavi e blocca i socket; `fetch` e `PLUGIN_ROOT` si risolvono al momento della chiamata, così i `mock.patch` funzionano.
 - **Host delle API fuori da `bin/`**: stanno in `templates/models.toml`, così `test_real_markers_not_in_tollgate_bin` resta com'è e i progetti non ricevono gli host in `.github/tollgate/`.
 - **`models_check.check` non solleva mai** e `start` non cambia esito per colpa sua; gira solo per un lavoro nuovo.
 - **Nessun nome nuovo con `sentinel`**: è già del gate (workflow, componente, evento).
