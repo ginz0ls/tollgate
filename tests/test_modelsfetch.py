@@ -239,7 +239,7 @@ class ApiKeyTest(NetCase):
         self.assertIsNone(api_key(p, {"TOLLGATE_MODELS_X_KEY": "", "X_API_KEY": ""}))
         self.assertIsNone(api_key(p, {"OTHER": "x"}))
 
-    def test_gemini_order(self):
+    def test_real_gemini_order(self):
         gemini = load_providers(ROOT)["gemini"]
         both = {"GEMINI_API_KEY": "g", "GOOGLE_API_KEY": "o"}
         self.assertEqual(api_key(gemini, both), "o")
@@ -404,11 +404,33 @@ class ClientTest(NetCase):
 
     def test_environment_proxy_ignored(self):
         with mock.patch.dict(os.environ, {"https_proxy": "http://proxy.invalid:3128",
-                                          "HTTPS_PROXY": "http://proxy.invalid:3128"}):
+                                          "HTTPS_PROXY": "http://proxy.invalid:3128",
+                                          "http_proxy": "http://proxy.invalid:3128"}):
             opener = build_opener()
-        proxies = [h for h in opener.handlers if isinstance(h, urllib.request.ProxyHandler)]
-        self.assertTrue(all(h.proxies == {} for h in proxies))
-        self.assertNotIn("https", [s for h in proxies for s in h.proxies])
+        self.assertFalse(any(isinstance(h, urllib.request.ProxyHandler) and h.proxies
+                             for h in opener.handlers))
+        self.assertFalse(any(hasattr(h, "proxy_open") for h in opener.handlers))
+        self.assertEqual([type(h) for h in opener.handle_open["https"]],
+                         [urllib.request.HTTPSHandler])
+
+    def test_deeply_nested_json_is_fetch_error(self):
+        body = b"[" * 200_000 + b"]" * 200_000
+        with self.assertRaises(FetchError) as cm:
+            self.run_fetch(make_provider(), FakeOpener(FakeResponse(raw=body)))
+        self.assertEqual(str(cm.exception), "risposta non JSON")
+        self.assertIsNone(cm.exception.__context__)
+        self.assertIsNone(cm.exception.__cause__)
+
+    def test_redirect_handler_closes_response(self):
+        handler = next(h for h in build_opener().handlers
+                       if isinstance(h, urllib.request.HTTPRedirectHandler))
+        req = urllib.request.Request("https://api.example.invalid/v1/models")
+        for call in (lambda fp: handler.redirect_request(req, fp, 302, "x", {}, "https://a.invalid/"),
+                     lambda fp: handler.http_error_302(req, fp, 302, "x", {})):
+            fp = FakeResponse({})
+            with self.assertRaises(FetchError):
+                call(fp)
+            self.assertTrue(fp.closed)
 
     def test_default_opener_built_at_call_time(self):
         opener = FakeOpener(FakeResponse({"data": []}))
@@ -652,6 +674,22 @@ class CacheTest(NetCase):
         self.assertEqual(dst, "openai.json")
         self.assertNotEqual(src, dst)
         self.assertTrue(existed)
+        self.assertEqual([p.name for p in self.path.parent.iterdir()], ["openai.json"])
+
+    def test_cache_temp_names_are_unique_and_removed_on_failure(self):
+        names = []
+        real_replace = os.replace
+
+        def spy(src, dst):
+            names.append(Path(src).name)
+            return real_replace(src, dst)
+
+        with mock.patch("os.replace", spy):
+            self.run_cached()
+            self.run_cached(now=T0 + timedelta(hours=30))
+        self.assertEqual(len(names), 2)
+        self.assertNotEqual(names[0], names[1])
+        self.assertNotEqual(names[0], ".openai.json.tmp")
         self.assertEqual([p.name for p in self.path.parent.iterdir()], ["openai.json"])
 
     def test_cache_write_failure_does_not_break_result(self):

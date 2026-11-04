@@ -7,7 +7,9 @@ originale (che può contenere URL o intestazioni) resta in `__context__` o `__ca
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 import time
 import tomllib
 import urllib.request
@@ -21,7 +23,6 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from tollgate_analysis.models import PROVIDERS
 from tollgate_core import clock
-from tollgate_core.fsutil import write_atomic
 from tollgate_core.paths import State
 
 CACHE_HOURS = 24
@@ -152,9 +153,11 @@ def api_key(provider: Provider, environ: Mapping[str, str]) -> str | None:
 
 class _RefuseRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        raise FetchError("redirect rifiutato")
+        self._refuse(req, fp, code, msg, headers)
 
     def _refuse(self, req, fp, code, msg, headers):
+        if fp is not None:
+            fp.close()
         raise FetchError("redirect rifiutato")
 
     http_error_301 = http_error_302 = http_error_303 = _refuse
@@ -244,7 +247,7 @@ def _get_json(provider: Provider, key: str, url: str, deadline: Deadline, opener
         return None, reason
     try:
         return json.loads(bytes(body).decode("utf-8")), None
-    except ValueError:
+    except (ValueError, RecursionError):
         return None, "risposta non JSON"
 
 
@@ -283,6 +286,23 @@ def fetch_pages(provider: Provider, key: str, *, deadline: Deadline, opener=None
 
 def _cache_path(state: State, provider: Provider) -> Path:
     return state.root / "models" / f"{provider.name}.json"
+
+
+def _write_cache(path: Path, text: str) -> None:
+    """Temporaneo con nome unico nella stessa cartella e `os.replace`: due controlli
+    concorrenti non si pestano; se la scrittura fallisce il temporaneo non resta."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    except (OSError, ValueError):
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def _read_cache(path: Path, validate: Callable[[list[dict]], object]):
@@ -327,7 +347,7 @@ def cached_pages(state: State, provider: Provider, key: str, *, now: datetime, d
                            f"elenco dalla cache del {cached[0]:%Y-%m-%d}")
     validate(pages)
     try:
-        write_atomic(path, json.dumps({"fetched_at": clock.fmt(now), "pages": pages}))
+        _write_cache(path, json.dumps({"fetched_at": clock.fmt(now), "pages": pages}))
     except (OSError, ValueError):
         pass
     return pages, None
