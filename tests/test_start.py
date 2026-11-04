@@ -14,12 +14,12 @@ from pathlib import Path
 from unittest import mock
 
 from tests.flowkit import ORIGIN_URL, SESSION, SPEC, FlowLab, spec_text
-from tests.helpers import BIN
+from tests.helpers import BIN, no_network
 from tests.hookkit import DEFAULT_TOML
 from tollgate_analysis import approvals
 from tollgate_core import (VERSION, cli, clock, effects, events, intents, lookups, phases, sessions,
                            subagents, tasks)
-from tollgate_flow import gitw, housekeeping, start as flow_start
+from tollgate_flow import gitw, housekeeping, models_check, modelsfetch, start as flow_start
 
 SENTINEL_TITLE = "tollgate: merge non verificato"
 
@@ -1225,6 +1225,76 @@ class HousekeepingTest(StartCase):
         phases.set_phase(fl.conn, state, w["id"], "closed", "abandoned", now=clock.now())
         sessions.prune_bound(fl.conn, state, now=clock.now(), stale_minutes=30)
         self.assertFalse((fl.ts.dir / "bound" / SESSION).exists())
+
+
+class StartModelsTest(StartCase):
+    """Gli avvisi sui modelli all'avvio (B3-bis, decisione 6). Tutto nel processo del test, sotto
+    `no_network()`, con la radice del plugin su host `.invalid`."""
+    TOML = DEFAULT_TOML + '[models]\nfiles = ["src/ai/models.py"]\n'
+    FILES = {"src/ai/models.py": 'MODEL = "claude-old-4-20250101"\n'}
+
+    def setUp(self):
+        from tests.test_models_check import providers_toml
+        self.enterContext(no_network())
+        plugin = Path(tempfile.mkdtemp(prefix="tollgate-plugin-"))
+        self.addCleanup(shutil.rmtree, plugin, True)
+        (plugin / "templates").mkdir()
+        (plugin / "templates" / "models.toml").write_text(providers_toml())
+        self.enterContext(mock.patch.object(models_check, "PLUGIN_ROOT", plugin))
+
+    def lab(self, **kw):
+        return self.make(toml=self.TOML, files=self.FILES, **kw)
+
+    def start_direct(self, fl):
+        sessions.note_cli_call(fl.ts.state, SESSION, str(fl.main), ["start", "7"],
+                               now=clock.now())
+        with mock.patch.dict(os.environ, fl.env()):
+            return flow_start.start(fl.ts.state, fl.main, 7, level=None, confirm=False,
+                                    reopen_execution=False, claude_dir=fl.home / ".claude")
+
+    def test_start_appends_model_warnings(self):
+        fl = self.lab()
+        calls = []
+
+        def fake(state, repo, ref, cfg, **kw):
+            calls.append((ref, kw["environ"], kw.get("show_cache")))
+            return ["modelli: x"]
+
+        with mock.patch.object(models_check, "check", fake):
+            r = self.start_direct(fl)
+        self.assertEqual(r.code, 0, r.lines)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], "origin/main")
+        self.assertEqual(calls[0][1], os.environ)
+        self.assertIs(calls[0][2], False)
+        at = r.lines.index("avviso: modelli: x")
+        self.assertTrue(r.lines[at + 1].startswith("lavoro #7 avviato"), r.lines)
+
+    def test_start_succeeds_when_check_fails(self):
+        fl = self.lab()
+        fetch = mock.Mock(side_effect=modelsfetch.FetchError("rete non raggiungibile"))
+        with mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-PROVA-123"}), \
+                mock.patch("tollgate_flow.modelsfetch.fetch_pages", fetch):
+            r = self.start_direct(fl)
+        self.assertEqual(r.code, 0, r.lines)
+        fetch.assert_called_once()
+        self.assertEqual(sum("elenco non letto" in l for l in r.lines), 1, r.lines)
+        self.assertNotIn("sk-PROVA-123", "\n".join(r.lines))
+
+    def test_resume_does_not_check(self):
+        fl = self.lab(issue=7)
+        fake = mock.Mock(return_value=["modelli: x"])
+        with mock.patch.object(models_check, "check", fake):
+            r = self.start_direct(fl)
+        self.assertEqual(r.code, 0, r.lines)
+        fake.assert_not_called()
+        self.assertFalse([l for l in r.lines if l.startswith("avviso: modelli")])
+
+    def test_start_without_models_section_no_model_lines(self):
+        fl = self.make()
+        r = self.start_direct(fl)
+        self.assertEqual(r.code, 0, r.lines)
+        self.assertFalse([l for l in r.lines if l.startswith("avviso: modelli")], r.lines)
 
 
 if __name__ == "__main__":

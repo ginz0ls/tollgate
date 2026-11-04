@@ -86,6 +86,13 @@ def build_parser() -> argparse.ArgumentParser:
     dp = sub.add_parser("db", help="manutenzione del DB")
     dsub = dp.add_subparsers(dest="db_cmd", required=True)
     dsub.add_parser("restore", help="ripristina l'ultima copia integra (solo da terminale)")
+    mp = sub.add_parser("models", help="confronta i modelli del progetto con gli elenchi dei "
+                                       "fornitori")
+    msub = mp.add_subparsers(dest="models_cmd", required=True)
+    mc = msub.add_parser("check", help="avvisa dei modelli dichiarati in [models] files che sono "
+                                       "superati o in ritiro")
+    mc.add_argument("--refresh", action="store_true",
+                    help="ignora la cache di un giorno e rilegge gli elenchi")
     sa = sub.add_parser("start", help="avvia o riprende il lavoro su un'issue (6.1)")
     sa.add_argument("issue", type=_issue_number, metavar="N")
     sa.add_argument("--level", choices=("L1", "L2"), help="livello scelto dall'utente")
@@ -284,6 +291,40 @@ def _external_errors() -> tuple[type[Exception], ...]:
     return (gh.GhError, git.GitError, gitw.GitWriteError)
 
 
+def _models_check(state, refresh: bool) -> int:
+    """`models check` (B3-bis, decisione 8): le righe del controllo, senza toccare il DB."""
+    from . import config
+    from tollgate_flow import models_check
+    top = git.toplevel(Path.cwd())
+    if top is None:
+        print("rifiuto: la cartella corrente non è in un repo git")
+        return 1
+    main = git.main_worktree(top)
+    if not git.origin_url(main):
+        print("rifiuto: il repo non ha il remote origin")
+        return 1
+    ref = git.default_ref(main)
+    if ref is None:
+        print("rifiuto: origin non ha un ramo predefinito con almeno un commit")
+        return 1
+    try:
+        cfg = config.load_config(state, main, ref)
+    except config.ConfigError as e:    # compresa ConfigNotFound
+        print(f"rifiuto: configurazione non valida: {e}")
+        return 1
+    lines = [f"avviso: {w}" for w in cfg.warnings]
+    lines += [f"avviso: {w}" for w in models_check.check(
+        state, main, ref, cfg, environ=os.environ, now=clock.now(), refresh=refresh)]
+    if not cfg.get("components.models_check"):
+        lines.append("modelli: controllo spento ([components] models_check = false)")
+    elif not cfg.get("models.files"):
+        lines.append("modelli: nessun file dichiarato in [models] files")
+    elif not lines:
+        lines.append("modelli: nessun avviso")
+    print("\n".join(lines))
+    return 0
+
+
 def main(argv: list[str]) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -302,6 +343,8 @@ def main(argv: list[str]) -> int:
     try:
         if args.cmd == "db":
             return _restore(state)
+        if args.cmd == "models":
+            return _models_check(state, args.refresh)
         if args.cmd == "verify":
             code, lines = verify.run_verify(state, Path.cwd(), related=args.related)
             print("\n".join(lines))

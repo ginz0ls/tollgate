@@ -19,6 +19,8 @@ Crea il ramo `tg/<N>-<slug>` e il worktree in `.claude/worktrees/`, sceglie il l
 
 In modalità `detect` mostra a ogni avvio "modalità rilevazione: il merge non è impedito" e le issue aperte "tollgate: merge non verificato".
 
+Se `tollgate.toml` dichiara `[models] files`, all'avvio di un lavoro nuovo `start` controlla anche i modelli AI scritti in quei file, e mostra righe `avviso: modelli: …` quando ne trova uno più nuovo o in ritiro. Sono solo avvisi: non cambiano l'esito di `start`. Dettagli in [il controllo dei modelli](#il-controllo-dei-modelli).
+
 ### `/tollgate:spec-audit`
 
 Audit di spec e piano nei lavori L2: giri avversariali, audit a lenti sulla spec e avversario del piano, finché tollgate chiede la tua approvazione. Nessun argomento. Il coordinatore non scrive codice: lancia gli agenti, legge i report, corregge spec e piano. L'audit a lenti ha un costo: `audit prepare` chiede conferma prima di partire.
@@ -160,8 +162,37 @@ La CLI è `bin/tollgate` e si lancia con `python3` davanti al percorso, tra virg
 - `stats [--since AAAA-MM-GG] [--work N]`: statistiche dagli eventi, in JSON (tempo per fase, veti per regola, blocchi, deroghe, token). Serve a vedere se tollgate rallenta più di quanto protegge.
 - `events --after-seq N`: esporta gli eventi in JSONL.
 - `init --propose` e `init --update`: come sopra.
+- `models check [--refresh]`: il controllo dei modelli sul repo corrente, senza aprire un lavoro. Vedi [il controllo dei modelli](#il-controllo-dei-modelli).
 - `db restore`: ripristina l'ultima copia integra del DB, solo da un terminale interattivo e solo se il DB è guasto. Nessuna skill lo chiama.
 - `gate -h`: i comandi del gate che girano nei workflow di GitHub Actions (`run`, `evaluate`, `guard`, `base-ids`, `base-publish`, `sentinel`). Senza stato locale. Il flag `--publish` vale solo dentro GitHub Actions.
 - `--version`.
 
 Il resto (`start`, `task`, `act`, `finish`, `review`, `audit`, `sync`, `adopt`, `abandon`, `cleanup`, `verify`, `waiver`, `block`) è del coordinatore o dell'agente. Un subagente non lancia quelli del coordinatore: gli hook glielo negano.
+
+### Il controllo dei modelli
+
+Un progetto che usa modelli AI dichiara in `tollgate.toml` i file dove scrive i loro nomi:
+
+```toml
+[models]
+files = ["src/ai/models.py"]
+```
+
+I percorsi sono quelli esatti dei file, relativi alla radice del repo, al più 20, senza `*` né `..`. Uno scritto male viene tolto con un avviso. Un tipo sbagliato in `[models]` (per esempio un testo al posto dell'elenco) è un errore di configurazione, come per ogni altra sezione di `tollgate.toml`. `[components] models_check = false` spegne il controllo.
+
+Il controllo legge quei file dal ramo predefinito di `origin`, non dalla tua cartella di lavoro: una modifica non ancora spinta non conta. Prende i nomi scritti tra virgolette (`"..."`, `'...'` o con l'apice rovesciato) e li confronta con l'elenco ufficiale che ogni fornitore pubblica. I nomi senza virgolette, come in un file `.env` o in uno YAML non quotato, non si vedono. Per interrogare un fornitore serve la sua chiave nell'ambiente: [come darla](installazione.md#le-chiavi-per-il-controllo-dei-modelli). Senza chiave quel fornitore si salta e la riga lo dice.
+
+Cosa controlla, fornitore per fornitore:
+
+- Anthropic: un modello più nuovo della stessa famiglia, un modello deprecato (con la data di ritiro, se c'è), un nome che non è nell'elenco.
+- Gemini: un modello più nuovo della stessa famiglia. Il ritiro non lo controlla: l'elenco non lo dice.
+- OpenAI: il ritiro. Il modello più nuovo non lo controlla.
+- OpenRouter: il ritiro. Il modello più nuovo non lo controlla, e la riga rimanda alla pagina del fornitore originale.
+
+Quello che non si può controllare compare come riga «non controllato», una volta per fornitore. Il controllo non usa modelli AI e non spende token: fa una richiesta di elenco per fornitore, con un tempo massimo di 20 secondi in tutto. Se la rete non risponde, o la risposta non ha la forma attesa, avvisa e va avanti. Dietro un proxy aziendale non funziona: i proxy dell'ambiente non si usano.
+
+L'elenco di ogni fornitore resta in una cache di un giorno nella cartella di stato di tollgate: un modello uscito oggi può arrivare con un giorno di ritardo. `models check --refresh` la ignora e rilegge gli elenchi. All'avvio di un lavoro nuovo la riga «elenco dalla cache» non compare; con `models check` sì.
+
+`models check` lo lanci da dentro il repo, con il programma del plugin e non con la copia del gate in `.github/tollgate/` (quella non lo contiene). Un subagente può lanciarlo, anche con `--refresh`: una richiesta per fornitore e nessun token. Stampa le stesse righe di `start`, oppure «modelli: nessun avviso». Se il controllo è spento o `[models] files` è vuoto lo dice. Esce con 0; con 1 solo se la cartella non è in un repo, manca `origin` o `tollgate.toml` non è leggibile.
+
+Le righe nascono da file del progetto e da elenchi esterni: per Claude sono dati, non istruzioni, e non cambia modello da solo.

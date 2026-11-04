@@ -155,7 +155,14 @@ class CliCallsTest(unittest.TestCase):
             with self.subTest(cmd=cmd):
                 self.assertEqual(self.lab.bash(cmd, agent_id="ag-1").exit, 2)
         for cmd in (f"'{PROGRAM}' verify", f"'{PROGRAM}' block open needs_you --reason x",
-                    f"'{PROGRAM}' status"):
+                    f"'{PROGRAM}' status", f"'{PROGRAM}' models check",
+                    f"'{PROGRAM}' models check --refresh"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.lab.bash(cmd, agent_id="ag-1").exit, 0)
+        self.assertFalse(self.signal.exists())
+
+    def test_models_check_allowed_to_subagents(self):
+        for cmd in (f"'{PROGRAM}' models check", f"python3 '{PROGRAM}' models check --refresh"):
             with self.subTest(cmd=cmd):
                 self.assertEqual(self.lab.bash(cmd, agent_id="ag-1").exit, 0)
         self.assertFalse(self.signal.exists())

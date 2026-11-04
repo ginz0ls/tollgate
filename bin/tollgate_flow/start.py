@@ -8,6 +8,7 @@ non entra mai in un comando né negli argomenti di git: finisce solo in
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import sqlite3
 import unicodedata
@@ -20,7 +21,7 @@ from tollgate_core import (VERSION, active, clock, config, db, git, phases, sess
 from tollgate_core.paths import State, repo_key
 from tollgate_gate import protection
 
-from . import gh, gitw, housekeeping, l2tree, prereq, prstate, sync as flow_sync
+from . import gh, gitw, housekeeping, l2tree, models_check, prereq, prstate, sync as flow_sync
 
 OK, REFUSED, NEEDS_CONFIRM, INCOMPLETE = 0, 1, 3, 4
 TRUSTED_AUTHORS = ("OWNER", "MEMBER", "COLLABORATOR")
@@ -508,6 +509,8 @@ def _create(state, conn, main, ref, base_sha, cfg, iss, issue, key, session, lev
         issue_file = None
     incomplete = steps.failed
     notes.warnings.extend(housekeeping.run(conn, state, cfg, now=now))
+    notes.warnings.extend(models_check.check(state, main, ref, cfg, environ=os.environ, now=now,
+                                             show_cache=False))
     notes.warnings.extend(f"registrazione incompleta: {x}" for x in incomplete)
     row = phases.get_work(conn, work)
     lines = [*[f"avviso: {w}" for w in notes.warnings],

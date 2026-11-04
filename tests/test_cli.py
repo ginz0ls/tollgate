@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import pty
@@ -9,13 +10,15 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 from tests.flowkit import SESSION, FlowLab
-from tests.helpers import BIN, ROOT, TempState, git, make_repo
+from tests.helpers import BIN, ROOT, TempState, git, make_origin_repo, make_repo, no_network
 from tests.hookkit import sample
 from tollgate_analysis import research
-from tollgate_core import clock, db, events, paths, phases, tasks
+from tollgate_core import cli, clock, db, events, paths, phases, tasks
 
 T0 = clock.parse("2026-10-08T10:00:00.000000Z")
 
@@ -386,3 +389,116 @@ class ResearchCliTest(unittest.TestCase):
         r = self.run_research("submit", "9", stdin="x")
         self.assertEqual(r.returncode, 2)
         self.assertIn("inesistente", r.stderr)
+
+
+class ModelsCheckTest(unittest.TestCase):
+    """`models check` (B3-bis, decisione 8): tutto nel processo del test, sotto `no_network()`,
+    con `models_check.check` sostituito: nessun socket, nessuna chiave."""
+    TOML = 'schema_version = 1\n[gate]\nmode = "detect"\n[models]\nfiles = ["ai/models.py"]\n'
+    NO_FILES = 'schema_version = 1\n[gate]\nmode = "detect"\n'
+
+    def setUp(self):
+        self.enterContext(no_network())
+        self.t = TempState()
+        self.addCleanup(self.t.cleanup)
+        self.tmp = Path(tempfile.mkdtemp(prefix="tollgate-models-cli-"))
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.enterContext(mock.patch.dict(os.environ, {"TOLLGATE_STATE": str(self.t.dir)}))
+        self.addCleanup(os.chdir, os.getcwd())
+
+    def repo(self, toml=None):
+        main, _, _ = make_origin_repo(self.tmp / "r", {"ai/models.py": "x = 1\n"},
+                                      self.TOML if toml is None else toml)
+        os.chdir(main)
+        return main
+
+    def run_models(self, *args, lines=(), calls=None):
+        from tollgate_flow import models_check
+
+        def fake(state, repo, ref, cfg, **kw):
+            if calls is not None:
+                calls.append((repo, ref, kw))
+            return list(lines)
+
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.object(models_check, "check", fake), \
+                redirect_stdout(out), redirect_stderr(err):
+            code = cli.main(["models", "check", *args])
+        return code, out.getvalue(), err.getvalue()
+
+    def test_models_check_prints_lines(self):
+        self.repo()
+        code, out, _ = self.run_models(lines=["modelli: x", "modelli: y"])
+        self.assertEqual((code, out), (0, "avviso: modelli: x\navviso: modelli: y\n"))
+
+    def test_models_check_no_warnings(self):
+        self.repo()
+        self.assertEqual(self.run_models()[:2], (0, "modelli: nessun avviso\n"))
+
+    def test_models_check_component_off_says_so(self):
+        self.repo(self.TOML + "[components]\nmodels_check = false\n")
+        self.assertEqual(self.run_models()[:2], (
+            0, "modelli: controllo spento ([components] models_check = false)\n"))
+
+    def test_models_check_without_files_says_so(self):
+        self.repo(self.NO_FILES)
+        self.assertEqual(self.run_models()[:2], (
+            0, "modelli: nessun file dichiarato in [models] files\n"))
+
+    def test_models_check_without_files_keeps_the_check_lines(self):
+        self.repo(self.NO_FILES)
+        code, out, _ = self.run_models(lines=["modelli: il profilo ai è dichiarato"])
+        self.assertEqual((code, out.splitlines()), (0, [
+            "avviso: modelli: il profilo ai è dichiarato",
+            "modelli: nessun file dichiarato in [models] files"]))
+
+    def test_models_check_prints_config_warnings(self):
+        self.repo(self.TOML.replace('["ai/models.py"]', '["ai/models.py", "../fuori.py"]'))
+        code, out, _ = self.run_models()
+        self.assertEqual(code, 0)
+        warned = [l for l in out.splitlines() if "../fuori.py" in l]
+        self.assertEqual(len(warned), 1, out)
+        self.assertTrue(warned[0].startswith("avviso: "), out)
+
+    def test_models_check_outside_repo_exits_1(self):
+        os.chdir(self.tmp)
+        code, out, err = self.run_models()
+        self.assertEqual(code, 1)
+        self.assertIn("rifiuto:", out + err)
+
+    def test_models_check_without_origin_exits_1(self):
+        os.chdir(make_repo(self.tmp / "solo"))
+        code, out, err = self.run_models()
+        self.assertEqual(code, 1)
+        self.assertIn("rifiuto:", out + err)
+
+    def test_models_check_without_toml_on_origin_exits_1(self):
+        main = self.repo()
+        git(main, "rm", "-q", "tollgate.toml")
+        git(main, "commit", "-qm", "senza")
+        git(main, "push", "-q")
+        code, out, err = self.run_models()
+        self.assertEqual(code, 1)
+        self.assertIn("rifiuto: configurazione non valida:", out + err)
+
+    def test_models_check_config_error_exits_1(self):
+        self.repo("schema_version = 1\n[models]\nfiles = 3\n")
+        code, out, err = self.run_models()
+        self.assertEqual(code, 1)
+        self.assertIn("rifiuto: configurazione non valida:", out + err)
+
+    def test_models_check_does_not_open_db(self):
+        self.repo()
+        self.run_models(lines=["modelli: x"])
+        self.assertFalse(self.t.state.db_path.exists())
+        self.assertEqual({p.name for p in self.t.dir.iterdir()}, {".tollgate-test"})
+
+    def test_models_check_refresh_flag_passed(self):
+        main = self.repo()
+        calls = []
+        self.run_models(calls=calls)
+        self.run_models("--refresh", calls=calls)
+        self.assertEqual([c[2]["refresh"] for c in calls], [False, True])
+        self.assertEqual(calls[0][1], "origin/main")
+        self.assertEqual(calls[0][0].resolve(), main.resolve())
+        self.assertEqual(calls[0][2]["environ"], os.environ)

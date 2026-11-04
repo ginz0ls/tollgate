@@ -49,6 +49,24 @@ Dai all'agente un token GitHub separato dal tuo, con permessi solo su contenuti,
 
 Se usi jest, il `README.md` della proposta spiega anche la configurazione di jest-junit che mette il file nell'identificativo del test: con quella predefinita due test omonimi in file diversi si confondono.
 
+## Le chiavi per il controllo dei modelli
+
+Il [controllo dei modelli](comandi.md#il-controllo-dei-modelli) serve solo ai progetti che dichiarano `[models] files` in `tollgate.toml`. Per leggere l'elenco di un fornitore vuole la sua chiave API, che prende dall'ambiente. Per ogni fornitore guarda prima la variabile dedicata a tollgate, poi quella standard:
+
+- Anthropic: `TOLLGATE_MODELS_ANTHROPIC_KEY`, poi `ANTHROPIC_API_KEY`.
+- Gemini: `TOLLGATE_MODELS_GEMINI_KEY`, poi `GOOGLE_API_KEY`, poi `GEMINI_API_KEY`.
+- OpenAI: `TOLLGATE_MODELS_OPENAI_KEY`, poi `OPENAI_API_KEY`.
+- OpenRouter: `TOLLGATE_MODELS_OPENROUTER_KEY`, poi `OPENROUTER_API_KEY`.
+
+Preferisci quelle dedicate. Con `ANTHROPIC_API_KEY` nell'ambiente, Claude Code usa quella chiave al posto del tuo abbonamento e paga a consumo. L'elenco delle variabili è fisso e non si cambia da `tollgate.toml`.
+
+Due cose da sapere:
+
+- Una chiave nell'ambiente la legge qualunque comando della sessione, non solo tollgate. tollgate non la scrive mai: non finisce in un URL, in una riga, in un messaggio d'errore, nella cache o nei log. Non può però nasconderla agli altri comandi.
+- Il controllo non usa modelli AI: fa una richiesta di elenco per fornitore e non spende token.
+
+Se lavori in una sandbox di rete, consenti questi quattro indirizzi (sono in `templates/models.toml` nel plugin): `api.anthropic.com`, `generativelanguage.googleapis.com`, `api.openai.com`, `openrouter.ai`. Dietro un proxy aziendale il controllo non funziona. Un fornitore senza chiave viene saltato e la riga lo dice; senza nessuna chiave il controllo non fa rete.
+
 ## Dopo l'installazione
 
 Apri un'issue e lancia `/tollgate:start #N` ([comandi](comandi.md)). Per spegnere tollgate su questa macchina c'è `/tollgate:off`, per riaccenderlo `/tollgate:on`. Il gate su GitHub resta attivo anche da spento.
