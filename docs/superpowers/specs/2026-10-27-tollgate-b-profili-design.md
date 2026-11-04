@@ -1,7 +1,7 @@
 # tollgate B: profili con «informati prima»
 
 Data: 27 ottobre 2026. Stato: **approvato dall'utente il 27 ottobre 2026**.
-Avanzamento: B1, B2 e B3 eseguite (B3 sul ramo `b3-profilo-ai`, merge in attesa dell'OK dell'utente), vedi piano principale di B (`docs/superpowers/plans/2026-10-27-tollgate-b-piano-principale.md`).
+Avanzamento: B1, B2 e B3 eseguite e unite su `main` (B3 il 03/11/2026); B3-bis (sentinella dei modelli) pianificata il 04/11/2026, vedi piano principale di B (`docs/superpowers/plans/2026-10-27-tollgate-b-piano-principale.md`).
 Sotto-progetto B di tollgate (spec del nucleo `2026-10-08-tollgate-nucleo-design.md`, rev 26, sezioni 1.3, 5, 6.3, 7.2, 8.1, 8.6, 11.4). Parte dal catalogo `2026-10-08-tollgate-profili-verticali.md` e lo restringe.
 
 Le scelte prese con l'utente nella conversazione del 26-27 ottobre sono marcate **(utente)**. Quelle prese da chi scrive, che l'utente può ribaltare, sono marcate **(mia scelta)**.
@@ -184,3 +184,11 @@ Decise con l'utente prima di scrivere il piano di B3, dopo una ricerca sulle pag
 - **Ordine (utente):** B3 porta l'infrastruttura dei profili, il profilo `ai` con le sue regole e i suoi agenti; la sentinella è una fetta a parte, **B3-bis**, subito dopo B3.
 - **Fornitori e framework (utente, 1° novembre 2026, alla revisione del piano di B3):** oltre ad Anthropic e Google (Gemini), il profilo `ai` copre **OpenAI**, **OpenRouter** e il framework **Agno**: le loro pagine ufficiali sono fonti di `rules-ai` e i loro import accendono il profilo. Vercel AI SDK non è tra quelli usati.
 - **Solo modelli stabili (utente):** «il più recente della famiglia» è l'ultimo modello **stabile**. Un modello in anteprima («preview», «experimental») si usa solo se il report lo dichiara con il motivo.
+
+## 10. Aggiunte dell'utente del 4 novembre 2026: la sentinella dei modelli (B3-bis)
+
+Decise con l'utente scrivendo il piano di B3-bis, dopo una verifica sulle pagine ufficiali degli elenchi dei modelli (Anthropic, Google, OpenAI, OpenRouter).
+
+- **Ciò che l'elenco non dà si salta, e si dice (utente).** L'elenco di Gemini non ha date di ritiro; quelli di OpenAI e OpenRouter non dicono a quale famiglia appartiene un modello. La sentinella avvisa solo per ciò che l'elenco ufficiale dà e, per il resto, scrive una riga «non controllato». Non legge pagine web dei fornitori: si romperebbe a ogni cambio della pagina.
+- **Una prova vera, una volta (utente).** Alla fine dell'esecuzione il controller lancia la sentinella sulle chiavi già presenti nell'ambiente dell'utente, una chiamata di elenco per fornitore; senza chiave quel fornitore si salta. Nessun modello viene usato.
+- **Pulizia di `/tmp` (utente).** B3-bis ferma la crescita delle cartelle che i test lasciano in `/tmp` e cancella quelle vecchie: solo le cartelle dell'utente che iniziano con `tollgate`, più vecchie di un giorno, dopo averne mostrato l'elenco con il numero.
