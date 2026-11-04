@@ -501,4 +501,4 @@ class ModelsCheckTest(unittest.TestCase):
         self.assertEqual([c[2]["refresh"] for c in calls], [False, True])
         self.assertEqual(calls[0][1], "origin/main")
         self.assertEqual(calls[0][0].resolve(), main.resolve())
-        self.assertEqual(calls[0][2]["environ"], os.environ)
+        self.assertTrue(calls[0][2]["environ"] is os.environ, "environ non è os.environ")

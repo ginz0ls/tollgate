@@ -1265,19 +1265,24 @@ class StartModelsTest(StartCase):
         self.assertEqual(r.code, 0, r.lines)
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0][0], "origin/main")
-        self.assertEqual(calls[0][1], os.environ)
+        self.assertTrue(calls[0][1] is os.environ, "environ non è os.environ")
         self.assertIs(calls[0][2], False)
         at = r.lines.index("avviso: modelli: x")
         self.assertTrue(r.lines[at + 1].startswith("lavoro #7 avviato"), r.lines)
 
     def test_start_succeeds_when_check_fails(self):
         fl = self.lab()
-        fetch = mock.Mock(side_effect=modelsfetch.FetchError("rete non raggiungibile"))
+        calls = []
+
+        def fetch(provider, key, *, deadline):
+            calls.append(provider.name)
+            raise modelsfetch.FetchError("rete non raggiungibile")
+
         with mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-PROVA-123"}), \
                 mock.patch("tollgate_flow.modelsfetch.fetch_pages", fetch):
             r = self.start_direct(fl)
         self.assertEqual(r.code, 0, r.lines)
-        fetch.assert_called_once()
+        self.assertEqual(calls, ["anthropic"])
         self.assertEqual(sum("elenco non letto" in l for l in r.lines), 1, r.lines)
         self.assertNotIn("sk-PROVA-123", "\n".join(r.lines))
 
@@ -1287,7 +1292,7 @@ class StartModelsTest(StartCase):
         with mock.patch.object(models_check, "check", fake):
             r = self.start_direct(fl)
         self.assertEqual(r.code, 0, r.lines)
-        fake.assert_not_called()
+        self.assertEqual(fake.call_count, 0)
         self.assertFalse([l for l in r.lines if l.startswith("avviso: modelli")])
 
     def test_start_without_models_section_no_model_lines(self):
