@@ -24,6 +24,7 @@ Prima del Task 1, un analista sonnet in sola lettura scrive `preflight-scan.md`:
 - `tollgate_analysis/models.py` contro `tests/test_analysis_isolation.py` e `tests/test_layers.py`; `modelsfetch.py` e `models_check.py` in `tollgate_flow` contro gli strati e contro `test_hooks_do_not_reach_models_net`;
 - `config.DEFAULTS["models"]`, il filtro dei percorsi e `[components] models_check` contro `_set_key`, `_type_ok`, `_OPEN` e i test esistenti di `tests/test_config.py`; la parola `sentinel` già usata dal gate (componente, evento, workflow);
 - `_create` di `start.py` e i test esistenti di `tests/test_start.py`: nessuno deve fare rete né cambiare uscita con `[models]` assente;
+- i test che lanciano `bin/tollgate` in un processo figlio (`run_cli` di `tests/test_cli.py`, `FlowLab.cli` di `tests/flowkit.py`): non vedono `no_network()` né la radice finta, quindi non impostano chiavi né `[models] files` (Global Constraints);
 - il parser `models` in `cli.py` contro `cli_calls` (comandi del coordinatore negati ai subagenti) e contro i test di `tests/test_cli.py` che elencano i sottocomandi;
 - `tests/run` con `TMPDIR` per corsa contro `tests/test_p4_ghguard.py` (la guardia vuole `/tmp` o `$TMPDIR`), contro i test che vogliono un temporaneo fuori da un repo, e contro la CI (`.github/workflows/ci.yml`);
 - `flowreg.external_skill` e `togli_pagine` contro i test esistenti di `tests/test_b1_scripts.py` e contro i test che leggono file in `docs/verifiche/evidenze/` (`grep -rn evidenze tests/`);
@@ -32,7 +33,7 @@ Prima del Task 1, un analista sonnet in sola lettura scrive `preflight-scan.md`:
 ## Ordine e modelli
 
 1. **Task 1-6:** implementatore sonnet. Il piano dà firme e test, non il codice: niente haiku. Il Task 5 e il Task 6 non dipendono dai Task 1-4 e possono partire prima, uno alla volta (scrittore unico).
-2. **Task 1, Step 0** è del controller (alias di Anthropic nell'elenco e variabile d'ambiente di OpenRouter, sulle pagine ufficiali), prima di lanciare il Task 1.
+2. **Task 1, Step 0** è del controller (alias di Anthropic nell'elenco, variabile d'ambiente di OpenRouter e forma degli ID di OpenAI, sulle pagine ufficiali), prima di lanciare il Task 1.
 3. **Task 7:** Step 1, 5, 6 e 7 del controller; Step 2-4 di un implementatore sonnet, dopo il Task 4.
 4. **Task 8:** implementatore sonnet, dopo il Task 7.
 5. **Revisioni:** revisore di ogni task sonnet; ri-revisioni mirate sonnet; **revisione finale dell'intero ramo opus**.

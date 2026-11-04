@@ -10,7 +10,7 @@ Il lavoro è finito quando:
 - tutti gli 8 task sono `complete` nel ledger, ognuno con la revisione pulita;
 - la prova vera del Task 7 è riuscita, oppure il rapporto dice con chiarezza perché no;
 - le cartelle vecchie di `/tmp` sono cancellate e una corsa di `tests/run` non ne lascia di nuove;
-- `test_real_evidence_has_no_third_party_text` è verde sulle evidenze ripulite;
+- `test_committed_evidence_has_no_long_web_results`, esteso nel Task 6, è verde sulle evidenze ripulite;
 - la revisione finale (opus) è chiusa, con i rilievi `critical` e `important` corretti e ri-revisionati;
 - la suite è verde tre volte su `python3.11` e `python3`, con `PYTHONWARNINGS=error::ResourceWarning`;
 - il rapporto all'utente è consegnato, in parole semplici, con la richiesta dell'OK per il merge.
