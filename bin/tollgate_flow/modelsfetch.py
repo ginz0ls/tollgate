@@ -21,7 +21,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from tollgate_analysis.models import PROVIDERS
+from tollgate_analysis.models import PROVIDERS, ModelsFormatError
 from tollgate_core import clock
 from tollgate_core.paths import State
 
@@ -40,6 +40,10 @@ class ProvidersError(ValueError):
 
 class FetchError(Exception):
     """Lettura di un elenco non riuscita; il testo è sempre uno dei testi fissi del client."""
+
+
+class DeadlineSkipped(FetchError):
+    """Scadenza del controllo già finita prima di chiedere l'elenco, e nessuna cache da usare."""
 
 
 @dataclass(frozen=True)
@@ -325,8 +329,10 @@ def cached_pages(state: State, provider: Provider, key: str, *, now: datetime, d
     """Le pagine dell'elenco: dalla cache se ha meno di `CACHE_HOURS` ore, altrimenti dalla rete.
     Seconda voce: `None` se vengono dalla rete, altrimenti la riga di cache (senza il prefisso
     `modelli: <fornitore>: `). `validate` si chiama sulle pagine nuove prima di scrivere la
-    cache: se solleva, la cache non cambia e l'eccezione esce. Rete fallita con una cache
-    leggibile: si usa quella; senza, `FetchError`."""
+    cache. Rete fallita (o scadenza del controllo già finita, o risposta di forma inattesa) con
+    una cache leggibile: si usa quella e la cache non cambia; senza, `FetchError`
+    (`DeadlineSkipped` se la scadenza era finita prima di chiedere; `ModelsFormatError` se la
+    forma era sbagliata)."""
     path = _cache_path(state, provider)
     cached = _read_cache(path, validate)
     if cached is not None and not refresh:
@@ -336,16 +342,27 @@ def cached_pages(state: State, provider: Provider, key: str, *, now: datetime, d
     if fetch is None:
         fetch = fetch_pages
     failure = None
-    try:
-        pages = fetch(provider, key, deadline=deadline)
-    except FetchError as e:
-        failure = str(e)
+    skipped = False
+    pages = None
+    if deadline.left() <= 0:
+        failure, skipped = "tempo scaduto", True
+    else:
+        try:
+            pages = fetch(provider, key, deadline=deadline)
+        except FetchError as e:
+            failure = str(e)
+    if failure is None:
+        try:
+            validate(pages)
+        except ModelsFormatError:
+            if cached is None:
+                raise
+            failure = "forma inattesa"
     if failure is not None:
         if cached is None:
-            raise FetchError(failure)
+            raise (DeadlineSkipped if skipped else FetchError)(failure)
         return cached[1], (f"rete non riuscita ({failure}), "
                            f"elenco dalla cache del {cached[0]:%Y-%m-%d}")
-    validate(pages)
     try:
         _write_cache(path, json.dumps({"fetched_at": clock.fmt(now), "pages": pages}))
     except (OSError, ValueError):

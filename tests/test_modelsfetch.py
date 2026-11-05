@@ -20,7 +20,7 @@ from tests.test_layers import imported_modules
 from tollgate_analysis.models import ModelsFormatError, PROVIDERS
 from tollgate_core import clock
 from tollgate_flow import modelsfetch
-from tollgate_flow.modelsfetch import (Deadline, FetchError, Provider, ProvidersError, api_key,
+from tollgate_flow.modelsfetch import (Deadline, DeadlineSkipped, FetchError, Provider, ProvidersError, api_key,
                                        build_opener, cached_pages, fetch_pages, load_providers)
 
 KEY = "sk-PROVA-123"
@@ -580,7 +580,8 @@ class CacheTest(NetCase):
 
     def run_cached(self, now=T0, validate=None, **kw):
         kw.setdefault("fetch", self.fetch)
-        return cached_pages(self.state, self.provider, KEY, now=now, deadline=Deadline(60),
+        kw.setdefault("deadline", Deadline(60))
+        return cached_pages(self.state, self.provider, KEY, now=now,
                             validate=validate or (lambda pages: None), **kw)
 
     def write_cache(self, fetched_at, pages=None):
@@ -658,6 +659,43 @@ class CacheTest(NetCase):
             self.run_cached(fetch=self.failing("nessuna risposta"))
         self.assertEqual(str(cm.exception), "nessuna risposta")
         self.assertFalse(self.path.exists())
+
+    def test_expired_deadline_uses_cache_without_fetch(self):
+        for age, prefix in ((timedelta(hours=1), ""),
+                            (timedelta(days=3), "rete non riuscita (tempo scaduto), ")):
+            with self.subTest(age=age):
+                self.write_cache(T0 - age)
+                before = self.path.read_bytes()
+                pages, note = self.run_cached(fetch=self.failing("non deve essere chiamata"),
+                                              deadline=Deadline(-1))
+                self.assertEqual(pages, self.pages)
+                self.assertEqual(note, f"{prefix}elenco dalla cache del {T0 - age:%Y-%m-%d}")
+                self.assertEqual((self.calls, self.path.read_bytes()), (0, before))
+
+    def test_expired_deadline_without_cache_is_skipped(self):
+        with self.assertRaises(DeadlineSkipped):
+            self.run_cached(fetch=self.failing("non deve essere chiamata"), deadline=Deadline(-1))
+        self.assertEqual(self.calls, 0)
+        self.assertFalse(self.path.exists())
+        self.assertTrue(issubclass(DeadlineSkipped, FetchError))
+
+    def test_bad_shape_from_network_falls_back_to_cache(self):
+        self.write_cache(T0 - timedelta(days=3))
+        before = self.path.read_bytes()
+
+        def validate(pages):
+            if pages == self.bad:
+                raise ModelsFormatError("storto")
+
+        self.bad = [{"data": "storto"}]
+        for refresh in (False, True):
+            with self.subTest(refresh=refresh):
+                pages, note = self.run_cached(validate=validate, refresh=refresh,
+                                              fetch=lambda p, k, *, deadline: self.bad)
+                self.assertEqual(pages, self.pages)
+                self.assertEqual(note, "rete non riuscita (forma inattesa), elenco dalla cache "
+                                       "del 2026-11-01")
+                self.assertEqual(self.path.read_bytes(), before)
 
     def test_cache_written_atomically(self):
         real_replace = os.replace
@@ -774,6 +812,7 @@ class LayersTest(unittest.TestCase):
 class NoNetworkHelperTest(unittest.TestCase):
     def test_no_network_helper(self):
         real_socket, real_connect = socket.socket, socket.create_connection
+        real_resolve = socket.getaddrinfo
         with mock.patch.dict(os.environ, {name: "valore-finto" for name in helpers.MODEL_KEY_VARS}):
             with no_network():
                 for name in helpers.MODEL_KEY_VARS:
@@ -782,11 +821,14 @@ class NoNetworkHelperTest(unittest.TestCase):
                     socket.create_connection(("127.0.0.1", 9), timeout=1)
                 with self.assertRaises(AssertionError):
                     socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                with self.assertRaises(AssertionError):
+                    socket.getaddrinfo("esempio.invalid", 443)
                 self.assertTrue(issubclass(socket.socket, real_socket))
             for name in helpers.MODEL_KEY_VARS:
                 self.assertEqual(os.environ[name], "valore-finto")
         self.assertIs(socket.socket, real_socket)
         self.assertIs(socket.create_connection, real_connect)
+        self.assertIs(socket.getaddrinfo, real_resolve)
 
 
 if __name__ == "__main__":

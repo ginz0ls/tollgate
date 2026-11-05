@@ -1,3 +1,4 @@
+import dataclasses
 import re
 import unittest
 
@@ -223,7 +224,11 @@ class GeminiTest(unittest.TestCase):
                            ("gemini-3.8-flash-tts", ("flash-tts", (3, 8))),
                            ("gemini-2.5-flash-preview-09-2025", ("flash", (2, 5))),
                            ("models/gemini-3-flash", ("flash", (3,))),
-                           ("gemini-3.7-flash-preview-tts", ("flash", (3, 7))),
+                           ("gemini-3.7-flash-preview-tts", ("flash-tts", (3, 7))),
+                           ("gemini-2.5-flash-preview-tts", ("flash-tts", (2, 5))),
+                           ("gemini-2.0-flash-exp-image-generation",
+                            ("flash-image-generation", (2, 0))),
+                           ("gemini-2.5-flash-lite-preview-06-17", ("flash-lite", (2, 5))),
                            ("gemini-flash-latest", None), ("gemini-embedding-001", None),
                            ("claude-x-5", None), ("gemini-3.6", None)]:
             with self.subTest(name=name):
@@ -252,6 +257,24 @@ class GeminiTest(unittest.TestCase):
         gi = self.gem("gemini-3-flash", "gemini-3.6-flash")
         lines = run("gemini", {"gemini-3-flash"}, gi)
         self.assertTrue(any("esiste gemini-3.6-flash" in l for l in lines), lines)
+
+    def test_gemini_preview_mode_in_use_is_not_compared_to_plain_family(self):
+        gi = self.gem("gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts",
+                      "gemini-3-flash", "gemini-3-pro")
+        lines = run("gemini", {"gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"}, gi)
+        self.assertFalse(any("più recente" in l for l in lines), lines)
+        gi += self.gem("gemini-3-flash-tts")
+        lines = run("gemini", {"gemini-2.5-flash-preview-tts"}, gi)
+        newer = [l for l in lines if "più recente" in l]
+        self.assertEqual(len(newer), 1, lines)
+        self.assertIn("esiste gemini-3-flash-tts", newer[0])
+
+    def test_anthropic_empty_line_is_no_family(self):
+        items = [{"id": "a-1", "line": "", "lifecycle": "active", "created_at": "2026-01-01T00:00:00Z"},
+                 {"id": "a-2", "line": "", "lifecycle": "active", "created_at": "2026-09-01T00:00:00Z"}]
+        ai = models.parse_pages("anthropic", [{"data": items}])
+        self.assertEqual([i.family for i in ai], [None, None])
+        self.assertFalse(any("più recente" in l for l in run("anthropic", {"a-1"}, ai)))
 
     def test_gemini_latest_no_newer(self):
         gi = self.gem("gemini-flash-latest", "gemini-3.6-flash", "gemini-2.5-flash-latest")
@@ -351,7 +374,7 @@ class ProvidersTest(unittest.TestCase):
         self.assertEqual(models.PROVIDERS, ("anthropic", "gemini", "openai", "openrouter"))
 
     def test_model_info_is_frozen(self):
-        with self.assertRaises(Exception):
+        with self.assertRaises(dataclasses.FrozenInstanceError):
             info("openai", "gpt-x").id = "altro"
 
 

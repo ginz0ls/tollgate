@@ -73,6 +73,8 @@ def _provider_lines(modelsfetch, state: State, provider, key: str, found: set[st
             state, provider, key, now=now, deadline=deadline, refresh=refresh, fetch=fetch,
             validate=lambda got: models.parse_pages(name, got))
         infos = models.parse_pages(name, pages)
+    except modelsfetch.DeadlineSkipped:
+        return [], [f"modelli: {name}: saltato, tempo del controllo finito"]
     except modelsfetch.FetchError as e:
         return [], [f"modelli: {name}: elenco non letto: {e}"]
     except models.ModelsFormatError:
@@ -122,8 +124,6 @@ def _check(state: State, repo: Path, ref: str, cfg: Config, *, environ: Mapping[
                 if _wanted(provider, found):
                     per_provider.append(f"modelli: {name}: non controllato: manca la chiave "
                                         f"({', '.join(provider.env)})")
-            elif deadline.left() <= 0:
-                per_provider.append(f"modelli: {name}: saltato, tempo del controllo finito")
             else:
                 got_model, got_provider = _provider_lines(
                     modelsfetch, state, provider, key, found, where, now=now, deadline=deadline,

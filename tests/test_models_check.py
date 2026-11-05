@@ -4,7 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -275,6 +275,43 @@ class ProvidersTest(CheckCase):
         self.assertEqual(lines, ["modelli: gemini: saltato, tempo del controllo finito",
                                  "modelli: openai: saltato, tempo del controllo finito"])
         self.assertEqual(fetch.names, ["anthropic"])
+
+    def slow_run(self, now, gemini_cached_at=None):
+        """Anthropic consuma il tempo; Gemini ha una cache (scritta a `gemini_cached_at`)."""
+        clock = FakeClock()
+
+        class Slow(FakeFetch):
+            def __call__(self, provider, key, *, deadline):
+                clock.t += 100
+                return super().__call__(provider, key, deadline=deadline)
+
+        env = {"ANTHROPIC_API_KEY": KEY, "GOOGLE_API_KEY": KEY}
+        if gemini_cached_at is not None:
+            self.check(self.cfg(), FakeFetch(gemini=g_page("gemini-3.5-flash", "gemini-3.6-flash")),
+                       env={"GOOGLE_API_KEY": KEY}, now=gemini_cached_at)
+        fetch = Slow(anthropic=a_page(a_model("claude-old-4-20250101")),
+                     gemini=g_page("gemini-3.5-flash", "gemini-3.6-flash"))
+        return self.check(self.cfg(), fetch, clock=clock, env=env, now=now), fetch
+
+    def test_deadline_over_still_uses_fresh_cache(self):
+        self.repo({FILE: 'a = "claude-old-4-20250101"\nb = "gemini-3.5-flash"\n'})
+        lines, fetch = self.slow_run(T0 + timedelta(hours=1), gemini_cached_at=T0)
+        self.assertEqual(fetch.names, ["anthropic"])
+        self.assertEqual(lines, [
+            f"modelli: gemini: gemini-3.5-flash ({FILE}): esiste gemini-3.6-flash, più recente "
+            f"della stessa famiglia — {PAGE['gemini']}",
+            "modelli: gemini: elenco dalla cache del 2026-11-04",
+            f"modelli: gemini: ritiro non controllato: l'elenco non lo dà — {PAGE['gemini']}"])
+        self.assertNotIn("saltato", "".join(lines))
+
+    def test_deadline_over_uses_stale_cache_with_its_line(self):
+        self.repo({FILE: 'a = "claude-old-4-20250101"\nb = "gemini-3.5-flash"\n'})
+        lines, fetch = self.slow_run(T0 + timedelta(hours=30), gemini_cached_at=T0)
+        self.assertEqual(fetch.names, ["anthropic"])
+        self.assertIn("modelli: gemini: rete non riuscita (tempo scaduto), elenco dalla cache "
+                      "del 2026-11-04", lines)
+        self.assertTrue(any("gemini-3.6-flash, più recente" in l for l in lines), lines)
+        self.assertNotIn("saltato", "".join(lines))
 
     def test_gemini_provider_line_comes_after_model_lines_of_all_providers(self):
         self.repo({FILE: 'a = "claude-old-4-20250101"\nb = "gemini-3.6-flash"\n'})

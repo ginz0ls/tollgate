@@ -63,16 +63,19 @@ def normalize(name: str) -> str:
 
 def gemini_family(model_id: str) -> tuple[str, tuple[int, ...]] | None:
     """`(variante, versione)` di `gemini-<versione>-<variante>[-<suffisso>]`; `None` se il
-    nome non ha una versione dopo `gemini-`. I suffissi (un numero di tre cifre, `preview`,
-    `exp`, `experimental`, `latest` e quanto li segue) stanno fuori dalla variante."""
+    nome non ha una versione dopo `gemini-`. Stanno fuori dalla variante i suffissi (un numero
+    di tre cifre, `preview`, `exp`, `experimental`, `latest`) e le date numeriche che li
+    seguono; le parole dopo un suffisso (la modalità: `tts`, `image`) restano nella variante."""
     m = _GEMINI_NAME.fullmatch(_norm(model_id))
     if not m:
         return None
     variant = []
+    after_suffix = False
     for part in m.group(2).split("-"):
         if _GEMINI_SUFFIX.fullmatch(part):
-            break
-        variant.append(part)
+            after_suffix = True
+        elif not (after_suffix and part.isdigit()):
+            variant.append(part)
     if not variant or "" in variant:
         return None
     return "-".join(variant), tuple(int(n) for n in m.group(1).split("."))
@@ -97,7 +100,7 @@ def _parse_anthropic(item: dict) -> ModelInfo | None:
     if not isinstance(mid, str) or not mid:
         return None
     lifecycle = item.get("lifecycle")
-    return ModelInfo("anthropic", mid, _text(item.get("line")), lifecycle == "active",
+    return ModelInfo("anthropic", mid, _text(item.get("line")) or None, lifecycle == "active",
                      _text(item.get("created_at")), _text(item.get("retires_at")),
                      lifecycle == "deprecated")
 

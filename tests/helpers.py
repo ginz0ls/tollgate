@@ -41,11 +41,12 @@ def _no_connection(*args, **kwargs):
 @contextlib.contextmanager
 def no_network():
     """Per i test che toccano il controllo dei modelli: toglie da `os.environ` le variabili delle
-    chiavi e fa fallire ogni socket nuovo e `socket.create_connection`. Vale solo nel processo
-    del test (i processi figli non sono coperti)."""
+    chiavi e fa fallire ogni socket nuovo, `socket.create_connection` e `socket.getaddrinfo`
+    (nessuna query DNS). Vale solo nel processo del test (i processi figli non sono coperti)."""
     with mock.patch.dict(os.environ), \
             mock.patch.object(socket, "socket", _NoSocket), \
-            mock.patch.object(socket, "create_connection", _no_connection):
+            mock.patch.object(socket, "create_connection", _no_connection), \
+            mock.patch.object(socket, "getaddrinfo", _no_connection):
         for name in MODEL_KEY_VARS:
             os.environ.pop(name, None)
         yield
