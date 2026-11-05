@@ -24,6 +24,7 @@ class CtxTest(unittest.TestCase):
     def setUp(self):
         self.ts = TempState()
         self.home = tempfile.mkdtemp(prefix="tollgate-home-")
+        self.addCleanup(shutil.rmtree, self.home, ignore_errors=True)
         self.addCleanup(self.ts.cleanup)
 
     def run_ctx(self, stdin, *args, env=None):

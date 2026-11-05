@@ -1,5 +1,6 @@
 import json
 import multiprocessing
+import shutil
 import sys
 import tempfile
 import textwrap
@@ -195,6 +196,12 @@ class RunnerTest(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = Path(tempfile.mkdtemp(prefix="tollgate-finti-"))
         cls.checks = fake_checks(cls.tmp)
+
+    @classmethod
+    def tearDownClass(cls):
+        for name in [n for n in sys.modules if n == "finti_checks" or n.startswith("finti_checks.")]:
+            del sys.modules[name]
+        shutil.rmtree(cls.tmp, ignore_errors=True)
 
     def setUp(self):
         self.lab = Lab()

@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -18,6 +19,7 @@ class FakeGhCase(unittest.TestCase):
         self.ts = TempState()
         self.addCleanup(self.ts.cleanup)
         self.tmp = Path(tempfile.mkdtemp(prefix="tollgate gh "))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self.data = self.tmp / "data.json"
         self.log = self.tmp / "log"
         patch = mock.patch.dict(os.environ, {

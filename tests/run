@@ -2,6 +2,10 @@
 # Esegue la suite con Python 3.11 (minimo della spec) e con python3 di sistema.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# Una cartella temporanea per corsa: i test la usano come TMPDIR e all'uscita sparisce.
+RUN_TMP="$(mktemp -d "${TMPDIR:-/tmp}/tollgate-run-XXXXXX")"
+trap 'chmod -R u+rwX "$RUN_TMP" 2>/dev/null || true; rm -rf "$RUN_TMP" || true' EXIT
+export TMPDIR="$RUN_TMP"
 for py in ${PYTHONS:-python3.11 python3}; do
   command -v "$py" >/dev/null || { echo "manca $py" >&2; exit 1; }
   echo "== $("$py" --version)"
