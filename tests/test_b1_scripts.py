@@ -1041,8 +1041,11 @@ class FlowScriptTest(unittest.TestCase):
         other = json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "ALTRUI" * 1700}})
         short = json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "BREVE" * 200}}, indent=2)
         mine = json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "tollgate: " + "M" * 3000}})
+        failed = json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart",
+                                                    "additionalContext": "(tollgate: controllo «x» in errore: " + "E" * 3000 + ")"}})
         rows = [self.hook_row("SessionStart:startup", other), self.hook_row("SessionStart:startup", short),
                 self.hook_row("SessionStart:startup", mine), self.hook_row("SessionStart:startup", ""),
+                self.hook_row("SessionStart:startup", failed),
                 {"type": "system", "subtype": "hook_response", "hook_event": "PreToolUse", "output": "PRE" * 900, "stdout": "PRE" * 900}]
         stream.write_text("".join(json.dumps(x) + "\n" for x in rows))
         self.assertEqual([x.split(":")[1].split()[0] for x in flowreg.third_party_blocks(stream)], ["hook", "hook"])
@@ -1057,7 +1060,8 @@ class FlowScriptTest(unittest.TestCase):
         self.assertEqual(out[1]["stdout"], f"[uscita di hook di terzi tolta dalle evidenze: SessionStart:startup, {len(short)} caratteri]")
         self.assertEqual(out[2]["stdout"], mine, "l'uscita di tollgate resta")
         self.assertEqual(out[3]["stdout"], "")
-        self.assertEqual(out[4]["stdout"], "PRE" * 900, "solo gli hook SessionStart")
+        self.assertEqual(out[4]["stdout"], failed, "anche il messaggio d'errore del runner è di tollgate")
+        self.assertEqual(out[5]["stdout"], "PRE" * 900, "solo gli hook SessionStart")
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(flowreg.togli_pagine([str(stream)]), 0)
         self.assertEqual(flowreg.third_party_blocks(stream), [])

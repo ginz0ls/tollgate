@@ -20,6 +20,7 @@ from tollgate_core.paths import State
 PLUGIN_ROOT = Path(__file__).resolve().parents[2]
 MAX_LINES = 12
 DEADLINE_S = 20
+NO_NAMES = "modelli: nessun nome di modello riconosciuto nei file dichiarati"
 MAX_FILE_BYTES = 256 * 1024
 # Le righe per fornitore di `findings` cominciano così; un letterale non ha spazi, quindi quelle
 # per modello (`<fornitore>: <letterale> (<file>): …`) non possono confondersi.
@@ -65,8 +66,10 @@ def _wanted(provider, found: set[str]) -> bool:
 
 def _provider_lines(modelsfetch, state: State, provider, key: str, found: set[str],
                     where: dict[str, str], *, now: datetime, deadline, refresh: bool,
-                    show_cache: bool, fetch) -> tuple[list[str], list[str]]:
-    """`(righe per modello, righe per fornitore)` di un fornitore con la sua chiave."""
+                    show_cache: bool, fetch) -> tuple[list[str], list[str], bool | None]:
+    """`(righe per modello, righe per fornitore, riconosciuto)` di un fornitore con la sua
+    chiave. `riconosciuto` è `None` se l'elenco non si è letto, altrimenti se almeno un
+    letterale dei file coincide con un suo modello o ha la forma dei suoi nomi."""
     name = provider.name
     try:
         pages, cache_line = modelsfetch.cached_pages(
@@ -74,11 +77,11 @@ def _provider_lines(modelsfetch, state: State, provider, key: str, found: set[st
             validate=lambda got: models.parse_pages(name, got))
         infos = models.parse_pages(name, pages)
     except modelsfetch.DeadlineSkipped:
-        return [], [f"modelli: {name}: saltato, tempo del controllo finito"]
+        return [], [f"modelli: {name}: saltato, tempo del controllo finito"], None
     except modelsfetch.FetchError as e:
-        return [], [f"modelli: {name}: elenco non letto: {e}"]
+        return [], [f"modelli: {name}: elenco non letto: {e}"], None
     except models.ModelsFormatError:
-        return [], [f"modelli: {name}: elenco non letto: forma inattesa"]
+        return [], [f"modelli: {name}: elenco non letto: forma inattesa"], None
     per_provider = []
     if cache_line is not None and (show_cache or not cache_line.startswith("elenco dalla cache")):
         per_provider.append(f"modelli: {name}: {cache_line}")
@@ -87,7 +90,7 @@ def _provider_lines(modelsfetch, state: State, provider, key: str, found: set[st
     prefix = f"modelli: {name}: "
     own = [l for l in lines if l.startswith(prefix)
            and l[len(prefix):].startswith(_NOT_CHECKED)]
-    return [l for l in lines if l not in own], per_provider + own
+    return [l for l in lines if l not in own], per_provider + own, bool(matches or lines)
 
 
 def _check(state: State, repo: Path, ref: str, cfg: Config, *, environ: Mapping[str, str],
@@ -113,6 +116,7 @@ def _check(state: State, repo: Path, ref: str, cfg: Config, *, environ: Mapping[
     keys = {name: modelsfetch.api_key(p, environ) for name, p in providers.items()}
     per_model: list[str] = []
     per_provider: list[str] = []
+    recognized: list[bool] = []
     if not any(keys.values()):
         general.append("modelli: nessuna chiave nell'ambiente: imposta "
                        + ", ".join(p.env[0] for p in providers.values()))
@@ -122,14 +126,21 @@ def _check(state: State, repo: Path, ref: str, cfg: Config, *, environ: Mapping[
             key = keys[name]
             if key is None:
                 if _wanted(provider, found):
+                    recognized.append(True)
                     per_provider.append(f"modelli: {name}: non controllato: manca la chiave "
                                         f"({', '.join(provider.env)})")
             else:
-                got_model, got_provider = _provider_lines(
+                got_model, got_provider, got_known = _provider_lines(
                     modelsfetch, state, provider, key, found, where, now=now, deadline=deadline,
                     refresh=refresh, show_cache=show_cache, fetch=fetch)
                 per_model += got_model
                 per_provider += got_provider
+                if got_known is not None:
+                    recognized.append(got_known)
+        if recognized and not any(recognized):
+            general.append(NO_NAMES)
+    elif texts:
+        general.append(NO_NAMES)
     lines = per_model + per_provider + general
     if len(lines) > MAX_LINES:
         lines = lines[:MAX_LINES] + [f"modelli: … e altri {len(lines) - MAX_LINES} avvisi"]

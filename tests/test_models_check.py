@@ -21,6 +21,7 @@ FILE = "src/ai/models.py"
 PAGE = {name: f"https://docs.{name}.invalid/deprecations"
         for name in ("anthropic", "gemini", "openai", "openrouter")}
 MIN = 'schema_version = 1\n[gate]\nmode = "detect"\n'
+NO_NAMES = "modelli: nessun nome di modello riconosciuto nei file dichiarati"
 DEDICATED = ("TOLLGATE_MODELS_ANTHROPIC_KEY, TOLLGATE_MODELS_GEMINI_KEY, "
              "TOLLGATE_MODELS_OPENAI_KEY, TOLLGATE_MODELS_OPENROUTER_KEY")
 
@@ -99,8 +100,8 @@ class CheckCase(unittest.TestCase):
         (self.plugin / "templates").mkdir(parents=True)
         (self.plugin / "templates" / "models.toml").write_text(providers_toml())
 
-    def repo(self, files, toml=MIN):
-        self.main, self.origin, _ = make_origin_repo(self.tmp / "r", files, toml)
+    def repo(self, files, toml=MIN, name="r"):
+        self.main, self.origin, _ = make_origin_repo(self.tmp / name, files, toml)
         return self.main
 
     def cfg(self, files=(FILE,), extra=""):
@@ -182,7 +183,8 @@ class ComponentAndFilesTest(CheckCase):
         with mock.patch.object(git, "show", wraps=real_show) as show:
             lines = self.check(self.cfg(["b.bin", "big.py", FILE]), FakeFetch())
         self.assertEqual(lines, ["modelli: b.bin: non letto (binario o oltre 256 KiB)",
-                                 "modelli: big.py: non letto (binario o oltre 256 KiB)"])
+                                 "modelli: big.py: non letto (binario o oltre 256 KiB)",
+                                 NO_NAMES])
         self.assertEqual([c.args[2] for c in show.call_args_list], ["b.bin", FILE])
 
     def test_folder_entry_line(self):
@@ -200,7 +202,7 @@ class ComponentAndFilesTest(CheckCase):
     def test_no_literals_no_network(self):
         self.repo({FILE: "x = 1\nname = 'due parole'\n"})
         fetch = FakeFetch()
-        self.assertEqual(self.check(self.cfg(), fetch), [])
+        self.assertEqual(self.check(self.cfg(), fetch), [NO_NAMES])
         self.assertEqual(fetch.calls, [])
 
 
@@ -275,6 +277,32 @@ class ProvidersTest(CheckCase):
         self.assertEqual(lines, ["modelli: gemini: saltato, tempo del controllo finito",
                                  "modelli: openai: saltato, tempo del controllo finito"])
         self.assertEqual(fetch.names, ["anthropic"])
+
+    def test_no_recognized_name_gives_general_line(self):
+        for body in ('x = 1\n', 'name = "pippo-pluto-1"\nother = "gpt"\n'):
+            with self.subTest(body=body):
+                self.repo({FILE: body}, name=f"r{len(body)}")
+                fetch = FakeFetch(anthropic=a_page(a_model("claude-new-4-20250101")))
+                self.assertEqual(self.check(self.cfg(), fetch), [NO_NAMES])
+
+    def test_recognized_name_has_no_general_line(self):
+        self.repo({FILE: 'm = "claude-new-4-20250101"\n'})
+        fetch = FakeFetch(anthropic=a_page(a_model("claude-new-4-20250101")))
+        self.assertEqual(self.check(self.cfg(), fetch), [])
+
+    def test_failed_list_has_no_general_line(self):
+        self.repo({FILE: 'm = "pippo-pluto-1"\n'})
+        fetch = FakeFetch(anthropic=FetchError("nessuna risposta"))
+        lines = self.check(self.cfg(), fetch)
+        self.assertEqual(lines, ["modelli: anthropic: elenco non letto: nessuna risposta"])
+
+    def test_general_line_comes_last_and_not_without_files_read(self):
+        self.repo({FILE: 'x = 1\n'})
+        cfg = self.cfg(files=(FILE, "manca.py"))
+        lines = self.check(cfg, FakeFetch(anthropic=a_page()))
+        self.assertEqual(lines, ["modelli: manca.py: non trovato su origin/main", NO_NAMES])
+        self.assertEqual(self.check(self.cfg(files=("manca.py",)), FakeFetch(anthropic=a_page())),
+                         ["modelli: manca.py: non trovato su origin/main"])
 
     def slow_run(self, now, gemini_cached_at=None):
         """Anthropic consuma il tempo; Gemini ha una cache (scritta a `gemini_cached_at`)."""

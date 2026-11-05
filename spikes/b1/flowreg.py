@@ -301,7 +301,7 @@ def _hook_text(obj):
         return text
     hso = data.get("hookSpecificOutput") if isinstance(data, dict) else None
     context = hso.get("additionalContext") if isinstance(hso, dict) else None
-    return None if isinstance(context, str) and context.startswith("tollgate:") else text
+    return None if isinstance(context, str) and context.startswith(("tollgate:", "(tollgate:")) else text
 
 
 def _third_party(obj, names):
