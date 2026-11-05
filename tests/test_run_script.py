@@ -5,6 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tests.helpers import MODEL_KEY_VARS
+
 ROOT = Path(__file__).resolve().parent.parent
 RUN = ROOT / "tests" / "run"
 
@@ -35,9 +37,10 @@ class RunScriptTest(unittest.TestCase):
         subprocess.run(["rm", "-rf", str(self.base)], check=False)
 
     def launch(self, **extra):
-        env = dict(os.environ, TMPDIR=str(self.base), PYTHONS=sys.executable,
+        env = {k: v for k, v in os.environ.items()
+               if k not in MODEL_KEY_VARS and k != "PYTHONWARNINGS"}
+        env.update(TMPDIR=str(self.base), PYTHONS=sys.executable,
                    RUN_TMP_PROBE=str(self.probe), **extra)
-        env.pop("PYTHONWARNINGS", None)
         return subprocess.run([str(RUN), "-k", "test_tmpdir_probe"], env=env,
                               capture_output=True, text=True)
 
@@ -49,7 +52,7 @@ class RunScriptTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         seen = self.seen()
         self.assertTrue(seen.name.startswith("tollgate-run-"), seen)
-        self.assertEqual(seen.parent, self.base)
+        self.assertEqual(seen.parent.resolve(), self.base.resolve())
         self.assertFalse(seen.exists())
 
     def test_run_removes_tmpdir_on_failure(self):
@@ -59,6 +62,7 @@ class RunScriptTest(unittest.TestCase):
         self.assertTrue(seen.name.startswith("tollgate-run-"), seen)
         self.assertFalse(seen.exists())
 
+    @unittest.skipIf(os.geteuid() == 0, "da root i permessi non contano")
     def test_run_removes_sealed_dirs_and_keeps_exit_code(self):
         r = self.launch(RUN_TMP_PROBE_SEAL="1")
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -85,9 +89,10 @@ class KnownLeaksTest(unittest.TestCase):
         self.check_gone(ctx, ctx.home)
 
         RunnerTest.setUpClass()
+        self.addCleanup(RunnerTest.tearDownClass)
         folder = RunnerTest.tmp
         self.assertTrue(folder.exists())
-        RunnerTest.tearDownClass()
+        self.doCleanups()
         self.assertFalse(folder.exists())
 
 
