@@ -2,6 +2,8 @@
 e senza `claude` vero: `bash -n`, il modo `controlla`, un `claude` finto nel PATH che registra gli argomenti, prove dirette dei file
 della sonda e della raccolta anonimizzata su un registro finto. Nessuna prova scrive in /tmp/tollgate-b1: le radici sono temporanee
 (`B1_CHECK=1` con `B1_TMP`)."""
+import contextlib
+import io
 import json
 import os
 import re
@@ -994,37 +996,81 @@ class FlowScriptTest(unittest.TestCase):
         self.assertIn("22794 caratteri", stream.read_text())
         self.assertEqual((self.b.out / "registro-1" / "fallimenti.txt").read_text(), "")
 
-    def test_committed_evidence_has_no_long_web_results(self):
-        """Nelle evidenze pubbliche un risultato di WebFetch/WebSearch non supera MAX_WEB_RESULT: il testo delle pagine dei fornitori non si pubblica."""
+    @staticmethod
+    def flowreg_module():
         sys.path.insert(0, str(B1))
         try:
             import flowreg
         finally:
             sys.path.remove(str(B1))
+        return flowreg
+
+    def test_tollgate_skill_by_folder_not_word(self):
+        flowreg = self.flowreg_module()
+        for path in ("/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/skills/execute",
+                     "/home/USER/.claude/plugins/cache/x/tollgate/0.2.0/skills/start",
+                     "/tmp/tollgate-b1/plugin/skills/start",
+                     "/tmp/tollgate-eval-target/skills/init",
+                     "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/p4/skills/execute",
+                     "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/skills/execute/"):
+            self.assertTrue(flowreg.tollgate_skill(path), path)
+        for path in ("/home/USER/.claude/plugins/cache/claude-plugins-official/superpowers/7.0.0/skills/writing-plans",
+                     "/home/x/altro/skills/init",
+                     "/home/USER/.claude/plugins/cache/x/altro/0.2.0/skills/start",
+                     "/home/USER/tollgate/skills/start",
+                     "/home/USER/MEGA/Plugin IT workflow/skills/writing-plans",
+                     "/tmp/tollgate-b1/plugin/altro/start"):
+            self.assertFalse(flowreg.tollgate_skill(path), path)
+        self.assertNotEqual(ROOT.name, "Plugin IT workflow", "il risultato non dipende dal nome della cartella di questo repo")
+
+    def test_external_skill_keeps_tollgate_execute(self):
+        flowreg = self.flowreg_module()
+        text = f"{flowreg.SKILL_PREFIX} /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/skills/execute\n\n" + "E" * 20000
+        self.assertIsNone(flowreg.external_skill(text))
+        other = text.replace("Plugin IT workflow/skills/execute", "x/superpowers/7.0.0/skills/writing-plans")
+        self.assertEqual(flowreg.external_skill(other), "writing-plans")
+
+    def hook_row(self, hook_name, text):
+        return {"type": "system", "subtype": "hook_response", "hook_id": "h1", "hook_name": hook_name, "hook_event": "SessionStart",
+                "output": text, "stdout": text, "stderr": "", "exit_code": 0, "outcome": "success"}
+
+    def test_session_start_output_of_other_plugins_replaced(self):
+        flowreg = self.flowreg_module()
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-b3-flowreg-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        stream = tmp / "claude.jsonl"
+        other = json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "ALTRUI" * 1700}})
+        short = json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "BREVE" * 200}}, indent=2)
+        mine = json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "tollgate: " + "M" * 3000}})
+        rows = [self.hook_row("SessionStart:startup", other), self.hook_row("SessionStart:startup", short),
+                self.hook_row("SessionStart:startup", mine), self.hook_row("SessionStart:startup", ""),
+                {"type": "system", "subtype": "hook_response", "hook_event": "PreToolUse", "output": "PRE" * 900, "stdout": "PRE" * 900}]
+        stream.write_text("".join(json.dumps(x) + "\n" for x in rows))
+        self.assertEqual([x.split(":")[1].split()[0] for x in flowreg.third_party_blocks(stream)], ["hook", "hook"])
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(flowreg.togli_pagine([str(stream)]), 2)
+        text = stream.read_text()
+        self.assertNotIn("ALTRUI", text)
+        self.assertNotIn("BREVE", text)
+        out = [json.loads(x) for x in text.splitlines()]
+        self.assertEqual(out[0]["output"], f"[uscita di hook di terzi tolta dalle evidenze: SessionStart:startup, {len(other)} caratteri]")
+        self.assertEqual(out[0]["stdout"], out[0]["output"])
+        self.assertEqual(out[1]["stdout"], f"[uscita di hook di terzi tolta dalle evidenze: SessionStart:startup, {len(short)} caratteri]")
+        self.assertEqual(out[2]["stdout"], mine, "l'uscita di tollgate resta")
+        self.assertEqual(out[3]["stdout"], "")
+        self.assertEqual(out[4]["stdout"], "PRE" * 900, "solo gli hook SessionStart")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(flowreg.togli_pagine([str(stream)]), 0)
+        self.assertEqual(flowreg.third_party_blocks(stream), [])
+
+    def test_committed_evidence_has_no_long_web_results(self):
+        """Nelle evidenze pubbliche non c'è testo di terzi: né risultati di WebFetch/WebSearch oltre MAX_WEB_RESULT, né skill che non sono di
+        tollgate, né uscite di hook SessionStart di altri plugin."""
+        flowreg = self.flowreg_module()
         found = []
         for path in sorted((ROOT / "docs" / "verifiche" / "evidenze").rglob("*.jsonl")):
-            names = {}
-            for n, line in enumerate(path.read_text(errors="replace").splitlines(), 1):
-                try:
-                    obj = json.loads(line)
-                except ValueError:
-                    continue
-                msg = obj.get("message") if isinstance(obj, dict) else None
-                for block in (msg.get("content") if isinstance(msg, dict) and isinstance(msg.get("content"), list) else []):
-                    if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in flowreg.WEB_TOOLS:
-                        names[block.get("id")] = block.get("name")
-                for _, block, _ in flowreg.web_results(obj, names):
-                    size = len(flowreg._content_text(block.get("content")))
-                    if size > flowreg.MAX_WEB_RESULT:
-                        found.append(f"{path.relative_to(ROOT)}:{n} ({size} caratteri)")
-                for block in (msg.get("content") if isinstance(msg, dict) and isinstance(msg.get("content"), list) else []):
-                    if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str) \
-                            and "evidenze/b3/" in path.as_posix() and flowreg.external_skill(block["text"]):
-                        found.append(f"{path.relative_to(ROOT)}:{n} skill di terzi ({len(block['text'])} caratteri)")
-                res = obj.get("tool_use_result") if isinstance(obj, dict) else None
-                if isinstance(res, dict) and isinstance(res.get("result"), str) and "codeText" in res and len(res["result"]) > flowreg.MAX_WEB_RESULT:
-                    found.append(f"{path.relative_to(ROOT)}:{n} tool_use_result ({len(res['result'])} caratteri)")
-        self.assertEqual(found, [], "pagine di terzi nelle evidenze: lancia flowreg.py togli-pagine")
+            found += [f"{path.relative_to(ROOT)}:{x}" for x in flowreg.third_party_blocks(path)]
+        self.assertEqual(found, [], "testo di terzi nelle evidenze: lancia flowreg.py togli-pagine")
 
     def test_flow_registra_reports_collection_failures_but_collects_the_rest(self):
         self.b.prepara()

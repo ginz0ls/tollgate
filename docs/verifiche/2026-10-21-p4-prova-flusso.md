@@ -88,3 +88,7 @@ Uscita del tool Bash per `command -v gh` nel passo `shim`: `/tmp/tollgate-p4/flo
 - L'unione della PR (`gh pr merge`) dal flusso: la PR #105 è rimasta aperta.
 - Il flusso sul repo detect e con una protezione di `main` incompleta (vedi criterio 11 nel rapporto del gate).
 - Un modello ostile: la prova è cooperativa, la garanzia è la verifica dello stato dopo ogni passo.
+
+## Anonimizzazione delle evidenze
+
+Il 5 novembre 2026 il testo di skill, pagine e hook di terzi è stato sostituito da un segnaposto (`flowreg.py togli-pagine`); i commit precedenti lo contengono ancora.

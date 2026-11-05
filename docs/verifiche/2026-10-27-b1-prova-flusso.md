@@ -105,3 +105,7 @@ Il passo 2 da solo non si può ripetere, perché ha bisogno del lavoro in `execu
 - **Brief del revisore:** dopo il recinto della nota c'è il nuovo blocco «Esito del controllo di tollgate» con `esito: valida`, anch'esso in un recinto. Verdetto `approved`.
 - **Totale stimato:** 0,86 USD, dentro l'abbonamento. Token di tollgate: implementatore 47.058, revisore del task 28.467.
 - **Difetti trovati:** nessuno nel prodotto e nessuno nello script.
+
+## Anonimizzazione delle evidenze
+
+Il 5 novembre 2026 il testo di skill, pagine e hook di terzi è stato sostituito da un segnaposto (`flowreg.py togli-pagine`); i commit precedenti lo contengono ancora.

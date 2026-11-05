@@ -10,14 +10,16 @@
                               di sessione ricavate da `cwd` e `session_id` di ogni flusso; si stampano solo le righe col titolo
   tipi <tollgate.db>          (B3) agent_type e reviewer_type di ogni task (sola lettura)
   togli-pagine <stream.jsonl>...   (B3) UNICO comando che scrive: riscrive il flusso al suo posto, sostituendo il testo delle pagine dei
-                              fornitori (risultati lunghi di WebFetch e WebSearch) e quello delle skill che non sono di tollgate
-                              (blocchi "Base directory for this skill:" lunghi) con un segnaposto che dice nome o URL e lunghezza
+                              fornitori (risultati lunghi di WebFetch e WebSearch), quello delle skill che non sono di tollgate
+                              (blocchi "Base directory for this skill:" lunghi) e le uscite degli hook SessionStart di altri
+                              plugin (quelle il cui additionalContext non comincia con "tollgate:") con un segnaposto che dice
+                              nome o URL e lunghezza
 """
 import json
 import re
 import sqlite3
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 WANTED = ("research_note", "research_reminder", "veto")
 RULES_TITLE = "# Regole di base (versione 1)"
@@ -248,6 +250,22 @@ def web_results(obj, names):
 
 
 SKILL_PREFIX = "Base directory for this skill:"
+HOOK_PLACEHOLDER = "[uscita di hook di terzi tolta dalle evidenze:"
+TOLLGATE_ROOTS = ("/tmp/tollgate-b1/plugin", "/tmp/tollgate-eval-target")  # radici note di tollgate (letterali: mai ricavate da ROOT.name)
+REPO_SKILLS = Path(__file__).resolve().parents[2] / "skills"
+
+
+def tollgate_skill(path):
+    """True se `path` finisce con `<radice>/skills/<nome>`: `<nome>` è una cartella di `skills/` del repo e `<radice>` una radice nota di tollgate."""
+    p = PurePosixPath(path.rstrip("/"))
+    if p.parent.name != "skills" or not p.parent.parent.name or p.name not in {d.name for d in REPO_SKILLS.iterdir() if d.is_dir()}:
+        return False
+    root = p.parent.parent
+    cache = root.parent.parent.parent
+    return (str(root) in TOLLGATE_ROOTS
+            or root.name == "Plugin IT workflow"
+            or (root.parent.name == "worktrees" and root.parent.parent.name == ".claude" and root.parent.parent.parent.name == "Plugin IT workflow")
+            or (root.parent.name == "tollgate" and cache.name == "cache" and cache.parent.name == "plugins"))
 
 
 def external_skill(text):
@@ -255,7 +273,7 @@ def external_skill(text):
     if not text.startswith(SKILL_PREFIX) or len(text) <= MAX_WEB_RESULT:
         return None
     path = text[len(SKILL_PREFIX):].split("\n", 1)[0].strip()
-    if "tollgate" in path.lower():
+    if tollgate_skill(path):
         return None
     return path.rstrip("/").rsplit("/", 1)[-1] or "?"
 
@@ -264,42 +282,96 @@ def _placeholder(url, length):
     return f"[pagina di terzi tolta dalle evidenze: {url}, {length} caratteri]"
 
 
+def _hook_text(obj):
+    """Il testo di un'uscita di hook `SessionStart` di terzi (stdout, o output se manca), altrimenti None."""
+    if obj.get("type") != "system" or obj.get("subtype") != "hook_response" or obj.get("hook_event") != "SessionStart":
+        return None
+    text = obj.get("stdout") if isinstance(obj.get("stdout"), str) and obj.get("stdout") else obj.get("output")
+    if not isinstance(text, str) or not text or text.startswith(HOOK_PLACEHOLDER):
+        return None
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return text
+    hso = data.get("hookSpecificOutput") if isinstance(data, dict) else None
+    context = hso.get("additionalContext") if isinstance(hso, dict) else None
+    return None if isinstance(context, str) and context.startswith("tollgate:") else text
+
+
+def _third_party(obj, names):
+    """Il punto unico che riconosce il testo di terzi in una riga: per ogni blocco `(tipo, caratteri, sostituisci)`.
+    `names` (id del tool_use -> URL o ricerca) si aggiorna da solo; `sostituisci()` riscrive il blocco nell'oggetto."""
+    if not isinstance(obj, dict):
+        return
+    msg = obj.get("message")
+    blocks = msg.get("content") if isinstance(msg, dict) and isinstance(msg.get("content"), list) else []
+    for block in blocks:
+        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in WEB_TOOLS:
+            ti = block.get("input") or {}
+            names[block.get("id")] = str(ti.get("url") or ti.get("query") or block.get("name"))
+    for block in blocks:
+        if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str):
+            skill = external_skill(block["text"])
+            if skill:
+                def swap(block=block, skill=skill):
+                    block["text"] = f"[skill di terzi tolta dalle evidenze: {skill}, {len(block['text'])} caratteri]"
+                yield "skill", len(block["text"]), swap
+    web = False
+    for _, block, label in web_results(obj, names):
+        text = _content_text(block.get("content"))
+        if len(text) > MAX_WEB_RESULT:
+            web = True
+
+            def swap(block=block, label=label, text=text):
+                block["content"] = _placeholder(label, len(text))
+                res = obj.get("tool_use_result")
+                if isinstance(res, dict) and isinstance(res.get("result"), str):
+                    res["result"] = block["content"]
+                elif isinstance(res, str) and len(res) > MAX_WEB_RESULT:
+                    obj["tool_use_result"] = block["content"]
+            yield "pagina", len(text), swap
+    res = obj.get("tool_use_result")
+    if not web and isinstance(res, dict) and isinstance(res.get("result"), str) and "codeText" in res and len(res["result"]) > MAX_WEB_RESULT:
+        def swap(res=res):
+            res["result"] = _placeholder(res.get("url") or "?", len(res["result"]))
+        yield "tool_use_result", len(res["result"]), swap
+    hook = _hook_text(obj)
+    if hook is not None:
+        def swap(hook=hook):
+            marker = f"{HOOK_PLACEHOLDER} {obj.get('hook_name') or '?'}, {len(hook)} caratteri]"
+            for key in ("output", "stdout"):
+                if isinstance(obj.get(key), str) and obj[key]:
+                    obj[key] = marker
+        yield "hook", len(hook), swap
+
+
+def _scan(path):
+    """Per ogni riga del flusso: `(numero, riga, oggetto o None, blocchi di terzi)`."""
+    names = {}
+    for n, line in enumerate(Path(path).read_text(errors="replace").splitlines(), 1):
+        try:
+            obj = json.loads(line)
+        except ValueError:
+            obj = None
+        yield n, line, obj, list(_third_party(obj, names)) if obj is not None else []
+
+
+def third_party_blocks(path):
+    """Sola lettura: una voce `<riga>: <tipo> (<caratteri>)` per ogni blocco di terzi del flusso."""
+    return [f"{n}: {kind} ({size})" for n, _, _, found in _scan(path) for kind, size, _ in found]
+
+
 def togli_pagine(paths):
-    """Riscrive ogni flusso sostituendo i risultati lunghi di WebFetch/WebSearch (tetto MAX_WEB_RESULT) con un segnaposto."""
+    """Riscrive ogni flusso sostituendo con un segnaposto il testo di terzi: risultati lunghi di WebFetch/WebSearch (tetto MAX_WEB_RESULT),
+    skill che non sono di tollgate e uscite di hook `SessionStart` di altri plugin. Restituisce il numero di righe cambiate."""
     total = 0
     for path in paths:
-        names, out, changed = {}, [], 0
-        for line in Path(path).read_text(errors="replace").splitlines():
-            try:
-                obj = json.loads(line)
-            except ValueError:
-                out.append(line)
-                continue
-            msg = obj.get("message") if isinstance(obj, dict) else None
-            blocks = msg.get("content") if isinstance(msg, dict) else None
-            for block in blocks if isinstance(blocks, list) else []:
-                if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in WEB_TOOLS:
-                    ti = block.get("input") or {}
-                    names[block.get("id")] = str(ti.get("url") or ti.get("query") or block.get("name"))
-            dirty = False
-            for block in blocks if isinstance(blocks, list) else []:
-                if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str):
-                    skill = external_skill(block["text"])
-                    if skill:
-                        block["text"] = f"[skill di terzi tolta dalle evidenze: {skill}, {len(block['text'])} caratteri]"
-                        dirty = True
-            for _, block, label in web_results(obj, names):
-                text = _content_text(block.get("content"))
-                if len(text) > MAX_WEB_RESULT:
-                    block["content"] = _placeholder(label, len(text))
-                    dirty = True
-                    res = obj.get("tool_use_result")
-                    if isinstance(res, dict) and isinstance(res.get("result"), str):
-                        res["result"] = block["content"]
-                    elif isinstance(res, str) and len(res) > MAX_WEB_RESULT:
-                        obj["tool_use_result"] = block["content"]
-            changed += dirty
-            out.append(json.dumps(obj, ensure_ascii=False) if dirty else line)
+        out, changed = [], 0
+        for _, line, obj, found in _scan(path):
+            for _, _, swap in found:
+                swap()
+            changed += bool(found)
+            out.append(json.dumps(obj, ensure_ascii=False) if found else line)
         if changed:
             Path(path).write_text("\n".join(out) + "\n")
         print(f"{path}: {changed} risultati sostituiti")

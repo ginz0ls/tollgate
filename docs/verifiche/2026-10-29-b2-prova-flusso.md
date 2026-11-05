@@ -107,3 +107,5 @@ Totale della seconda corsa 0,95 USD; delle due corse circa 1,87 USD stimati, den
 ## Anonimizzazione delle evidenze
 
 Come in B1, prima del commit: la cartella home `/home/<utente>` è `/home/USER`, il nome utente `USER`, il nome dell'host (campo `host` di `events.jsonl` e `eventi-ricerca.jsonl`) `HOST`, i due id di sessione (quelli di `session_id` negli stream e di `session` negli eventi) `SESSION-ID`. Sostituzione di testo su tutti i file di `evidenze/b2/flusso/`, compresi `events.jsonl`, `comandi-modello.txt` e `precarico.err` (vuoto). Dagli stream-json sono state tolte **24 righe**: i 2 messaggi `init` (elenco dei plugin e dei server MCP della macchina) e 22 eventi degli hook di `SessionStart` degli altri plugin (restano i due eventi dell'hook di tollgate del passo 2). Controllo: nessuna occorrenza dei nomi della macchina o dell'utente né di prefissi di token di API o di GitHub.
+
+Il 5 novembre 2026 il testo di skill, pagine e hook di terzi è stato sostituito da un segnaposto (`flowreg.py togli-pagine`); i commit precedenti lo contengono ancora.
