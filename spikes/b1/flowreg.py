@@ -15,6 +15,7 @@
                               plugin (quelle il cui additionalContext non comincia con "tollgate:") con un segnaposto che dice
                               nome o URL e lunghezza
 """
+import functools
 import json
 import re
 import sqlite3
@@ -255,10 +256,15 @@ TOLLGATE_ROOTS = ("/tmp/tollgate-b1/plugin", "/tmp/tollgate-eval-target")  # rad
 REPO_SKILLS = Path(__file__).resolve().parents[2] / "skills"
 
 
+@functools.cache
+def _repo_skill_names():
+    return frozenset(d.name for d in REPO_SKILLS.iterdir() if d.is_dir())
+
+
 def tollgate_skill(path):
     """True se `path` finisce con `<radice>/skills/<nome>`: `<nome>` è una cartella di `skills/` del repo e `<radice>` una radice nota di tollgate."""
     p = PurePosixPath(path.rstrip("/"))
-    if p.parent.name != "skills" or not p.parent.parent.name or p.name not in {d.name for d in REPO_SKILLS.iterdir() if d.is_dir()}:
+    if p.parent.name != "skills" or not p.parent.parent.name or p.name not in _repo_skill_names():
         return False
     root = p.parent.parent
     cache = root.parent.parent.parent

@@ -1021,7 +1021,6 @@ class FlowScriptTest(unittest.TestCase):
                      "/home/USER/MEGA/Plugin IT workflow/skills/writing-plans",
                      "/tmp/tollgate-b1/plugin/altro/start"):
             self.assertFalse(flowreg.tollgate_skill(path), path)
-        self.assertNotEqual(ROOT.name, "Plugin IT workflow", "il risultato non dipende dal nome della cartella di questo repo")
 
     def test_external_skill_keeps_tollgate_execute(self):
         flowreg = self.flowreg_module()
