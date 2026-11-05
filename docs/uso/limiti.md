@@ -102,6 +102,12 @@ Salta `tollgate-sentinel` per quel push. Dalla 0.2.0 ogni push controllato lasci
 
 `verdict` confronta il contenuto di `tollgate.toml` che il run ha usato con quello della punta del predefinito, non il commit: un merge che non tocca `tollgate.toml` non dà più `error` alle PR in volo. Un aggiornamento di `.github/tollgate/bin/` nello stesso intervallo passa: il run ha eseguito il CLI della sua base, `verdict` usa quello della punta.
 
+## Il controllo dei modelli
+
+### La chiave del controllo dei modelli sta nell'ambiente della sessione, leggibile da qualunque comando
+
+Il [controllo dei modelli](comandi.md#il-controllo-dei-modelli) prende la chiave del fornitore da una variabile d'ambiente, e quella variabile la legge qualunque comando della sessione: tollgate non la protegge da lì. Protegge solo i propri percorsi: la chiave non entra mai in un URL, in una riga d'avviso, in un messaggio d'errore, nella cache né nei log, e le variabili `TOLLGATE_…` non arrivano ai comandi del progetto. La variabile dedicata (`TOLLGATE_MODELS_<FORNITORE>_KEY`) evita che `ANTHROPIC_API_KEY` faccia pagare Claude Code a consumo, ma non nasconde la chiave: chi la mette nell'ambiente la espone a ogni comando e a ogni agente di quella sessione.
+
 ## I guardrail locali
 
 ### I subagenti con `isolation: worktree` non vengono bloccati
