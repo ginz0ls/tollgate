@@ -19,7 +19,7 @@ Data: 5 novembre 2026 (piano del 4 novembre). Piano: B3-bis (sentinella dei mode
 
 Le righe sono quelle attese dalla decisione 4 del piano per il caso «`[models] files` non vuoto e nessuna chiave»: una sola riga che nomina le quattro variabili dedicate, nessuna rete. Dopo le due corse la cartella di stato contiene solo la sentinella `.tollgate-test`: niente cache (giusto, senza elenchi letti) e niente database (`models check` non apre il DB, decisione 8).
 
-- Tentativi: 1. L'esito **non è composito**.
+- Tentativi: 2, ciascuno completo da solo. Il primo il 5 novembre alle 3.58; il secondo alle 6.09, dopo le correzioni della revisione finale che toccano `models_check` (stesso ambiente, nessuna chiave), con uscite identiche alla prima. L'esito **non è composito**.
 - Tempi: le due corse insieme 0,28 s.
 - Richieste di rete verso i fornitori: 0. Nessun modello usato, nessun token.
 
