@@ -14,6 +14,7 @@
 # B3BIS_PY (predefinita python3.11), B3BIS_TOLLGATE (predefinita <plugin>/bin/tollgate; sotto /tmp/tollgate-b3bis-test-*
 # è obbligatoria: nei test è un finto). Il valore di una chiave non viene mai stampato, copiato né passato come argomento.
 set -uo pipefail
+umask 077   # le uscite e lo stato stanno in /tmp, condiviso
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
 MODE="${1:-}"
@@ -40,15 +41,29 @@ rot() {
   done
 }
 
-# verifica_dir: B3BIS_DIR è /tmp/tollgate-b3bis o sta sotto /tmp/tollgate-b3bis-test-<nome>, senza `..`
+# verifica_dir: B3BIS_DIR è /tmp/tollgate-b3bis, oppure /tmp/tollgate-b3bis-test-<nome> o una sola cartella sotto di essa;
+# senza `..`, senza link simbolici (né B3BIS_DIR né la cartella <nome>) e, se esiste, con `pwd -P` uguale al percorso dato
 verifica_dir() {
+  local rest top
   case "$DIR" in
     *..*) die "B3BIS_DIR ($DIR) contiene '..'" ;;
-    "$DEFAULT_DIR") ;;
-    "$DEFAULT_DIR"-test-?*) FAKE_REQUIRED=1 ;;
+    */) die "B3BIS_DIR ($DIR) finisce con '/'" ;;
+    "$DEFAULT_DIR") top="$DIR" ;;
+    "$DEFAULT_DIR"-test-?*)
+      FAKE_REQUIRED=1
+      rest="${DIR#"$DEFAULT_DIR"-test-}"
+      case "$rest" in
+        /*|*//*|*/*/*) die "B3BIS_DIR ($DIR): ammesso un solo livello sotto $DEFAULT_DIR-test-<nome>" ;;
+      esac
+      top="$DEFAULT_DIR-test-${rest%%/*}"
+      ;;
     *) die "B3BIS_DIR ($DIR) non è $DEFAULT_DIR né sta sotto $DEFAULT_DIR-test-*" ;;
   esac
-  case "$DIR" in */) die "B3BIS_DIR ($DIR) finisce con '/'" ;; esac
+  local d
+  for d in "$top" "$DIR"; do
+    if [ -L "$d" ]; then die "B3BIS_DIR: $d è un link simbolico"; fi
+    if [ -e "$d" ] && [ "$(cd "$d" 2>/dev/null && pwd -P)" != "$d" ]; then die "B3BIS_DIR: $d non è un percorso reale"; fi
+  done
 }
 
 # nomi_chiavi: i nomi delle variabili di chiave di templates/models.toml, nell'ordine del file (mai i valori)

@@ -135,6 +135,36 @@ class ScriptTest(Bench):
         self.assertEqual(self.signals(), [])
         self.assertFalse(Path("relativa").exists() or (self.dir / "relativa").exists())
 
+    def test_dir_rejects_symlinks_and_deep_paths(self):
+        target = self.dir / "altro"
+        target.mkdir()
+        (self.dir / "lnk").symlink_to(target)
+        top = Path(tempfile.mkdtemp(prefix="tollgate-b3bis-test-", dir="/tmp"))
+        self.addCleanup(shutil.rmtree, top, True)
+        toplink = Path("/tmp") / (top.name + "-lnk")
+        toplink.symlink_to(top)
+        self.addCleanup(toplink.unlink)
+        (top / "w").mkdir()
+        (top / "alias").symlink_to(top / "w")
+        bad = [self.dir / "lnk", self.dir / "lnk" / "x", toplink / "w", top / "alias", self.dir / "a" / "b"]
+        for d in bad:
+            for mode in ("controlla", "prepara", "prova"):
+                with self.subTest(dir=str(d), mode=mode):
+                    r = self.run_script(mode, env=self.env(B3BIS_DIR=str(d)))
+                    self.assertNotEqual(r.returncode, 0)
+                    self.assertIn("B3BIS_DIR", r.stderr)
+        self.assertEqual(list(target.iterdir()), [])
+        self.assertEqual(list((top / "w").iterdir()), [])
+        self.assertFalse((self.dir / "a").exists())
+
+    def test_out_and_state_are_private(self):
+        self.assertEqual(self.run_script("prepara").returncode, 0)
+        self.assertEqual(self.run_script("prova").returncode, 0)
+        for name in ("state", "out"):
+            self.assertEqual((self.work / name).stat().st_mode & 0o077, 0, name)
+        for f in (self.work / "out").iterdir():
+            self.assertEqual(f.stat().st_mode & 0o077, 0, f.name)
+
     def test_prova_in_test_dir_needs_fake_tollgate(self):
         self.assertEqual(self.run_script("prepara").returncode, 0)
         env = self.env()
@@ -174,7 +204,11 @@ class ScriptTest(Bench):
         self.assertNotEqual(r.returncode, 0)
         self.assertEqual(len(self.signals()), 1, "il finto è girato e lo script si è fermato")
         self.assertNotIn(FAKE_KEY, r.stdout + r.stderr)
-        self.assertIn("chiave", r.stderr)
+        self.assertIn("ERRORE: l'uscita contiene il valore di una variabile di chiave (ANTHROPIC_API_KEY): non salvata",
+                      r.stderr)
+        for f in self.work.rglob("*"):
+            if f.is_file() and not f.is_relative_to(self.work / "repo" / ".git"):
+                self.assertNotIn(FAKE_KEY.encode(), f.read_bytes(), str(f))
         saved = list((self.work / "out").glob("*")) if (self.work / "out").exists() else []
         self.assertEqual(saved, [])
         # una variabile impostata ma vuota si salta, come in api_key
