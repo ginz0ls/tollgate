@@ -47,6 +47,7 @@ Esegui il piano `docs/superpowers/plans/2026-11-06-tollgate-b4-profilo-infra.md`
 - **`infra` copre deploy, Vercel, Cloudflare e server, livello minimo L1** (progetto 4).
 - **I workflow di GitHub restano al gate** (progetto 11): `.github/workflows/` non accende `infra`.
 - **Il codice dei Worker di Cloudflare è `backend`** (progetto 11): `infra` copre la configurazione di Wrangler e il deploy, non il programma.
+- **I comandi di servizio lanciati con `npx` chiedono l'approvazione** (progetto 11): B4 chiude il buco; alcuni comandi solo locali di Supabase chiederanno il permesso finché B7 non li restringe.
 - **Le regole nascono così** (progetto 5): bozza con la fonte per ogni regola, verifica da un agente di sola lettura, una pagina in parole semplici per l'utente che approva, corregge o toglie; solo le regole approvate entrano; senza approvazione il profilo non si propone.
 - **Il repo `ginz0ls/tollgate` è pubblico:** dalle pagine dei fornitori si prendono fatti con parole nostre, mai testo intero; niente nomi di progetti privati dell'utente, niente nome utente né host, niente token.
 

@@ -2,7 +2,7 @@
 
 Esegui il piano `docs/superpowers/plans/2026-11-06-tollgate-b4-profilo-infra.md` con la skill `superpowers:subagent-driven-development`.
 
-- **Progetto di B** (l'autorità): `docs/superpowers/specs/2026-10-27-tollgate-b-profili-design.md`, comprese le sezioni 9, 10 e **11 (6 novembre 2026: workflow al gate, codice dei Worker in `backend`, Docker sì)**. Le scelte marcate «utente» non si discutono; quelle marcate «mia scelta» si correggono solo con una `Ruling:` che dice il motivo.
+- **Progetto di B** (l'autorità): `docs/superpowers/specs/2026-10-27-tollgate-b-profili-design.md`, comprese le sezioni 9, 10 e **11 (6 novembre 2026: workflow al gate, codice dei Worker in `backend`, comandi di servizio con `npx` da approvare; Docker sì è una «mia scelta»)**. Le scelte marcate «utente» non si discutono; quelle marcate «mia scelta» si correggono solo con una `Ruling:` che dice il motivo.
 - **Spec del nucleo:** `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md`, oggi alla revisione 30. La revisione 31 la scrive il Task 10.
 - **Piano principale di B:** `docs/superpowers/plans/2026-10-27-tollgate-b-piano-principale.md`, sezioni 1, 2, 3 e 9 (blocchi «A B3-B7», «A B4-B7, da B3», «A B4-B8, da B3-bis»).
 - **Registri modello del metodo:** `docs/sdd/2026-11-01-tollgate-b3-profilo-ai/` (il primo profilo: fonti, pagina, approvazione, prova reale) e `docs/sdd/2026-11-04-tollgate-b3bis-sentinella-modelli/` (il metodo più recente). Da riusare, adattati: `implementer-rules.md`, `reviewer-rules.md`, `rereview-rules.md`, `cautele.md`, la forma di `progress.md`, `carry.md`, `preflight-scan.md`, `task-6-fonti-brief.md` di B3 (brief del verificatore delle fonti), `final-review.md`.
