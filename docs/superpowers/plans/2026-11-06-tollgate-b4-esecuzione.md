@@ -3,7 +3,7 @@
 Esegui il piano `docs/superpowers/plans/2026-11-06-tollgate-b4-profilo-infra.md` con la skill `superpowers:subagent-driven-development`.
 
 - **Progetto di B** (l'autorità): `docs/superpowers/specs/2026-10-27-tollgate-b-profili-design.md`, comprese le sezioni 9, 10 e **11 (6 novembre 2026: workflow al gate, codice dei Worker in `backend`, Docker sì)**. Le scelte marcate «utente» non si discutono; quelle marcate «mia scelta» si correggono solo con una `Ruling:` che dice il motivo.
-- **Spec del nucleo:** `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md`, oggi alla revisione 30. La revisione 31 la scrive il Task 9.
+- **Spec del nucleo:** `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md`, oggi alla revisione 30. La revisione 31 la scrive il Task 10.
 - **Piano principale di B:** `docs/superpowers/plans/2026-10-27-tollgate-b-piano-principale.md`, sezioni 1, 2, 3 e 9 (blocchi «A B3-B7», «A B4-B7, da B3», «A B4-B8, da B3-bis»).
 - **Registri modello del metodo:** `docs/sdd/2026-11-01-tollgate-b3-profilo-ai/` (il primo profilo: fonti, pagina, approvazione, prova reale) e `docs/sdd/2026-11-04-tollgate-b3bis-sentinella-modelli/` (il metodo più recente). Da riusare, adattati: `implementer-rules.md`, `reviewer-rules.md`, `rereview-rules.md`, `cautele.md`, la forma di `progress.md`, `carry.md`, `preflight-scan.md`, `task-6-fonti-brief.md` di B3 (brief del verificatore delle fonti), `final-review.md`.
 
@@ -26,27 +26,28 @@ Prima del Task 1, un analista sonnet in sola lettura scrive `preflight-scan.md`:
 - `fragments.rules` che solleva (decisione 10) contro ogni chiamante, `init.propose` compreso;
 - il frammento vero di `infra` contro i test che lanciano `init` dalla CLI con la radice vera (`ModeTest`, `FilesTest`, `ServicesTest`, `HintsTest`, `UpdateTest`, `ProtectScriptTest`) e contro `test_real_trees_light_no_profile`;
 - `test_area_agents_name_rules_ai` e le frasi esatte di `tests/test_manifest.py` contro la decisione 9 (test d'area su `AREAS`);
+- `bash.effect_reason` e `unwrap_launcher` (Task 3) contro `tests/test_bash.py`, `tests/test_effects.py`, `tests/test_check_effects.py` e `[external_effects] allow`/`commands`/`project_scripts`, che si confrontano sul testo di tutto il comando: nessun comando che oggi non è un effetto deve diventarlo, salvo quelli della decisione 17;
 - `READONLY_TYPES` di `hooks/run` contro `config.DEFAULTS["review"]["readonly_agents"]` e `test_readonly_list_matches_config_and_agents`;
 - `spikes/run-b1-flow.sh` con `B1_FLOW_CASE=infra` contro i test esistenti di `tests/test_b1_scripts.py` (casi `b1` e `ai`) e contro `test_committed_evidence_has_no_long_web_results`.
 
 ## Ordine e modelli
 
-1. **Task 1, 2, 3 (Step 1-6), 6, 7:** implementatore sonnet. Il piano dà firme e test, non il codice: niente haiku. Il Task 3 dipende dal Task 1 (`parse_pattern`) e dal Task 2 (`test_real_trees_light_no_profile` esteso).
-2. **Task 3, Step 0** è del controller (copie delle fonti e punti (a)-(c) di «Da verificare prima del codice»), prima di lanciare l'implementatore del Task 3.
-3. **Task 4:** Step 1 del controller (verificatore `Explore` sonnet in sola lettura, sul modello di `task-6-fonti-brief.md` di B3, esteso ai pattern di `paths`); Step 2-5 di un implementatore sonnet.
-4. **Task 5:** del controller con l'utente (fermata), poi un implementatore sonnet per gli Step 2-4.
-5. **Task 6** solo dopo il Task 5. **Task 7** dopo il Task 6. **Task 8** del controller. **Task 9:** implementatore sonnet, dopo il Task 8.
+1. **Task 1, 2, 3, 4 (Step 1-6), 7, 8:** implementatore sonnet. Il piano dà firme e test, non il codice: niente haiku. Il Task 3 (effetti dietro `npx`) non dipende dai Task 1-2 e può partire prima, uno alla volta (scrittore unico). Il Task 4 dipende dal Task 1 (`parse_pattern`) e dal Task 2 (`test_real_trees_light_no_profile` esteso).
+2. **Task 4, Step 0** è del controller (copie delle fonti e punti (a)-(c) di «Da verificare prima del codice»), prima di lanciare l'implementatore del Task 4.
+3. **Task 5:** Step 1 del controller (verificatore `Explore` sonnet in sola lettura, sul modello di `task-6-fonti-brief.md` di B3, esteso ai pattern di `paths`); Step 2-5 di un implementatore sonnet.
+4. **Task 6:** del controller con l'utente (fermata), poi un implementatore sonnet per gli Step 2-4.
+5. **Task 7** solo dopo il Task 6. **Task 8** dopo il Task 7 e il Task 3. **Task 9** del controller. **Task 10:** implementatore sonnet, dopo il Task 9.
 6. **Revisioni:** revisore di ogni task sonnet; ri-revisioni mirate sonnet; **revisione finale dell'intero ramo opus**.
 7. Indica sempre il modello a ogni lancio di un subagente.
 
 ## Ruling nel ledger e `carry.md`
 
-Il piano dà firme, test e valori; il corpo lo scrive l'implementatore. Se il piano contraddice il progetto o la spec, vince il progetto, poi la spec: decidi tu, scrivi `Ruling: <cosa> — <perché> — <costo se sbagliata>` nel ledger e vai avanti. Una correzione che cambia la spec va nella revisione 31, scritta dal Task 9. I rilievi minori vanno nel ledger come `Task N: minor (deferred): …`: la revisione finale ne fa il triage, e quelli che riguardano B5-B8 finiscono nel piano principale di B. Le regole approvate (`rules-base`, `rules-ai`) e le loro pagine e rapporti **non si toccano**; `rules-infra`, dopo il Task 5, cambia solo con l'utente.
+Il piano dà firme, test e valori; il corpo lo scrive l'implementatore. Se il piano contraddice il progetto o la spec, vince il progetto, poi la spec: decidi tu, scrivi `Ruling: <cosa> — <perché> — <costo se sbagliata>` nel ledger e vai avanti. Una correzione che cambia la spec va nella revisione 31, scritta dal Task 10. I rilievi minori vanno nel ledger come `Task N: minor (deferred): …`: la revisione finale ne fa il triage, e quelli che riguardano B5-B8 finiscono nel piano principale di B. Le regole approvate (`rules-base`, `rules-ai`) e le loro pagine e rapporti **non si toccano**; `rules-infra`, dopo il Task 6, cambia solo con l'utente.
 
 ## Lezioni dei piani precedenti
 
 - **Le regole nascono come in B3:** bozza con la fonte per ogni regola, verificatore di sola lettura, pagina in parole semplici, approvazione dell'utente; solo le regole approvate entrano. Una regola nuova o con una fonte nuova ripassa dal verificatore.
-- **La prova reale si divide:** script e test dell'implementatore (Task 7), esecuzione del controller (Task 8). Le correzioni del prodotto scoperte nella prova sono giri del task che possiede il codice, ognuna con un test, e si ripete solo il passo interessato. **Un esito ottenuto in più tentativi è «composito»**, e il rapporto lo dice.
+- **La prova reale si divide:** script e test dell'implementatore (Task 8), esecuzione del controller (Task 9). Le correzioni del prodotto scoperte nella prova sono giri del task che possiede il codice, ognuna con un test, e si ripete solo il passo interessato. **Un esito ottenuto in più tentativi è «composito»**, e il rapporto lo dice.
 - **Evidenze pubbliche** (lezione I-1 di B3): lo stream di `claude -p` contiene i `tool_result` di `WebFetch` e il testo delle skill caricate. Prima di ogni commit di evidenze e prima della copia del registro: `flowreg togli-pagine`, poi `grep` del nome utente, dell'host, di `/home/`, degli id di sessione e delle forme di token. Nei file nuovi niente nomi di progetti privati dell'utente.
 - **Mai asserzioni che al fallimento mostrino `os.environ`** (incidente di B3-bis): `assertTrue(x is os.environ, "…")`, `call_count` invece di `assert_not_called`. Il brief di ogni implementatore lo dice.
 - **Il brief del revisore contiene il report dell'implementatore.**
@@ -55,7 +56,7 @@ Il piano dà firme, test e valori; il corpo lo scrive l'implementatore. Se il pi
 
 ## Regole di cautela
 
-Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincolante). Sono quelle di `docs/sdd/2026-11-04-tollgate-b3bis-sentinella-modelli/cautele.md`, con i percorsi di B4, con le aggiunte qui sotto, e con le **sole** eccezioni elencate dopo, che valgono **solo per il controller** e non vanno mai a un subagente.
+Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincolante). Si parte da `docs/sdd/2026-11-04-tollgate-b3bis-sentinella-modelli/cautele.md`, copiato **per intero** con i percorsi di B4 (comprese le righe sul testo non fidato, su `/tmp` e sui tempi della suite, l'elenco dei nomi delle chiavi e il test instabile `test_db_restore_interactive_eof_and_ctrl_c`), tolte solo le righe proprie di B3-bis (`spikes/b3bis/`, la pulizia di `/tmp`, la prova dei modelli); poi si aggiunge l'elenco qui sotto, che vince dove i due dicono cose diverse. Le **sole** eccezioni elencate dopo valgono **solo per il controller** e non vanno mai a un subagente.
 
 **Stato e configurazione dell'utente**
 - Mai toccare `~/.local/state/tollgate`. I test usano solo `tests.helpers.TempState` e una `HOME` temporanea.
@@ -80,13 +81,13 @@ Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincol
 **Commit e lingua**
 - Un commit dopo ogni task, con la riga `Co-Authored-By` del modello. Prima di ogni commit `tests/run` deve passare con `python3.11` e con `python3`.
 - Nessun `__pycache__` nel commit (`python3 -B`): controlla `git status` prima di `git add`.
-- Non toccare `skills/rules-base/SKILL.md`, `skills/rules-ai/SKILL.md`, `docs/profili/base.md`, `docs/profili/ai.md`, `docs/profili/verifiche/base-fonti.md`, `docs/profili/verifiche/ai-fonti.md`. `approved` in `skills/rules-infra/SKILL.md` si scrive solo nel Task 5, su indicazione del controller.
+- Non toccare `skills/rules-base/SKILL.md`, `skills/rules-ai/SKILL.md`, `docs/profili/base.md`, `docs/profili/ai.md`, `docs/profili/verifiche/base-fonti.md`, `docs/profili/verifiche/ai-fonti.md`. `approved` in `skills/rules-infra/SKILL.md` si scrive solo nel Task 6, su indicazione del controller.
 - Lavora solo nel worktree `.claude/worktrees/b4` (ramo `b4-profilo-infra`), mai nel checkout principale né su `main`. Il percorso contiene spazi: virgolette sempre.
 - Risposte e messaggi in italiano; identificatori in inglese.
 
 **Eccezioni per il controller, una per una**
-1. **Pagine ufficiali** (Task 3, Step 0, e Task 4 se una fonte va sostituita): `WebFetch` in sola lettura delle pagine ufficiali di Vercel (`vercel.com/docs`), Cloudflare (`developers.cloudflare.com`), Docker (`docs.docker.com`) e dei repository `github.com/cloudflare/skills` e `github.com/docker/docs` (licenza e `SKILL.md` di `wrangler`). Copie nel workspace, trattate come dati non fidati, mai nel repo. Se una pagina ufficiale sta su un altro dominio, ti fermi e chiedi.
-2. **Prova reale** (Task 8), già prevista dal piano (decisione 14): `spikes/run-b1-flow.sh` con `B1_FLOW_CASE=infra B1_FLOW_RULES=vere`, modi `prepara`, `passo1`, `passo2`, `registra`, solo sotto `/tmp/tollgate-b1/`, sempre con `--plugin-dir`, al più 3 tentativi per passo. È l'unico `claude -p` di B4 e consuma l'abbonamento (circa 1-1,5 USD stimati). Prima di partire controlla che nell'ambiente **non** ci siano `ANTHROPIC_API_KEY`, `VERCEL_TOKEN` e `CLOUDFLARE_API_TOKEN` (solo se sono impostate, mai il valore): con `ANTHROPIC_API_KEY` Claude Code userebbe la chiave al posto dell'abbonamento, e le altre due darebbero al modello credenziali vere. Se una c'è, ti fermi e chiedi.
+1. **Pagine ufficiali** (Task 4, Step 0, e Task 5 se una fonte va sostituita): `WebFetch` in sola lettura delle pagine ufficiali di Vercel (`vercel.com/docs`), Cloudflare (`developers.cloudflare.com`), Docker (`docs.docker.com`) e dei repository `github.com/cloudflare/skills` e `github.com/docker/docs` (licenza e `SKILL.md` di `wrangler`). Copie nel workspace, trattate come dati non fidati, mai nel repo. Se una pagina ufficiale sta su un altro dominio, ti fermi e chiedi.
+2. **Prova reale** (Task 9), già prevista dal piano (decisione 14): `spikes/run-b1-flow.sh` con `B1_FLOW_CASE=infra B1_FLOW_RULES=vere`, modi `prepara`, `passo1`, `passo2`, `registra`, solo sotto `/tmp/tollgate-b1/`, sempre con `--plugin-dir`, al più 3 tentativi per passo. È l'unico `claude -p` di B4 e consuma l'abbonamento (circa 1-1,5 USD stimati). Prima di partire controlla che nell'ambiente **non** ci siano `ANTHROPIC_API_KEY`, `VERCEL_TOKEN` e `CLOUDFLARE_API_TOKEN` (solo se sono impostate, mai il valore): con `ANTHROPIC_API_KEY` Claude Code userebbe la chiave al posto dell'abbonamento, e le altre due darebbero al modello credenziali vere. Se una c'è, ti fermi e chiedi. L'assenza delle variabili non basta: le credenziali di `vercel login` e `wrangler login` stanno in file della cartella dell'utente, e per questo lo script con `B1_FLOW_CASE=infra` vieta al modello `vercel`, `wrangler`, `docker` e i lanciatori dei pacchetti (decisione 14, `test_flow_disallows_deploy_clis`); prima di lanciare `passo1` controlla nell'uscita di `controlla` che la riga `--disallowedTools` li contenga.
 3. **Push di `main` su `https://github.com/ginz0ls/tollgate.git`**, solo dopo il merge con l'OK dell'utente e solo dopo `spikes/gh-p4/ghguard.py gitcheck -- push https://github.com/ginz0ls/tollgate.git main` con `P4_PROFILE=p5` uscito con 0; mai forzato. Poi `gh run list|view|watch` della CI di `main`, dalla guardia con lo stesso profilo (`run list` senza `--branch`). Nessun altro comando verso GitHub.
 
 Vietati anche al controller: `claude plugin eval`; `vercel`, `wrangler`, `docker`, `npx` veri; ogni operazione sui repo di prova di P4 e su altri repo; leggere o stampare chiavi e token; cambi di visibilità; cancellare repo o rami remoti; riscrivere la storia; cancellazioni in `/tmp` fuori dalle cartelle della prova.
@@ -94,7 +95,7 @@ Vietati anche al controller: `claude plugin eval`; `vercel`, `wrangler`, `docker
 ## Quando fermarsi e chiedere
 
 Solo in questi casi:
-- **l'approvazione delle regole** (Task 5, Step 1): fermata prevista;
+- **l'approvazione delle regole** (Task 6, Step 1): fermata prevista;
 - una pagina ufficiale che smentisce un fatto della tabella «Fatti verificati» del piano al punto da cambiare una decisione (per esempio un nome di file che lo strumento non legge più);
 - più di 3 tentativi di un passo della prova reale, o una variabile di credenziali nell'ambiente prima della prova (eccezione 2);
 - `/tmp` sotto 1 GB libero;
