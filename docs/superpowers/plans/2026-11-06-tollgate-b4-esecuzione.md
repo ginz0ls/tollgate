@@ -26,7 +26,7 @@ Prima del Task 1, un analista sonnet in sola lettura scrive `preflight-scan.md`:
 - `fragments.rules` che solleva (decisione 10) contro ogni chiamante, `init.propose` compreso;
 - il frammento vero di `infra` contro i test che lanciano `init` dalla CLI con la radice vera (`ModeTest`, `FilesTest`, `ServicesTest`, `HintsTest`, `UpdateTest`, `ProtectScriptTest`) e contro `test_real_trees_light_no_profile`;
 - `test_area_agents_name_rules_ai` e le frasi esatte di `tests/test_manifest.py` contro la decisione 9 (test d'area su `AREAS`);
-- `bash.effect_reason` e `unwrap_launcher` (Task 3) contro `tests/test_bash.py`, `tests/test_effects.py`, `tests/test_check_effects.py` e `[external_effects] allow`/`commands`/`project_scripts`, che si confrontano sul testo di tutto il comando: nessun comando che oggi non è un effetto deve diventarlo, salvo quelli della decisione 17;
+- `bash.effect_reason` e `launcher_candidates` (Task 3) contro `tests/test_bash.py`, `tests/test_effects.py`, `tests/test_check_effects.py` e `[external_effects] allow`/`commands`/`project_scripts`, che si confrontano sul testo di tutto il comando: nessun comando che oggi non è un effetto deve diventarlo, salvo quelli della decisione 17;
 - `READONLY_TYPES` di `hooks/run` contro `config.DEFAULTS["review"]["readonly_agents"]` e `test_readonly_list_matches_config_and_agents`;
 - `spikes/run-b1-flow.sh` con `B1_FLOW_CASE=infra` contro i test esistenti di `tests/test_b1_scripts.py` (casi `b1` e `ai`) e contro `test_committed_evidence_has_no_long_web_results`.
 
