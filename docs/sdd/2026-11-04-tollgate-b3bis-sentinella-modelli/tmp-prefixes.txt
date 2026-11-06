@@ -1,0 +1,61 @@
+tollgate artifacts 
+tollgate-b1-eco-
+tollgate-b1-flowreg-
+tollgate-b1-latenza-
+tollgate-b1-record-
+tollgate-b1-test-
+tollgate-b2-flowreg-
+tollgate-b3-flowreg-
+tollgate-bin-
+tollgate blob 
+tollgate block gate 
+tollgate claude 
+tollgate eval cases 
+tollgate eval kit 
+tollgate-finti-
+tollgate fp 
+tollgate-gate-
+tollgate gate lab 
+tollgate gh 
+tollgate git 
+tollgate grep 
+tollgate guard 
+tollgate home 
+tollgate-home-
+tollgate-inattivo-
+tollgate l2tree 
+tollgate lab 
+tollgate ls 
+tollgate-nosentinel-
+tollgate out 
+tollgate outside 
+tollgate p4 casi 
+tollgate-p4-cmp-
+tollgate-p4-conferma-
+tollgate-p4-controlla-
+tollgate-p4-controlla.
+tollgate p4 flow 
+tollgate-p4-flow-controlla.
+tollgate-p4-gate-controlla.
+tollgate p4 gen 
+tollgate p4 guard 
+tollgate-p4-state-
+tollgate p4 wrap 
+tollgate-p5-controlla-
+tollgate-p5-controlla.
+tollgate-p5-gate-controlla-
+tollgate-p5-gate-controlla.
+tollgate-p5-shim-
+tollgate-p5-sonda-
+tollgate parent 
+tollgate pid 
+tollgate root 
+tollgate sentinel 
+tollgate sp 
+tollgate-test-
+tollgate-test-cost-
+tollgate-test-evalrun-
+tollgate verdict 
+tollgate-verify-
+tollgate-waiver-
+tollgate wrapper 

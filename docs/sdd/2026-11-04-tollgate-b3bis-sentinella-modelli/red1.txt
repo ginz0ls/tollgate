@@ -1,0 +1,10 @@
+FAIL: test_anthropic_empty_line_is_no_family (tests.test_models.GeminiTest.test_anthropic_empty_line_is_no_family)
+FAIL: test_gemini_family_parse (tests.test_models.GeminiTest.test_gemini_family_parse) (name='gemini-3.7-flash-preview-tts')
+FAIL: test_gemini_family_parse (tests.test_models.GeminiTest.test_gemini_family_parse) (name='gemini-2.5-flash-preview-tts')
+FAIL: test_gemini_family_parse (tests.test_models.GeminiTest.test_gemini_family_parse) (name='gemini-2.0-flash-exp-image-generation')
+FAIL: test_gemini_preview_mode_in_use_is_not_compared_to_plain_family (tests.test_models.GeminiTest.test_gemini_preview_mode_in_use_is_not_compared_to_plain_family)
+Ran 40 tests in 0.004s
+FAILED (failures=5)
+FAIL: test_anthropic_empty_line_is_no_family (tests.test_models.GeminiTest.test_anthropic_empty_line_is_no_family)
+Ran 40 tests in 0.003s
+FAILED (failures=1)

@@ -1,0 +1,4 @@
+AssertionError: Lists differ: ['docs/verifiche/evidenze/b1/flusso/passo1[1249 chars]04)'] != []
+First list contains 17 additional elements.
+'docs/verifiche/evidenze/b1/flusso/passo1/tentativo-2/claude.jsonl:68: skill (10769)'
+FAILED (failures=1)

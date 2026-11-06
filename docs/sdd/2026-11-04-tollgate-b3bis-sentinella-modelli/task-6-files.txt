@@ -1,0 +1,8 @@
+docs/verifiche/evidenze/b1/flusso/passo1.prev-20261029-104334-3824318/tentativo-1/claude.jsonl {'skill': 1}
+docs/verifiche/evidenze/b1/flusso/passo1/tentativo-2/claude.jsonl {'skill': 1}
+docs/verifiche/evidenze/b2/flusso/passo1.prev-20261101-082818-633829/tentativo-1/claude.jsonl {'skill': 1}
+docs/verifiche/evidenze/b2/flusso/passo1/tentativo-2/claude.jsonl {'skill': 1}
+docs/verifiche/evidenze/gh-p4/flusso/passo1.jsonl {'hook': 3, 'skill': 1}
+docs/verifiche/evidenze/gh-p4/flusso/passo2.jsonl {'hook': 3}
+docs/verifiche/evidenze/gh-p4/flusso/passo3.jsonl {'hook': 3}
+docs/verifiche/evidenze/gh-p4/flusso/shim.jsonl {'hook': 3}

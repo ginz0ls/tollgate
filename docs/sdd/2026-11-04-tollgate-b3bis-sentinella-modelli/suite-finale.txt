@@ -1,0 +1,22 @@
+=== corsa 1 2026-11-05T06:10:48+01:00
+corsa 1 exit=0
+Ran 3572 tests in 1515.399s
+OK (skipped=5)
+Ran 3572 tests in 1468.380s
+OK (skipped=3)
+0
+=== corsa 2 2026-11-05T07:00:34+01:00
+corsa 2 exit=0
+Ran 3572 tests in 1489.789s
+OK (skipped=5)
+Ran 3572 tests in 1469.631s
+OK (skipped=3)
+0
+=== corsa 3 2026-11-05T07:49:55+01:00
+corsa 3 exit=0
+Ran 3572 tests in 1491.164s
+OK (skipped=5)
+Ran 3572 tests in 1490.424s
+OK (skipped=3)
+0
+--- nuove in /tmp:

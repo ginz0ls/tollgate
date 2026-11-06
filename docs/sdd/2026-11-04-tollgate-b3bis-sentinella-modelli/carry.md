@@ -1,0 +1,40 @@
+# Decisioni del controller portate nei task (prevalgono sul testo del piano)
+
+Ogni voce nomina i task a cui si applica. Il dispatch di un task copia tutte le voci che lo nominano.
+
+## Dal Task 1, Step 0 (pagine ufficiali, 2026-11-04)
+
+- **Task 1, 2 (Step 0 a):** le pagine di Anthropic non dicono che l'elenco contenga gli alias senza data dei modelli prima della 4.6 (l'API li accetta). La regola della decisione 2 (letterale `L` con un ID `L-AAAAMMGG` nell'elenco → vale come quell'ID, riga «alias di …») **si implementa**; `test_alias_and_vertex_ids_not_flagged` resta.
+- **Task 2 (Step 0 b):** OpenRouter: `env = ["TOLLGATE_MODELS_OPENROUTER_KEY", "OPENROUTER_API_KEY"]` (variabile dell'esempio cURL di https://openrouter.ai/docs/api-reference/authentication).
+- **Task 2 (Step 0 c):** OpenAI: `hint = "gpt-[a-z0-9][a-z0-9.-]*"` (gli ID della pagina https://developers.openai.com/api/docs/models cominciano tutti con `gpt-`). Gli altri `hint` come nella decisione 4: Anthropic `claude-(?:[a-z0-9]+-)?[0-9][a-z0-9.-]*`, Gemini `gemini-[0-9][a-z0-9.-]*`, OpenRouter `(anthropic|google|openai)/[A-Za-z0-9._:~-]+`.
+
+## Dallo scan pre-flight (preflight-scan.md)
+
+- **Task 1 (D19):** test in più: `gemini-3.7-flash-preview-tts` (coda non data dopo `preview`) non è stabile e non è mai proposto come «più nuovo»; la versione `(3,)` di `gemini-3-flash` è più vecchia di `(3, 6)`.
+- **Task 1 (D20):** `lifecycle` della risposta di Anthropic è una stringa (`active`, `deprecated`, `retired`); un valore non stringa → non stabile e non in ritiro. Nessuna gestione di liste.
+- **Task 2 (D6):** `tests/helpers.py` importa `ssl`, `http.client`, `urllib.request` in cima al file, prima di ogni patch, con un commento che dice perché (sotto `no_network()` il primo `import urllib.request` fallirebbe con `TypeError` se `ssl` non è caricato).
+- **Task 2, 3, 4 (D8):** `cached_pages` chiama `fetch(provider, key, deadline=deadline)`; i `fetch` finti dei test dei Task 3 e 4 hanno questa forma.
+- **Task 2 (D17):** `test_hooks_do_not_reach_models_net` asserisce anche che nessun modulo di `tollgate_hooks` e `tollgate_checks` importa qualcosa di `tollgate_flow` (usa l'analisi degli import di `tests/test_layers.py`).
+- **Task 2 (D21):** `build_opener()` costruisce un `urllib.request.OpenerDirector()` minimo e vi aggiunge solo: `ProxyHandler({})`, `HTTPSHandler`, `HTTPDefaultErrorHandler`, `HTTPErrorProcessor` e il gestore di redirect che solleva `FetchError("redirect rifiutato")`. Niente `file:`, `ftp:`, `data:`, `http:`. Test: l'opener non ha gestori per `http`/`file`.
+- **Task 3 (D2):** un tipo sbagliato in `[models]` (`files` come stringa, `models_check` non booleano) è un `ConfigError` come per ogni altra chiave (`test_models_files_type_checked`). Nessun trattamento speciale.
+- **Task 3 (D9):** il filtro dei percorsi della decisione 1 toglie anche le voci con un segmento `.` o vuoto (`./x`, `a//b`, una `/` finale), con lo stesso avviso (voce con `repr`); test. `git.object_info_at` decide dal codice d'uscita di git, mai dal testo di stderr (i messaggi di git sono localizzati). Un link simbolico tracciato si legge come blob: nessun caso speciale.
+- **Task 3 (D10):** ordine in `check`: componente spento → `[]`; `files` vuoto → `[]` o il solo promemoria del profilo `ai`; **solo dopo** `load_providers` e il resto (le copie parziali del plugin nei test hanno solo `bin/`, senza `templates/`). Test: con `files` vuoto e una radice del plugin senza `templates/` nessuna riga «controllo non riuscito».
+- **Task 3 (D18):** il parametro di `check` resta `clock=`; se serve il modulo `tollgate_core.clock`, importalo con un altro nome.
+- **Task 4 (D4):** nel ramo `models` della CLI: componente spento → stampa `modelli: controllo spento ([components] models_check = false)`; `[models] files` vuoto → `modelli: nessun file dichiarato in [models] files` (dopo le eventuali righe di `check`, cioè il promemoria del profilo `ai`); solo negli altri casi senza righe `modelli: nessun avviso`. Uscita 0. Test per i due casi. `start` invariato.
+- **Task 4 (D7):** `models check` trova repo e ramo con `git.toplevel`, `git.main_worktree`, `git.origin_url`, `git.default_ref` come fa `start`; cattura `ConfigError` e `ConfigNotFound` nel proprio ramo (`cli.main` non le cattura) e stampa `rifiuto: configurazione non valida: …` con uscita 1.
+- **Task 4 (D16):** `BareProgramInMessagesTest` (classe a `tests/test_manifest.py:562`) legge anche `help=`/`description=` del parser: nessuna stringa di `bin/` con `tollgate models …` alla lettera; `help` del parser: «confronta i modelli del progetto con gli elenchi dei fornitori».
+- **Task 4 (D28):** l'elenco degli avvisi in `skills/start/SKILL.md` è alle righe 26-30.
+- **Task 4 (D29):** nei testi per l'utente (`comandi.md`, `installazione.md`, skill `start`) scrivi «controllo dei modelli», non «sentinella» da sola: il gate usa già `sentinel`.
+- **Task 4 (D2, D5, D15, D21, D23, D24):** `installazione.md`/`comandi.md` dicono anche, in parole semplici: un tipo sbagliato in `[models]` è un errore di configurazione come altrove; un subagente può lanciare `models check --refresh` (una richiesta per fornitore, nessun token); la chiave nell'ambiente è leggibile da qualunque comando della sessione; in una sandbox di rete vanno consentiti i quattro host di `templates/models.toml`; il comando si lancia dal plugin, non dalla copia del gate in `.github/tollgate/`; i nomi di modello senza virgolette (`.env`, YAML non quotato) non si vedono.
+- **Task 5 (D1):** il trap di `tests/run` è `trap 'chmod -R u+rwX "$RUN_TMP" 2>/dev/null || true; rm -rf "$RUN_TMP" || true' EXIT` e il codice d'uscita della corsa resta quello dei test; test in più `test_run_removes_sealed_dirs_and_keeps_exit_code` (la sonda crea dentro `TMPDIR` una cartella a 0o500 con una sottocartella a 0, e passa: uscita 0, cartella tolta).
+- **Task 5 (D13):** `FakeGhCase()` solleva `ValueError` (non ha test): in `test_known_leaks_closed` istanzia una sottoclasse con test (per esempio `PrReadTest("<un suo test>")`); per la classe di `tests/test_hook_engine.py:196` chiama `setUpClass`/`tearDownClass` a mano.
+- **Task 6 (D26):** un'uscita di hook si riconosce da `type == "system"`, `subtype == "hook_response"`, `hook_event == "SessionStart"` (non `hook_event_name`); il testo sta in `output` **e** in `stdout` (identici): si sostituiscono entrambi. «Comincia con `tollgate:`» si controlla su `hookSpecificOutput.additionalContext` dopo `json.loads(stdout)` (la stringa grezza comincia con `{`); `stdout` non JSON → di terzi (se non vuoto e non già segnaposto). Il segnaposto usa `hook_name` (per esempio `SessionStart:startup`).
+- **Task 6 (D27):** le cartelle di `skills/` del repo si ricavano da `Path(__file__).resolve().parents[2] / "skills"` (mai dalla cartella corrente né da `ROOT.name`); aggiorna il docstring in cima a `flowreg.py` per le uscite di hook.
+- **Task 7 (D3):** `spikes/b3bis/progetto/tollgate.toml` contiene `schema_version = 1`, `[gate] mode = "detect"` e `[models] files = ["ai/models.py"]`; test `test_progetto_toml_is_valid` che lo passa a `config.load_config_text` senza errori.
+- **Task 7 (D11):** `prepara` fa `git init -q -b main` e imposta nel repo e nell'`origin` `user.name prova`, `user.email prova@example.com`, `commit.gpgsign false`, come `spikes/run-b1-flow.sh:268-272` (sul runner della CI non c'è identità globale).
+- **Task 7 (D12):** le cartelle `tollgate-b3bis-test-*` dei test stanno direttamente in `/tmp` (come vuole lo script) e si tolgono con `addCleanup`.
+- **Task 8 (D15, D2):** la rev 30 aggiunge il limite «la chiave sta nell'ambiente della sessione, leggibile da qualunque comando: tollgate non la protegge da lì» alla sezione 1.2 della spec **e** a `docs/uso/limiti.md` nello stesso commit (`test_limits_match_spec_1_2`); la decisione 1 nella rev 30 dice che un tipo sbagliato in `[models]` è un errore di configurazione.
+
+## Dai task eseguiti
+
+- **Task 3 (Task 1):** `models.used` e `models.findings` vanno chiamati con gli `infos` di **un solo fornitore** alla volta (la regola degli alias vale solo per Anthropic).
