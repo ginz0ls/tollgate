@@ -192,3 +192,11 @@ Decise con l'utente scrivendo il piano di B3-bis, dopo una verifica sulle pagine
 - **Ciò che l'elenco non dà si salta, e si dice (utente).** L'elenco di Gemini non ha date di ritiro; quelli di OpenAI e OpenRouter non dicono a quale famiglia appartiene un modello. La sentinella avvisa solo per ciò che l'elenco ufficiale dà e, per il resto, scrive una riga «non controllato». Non legge pagine web dei fornitori: si romperebbe a ogni cambio della pagina.
 - **Una prova vera, una volta (utente).** Alla fine dell'esecuzione il controller lancia la sentinella sulle chiavi già presenti nell'ambiente dell'utente, una chiamata di elenco per fornitore; senza chiave quel fornitore si salta. Nessun modello viene usato.
 - **Pulizia di `/tmp` (utente).** B3-bis ferma la crescita delle cartelle che i test lasciano in `/tmp` e cancella quelle vecchie: solo le cartelle dell'utente che iniziano con `tollgate`, più vecchie di un giorno, dopo averne mostrato l'elenco con il numero.
+
+## 11. Aggiunte dell'utente del 6 novembre 2026: il profilo `infra` (B4)
+
+Decise con l'utente scrivendo il piano di B4, dopo una verifica sulle pagine ufficiali di Vercel, Cloudflare e Docker.
+
+- **I workflow di GitHub restano al gate (utente).** I file in `.github/workflows/` non accendono `infra`: restano controllati come oggi da `guard` e dalla deroga `ci` di test-guard, e più avanti dal profilo `ci`. Le regole di `infra` chiedono comunque di leggerli prima di parlare di deploy.
+- **Il codice dei Worker di Cloudflare va in `backend` (utente).** `infra` copre la configurazione e il deploy (la configurazione di Wrangler, quella di Vercel, Docker); il programma che risponde alle richieste è codice di `backend` (B5), come dice la riga `backend` della sezione 3.4. Fino a B5 quel codice va all'agente generico.
+- **Server: Docker sì, il resto dopo (mia scelta).** La domanda su quali server coprire non era chiara all'utente; i progetti sul suo disco, contati per nome di file senza aprirli, usano Docker (Dockerfile e file compose in più cartelle) e quasi mai Terraform o configurazioni di server propri. `infra` copre quindi Vercel, Cloudflare e Docker; Terraform, nginx e systemd si aggiungono quando un progetto reale li usa.
