@@ -25,6 +25,10 @@ class FragmentsTest(unittest.TestCase):
         self.root = Path(tmp.name)
         self.dir = self.root / "templates" / "profiles"
 
+    @staticmethod
+    def q(s):
+        return tomlout.table("x", {"v": s}).splitlines()[-1].split(" = ", 1)[1]
+
     def put(self, name, text):
         self.dir.mkdir(parents=True, exist_ok=True)
         (self.dir / name).write_text(text, encoding="utf-8")
@@ -87,10 +91,10 @@ class FragmentsTest(unittest.TestCase):
                 self.assertIn(name, str(cm.exception))
 
     def test_load_rejects_other_pattern_forms(self):
-        for pat in ("**/*.sql", "src/ai/**", "**/ai", "**/a/b/**", "**/**", "!**/ai/**",
+        for pat in ("**/*.sql", "src/ai/**", "**/a/b/**", "**/**", "!**/ai/**",
                     "**/a*/**", ""):
             with self.subTest(pat=pat):
-                self.put("ai.toml", f'[profile]\npaths = [{tomlout_str(pat)}]\n')
+                self.put("ai.toml", f'[profile]\npaths = [{self.q(pat)}]\n')
                 with self.assertRaises(fragments.FragmentError):
                     fragments.load(self.root)
 
@@ -105,7 +109,7 @@ class FragmentsTest(unittest.TestCase):
     def test_load_rejects_dot_folders(self):
         for pat in ("**/./**", "**/../**"):
             with self.subTest(pat=pat):
-                self.put("ai.toml", f'[profile]\npaths = [{tomlout_str(pat)}]\n')
+                self.put("ai.toml", f'[profile]\npaths = [{self.q(pat)}]\n')
                 with self.assertRaises(fragments.FragmentError):
                     fragments.load(self.root)
 
@@ -135,9 +139,48 @@ class FragmentsTest(unittest.TestCase):
     def test_rules_from_skill(self):
         self.put("ai.toml", GOOD)
         f = fragments.load(self.root)[0]
-        self.assertEqual(fragments.rules(f), ([], []))
+        with self.assertRaises(fragments.FragmentError):
+            fragments.rules(f)
         self.skill("ai", "---\nname: rules-ai\n---\nR-AI-02 b\nR-AI-01 [blocca] a\n")
         self.assertEqual(fragments.rules(f), (["R-AI-01", "R-AI-02"], ["R-AI-01"]))
+
+    def test_parse_pattern_forms(self):
+        P = fragments.Pattern
+        for pat, want in (("**/ai/**", P("folder", "ai")), ("infra/**", P("root_folder", "infra")),
+                          ("**/vercel.json", P("name", "vercel.json")),
+                          ("**/Dockerfile*", P("name", "Dockerfile*")),
+                          ("**/.dockerignore", P("name", ".dockerignore")),
+                          ("**/ai", P("name", "ai")), ("**/ab*", P("name", "ab*"))):
+            with self.subTest(pat=pat):
+                self.assertEqual(fragments.parse_pattern(pat), want)
+
+    def test_parse_pattern_rejects(self):
+        for pat in ("**/*", "**/**", "**", "**/*.sql", "**/*.json", "**/*.Dockerfile", "**/a*b",
+                    "**/a*", "**/Dockerfile**", "**/x", "**/a/b", "src/x/**", "/infra/**",
+                    "vercel.json", "**/.", "**/..", "**/./**", "**/a?b", "**/a[b]", "**/a\\b",
+                    "!**/x/**", "**/*.{tsx,jsx}", "**/", "**/ x", "**/\u00e8.json", "**/a*/**"):
+            with self.subTest(pat=pat):
+                self.assertIsNone(fragments.parse_pattern(pat))
+
+    def test_load_accepts_three_forms(self):
+        self.put("infra.toml", '[profile]\npaths = ["**/ai/**", "infra/**", "**/vercel.json"]\n')
+        (f,) = fragments.load(self.root)
+        P = fragments.Pattern
+        self.assertEqual(f.patterns, (P("folder", "ai"), P("root_folder", "infra"),
+                                      P("name", "vercel.json")))
+
+    def test_load_approved_filters_unapproved(self):
+        self.put("ai.toml", GOOD)
+        self.put("zeta.toml", GOOD)
+        self.skill("zeta", "---\nname: rules-zeta\napproved: 2026-11-01\n---\nR-ZETA-01 x\n")
+        self.assertEqual([f.area for f in fragments.load_approved(self.root)], ["zeta"])
+
+    def test_rules_unreadable_skill_raises(self):
+        self.put("ai.toml", GOOD)
+        f = fragments.load(self.root)[0]
+        with self.assertRaises(fragments.FragmentError) as cm:
+            fragments.rules(f)
+        self.assertIn("rules-ai/SKILL.md", str(cm.exception))
 
     def test_fragment_profile_validates(self):
         self.put("ai.toml", GOOD)
@@ -161,14 +204,17 @@ class RealFragmentsTest(unittest.TestCase):
         self.assertIn("ai", found)
         self.assertEqual(found["ai"].profile["agent"], "tollgate:implementer-ai")
         self.assertTrue(found["ai"].detect)
+        self.assertIn("infra", found)
+        self.assertEqual(found["infra"].profile["agent"], "tollgate:implementer-infra")
+        self.assertFalse(found["infra"].detect)
 
     def test_real_ai_fragment_approved(self):
         found = {f.area: f for f in fragments.load(ROOT)}
         self.assertTrue(fragments.approved(found["ai"]))
 
-
-def tomlout_str(s):
-    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    def test_real_infra_fragment_approved(self):
+        found = {f.area: f for f in fragments.load(ROOT)}
+        self.assertTrue(fragments.approved(found["infra"]))
 
 
 if __name__ == "__main__":

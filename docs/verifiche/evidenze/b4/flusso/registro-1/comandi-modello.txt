@@ -1,0 +1,29 @@
+# docs/verifiche/evidenze/b4/flusso/passo1/tentativo-1/claude.jsonl
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" start 1 --level L1
+bash: git ls-files | head -50; echo ---; cat vercel.json 2>/dev/null; echo ---; ls tests docs 2>/dev/null; cat package.json 2>/dev/null; cat tollgate.toml 2>/dev/null
+bash: cat tests/test_smoke.py; ls /tmp/tollgate-b1/plugin/skills/; ls /tmp/tollgate-b1/plugin/skills/rules-infra; grep -n "plan-check\|Must-have\|M<n>" -r /tmp/tollgate-b1/plugin --include=*.md | head -20
+grep: {"pattern": "^#+ headers|\"source\": \"/\\(\\.\\*\\)\"|X-Content-Type|\"headers\": \\[", "path": "/home/USER/.claude/projects/-tmp-tollgate-b1-flow--claude-worktrees-tg-1-aggiungi-l-intestazione-x-content-type-o/SESSIONE-1/tool-results/toolu_011NP9HtpUmEGu1Ex6qMrThf.txt", "output_mode": "content", "-n": true, "head_limit": 30}
+bash: git add docs/superpowers/plans/2026-11-08-x-content-type-options.md && git commit -q -m "docs: piano per X-Content-Type-Options in vercel.json ⏎  ⏎ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>" && git log --oneline -1
+# docs/verifiche/evidenze/b4/flusso/passo2/tentativo-1/claude.jsonl
+bash: pwd && ls docs/superpowers/plans/ 2>&1; git log --oneline -5; git status --short
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" status --checkpoint
+bash: cat docs/superpowers/reviews/1/checkpoint.md; git status --short; cat docs/superpowers/plans/2026-11-08-x-content-type-options.md | head -60
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" task start 1
+bash (subagente): ls -a . tests .github/workflows 2>&1; git ls-files
+grep (subagente): {"pattern": "\"headers\"|cleanUrls|\"source\"", "path": "/home/USER/.claude/projects/-tmp-tollgate-b1-flow--claude-worktrees-tg-1-aggiungi-l-intestazione-x-content-type-o/SESSIONE-2/tool-results/toolu_0166mqcgJyig3DKZCpRd34PM.txt", "output_mode": "content", "head_limit": 25, "-C": 1}
+bash (subagente): python3 /tmp/tollgate-b1/plugin/bin/tollgate research submit 1 <<'NOTA_DI_RICERCA_FINE' ⏎ ## Letto nel progetto ⏎ - vercel.json ⏎ - Dockerfile ⏎ - tests/test_smoke.py ⏎ - .github/workflows/tollgate-run.yml ⏎  ⏎ ## Documentazione ⏎ - https://vercel.com/docs/project-configuration/vercel-json — la proprietà `headers` è un array di oggetti con `source` (pattern, es. "/(.*)") e `headers` (lista di coppie `key`/`value`); `cleanUrls` è una proprietà booleana separata. ⏎  ⏎ ## Cosa ho trovato ⏎ vercel.json contiene solo `cleanUrls: true`. Il Dockerfile (python:3.12-slim, app/) e i workflow in .github/workflows (solo tollgate-*, nessun deploy) non toccano l'intestazione. Aggiungo la chiave `headers` con una voce `/(.*)` e X-Content-Type-Options: nosniff, lasciando cleanUrls. Test unittest nello stile di test_smoke.py. ⏎ NOTA_DI_RICERCA_FINE
+bash (subagente): python3 -m unittest tests.test_vercel_headers 2>&1 | tail -8
+bash (subagente): python3 -m unittest discover -s tests -t . 2>&1 | tail -5 && git add vercel.json tests/test_vercel_headers.py && git commit -q -m "feat: aggiungi X-Content-Type-Options nosniff in vercel.json ⏎  ⏎ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>" && python3 /tmp/tollgate-b1/plugin/bin/tollgate verify 2>&1 | tail -8
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" task review-prepare 1
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" task done 1; python3 "/tmp/tollgate-b1/plugin/bin/tollgate" status --checkpoint; tail -3 docs/superpowers/reviews/1/checkpoint.md
+# strumenti del modello (totale, di cui da subagenti)
+Agent: 2 (0)
+Bash: 14 (4)
+EnterWorktree: 1 (0)
+Grep: 2 (1)
+Read: 12 (8)
+Skill: 2 (0)
+ToolSearch: 2 (0)
+WebFetch: 2 (1)
+WebSearch: 1 (0)
+Write: 3 (2)

@@ -10,7 +10,7 @@
                               di sessione ricavate da `cwd` e `session_id` di ogni flusso; si stampano solo le righe col titolo
   tipi <tollgate.db>          (B3) agent_type e reviewer_type di ogni task (sola lettura)
   togli-pagine <stream.jsonl>...   (B3) UNICO comando che scrive: riscrive il flusso al suo posto, sostituendo il testo delle pagine dei
-                              fornitori (risultati lunghi di WebFetch e WebSearch), quello delle skill che non sono di tollgate
+                              fornitori (risultati lunghi di WebFetch e WebSearch, e qualunque risultato di Read/Grep su una copia salvata in `tool-results/`), quello delle skill che non sono di tollgate
                               (blocchi "Base directory for this skill:" lunghi) e le uscite degli hook SessionStart di altri
                               plugin (quelle il cui additionalContext non comincia con "tollgate:") con un segnaposto che dice
                               nome o URL e lunghezza
@@ -24,8 +24,11 @@ from pathlib import Path, PurePosixPath
 
 WANTED = ("research_note", "research_reminder", "veto")
 RULES_TITLE = "# Regole di base (versione 1)"
-AI_TITLES = ("# Regole ai (versione 1)", RULES_TITLE)
+AREA_TITLES = ("# Regole ai (versione 1)", "# Regole infra (versione 1)", RULES_TITLE)
 WEB_TOOLS = ("WebFetch", "WebSearch")
+SAVED_TOOLS = ("Read", "Grep")  # su una copia salvata da Claude Code in tool-results/ portano lo stesso testo di terzi, a qualunque lunghezza
+SAVED_DIR = "tool-results"
+PAGE_PLACEHOLDER = "[pagina di terzi tolta dalle evidenze:"
 MAX_WEB_RESULT = 5000  # caratteri: oltre, il risultato di WebFetch/WebSearch è una pagina di terzi e non entra nelle evidenze pubbliche
 
 
@@ -217,7 +220,7 @@ def trascrizioni(home, paths):
                 if not isinstance(obj, dict):
                     continue
                 for text_line in _message_text(obj).splitlines():
-                    if text_line.strip() in AI_TITLES:
+                    if text_line.strip() in AREA_TITLES:
                         found.append((text_line.strip(), bool(obj.get("isMeta"))))
             if not found:
                 print(f"{sub.name}: nessun titolo")
@@ -285,7 +288,27 @@ def external_skill(text):
 
 
 def _placeholder(url, length):
-    return f"[pagina di terzi tolta dalle evidenze: {url}, {length} caratteri]"
+    return f"{PAGE_PLACEHOLDER} {url}, {length} caratteri]"
+
+
+def _saved_copy(tool_input):
+    """Il nome del file se Read/Grep puntano dentro una cartella `tool-results/` (copia salvata da Claude Code), altrimenti None."""
+    path = str(tool_input.get("file_path") or tool_input.get("path") or "")
+    parts = PurePosixPath(path).parts
+    return parts[-1] if SAVED_DIR in parts[:-1] else None
+
+
+def _swap_saved(obj, block, marker):
+    """Scrive `marker` nel risultato (blocco e `tool_use_result`: `content`, `file.content` o stringa intera)."""
+    block["content"] = marker
+    res = obj.get("tool_use_result")
+    if isinstance(res, str):
+        obj["tool_use_result"] = marker
+    elif isinstance(res, dict):
+        if isinstance(res.get("content"), str):
+            res["content"] = marker
+        if isinstance(res.get("file"), dict) and isinstance(res["file"].get("content"), str):
+            res["file"]["content"] = marker
 
 
 def _hook_text(obj):
@@ -315,6 +338,10 @@ def _third_party(obj, names):
         if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in WEB_TOOLS:
             ti = block.get("input") or {}
             names[block.get("id")] = str(ti.get("url") or ti.get("query") or block.get("name"))
+        elif isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in SAVED_TOOLS:
+            copy = _saved_copy(block.get("input") or {})
+            if copy:
+                names[("salvata", block.get("id"))] = f"copia salvata da Claude Code ({copy})"
     for block in blocks:
         if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str):
             skill = external_skill(block["text"])
@@ -336,6 +363,13 @@ def _third_party(obj, names):
                 elif isinstance(res, str) and len(res) > MAX_WEB_RESULT:
                     obj["tool_use_result"] = block["content"]
             yield "pagina", len(text), swap
+    for block in blocks:
+        label = names.get(("salvata", block.get("tool_use_id"))) if isinstance(block, dict) and block.get("type") == "tool_result" else None
+        text = _content_text(block.get("content")) if label else ""
+        if text and not text.startswith(PAGE_PLACEHOLDER):
+            def swap(block=block, label=label, text=text):
+                _swap_saved(obj, block, _placeholder(label, len(text)))
+            yield "copia salvata", len(text), swap
     res = obj.get("tool_use_result")
     if not web and isinstance(res, dict) and isinstance(res.get("result"), str) and "codeText" in res and len(res["result"]) > MAX_WEB_RESULT:
         def swap(res=res):
@@ -369,7 +403,7 @@ def third_party_blocks(path):
 
 def togli_pagine(paths):
     """Riscrive ogni flusso sostituendo con un segnaposto il testo di terzi: risultati lunghi di WebFetch/WebSearch (tetto MAX_WEB_RESULT),
-    skill che non sono di tollgate e uscite di hook `SessionStart` di altri plugin. Restituisce il numero di righe cambiate."""
+    risultati di Read/Grep su copie salvate in tool-results/ (qualunque lunghezza), skill che non sono di tollgate e uscite di hook `SessionStart` di altri plugin. Restituisce il numero di righe cambiate."""
     total = 0
     for path in paths:
         out, changed = [], 0

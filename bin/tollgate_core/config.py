@@ -74,6 +74,7 @@ DEFAULTS: dict = {
               "max_turns": 60, "max_tokens": {"L0": 0, "L1": 400000, "L2": 800000}},
     "review": {
         "readonly_agents": ["tollgate:task-reviewer", "tollgate:reviewer-ai",
+                            "tollgate:reviewer-infra",
                             "tollgate:final-reviewer", "tollgate:finding-verifier",
                             "tollgate:plan-adversary", "tollgate:spec-adversary",
                             "tollgate:spec-auditor", "Explore"],

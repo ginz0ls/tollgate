@@ -6,6 +6,7 @@ import unittest
 
 from tests.helpers import ROOT
 
+AREAS = ("ai", "infra")
 ATTRIBUTION = ("Derivato da superpowers/skills/subagent-driven-development (MIT, © 2025 Jesse "
                "Vincent); vedi LICENSES/superpowers-MIT.txt")
 
@@ -114,16 +115,19 @@ class ManifestTest(unittest.TestCase):
             with self.subTest(agent=name):
                 fm = frontmatter(ROOT / "agents" / f"{name}.md")
                 self.assertEqual(fm.get("skills"), "[rules-base]")
-        for name in ("implementer-ai", "reviewer-ai"):
-            with self.subTest(agent=name):
-                fm = frontmatter(ROOT / "agents" / f"{name}.md")
-                self.assertEqual(fm.get("skills"), "[rules-base, rules-ai]")
+        for area in AREAS:
+            for name in (f"implementer-{area}", f"reviewer-{area}"):
+                with self.subTest(agent=name):
+                    fm = frontmatter(ROOT / "agents" / f"{name}.md")
+                    self.assertEqual(fm.get("skills"), f"[rules-base, rules-{area}]")
 
     def test_area_agents_derive_from_generic(self):
         """Decisioni 10 e 11: la copia contiene ogni paragrafo del corpo del generico (dopo la
         riga di attribuzione), con `model` uguale; `tools` uguali, più `WebFetch` al revisore."""
-        for name, generic, extra in (("implementer-ai", "implementer", []),
-                                     ("reviewer-ai", "task-reviewer", ["WebFetch"])):
+        cases = [(f"{kind}-{area}", generic, extra) for area in AREAS
+                 for kind, generic, extra in (("implementer", "implementer", []),
+                                              ("reviewer", "task-reviewer", ["WebFetch"]))]
+        for name, generic, extra in cases:
             with self.subTest(agent=name):
                 gpath, apath = ROOT / "agents" / f"{generic}.md", ROOT / "agents" / f"{name}.md"
                 gfm, afm = frontmatter(gpath), frontmatter(apath)
@@ -136,36 +140,60 @@ class ManifestTest(unittest.TestCase):
                                  [t.strip() for t in gfm["tools"].split(",")] + extra)
                 self.assertEqual(afm.get("maxTurns"), gfm.get("maxTurns"))
                 self.assertNotEqual(afm["description"], gfm["description"])
-                self.assertRegex(afm["description"], r"\bai\b")
+                self.assertRegex(afm["description"], r"\b%s\b" % name.split("-")[1])
                 body = gpath.read_text().split(ATTRIBUTION, 1)[1]
                 copy = apath.read_text()
                 for paragraph in [p for p in body.split("\n\n") if p.strip()]:
                     self.assertIn(paragraph.strip(), copy)
 
     def test_area_agents_attribution(self):
-        for name in ("implementer-ai", "reviewer-ai"):
+        for name in [f"{k}-{a}" for a in AREAS for k in ("implementer", "reviewer")]:
             with self.subTest(agent=name):
                 self.assertIn(ATTRIBUTION, (ROOT / "agents" / f"{name}.md").read_text())
 
-    def test_area_agents_name_rules_ai(self):
-        """La sezione «Area `ai`» nomina `rules-ai`, `R-AI-` e le regole che si giudicano sul
-        report (quelle che la skill vera segna «Si giudica su: report»); nel revisore, `WebFetch`
-        sugli URL citati e il caso del task senza modifiche (decisione D18)."""
-        skill = (ROOT / "skills" / "rules-ai" / "SKILL.md").read_text()
-        blocks = re.split(r"(?m)^(?=R-AI-\d\d\b)", skill)[1:]
-        on_report = [b[:7] for b in blocks if re.search(r"(?m)^Si giudica su: report$", b)]
-        self.assertTrue(on_report)
-        for name in ("implementer-ai", "reviewer-ai"):
-            with self.subTest(agent=name):
-                text = (ROOT / "agents" / f"{name}.md").read_text()
-                self.assertEqual(text.count("\n## Area `ai`\n"), 1)
-                section = text.split("\n## Area `ai`\n")[1].split("\n## ")[0]
-                section = " ".join(section.split())
-                self.assertIn("rules-ai", section)
-                self.assertIn("R-AI-", section)
-                for rule in on_report:
-                    self.assertIn(rule, section)
-                if name == "reviewer-ai":
+    def test_area_agents_name_area_rules(self):
+        """Decisione 9: nella sezione «Area `<area>`» l'insieme degli id `R-<AREA>-nn` nominati è
+        uguale a quello della skill; la frase con «si giudicano sul report» nomina esattamente le
+        regole che la skill segna «Si giudica su: report», quella con «si giudicano sul diff»
+        esattamente le altre; nell'implementatore la frase con «sul tuo report» nomina le regole
+        sul report. Gli id si estraggono con la regex, mai affettando il testo."""
+        for area in AREAS:
+            prefix = f"R-{area.upper()}-"
+            skill = (ROOT / "skills" / f"rules-{area}" / "SKILL.md").read_text()
+            blocks = re.split(r"(?m)^(?=%s\d\d\b)" % re.escape(prefix), skill)[1:]
+            ids = {re.match(r"%s\d\d" % re.escape(prefix), b).group(0) for b in blocks}
+            on_report = {re.match(r"%s\d\d" % re.escape(prefix), b).group(0) for b in blocks
+                         if re.search(r"(?m)^Si giudica su: report$", b)}
+            self.assertTrue(on_report)
+            self.assertTrue(ids - on_report)
+            pattern = re.compile(r"%s\d\d" % re.escape(prefix))
+
+            def named(sentence):
+                return set(pattern.findall(sentence))
+
+            def sentences(section):
+                return [s for s in re.split(r"(?<=\.)(?: |\n|$)", section) if s.strip()]
+
+            for kind in ("implementer", "reviewer"):
+                name = f"{kind}-{area}"
+                with self.subTest(agent=name):
+                    text = (ROOT / "agents" / f"{name}.md").read_text()
+                    self.assertEqual(text.count(f"\n## Area `{area}`\n"), 1)
+                    raw = text.split(f"\n## Area `{area}`\n")[1].split("\n## ")[0]
+                    section = " ".join(raw.split())
+                    self.assertIn(f"rules-{area}", section)
+                    self.assertIn(prefix, section)
+                    if kind == "implementer":
+                        mine = [s for s in sentences(raw) if "sul tuo report" in s]
+                        self.assertEqual(len(mine), 1)
+                        self.assertEqual(named(mine[0]), on_report)
+                        continue
+                    self.assertEqual(named(section), ids)
+                    rep = [s for s in sentences(raw) if "si giudicano sul report" in s]
+                    dif = [s for s in sentences(raw) if "si giudicano sul diff" in s]
+                    self.assertEqual((len(rep), len(dif)), (1, 1))
+                    self.assertEqual(named(rep[0]), on_report)
+                    self.assertEqual(named(dif[0]), ids - on_report)
                     self.assertIn("WebFetch", section)
                     self.assertIn("dati non fidati", section)
                     self.assertIn("senza modifiche", section)
@@ -177,6 +205,8 @@ class ManifestTest(unittest.TestCase):
                 text = " ".join((ROOT / "agents" / f"{name}.md").read_text().split()).lower()
                 self.assertIn("regole di un'area che si giudicano sul report sono del revisore "
                               "del task", text)
+                for area in AREAS:
+                    self.assertIn(f"r-{area}-", text)
 
     def test_other_agents_do_not_preload(self):
         for name in ("spec-auditor", "spec-adversary", "plan-adversary"):

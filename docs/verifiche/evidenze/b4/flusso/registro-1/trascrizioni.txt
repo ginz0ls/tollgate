@@ -1,0 +1,11 @@
+# tentativo-1: sessione 1, cartella -tmp-tollgate-b1-flow
+nessuna trascrizione di subagente
+# tentativo-1: sessione 2, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-aggiungi-l-intestazione-x-content-type-o
+agent-a9c1e6fe9e23cdbce.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a9c1e6fe9e23cdbce.jsonl: # Regole infra (versione 1) (isMeta: sì)
+agent-a9c1e6fe9e23cdbce.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a9c1e6fe9e23cdbce.jsonl: # Regole infra (versione 1) (isMeta: no)
+agent-aaf5b158e44e83c38.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-aaf5b158e44e83c38.jsonl: # Regole infra (versione 1) (isMeta: sì)
+agent-aaf5b158e44e83c38.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-aaf5b158e44e83c38.jsonl: # Regole infra (versione 1) (isMeta: no)

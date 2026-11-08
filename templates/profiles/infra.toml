@@ -1,0 +1,47 @@
+# Frammento del profilo `infra`: configurazione e deploy su Vercel, Cloudflare e Docker. `init` lo
+# completa con `rules` e `blocking_rules`, che calcola dalle righe `R-INFRA-NN` di
+# skills/rules-infra/SKILL.md. Il profilo si propone solo dopo l'approvazione di quella skill
+# (campo `approved`). Il profilo si riconosce dai nomi dei file, non dal contenuto: nessuna
+# tabella `[detect]`. Restano fuori `.github/workflows/` (del gate) e il codice dei Worker.
+
+[profile]
+kind = "vertical"
+min_level = "L1"
+# I nomi dei file, a qualunque profondità; `init` li trasforma nei percorsi concreti del progetto.
+paths = [
+  # La cartella `infra/` alla radice del progetto.
+  "infra/**",
+  # Vercel: un solo file di configurazione per progetto, uno di questi tre nomi
+  # (https://vercel.com/docs/project-configuration).
+  "**/vercel.json",
+  "**/vercel.toml",
+  "**/vercel.ts",
+  # Wrangler: i tre nomi che legge
+  # (https://developers.cloudflare.com/workers/wrangler/configuration/).
+  "**/wrangler.toml",
+  "**/wrangler.json",
+  "**/wrangler.jsonc",
+  # Docker: `Dockerfile` è il nome predefinito, e un nome con un suffisso dopo `Dockerfile` è
+  # coperto dal `*` finale (https://docs.docker.com/build/concepts/dockerfile/); `.dockerignore`
+  # sta nella radice del contesto di build (https://docs.docker.com/build/concepts/context/).
+  "**/Dockerfile*",
+  "**/.dockerignore",
+  # Compose: `compose.yaml` (preferito), `compose.yml` e per compatibilità i due nomi
+  # `docker-compose.*` (https://docs.docker.com/compose/intro/compose-application-model/);
+  # `compose.override.yaml` è il file che Compose unisce per impostazione predefinita
+  # (https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/).
+  "**/compose.yaml",
+  "**/compose.yml",
+  "**/compose.override.yaml",
+  "**/docker-compose.yaml",
+  "**/docker-compose.yml",
+]
+# Vuoti di proposito: `rules-infra` la precaricano gli agenti dell'area; il comando che prova il
+# deploy senza pubblicare dipende dal progetto (Wrangler installato, Vercel collegato) e un
+# `dod` scritto da `init` fallirebbe dove manca, quindi l'utente lo aggiunge a mano.
+skills = []
+reviewer_skills = []
+commands = {}
+dod = []
+agent = "tollgate:implementer-infra"
+reviewer = "tollgate:reviewer-infra"

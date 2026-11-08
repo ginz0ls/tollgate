@@ -1,0 +1,25 @@
+# lookups: id, work, task, agent_id, kind, target, at
+1	1	1	aaf5b158e44e83c38	read	.tollgate-run/1/task-1.md	2026-11-08T16:18:48.971670Z
+2	1	1	aaf5b158e44e83c38	read	vercel.json	2026-11-08T16:18:51.850836Z
+3	1	1	aaf5b158e44e83c38	fetch	https://vercel.com/docs/project-configuration/vercel-json	2026-11-08T16:18:52.989814Z
+4	1	1	aaf5b158e44e83c38	read	Dockerfile	2026-11-08T16:18:56.737513Z
+5	1	1	aaf5b158e44e83c38	read	tests/test_smoke.py	2026-11-08T16:18:57.199188Z
+6	1	1	aaf5b158e44e83c38	read	.github/workflows/tollgate-run.yml	2026-11-08T16:18:57.527555Z
+# per tipo
+fetch: 1
+read: 5
+# task: work, number, state, research_ok
+1	1	done	1
+# nota salvata, lavoro 1 task 1
+## Letto nel progetto
+- vercel.json
+- Dockerfile
+- tests/test_smoke.py
+- .github/workflows/tollgate-run.yml
+
+## Documentazione
+- https://vercel.com/docs/project-configuration/vercel-json — la proprietà `headers` è un array di oggetti con `source` (pattern, es. "/(.*)") e `headers` (lista di coppie `key`/`value`); `cleanUrls` è una proprietà booleana separata.
+
+## Cosa ho trovato
+vercel.json contiene solo `cleanUrls: true`. Il Dockerfile (python:3.12-slim, app/) e i workflow in .github/workflows (solo tollgate-*, nessun deploy) non toccano l'intestazione. Aggiungo la chiave `headers` con una voce `/(.*)` e X-Content-Type-Options: nosniff, lasciando cleanUrls. Test unittest nello stile di test_smoke.py.
+

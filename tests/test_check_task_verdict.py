@@ -222,6 +222,38 @@ class AiProfileNoStepTest(AiProfileTest):
         self.assertEqual(self.outcome("R-AI-07"), "approved")
 
 
+class InfraProfileTest(Base):
+    """Il blocco `infra` (regole di una skill finta, scritto nel test): solo le `[blocca]` fermano
+    il task."""
+    research = True
+    toml = DEFAULT_TOML + """
+[profiles]
+active = ["infra"]
+[profiles.infra]
+paths = ["**"]
+rules = ["R-INFRA-01", "R-INFRA-02", "R-INFRA-07"]
+blocking_rules = ["R-INFRA-01"]
+"""
+
+    def outcome(self, rule):
+        self.stop(text=self.verdict(outcome="approved", findings=[dict(GOOD, rule=rule)]))
+        return self.task()["verdict"]
+
+    def test_infra_profile_blocking_rule_changes(self):
+        self.assertEqual(self.outcome("R-INFRA-01"), "changes")
+
+    def test_infra_profile_non_blocking_rule_approves(self):
+        self.assertEqual(self.outcome("R-INFRA-07"), "approved")
+
+
+class InfraProfileNoStepTest(InfraProfileTest):
+    """Senza il passo (nessuna nota) le `[blocca]` di `infra` fermano comunque."""
+    research = False
+
+    def test_infra_blocking_rule_without_step(self):
+        self.assertEqual(self.outcome("R-INFRA-01"), "changes")
+
+
 class BaseRulesTest(Base):
     """Le `R-BASE-…` di `rules-base`: note sempre, bloccanti solo se `[blocca]`, con l'interruttore
     acceso e il passo di ricerca attivo nel lavoro."""

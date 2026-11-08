@@ -1,0 +1,4 @@
+fb11710 feat: aggiungi X-Content-Type-Options nosniff in vercel.json
+1075c61 docs: piano per X-Content-Type-Options in vercel.json
+5f8bd99 profilo infra proposto da init
+b8f3d1e base

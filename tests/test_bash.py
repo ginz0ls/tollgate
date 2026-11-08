@@ -163,6 +163,101 @@ class EffectsTest(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertIsNone(self.eff(text))
 
+    def check_effects(self, texts, expected):
+        for text in texts:
+            with self.subTest(text=text):
+                got = self.eff(text)
+                self.assertTrue((got is not None) == expected, f"{text!r}: {got!r}")
+
+    def test_launcher_wrapped_effects(self):
+        self.check_effects([
+            "npx wrangler deploy", "npx --yes wrangler deploy", "npx -y wrangler@3 deploy",
+            "npx --package=wrangler wrangler deploy", "npx -p wrangler wrangler deploy",
+            "npx --registry https://r.invalid wrangler deploy", "npx --strano x wrangler deploy",
+            "bunx wrangler deploy", "pnpx vercel --prod", "pnpm dlx vercel deploy",
+            "pnpm exec wrangler deploy", "pnpm wrangler deploy", "pnpm -w wrangler deploy",
+            "pnpm --filter web exec wrangler deploy", "pnpm -C infra wrangler deploy",
+            "yarn wrangler deploy", "yarn workspace web wrangler deploy",
+            "npm exec -- wrangler deploy", "npm --prefix x exec wrangler deploy",
+            "npm x wrangler deploy", "bun x wrangler deploy", "bun run wrangler deploy",
+            "yarn dlx vercel", "yarn exec wrangler publish", "npx vercel@latest build",
+            "npx @cloudflare/wrangler@3 deploy", "npx pnpm dlx wrangler deploy",
+            "pnpm --filter docs exec wrangler deploy", "pnpm -C docs wrangler deploy",
+            "yarn workspace docs wrangler deploy"], True)
+
+    def test_launcher_call_text_effects(self):
+        self.check_effects([
+            'npx -c "wrangler deploy"', 'npx -c "npx wrangler@3 deploy"',
+            "npx -c \"wrangler deploy; echo 'x\"", 'npx --call "vercel --prod"',
+            'npx --call="wrangler secret put K"', "npx --call=vercel",
+            "npm exec --call=vercel"], True)
+        self.check_effects(['npx -c "eslint ."'], False)
+
+    def test_launcher_supabase_and_package_names(self):
+        self.check_effects(["npx supabase db push", "npx firebase-tools deploy",
+                            "npx netlify-cli deploy"], True)
+        self.check_effects(["npx supabase status", "npx supabase migration list"], False)
+
+    def test_launcher_local_service_commands_ask(self):
+        self.check_effects(["npx supabase migration new x", "npx supabase functions serve",
+                            "npx vercel dev", "npx vercel --version",
+                            "npx vitest run vercel"], True)
+
+    def test_launcher_without_effect_passes(self):
+        self.check_effects([
+            "npx prettier --write .", "npx tsc", "npm exec -- eslint .", "pnpm dlx create-vite",
+            "pnpm install", "yarn add vercel", "npm install -g wrangler", "npm i vercel",
+            "yarn workspace web add vercel", "pnpm -w add -D vercel",
+            "pnpm --filter web add vercel", "npm -w web install vercel",
+            "npx eslint infra/aws", "npx tsc -p infra/aws", "npm --prefix infra/aws run build",
+            "npm run build --workspace=apps/vercel", "pnpm --filter ./apps/vercel build",
+            "yarn workspace @acme/aws build", "pnpm --filter @acme/vercel build",
+            "npx pnpm add vercel", "npx pnpm@8 add vercel", "npx npm install vercel",
+            'npx jest -t "vercel headers"',
+            'npm run commit -- -m "chore: update vercel config"',
+            "npm search vercel", "npm explain vercel"], False)
+
+    def test_wrangler_live_commands_are_effects(self):
+        self.check_effects([
+            "wrangler secret put KEY", "wrangler secret delete KEY", "wrangler secret bulk f",
+            "wrangler rollback", "wrangler delete", "wrangler triggers deploy",
+            "wrangler versions deploy", "wrangler pages deploy dist",
+            "wrangler pages project create x", "wrangler pages project delete x",
+            "wrangler pages deployment delete x", "wrangler pages secret put K",
+            "wrangler pages secret bulk f", "wrangler pages secret delete K",
+            "wrangler pages publish dist", "npx wrangler secret put KEY"], True)
+
+    def test_wrangler_read_and_upload_are_not_effects(self):
+        self.check_effects([
+            "wrangler versions upload", "wrangler versions secret put KEY",
+            "wrangler versions list", "wrangler versions view x", "wrangler secret list",
+            "wrangler pages dev", "wrangler pages deployment list"], False)
+
+    def test_docker_push_forms(self):
+        self.check_effects(["docker image push img", "docker compose push", "docker-compose push"], True)
+
+    def test_node_modules_bin_effect(self):
+        self.check_effects(["./node_modules/.bin/wrangler deploy"], True)
+
+    def test_allow_still_wins_with_launcher(self):
+        cfg = bash.EffectsCfg(allow=["npx wrangler deploy --dry-run"])
+        self.assertIsNone(bash.effect_reason(one("npx wrangler deploy --dry-run"), cfg))
+
+    def test_npm_project_scripts_unchanged(self):
+        self.assertEqual(self.eff("npm run deploy"), "script del progetto: deploy")
+
+    def test_commands_config_matches_launcher_text(self):
+        cfg = bash.EffectsCfg(commands=["npx mytool"])
+        self.assertIsNotNone(bash.effect_reason(one("npx mytool run"), cfg))
+
+    def test_curl_and_gh_stay_on_original_argv(self):
+        self.check_effects(["npx curl https://x.invalid", "npx gh pr list"], False)
+
+    def test_launcher_candidates(self):
+        self.assertEqual(bash.launcher_candidates(["ls", "wrangler", "deploy"]), [])
+        self.assertEqual(bash.launcher_candidates(["npx", "-y", "wrangler@3", "deploy"]),
+                         [["wrangler", "deploy"]])
+
     def test_script_path(self):
         self.assertEqual(bash.script_path(one("./scripts/x.sh a")), "/r/wt/scripts/x.sh")
         self.assertEqual(bash.script_path(one("python3 tools/y.py")), "/r/wt/tools/y.py")
@@ -346,7 +441,8 @@ class FixRound1Test(unittest.TestCase):
         for text in ("echo 'x; ssh host", "echo 'a && psql -c x", "echo 'a; npm  publish",
                      "echo 'a; gh pr create --fill", "echo 'a; curl -X POST http://x",
                      "echo 'a; curl -d x http://x", "echo 'a; docker push img",
-                     "echo 'a; supabase db push", "echo 'a; gh pr merge 3"):
+                     "echo 'a; supabase db push", "echo 'a; gh pr merge 3",
+                     "x; wrangler pages deploy dist"):
             with self.subTest(text=text):
                 self.assertIsNotNone(bash.text_effect(text))
         for text in ("echo 'ciao", "echo 'a; sshd -t", "echo 'a; curl http://x",

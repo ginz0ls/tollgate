@@ -59,14 +59,15 @@ def frontmatter(text: str) -> dict[str, str]:
     return dict(line.split(": ", 1) for line in lines[1:end] if ": " in line)
 
 
-def rules(text: str) -> list[tuple[str, bool, str, str, str]]:
-    """Le regole della pagina: (id, blocca, testo, fonte, oggetto). La fonte è la riga
+def rules(text: str, area: str = "ai") -> list[tuple[str, bool, str, str, str]]:
+    """Le regole della pagina dell'area: (id, blocca, testo, fonte, oggetto). La fonte è la riga
     `Fonte: …` e l'oggetto la riga `Si giudica su: diff|report|nota` che seguono la regola,
     prima della regola successiva o del titolo successivo; vuoti se mancano."""
+    rule = re.compile(rf"^(R-{area.upper()}-\d{{2}})( \[blocca\])? (\S.*)$")
     found: list[list] = []
     open_rule = False
     for line in text.split("\n"):
-        m = RULE.match(line)
+        m = rule.match(line)
         if m:
             found.append([m.group(1), bool(m.group(2)), m.group(3).strip(), "", ""])
             open_rule = True

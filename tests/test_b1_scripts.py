@@ -7,6 +7,7 @@ import io
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -499,20 +500,22 @@ class FlowBench(Bench):
     def claude_p(self):
         return [c for c in self.calls() if c["args"][:1] == ["-p"]]
 
-    def src_repo(self, *, approved=True, case="b1", ai_approved=True):
+    def src_repo(self, *, approved=True, case="b1", ai_approved=True, infra_approved=True):
         """Un piccolo repo git che traccia `bin/` del repo e una `skills/rules-base/SKILL.md`: la radice sorgente (`B1_FLOW_SRC`).
-        Con `case="ai"` copia invece i file veri (e tracciati) che servono a `init --propose`: `bin/`, `templates/`, `gate/`,
-        `agents/`, `skills/rules-base/` e `skills/rules-ai/`; con `ai_approved=False` toglie `approved` da quest'ultima."""
+        Con `case="ai"` o `case="infra"` copia invece i file veri (e tracciati) che servono a `init --propose`: `bin/`, `templates/`,
+        `gate/`, `agents/`, `skills/rules-base/`, `skills/rules-ai/` e `skills/rules-infra/`; con `ai_approved=False` o
+        `infra_approved=False` toglie `approved` dalla skill dell'area (solo quella del caso)."""
         src = self.dir / "src"
         (src / "skills" / "rules-base").mkdir(parents=True)
-        parts = ("bin",) if case == "b1" else ("bin", "templates", "gate", "agents", "skills/rules-base", "skills/rules-ai", ".claude-plugin")
+        parts = ("bin",) if case == "b1" else ("bin", "templates", "gate", "agents", "skills/rules-base", "skills/rules-ai",
+                                               "skills/rules-infra", ".claude-plugin")
         tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z", "--", *parts], capture_output=True, check=True).stdout
         for rel in filter(None, tracked.decode().split("\0")):
             (src / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / rel, src / rel)
-        if case == "ai":
-            if not ai_approved:
-                skill = src / "skills" / "rules-ai" / "SKILL.md"
+        if case in ("ai", "infra"):
+            if not (ai_approved if case == "ai" else infra_approved):
+                skill = src / "skills" / f"rules-{case}" / "SKILL.md"
                 skill.write_text(re.sub(r"(?m)^approved:.*\n", "", skill.read_text()))
         else:
             head = "---\nname: rules-base\ndescription: Regole di prova della sorgente finta.\nversion: 1\n"
@@ -1066,8 +1069,48 @@ class FlowScriptTest(unittest.TestCase):
             self.assertEqual(flowreg.togli_pagine([str(stream)]), 0)
         self.assertEqual(flowreg.third_party_blocks(stream), [])
 
+    def saved_copy_stream(self, copy_path):
+        """Flusso finto: Grep e Read su una copia salvata (percorso dato) e un Read su un file normale, con risultati corti."""
+        def use(i, name, **inp):
+            return {"type": "assistant", "parent_tool_use_id": None, "message": {"content": [{"type": "tool_use", "id": i, "name": name, "input": inp}]}}
+
+        def res(i, text, tur):
+            return {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": i, "content": text}]},
+                    "tool_use_result": tur}
+        return [
+            use("g1", "Grep", pattern="x", path=copy_path),
+            res("g1", "TERZI-GREP riga", {"mode": "content", "numFiles": 0, "filenames": [], "content": "TERZI-GREP riga", "numLines": 1}),
+            use("r1", "Read", file_path=copy_path),
+            res("r1", "TERZI-READ riga", {"type": "text", "file": {"filePath": copy_path, "content": "TERZI-READ riga", "numLines": 1}}),
+            use("r2", "Read", file_path="/work/progetto/README.md"),
+            res("r2", "NORMALE riga", {"type": "text", "file": {"filePath": "/work/progetto/README.md", "content": "NORMALE riga"}}),
+        ]
+
+    def test_flowreg_togli_pagine_replaces_reads_and_greps_of_saved_copies(self):
+        flowreg = self.flowreg_module()
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-b4-flowreg-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        stream = tmp / "claude.jsonl"
+        copy = "/home/USER/.claude/projects/X/SESSIONE-1/tool-results/toolu_FAKE.txt"
+        stream.write_text("".join(json.dumps(x) + "\n" for x in self.saved_copy_stream(copy)))
+        self.assertEqual([x.split(":")[0] for x in flowreg.third_party_blocks(stream)], ["2", "4"])
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(flowreg.togli_pagine([str(stream)]), 2)
+            self.assertEqual(flowreg.togli_pagine([str(stream)]), 0, "idempotente")
+        text = stream.read_text()
+        self.assertNotIn("TERZI", text)
+        out = [json.loads(x) for x in text.splitlines()]
+        marker = "[pagina di terzi tolta dalle evidenze: copia salvata da Claude Code (toolu_FAKE.txt), 15 caratteri]"
+        self.assertEqual(out[1]["message"]["content"][0]["content"], marker)
+        self.assertEqual(out[1]["tool_use_result"]["content"], marker)
+        self.assertEqual(out[3]["message"]["content"][0]["content"], marker)
+        self.assertEqual(out[3]["tool_use_result"]["file"]["content"], marker)
+        self.assertEqual(out[5]["message"]["content"][0]["content"], "NORMALE riga", "un Read normale non si tocca")
+        self.assertEqual(out[5]["tool_use_result"]["file"]["content"], "NORMALE riga")
+
     def test_committed_evidence_has_no_long_web_results(self):
-        """Nelle evidenze pubbliche non c'è testo di terzi: né risultati di WebFetch/WebSearch oltre MAX_WEB_RESULT, né skill che non sono di
+        """Nelle evidenze pubbliche non c'è testo di terzi: né risultati di WebFetch/WebSearch oltre MAX_WEB_RESULT, né Read/Grep di copie
+        salvate in tool-results/, né skill che non sono di
         tollgate, né uscite di hook SessionStart di altri plugin."""
         flowreg = self.flowreg_module()
         found = []
@@ -1286,6 +1329,179 @@ class FlowScriptTest(unittest.TestCase):
         self.b.prepara()
         self.assertEqual(self.b.run("registra").returncode, 0)
         self.assertFalse((self.b.out / "registro-1" / "trascrizioni.txt").exists())
+
+
+    # ------------------------------------------------------------------ il caso `infra` (B4, Task 8)
+
+    def infra_src(self, **kw):
+        return self.b.src_repo(case="infra", **kw)
+
+    def infra_prepara(self, **kw):
+        return self.b.run("prepara", B1_FLOW_CASE="infra", B1_FLOW_RULES="vere", B1_FLOW_SRC=str(self.infra_src(**kw)))
+
+    def test_flow_case_infra_out_dir(self):
+        r = self.b.run("controlla", B1_FLOW_CASE="infra", B1_FLOW_RULES="vere", B1_FLOW_OUT="")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("CONTROLLA: ok", r.stdout)
+        self.assertIn("B1_FLOW_CASE: infra", r.stdout)
+        self.assertIn("[profiles.infra]", r.stdout)
+        self.assertIn(f"cartella delle uscite: {ROOT}/docs/verifiche/evidenze/b4/flusso", r.stdout)
+        self.assertEqual(r.stderr, "")
+
+    def test_flow_case_infra_requires_real_rules(self):
+        for rules in (None, "prova"):
+            for mode in ("controlla", "prepara", "passo1", "passo2", "registra"):
+                with self.subTest(rules=rules, mode=mode):
+                    extra = {} if rules is None else {"B1_FLOW_RULES": rules}
+                    r = self.b.run(mode, B1_FLOW_CASE="infra", **extra)
+                    self.assertNotEqual(r.returncode, 0)
+                    self.assertIn("B1_FLOW_RULES", r.stderr)
+        self.assertEqual(self.b.calls(), [])
+        self.assertFalse(self.b.root.exists())
+
+    def test_flow_case_unknown_value_names_infra(self):
+        r = self.b.run("controlla", B1_FLOW_CASE="altro")
+        self.assertNotEqual(r.returncode, 0)
+        for value in ("b1", "ai", "infra"):
+            self.assertIn(value, r.stderr)
+
+    def test_real_flow_case_infra_prepara_proposes_profile(self):
+        r = self.infra_prepara()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("plan-check: ok", r.stdout)
+        text = (self.b.flow / "tollgate.toml").read_text()
+        self.assertIn("[profiles.infra]", text)
+        self.assertIn('"/vercel.json"', text)
+        self.assertIn('"/Dockerfile"', text)
+        self.assertIn('mode = "detect"', text)
+        for part in ("vercel.json", "Dockerfile", "app/main.py", "tests/__init__.py", "tests/test_smoke.py"):
+            self.assertTrue((self.b.flow / part).is_file(), part)
+        self.assertFalse((self.b.flow / "docs" / "superpowers" / "tollgate-init").exists(), "la cartella della proposta si toglie")
+        self.assertTrue(list(self.b.root.glob("tollgate-init.proposta-*")))
+        git = ["git", "-C", str(self.b.flow)]
+        self.assertEqual(subprocess.run([*git, "status", "--porcelain"], capture_output=True, text=True).stdout, "")
+        self.assertEqual(subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True).stdout,
+                         subprocess.run([*git, "rev-parse", "origin/main"], capture_output=True, text=True).stdout)
+        data = json.loads((self.b.root / "fakegh-data.json").read_text())
+        self.assertIn("vercel.json", data["issues"]["1"]["title"])
+        self.assertIn("X-Content-Type-Options", data["issues"]["1"]["body"])
+        self.assertIn("repos/{owner}/{repo}/branches/main/protection", data["api_status"])
+        sha = subprocess.run([*git, "rev-parse", "origin/main"], capture_output=True, text=True).stdout.strip()
+        self.assertIn(sha, data["statuses"])
+        self.assertEqual(self.b.calls(), [])
+
+    def test_flow_case_infra_prepara_refuses_without_profile(self):
+        r = self.infra_prepara(infra_approved=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("profiles.infra", r.stderr)
+
+    def test_flow_case_infra_project_verifies(self):
+        r = self.infra_prepara()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        verify = re.search(r'(?m)^verify = "(.*)"$', (self.b.flow / "tollgate.toml").read_text()).group(1)
+        self.assertIn("unittest", verify)
+        self.assertEqual((ROOT / "spikes" / "b4" / "flow" / "tollgate.toml").read_text(), (B1 / "flow" / "tollgate.toml").read_text())
+        cmd = verify.replace("python3 ", "python3 -B ", 1)
+        v = subprocess.run(cmd, shell=True, cwd=self.b.flow, capture_output=True, text=True, env=clean_env(PATH=os.environ["PATH"]))
+        self.assertEqual(v.returncode, 0, v.stdout + v.stderr)
+        self.assertFalse(list(self.b.flow.rglob("__pycache__")))
+
+    def disallowed(self, **extra):
+        """La lista di `--disallowedTools` che `controlla` stampa per il passo 1 (`printf '%q'`)."""
+        r = self.b.run("controlla", **extra)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        line = next(x for x in r.stdout.splitlines() if x.startswith("  passo1 (cwd"))
+        argv = shlex.split(line.split("): ", 1)[1])
+        return argv[argv.index("--disallowedTools") + 1].split(",")
+
+    def test_flow_disallows_deploy_clis(self):
+        denied = self.disallowed(B1_FLOW_CASE="infra", B1_FLOW_RULES="vere")
+        for prog in ("vercel", "wrangler", "docker", "npx", "bunx", "pnpx", "bun", "npm", "pnpm", "yarn"):
+            for form in (f"Bash({prog}:*)", f"Bash(*/{prog}:*)", f"Bash(command {prog}:*)", f"Bash(env {prog}:*)"):
+                self.assertIn(form, denied)
+        # `gh` non cambia: solo per percorso e dopo `command`
+        self.assertIn("Bash(*/gh:*)", denied)
+        self.assertIn("Bash(command gh:*)", denied)
+        self.assertNotIn("Bash(env gh:*)", denied)
+        for case, rules in (("b1", "prova"), ("ai", "vere")):
+            with self.subTest(case=case):
+                other = self.disallowed(B1_FLOW_CASE=case, B1_FLOW_RULES=rules)
+                self.assertFalse([x for x in other if "vercel" in x or "npx" in x or "docker" in x])
+
+    def test_flow_case_infra_project_has_no_credentials(self):
+        project = ROOT / "spikes" / "b4" / "flow"
+        found = [p.relative_to(project).as_posix() for p in project.rglob("*")
+                 if p.name == ".vercel" or p.name.startswith((".env", ".dev.vars", "wrangler", ".wrangler"))]
+        self.assertEqual(found, [])
+        self.assertTrue((project / "vercel.json").is_file())
+
+    def test_flow_case_infra_task_forbids_publishing(self):
+        project = ROOT / "spikes" / "b4" / "flow"
+        for name in ("issue-1.md", "piano-L1.md"):
+            with self.subTest(name):
+                text = " ".join((project / name).read_text().split())
+                self.assertIn("non è collegato a nessun servizio", text)
+                self.assertIn("prova senza pubblicazione non si fa", text)
+                self.assertRegex(text, r"(?i)(nel )?report (scrivi|dice)")
+
+    def _flow_stream(self, commands, **extra):
+        """prepara, un passo 1 finto e un flusso con i `Bash` dati: ritorna la cartella del primo registro."""
+        att = self.b.out / "passo1" / "tentativo-1"
+        self.assertEqual(self.b.run("passo1", **extra).returncode, 0)
+        stream = [{"type": "assistant", "parent_tool_use_id": None, "message": {"content": [
+                      {"type": "tool_use", "name": "Bash", "input": {"command": c}} for c in commands]}}]
+        (att / "claude.jsonl").write_text("".join(json.dumps(x) + "\n" for x in stream))
+        r = self.b.run("registra", **extra)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        return self.b.out / "registro-1"
+
+    def test_registra_flags_deploy_clis(self):
+        extra = dict(B1_FLOW_CASE="infra", B1_FLOW_RULES="vere")
+        self.assertEqual(self.infra_prepara().returncode, 0)
+        d = self._flow_stream(["npx vercel --prod", "bash -c 'npx vercel --prod'", "ls && docker build .", "/usr/local/bin/npm install",
+                               "cat vercel.json", "git add vercel.json", "python3 -m unittest discover"], **extra)
+        risky = (d / "comandi-rischiosi.txt").read_text()
+        for cmd in ("npx vercel --prod", "bash -c 'npx vercel --prod'", "ls && docker build .", "/usr/local/bin/npm install"):
+            self.assertIn(f"bash: {cmd}\n", risky)
+        for cmd in ("cat vercel.json", "git add vercel.json", "python3 -m unittest"):
+            self.assertNotIn(cmd, risky)
+        self.assertIn("env VAR", (d / "limiti.txt").read_text())
+
+    def test_registra_deploy_clis_only_for_infra(self):
+        self.b.prepara()
+        d = self._flow_stream(["npx vercel --prod", "git push https://github.com/x/y main"])
+        risky = (d / "comandi-rischiosi.txt").read_text()
+        self.assertIn("git push https://github.com", risky)
+        self.assertNotIn("npx vercel", risky)
+        self.assertNotIn("env VAR", (d / "limiti.txt").read_text())
+
+    def test_registra_reads_infra_title(self):
+        self.assertEqual(self.infra_prepara().returncode, 0)
+        self.assertEqual(self.b.run("passo1", B1_FLOW_CASE="infra", B1_FLOW_RULES="vere").returncode, 0)
+        cwd = "/tmp/prova.uno due/flow"
+        stream = [{"type": "system", "subtype": "init", "cwd": cwd, "session_id": "sess-uno"}]
+        (self.b.out / "passo1" / "tentativo-1" / "claude.jsonl").write_text("".join(json.dumps(x) + "\n" for x in stream))
+        self._transcripts(self.b.dir / "home", cwd, "sess-uno", {"a1": [
+            {"isMeta": True, "message": {"role": "user", "content": "# Regole di base (versione 1)\n- R-BASE-01 ..."}},
+            {"isMeta": True, "message": {"role": "user", "content": "# Regole infra (versione 1)\n- R-INFRA-01 ..."}},
+            {"message": {"role": "user", "content": "SEGRETO-DEL-COMPITO nel brief"}}]})
+        r = self.b.run("registra", B1_FLOW_CASE="infra", B1_FLOW_RULES="vere")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = self.b.out / "registro-1"
+        text = (d / "trascrizioni.txt").read_text()
+        self.assertIn("agent-a1.jsonl: # Regole infra (versione 1) (isMeta: sì)", text)
+        self.assertIn("# Regole di base (versione 1)", text)
+        self.assertNotIn("SEGRETO", text)
+        self.assertNotIn("R-INFRA-01", text)
+        self.assertIn("agent_type", (d / "tipi-task.txt").read_text())
+        self.assertEqual((d / "fallimenti.txt").read_text(), "")
+
+    def test_registra_infra_refuses_an_empty_home(self):
+        self.assertEqual(self.infra_prepara().returncode, 0)
+        r = self.b.run("registra", B1_FLOW_CASE="infra", B1_FLOW_RULES="vere", HOME="")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("HOME", r.stderr)
+        self.assertFalse((self.b.out / "registro-1").exists())
 
 
 if __name__ == "__main__":

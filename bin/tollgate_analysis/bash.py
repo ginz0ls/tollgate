@@ -985,10 +985,74 @@ _DEFAULT_EFFECTS = [("ssh",), ("scp",), ("rsync",), ("psql",), ("docker", "push"
                     ("kubectl",), ("terraform", "apply"), ("aws",), ("gcloud",), ("az",),
                     ("vercel",), ("netlify",), ("firebase", "deploy"), ("wrangler", "deploy"),
                     ("wrangler", "publish"), ("npm", "publish"), ("pnpm", "publish"),
-                    ("yarn", "publish")]
+                    ("yarn", "publish"), ("docker", "image", "push"),
+                    ("docker", "compose", "push"),
+                    ("docker-compose", "push"),
+                    ("wrangler", "secret", "put"), ("wrangler", "secret", "delete"),
+                    ("wrangler", "secret", "bulk"), ("wrangler", "rollback"),
+                    ("wrangler", "delete"), ("wrangler", "triggers", "deploy"),
+                    ("wrangler", "versions", "deploy"), ("wrangler", "pages", "deploy"),
+                    ("wrangler", "pages", "publish"),
+                    ("wrangler", "pages", "project", "create"),
+                    ("wrangler", "pages", "project", "delete"),
+                    ("wrangler", "pages", "deployment", "delete"),
+                    ("wrangler", "pages", "secret", "put"),
+                    ("wrangler", "pages", "secret", "bulk"),
+                    ("wrangler", "pages", "secret", "delete")]
 _SUPABASE_WRITE = {"db", "functions", "secrets", "link", "migration", "storage", "projects",
                    "orgs", "branches"}
 _SUPABASE_READ = {"list", "diff", "dump", "ls", "download", "--help", "-h"}
+# Lanciatori di pacchetti (decisione 17): i comandi di servizio dietro di loro sono effetti.
+LAUNCHERS = ("npx", "bunx", "pnpx", "npm", "pnpm", "yarn", "bun")
+_PACKAGE_MANAGERS = ("npm", "pnpm", "yarn", "bun")
+PACKAGE_COMMANDS = ("install", "i", "add", "remove", "rm", "uninstall", "un", "update", "up",
+                    "upgrade", "ci", "info", "view", "why", "ls", "list", "outdated", "audit",
+                    "init", "create", "link", "unlink", "publish", "pack", "search", "explain",
+                    "bugs", "rebuild", "dedupe", "prune", "fund")
+PACKAGE_PROGRAMS = {"firebase-tools": "firebase", "netlify-cli": "netlify",
+                    "@cloudflare/wrangler": "wrangler"}
+_CALL_OPTIONS = ("-c", "--call")
+
+
+def _launcher_token(tok: str) -> str:
+    if tok.startswith("-") and "=" in tok:
+        tok = tok.split("=", 1)[1]
+    at = tok.rfind("@")
+    if at > 0:
+        tok = tok[:at]
+    if "/.bin/" in tok or tok.startswith(".bin/"):
+        tok = tok.rsplit("/", 1)[-1]
+    return PACKAGE_PROGRAMS.get(tok, tok)
+
+
+def launcher_candidates(argv: list[str]) -> list[list[str]]:
+    """Comandi di servizio dietro un lanciatore: `[programma] + resto` per ogni posizione."""
+    if not argv or os.path.basename(argv[0]) not in LAUNCHERS:
+        return []
+    programs = {p[0] for p in _DEFAULT_EFFECTS} | {"supabase"}
+    out: list[list[str]] = []
+    manager_seen = package_command_seen = False
+    for i, tok in enumerate(argv):
+        norm = _launcher_token(os.path.basename(tok) if i == 0 else tok)
+        if i >= 1 and not package_command_seen and norm in programs:
+            out.append([norm] + argv[i + 1:])
+        if manager_seen and tok in PACKAGE_COMMANDS:
+            package_command_seen = True
+        if norm in _PACKAGE_MANAGERS:
+            manager_seen = True
+    return out
+
+
+def _launcher_call_texts(argv: list[str]) -> list[str]:
+    texts = []
+    for i, tok in enumerate(argv[1:], 1):
+        if tok in _CALL_OPTIONS and i + 1 < len(argv):
+            texts.append(argv[i + 1])
+        elif tok.startswith("--call="):
+            texts.append(tok.split("=", 1)[1])
+    return texts
+
+
 _GH_WRITE = {("pr", "create"), ("pr", "edit"), ("pr", "review"), ("pr", "close"),
              ("pr", "merge"), ("workflow", "run"), ("issue", "edit"), ("issue", "close"),
              ("issue", "create")}
@@ -1082,12 +1146,25 @@ def effect_reason(cmd: Cmd, cfg: EffectsCfg) -> str | None:
     if _matches(cfg.commands, text):
         return "comando dichiarato in [external_effects] commands"
     base = os.path.basename(a[0])
-    for prefix in _DEFAULT_EFFECTS:
-        if [base] + a[1:len(prefix)] == list(prefix):
-            return f"effetto esterno: {' '.join(prefix)}"
-    if base == "supabase" and len(a) > 1 and a[1] in _SUPABASE_WRITE \
-            and not (len(a) > 2 and a[2] in _SUPABASE_READ):
-        return "effetto esterno: supabase in scrittura"
+    for argv in [[base] + a[1:]] + launcher_candidates(a):
+        for prefix in _DEFAULT_EFFECTS:
+            if argv[:len(prefix)] == list(prefix):
+                return f"effetto esterno: {' '.join(prefix)}"
+        if argv[0] == "supabase" and len(argv) > 1 and argv[1] in _SUPABASE_WRITE \
+                and not (len(argv) > 2 and argv[2] in _SUPABASE_READ):
+            return "effetto esterno: supabase in scrittura"
+    for call_text in _launcher_call_texts(a) if base in LAUNCHERS else ():
+        try:
+            inner = parse(call_text, cmd.cwd)
+        except BashParseError:
+            reason = text_effect(call_text)
+            if reason:
+                return reason
+            continue
+        for c in inner:
+            reason = effect_reason(c, cfg)
+            if reason:
+                return reason
     if base in ("npm", "pnpm", "yarn", "bun") and len(a) > 1:
         script = a[2] if a[1] == "run" and len(a) > 2 else a[1]
         if script in cfg.project_scripts:

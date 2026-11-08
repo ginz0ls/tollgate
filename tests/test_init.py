@@ -12,7 +12,7 @@ from datetime import timedelta
 from pathlib import Path
 from unittest import mock
 
-from tests.flowkit import FAKEGH, FlowLab
+from tests.flowkit import FAKEGH, GATE_FILES, JUNIT_FILES, FlowLab
 from tests.helpers import ROOT, git
 from tests.hookkit import DEFAULT_FILES, DEFAULT_TOML
 from tests.test_gate_workflows import PINNED, uses_of
@@ -733,8 +733,10 @@ class ProfileBlocksTest(PluginMixin, unittest.TestCase):
     def test_install_dir_does_not_light_profile(self):
         got = self.blocks([".github/tollgate/bin/x/a.py", "docs/superpowers/tollgate-init/x/b"])
         self.assertEqual(got.text, "")
+        # Decisione 18: le cartelle di GitHub dei workflow e delle azioni non accendono profili.
         self.assertEqual(init.EXCLUDED_PREFIXES,
-                         (".claude/", ".github/tollgate/", "docs/superpowers/tollgate-init/"))
+                         (".claude/", ".github/tollgate/", "docs/superpowers/tollgate-init/",
+                          ".github/workflows/", ".github/actions/"))
 
     def test_concrete_paths_escaped(self):
         got = self.blocks(["app/[id]/x/p.ts"])
@@ -920,6 +922,111 @@ class ProfileBlocksTest(PluginMixin, unittest.TestCase):
         with mock.patch("tollgate_core.git._proc", side_effect=AssertionError("git")):
             self.assertIn("[profiles.x]", self.blocks(["src/x/a.py"]).text)
 
+    def paths_of(self, patterns, files, **kw):
+        """I `paths` proposti dal frammento `x` con i `patterns` dati (lista di stringhe)."""
+        toml = FRAGMENT_X.replace('["**/x/**"]', json.dumps(patterns))
+        got = self.blocks(files, root=self.plugin(fragment=toml), **kw)
+        return tomllib.loads(BASE_TOML + got.text)["profiles"]["x"]["paths"] if got.text else None
+
+    def test_name_pattern_exact_paths(self):
+        files = ["Dockerfile", "services/api/Dockerfile", "services/api/Dockerfile.prod"]
+        paths = self.paths_of(["**/Dockerfile*"], files)
+        self.assertEqual(paths, ["/Dockerfile", "services/api/Dockerfile",
+                                 "services/api/Dockerfile.prod"])
+        for f in files:
+            self.assertEqual(len([p for p in paths if globs.match(p, f)]), 1, f)
+
+    def test_name_pattern_literal_is_exact_path(self):
+        self.assertEqual(self.paths_of(["**/vercel.json"], ["vercel.json", "apps/web/vercel.json"]),
+                         ["/vercel.json", "apps/web/vercel.json"])
+
+    def test_name_pattern_dir_escaped(self):
+        paths = self.paths_of(["**/vercel.json"], ["app/[id]/vercel.json"])
+        self.assertEqual(paths, ["app/\\[id\\]/vercel.json"])
+        self.assertTrue(globs.match(paths[0], "app/[id]/vercel.json"))
+
+    def test_name_pattern_matches_files_not_folders(self):
+        pat = ["**/Dockerfile*"]
+        self.assertIsNone(self.paths_of(pat, ["docker/Dockerfiles/base.py",
+                                              "docker/Dockerfiles/README.md"]))
+        self.assertEqual(self.paths_of(pat, ["Dockerfiles/base/Dockerfile",
+                                             "Dockerfiles/base/a.py"]),
+                         ["Dockerfiles/base/Dockerfile"])
+
+    def test_root_folder_pattern_only_root(self):
+        self.assertEqual(self.paths_of(["infra/**"], ["infra/deploy.sh", "src/infra/db.py"]),
+                         ["/infra/**"])
+        self.assertIsNone(self.paths_of(["infra/**"], ["src/infra/db.py"]))
+
+    def test_name_covered_by_folder_not_repeated(self):
+        self.assertEqual(self.paths_of(["infra/**", "**/Dockerfile*"],
+                                       ["infra/Dockerfile", "infra/a.sh"]), ["/infra/**"])
+
+    def test_leftmost_folder_wins(self):
+        self.assertEqual(self.paths_of(["infra/**", "**/x/**"], ["infra/a/x/b.py"]),
+                         ["/infra/**"])
+        self.assertEqual(self.paths_of(["**/x/**"], ["src/x/lib/x/a.py"]), ["src/x/**"])
+
+    def test_name_pattern_skips_excluded_prefixes(self):
+        files = [".github/tollgate/Dockerfile", ".github/actions/build/Dockerfile",
+                 ".github/workflows/vercel.json",
+                 "docs/superpowers/tollgate-init/files/vercel.json", ".claude/x/vercel.json"]
+        self.assertIsNone(self.paths_of(["**/Dockerfile*", "**/vercel.json"], files))
+
+    def test_doc_files_do_not_light_folders(self):
+        docs = ["docs/x/guida.md", ".github/x/a.agent.md"]
+        self.assertIsNone(self.paths_of(["**/x/**"], docs))
+        self.assertEqual(self.paths_of(["**/x/**"], [*docs, "src/x/a.py"]), ["src/x/**"])
+        self.assertIsNone(self.paths_of(["**/Dockerfile*"], ["docs/Dockerfile-note.md"]))
+        self.assertEqual(self.paths_of(["**/README.md"], ["README.md"]), ["/README.md"])
+
+    def test_doc_extension_case_insensitive(self):
+        self.assertIsNone(self.paths_of(["**/x/**"], ["docs/x/README.MD"]))
+
+    def test_concrete_for_none_without_a_form(self):
+        pats = fragments.parse_pattern
+        self.assertIsNone(init.concrete_for("src/a.py", [pats("**/x/**")]))
+        self.assertEqual(init.concrete_for("src/x/a.py", [pats("**/x/**")]), "src/x/**")
+
+    def test_concrete_name_path_wins_over_declared_folder(self):
+        current = BASE_TOML + '[profiles.web]\npaths = ["web/**"]\n'
+        root = self.plugin(fragment=FRAGMENT_X.replace('["**/x/**"]',
+                                                       '["**/vercel.json", "**/Dockerfile*"]'))
+        got = self.blocks(["web/vercel.json", "web/Dockerfile"], current, root=root)
+        for f in ("web/vercel.json", "web/Dockerfile"):
+            line = next(l for l in got.lines if f in l and "«web»" in l)
+            self.assertIn("vince x", line)
+
+    def test_overlap_between_two_new_profiles_reported(self):
+        root = self.plugin()
+        (root / "templates" / "profiles" / "y.toml").write_text(
+            FRAGMENT_X.replace("**/x/**", "**/y/**").replace("-x", "-y"), encoding="utf-8")
+        (root / "skills" / "rules-y").mkdir()
+        (root / "skills" / "rules-y" / "SKILL.md").write_text(
+            SKILL_X.replace("rules-x", "rules-y").replace("R-X-", "R-Y-"), encoding="utf-8")
+        # `src/x/y/a.py` accende x e y: la riga di y nomina x; vince y (3 segmenti contro 2).
+        got = self.blocks(["src/x/y/a.py", "lib/y/b.py"], root=root)
+        tail = tomllib.loads(BASE_TOML + got.text)["profiles"]
+        self.assertEqual(tail["x"]["paths"], ["src/x/**"])
+        self.assertEqual(tail["y"]["paths"], ["lib/y/**", "src/x/y/**"])
+        line = next(l for l in got.lines if "«x»" in l)
+        self.assertIn("profilo y:", line)
+        self.assertIn("src/x/y/a.py", line)
+        self.assertIn("vince y", line)
+
+    def test_declared_profile_new_name_file_reported(self):
+        current = BASE_TOML + '[profiles.x]\npaths = ["/vercel.json"]\n'
+        root = self.plugin(fragment=FRAGMENT_X.replace('["**/x/**"]', '["**/vercel.json"]'))
+        got = self.blocks(["vercel.json", "apps/web/vercel.json"], current, root=root)
+        self.assertTrue(any('aggiungi "apps/web/vercel.json" (1 file)' in l for l in got.lines),
+                        got.lines)
+
+    def test_declared_profile_negation_respected_for_names(self):
+        current = BASE_TOML + '[profiles.x]\npaths = ["/vercel.json", "!apps/legacy/vercel.json"]\n'
+        root = self.plugin(fragment=FRAGMENT_X.replace('["**/x/**"]', '["**/vercel.json"]'))
+        got = self.blocks(["vercel.json", "apps/legacy/vercel.json"], current, root=root)
+        self.assertFalse([l for l in got.lines if "legacy" in l], got.lines)
+
     def test_real_trees_light_no_profile(self):
         """I frammenti veri, con una skill finta approvata ciascuno, non accendono nessun profilo
         sull'albero che i test di init spingono né su quello installato (`bin/` copiato in
@@ -940,7 +1047,10 @@ class ProfileBlocksTest(PluginMixin, unittest.TestCase):
                 f"---\napproved: 2026-11-01\n---\nR-{fr.area.upper()}-01 [blocca] x\n",
                 encoding="utf-8")
         installed = install.files(ROOT, default_branch="main", services={})
-        trees = {"push": {*DEFAULT_FILES, "tollgate.toml"}, "installato": set(installed),
+        cli_pushed = {*DEFAULT_FILES, *JUNIT_FILES, *GATE_FILES, ".github/tollgate/VERSION",
+                      "package.json", ".github/workflows/ci.yml", "tollgate.toml"}
+        trees = {"push": {*DEFAULT_FILES, "tollgate.toml"}, "file spinti dalla CLI": cli_pushed,
+                 "installato": set(installed),
                  "installato + proposta": {*installed, *(f"{FOLDER}/files/{p}" for p in installed)}}
         for name, paths in trees.items():
             with self.subTest(name):

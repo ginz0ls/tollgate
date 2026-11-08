@@ -13,13 +13,31 @@ from tollgate_core import config
 FRAGMENTS_DIR = ("templates", "profiles")
 RESERVED = ("base", "active")
 _AREA = re.compile(r"[a-z0-9-]+")
-# Fino a B4 un frammento accetta solo pattern `**/<cartella>/**` (decisione 5).
-_PATTERN = re.compile(r"\*\*/(?!\.{1,2}/)([^/*?\[\]!\\]+)/\*\*")
+# Le tre forme di pattern di un frammento (B4, decisione 2): una regex per forma.
+_SEGMENT = r"(?!\.{1,2}/)([^/*?\[\]!\\]+)"
+_FOLDER = re.compile(r"\*\*/" + _SEGMENT + r"/\*\*")
+_ROOT_FOLDER = re.compile(_SEGMENT + r"/\*\*")
+# Nome di file: tratto letterale ASCII di almeno 2 caratteri con una lettera, al più un `*` finale.
+_NAME = re.compile(r"\*\*/(?=[A-Za-z0-9._-]*[A-Za-z])(?=[A-Za-z0-9._-]{2})([A-Za-z0-9._-]+\*?)")
 _FORBIDDEN_KEYS = ("rules", "blocking_rules")
 
 
 class FragmentError(ValueError):
     """Frammento illeggibile o non valido; il messaggio nomina il file."""
+
+
+@dataclass(frozen=True)
+class Pattern:
+    kind: str  # "folder" | "root_folder" | "name"
+    name: str
+
+
+def parse_pattern(pattern: str) -> Pattern | None:
+    """La forma di un pattern di frammento, o `None` se non è una delle tre ammesse."""
+    for kind, regex in (("folder", _FOLDER), ("root_folder", _ROOT_FOLDER), ("name", _NAME)):
+        if m := regex.fullmatch(pattern):
+            return Pattern(kind, m.group(1))
+    return None
 
 
 @dataclass(frozen=True)
@@ -29,6 +47,7 @@ class Fragment:
     detect: tuple[str, ...]
     skill_path: Path
     source: Path
+    patterns: tuple[Pattern, ...]
 
 
 def _parse(path: Path, plugin_root: Path) -> Fragment:
@@ -61,9 +80,11 @@ def _parse(path: Path, plugin_root: Path) -> Fragment:
             except config.ConfigError as e:
                 raise FragmentError(f"{name}: [profile] {e}") from e
     paths = profile.get("paths", [])
-    if not isinstance(paths, list) or not all(
-            isinstance(p, str) and _PATTERN.fullmatch(p) for p in paths):
-        raise FragmentError(f"{name}: i pattern di paths devono avere la forma **/<cartella>/**")
+    parsed = [parse_pattern(p) if isinstance(p, str) else None
+              for p in (paths if isinstance(paths, list) else [None])]
+    if not isinstance(paths, list) or None in parsed:
+        raise FragmentError(f"{name}: i pattern di paths devono avere la forma **/<cartella>/**, "
+                            f"<cartella>/** o **/<nome-file>")
     extra = sorted(set(detect) - {"content"})
     if extra:
         raise FragmentError(f"{name}: chiave sconosciuta in [detect]: {', '.join(extra)}")
@@ -74,7 +95,7 @@ def _parse(path: Path, plugin_root: Path) -> Fragment:
         raise FragmentError(f"{name}: [profile] paths è obbligatorio e non vuoto "
                             f"(senza, il profilo si accenderebbe su ogni file)")
     skill = plugin_root / "skills" / f"rules-{area}" / "SKILL.md"
-    return Fragment(area, profile, tuple(content), skill, path)
+    return Fragment(area, profile, tuple(content), skill, path, tuple(parsed))
 
 
 def load(plugin_root) -> list[Fragment]:
@@ -93,12 +114,22 @@ def _skill_text(fragment: Fragment) -> str | None:
         return None
 
 
+def load_approved(plugin_root) -> list[Fragment]:
+    """I frammenti di `load` la cui skill è approvata, nello stesso ordine."""
+    return [f for f in load(plugin_root) if approved(f)]
+
+
 def approved(fragment: Fragment) -> bool:
     """Vero se la skill dell'area ha `approved` (decisione 4); skill assente: falso."""
     return research.enforced(_skill_text(fragment))
 
 
 def rules(fragment: Fragment) -> tuple[list[str], list[str]]:
-    """`(rules, blocking_rules)` ordinate, dalle righe `R-<AREA>-NN` della skill."""
-    known, blocking = research.area_rules(_skill_text(fragment) or "", fragment.area)
+    """`(rules, blocking_rules)` ordinate, dalle righe `R-<AREA>-NN` della skill.
+    Con la skill illeggibile solleva `FragmentError` col nome del file."""
+    text = _skill_text(fragment)
+    if text is None:
+        raise FragmentError(f"{fragment.skill_path.parent.name}/{fragment.skill_path.name}: "
+                            f"skill illeggibile, regole non calcolabili")
+    known, blocking = research.area_rules(text, fragment.area)
     return sorted(known), sorted(blocking)

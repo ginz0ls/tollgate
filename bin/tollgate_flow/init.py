@@ -32,8 +32,12 @@ FREE_MINUTES = "2.000"                  # GitHub Free, repo privati (9.5)
 RECEIPT_SOURCES = ("finish", "verify")
 MODE_PLACEHOLDER = "__MODE__"
 # Cartelle i cui file non accendono un profilo (decisione 5): gli agenti e le skill di progetto,
-# la copia di tollgate di ogni progetto e la proposta di `init`, che ne contiene un'altra copia.
-EXCLUDED_PREFIXES = (".claude/", install.INSTALL_DIR + "/", FOLDER + "/")
+# la copia di tollgate di ogni progetto, la proposta di `init`, che ne contiene un'altra copia, e
+# i workflow e le azioni di GitHub (B4, decisione 18).
+EXCLUDED_PREFIXES = (".claude/", install.INSTALL_DIR + "/", FOLDER + "/",
+                     ".github/workflows/", ".github/actions/")
+# Estensioni dei documenti (B4, decisione 4): non accendono un profilo per cartella.
+DOC_EXTENSIONS = ("md", "mdx", "markdown", "rst", "txt", "adoc")
 SHOWN_FILES = 10
 # Decisione 6: il rilevamento per contenuto guarda solo i file sorgente, non i test, non i grandi.
 SOURCE_EXTENSIONS = ("py", "ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs", "vue", "svelte",
@@ -183,7 +187,6 @@ def _jest(main, ref: str) -> tuple[bool, bool]:
     return ("jest" in deps or "jest" in data), "jest-junit" in deps
 
 
-_FOLDER_PATTERN = re.compile(r"\*\*/([^/]+)/\*\*")
 _AGENT_NAME = re.compile(r"[a-z0-9-]+")
 
 
@@ -202,26 +205,52 @@ def _shown(files: list[str]) -> str:
     return ", ".join(_plain(f) for f in files[:SHOWN_FILES]) + more
 
 
-def _names(fragment) -> set[str]:
-    """I nomi di cartella dei pattern `**/<cartella>/**` del frammento."""
-    return {m.group(1) for p in fragment.profile["paths"] if (m := _FOLDER_PATTERN.fullmatch(p))}
+def _is_doc(name: str) -> bool:
+    _, dot, ext = name.rpartition(".")
+    return bool(dot) and ext.lower() in DOC_EXTENSIONS
 
 
-def _folder_prefix(path: str, names: set[str]) -> str | None:
-    """Il percorso fino alla prima cartella (compresa) il cui nome è in `names`."""
+def _match(path: str, patterns) -> tuple[str, str] | None:
+    """Decisioni 3 e 4: come un file accende un profilo. `("dir", <percorso fino alla cartella>)`
+    per le forme a cartella (vince la più a sinistra; i documenti non le accendono), poi
+    `("file", <percorso>)` per la forma `name`; `None` se nessuna lo accende."""
+    if path.startswith(EXCLUDED_PREFIXES):
+        return None
     parts = path.split("/")
-    for i, part in enumerate(parts[:-1]):
-        if part in names:
-            return "/".join(parts[:i + 1])
+    name = parts[-1]
+    doc = _is_doc(name)
+    if not doc:
+        folders = {p.name for p in patterns if p.kind == "folder"}
+        roots = {p.name for p in patterns if p.kind == "root_folder"}
+        for i, part in enumerate(parts[:-1]):
+            if part in folders or (i == 0 and part in roots):
+                return "dir", "/".join(parts[:i + 1])
+    for p in patterns:
+        if p.kind == "name" and not (doc and "*" in p.name) \
+                and fnmatch.fnmatchcase(name, p.name):
+            return "file", path
     return None
 
 
-def _concrete_paths(names: set[str], files) -> list[str]:
-    """Decisione 5: per ogni file sotto una cartella di `names`, `<prefisso>/**` con
-    l'escape; un prefisso già coperto da uno più corto si toglie."""
-    prefixes = {pre for f in files if (pre := _folder_prefix(f, names))}
-    kept = [p for p in prefixes if not any(p != q and p.startswith(q + "/") for q in prefixes)]
-    return sorted(globs.escape(p) + "/**" for p in kept)
+def concrete_for(path: str, patterns) -> str | None:
+    """Decisione 3: il percorso concreto (con l'escape) che accende `path`, o `None`."""
+    found = _match(path, patterns)
+    if found is None:
+        return None
+    kind, raw = found
+    return globs.escape(raw) + ("/**" if kind == "dir" else "")
+
+
+def _concrete_paths(patterns, files) -> list[str]:
+    """Decisione 3: i percorsi concreti per `files`; un percorso a cartella già coperto da uno
+    più corto si toglie, e un percorso esatto già coperto da uno a cartella."""
+    found = {m for f in files if (m := _match(f, patterns))}
+    dirs = {raw for kind, raw in found if kind == "dir"}
+    kept = [d for d in dirs if not any(d != q and d.startswith(q + "/") for q in dirs)]
+    folder_paths = [globs.escape(d) + "/**" for d in kept]
+    exact = [globs.escape(raw) for kind, raw in found
+             if kind == "file" and not globs.match_any(folder_paths, raw)]
+    return sorted([*folder_paths, *exact])
 
 
 def _is_detectable(path: str, size: int | None) -> bool:
@@ -305,7 +334,7 @@ def _drift(area: str, decl: dict, fragment, rules: tuple[list[str], list[str]],
         uncovered_detected = [f for f in detected if f not in uncovered
                               and not globs.match_any(paths, f)
                               and not any(globs.match(n, f) for n in negations)]
-        proposed = sorted({*_concrete_paths(_names(fragment), uncovered),
+        proposed = sorted({*_concrete_paths(fragment.patterns, uncovered),
                            *(globs.escape(f) for f in uncovered_detected)})
         for pattern in proposed:
             count = sum(1 for f in [*uncovered, *uncovered_detected] if globs.match(pattern, f))
@@ -331,12 +360,10 @@ def profile_blocks(files: dict[str, int], current_text: str, plugin_root: Path, 
         effective = declared
     candidates = sorted(f for f in files if not f.startswith(EXCLUDED_PREFIXES))
     text, lines, other, sections = "", [], [], []
-    for fragment in fragments.load(plugin_root):
-        if not fragments.approved(fragment):
-            continue
+    proposed: dict[str, dict] = {}     # i profili proposti prima, nella stessa corsa (D11)
+    for fragment in fragments.load_approved(plugin_root):
         area = fragment.area
-        names = _names(fragment)
-        lighting = [f for f in candidates if _folder_prefix(f, names)]
+        lighting = [f for f in candidates if concrete_for(f, fragment.patterns)]
         found = sorted({f for f in (detected or {}).get(area, [])
                         if not f.startswith(EXCLUDED_PREFIXES)} - set(lighting))
         rules = fragments.rules(fragment)
@@ -345,7 +372,7 @@ def profile_blocks(files: dict[str, int], current_text: str, plugin_root: Path, 
             lines += drift
             other += drift
             continue
-        concrete = _concrete_paths(names, lighting)
+        concrete = _concrete_paths(fragment.patterns, lighting)
         paths = sorted({*concrete, *(globs.escape(f) for f in found
                                      if not globs.match_any(concrete, f))})
         if not paths:
@@ -374,7 +401,9 @@ def profile_blocks(files: dict[str, int], current_text: str, plugin_root: Path, 
             own.append(f"profilo {area}: [profiles] active contiene «{_plain(area)}»: con il "
                        "blocco proposto il profilo si accenderebbe su ogni task")
         vertical = {n: p for n, p in effective.items() if p.get("kind", "vertical") == "vertical"}
+        vertical.update(proposed)
         merged = {**vertical, area: {"kind": "vertical", "paths": paths}}
+        proposed[area] = merged[area]
         overlaps = [(f, route.vertical_for(f, vertical)) for f in lit]
         overlaps = [(f, declared_one) for f, declared_one in overlaps if declared_one]
         for f, declared_one in overlaps[:SHOWN_FILES]:
@@ -660,7 +689,7 @@ def propose(state: State, cwd: Path, *, update: bool, merges_per_month: int,
         sizes = git.tree_sizes_at(main, ref)
         warnings: list[str] = []
         if sizes:
-            approved = [f for f in fragments.load(profiles_root) if fragments.approved(f)]
+            approved = fragments.load_approved(profiles_root)
             detected = detect_files(main, ref, approved, sizes, warnings)
             found = _with_warnings(profile_blocks(sizes, toml, profiles_root, detected=detected),
                                    warnings)

@@ -29,7 +29,7 @@ Se un giro supera un tetto, o rifiuti il costo, il lavoro si ferma con un blocco
 
 ### `/tollgate:execute`
 
-Esegue il piano task per task con gli agenti `tollgate:implementer` e `tollgate:task-reviewer`, fino a quando tutti i task sono chiusi. Nessun argomento. È rientrante: dopo un `/clear` riparte dalla riga "prossimo passo" del checkpoint. Un solo implementatore scrive per volta, il coordinatore non scrive codice e ogni task passa da una revisione prima di chiudersi. Se il task tocca i percorsi di un profilo con agenti propri, i tipi sono quelli del profilo: per l'area `ai` (codice che usa modelli AI) sono `tollgate:implementer-ai` e `tollgate:reviewer-ai`, copie dei generici che precaricano anche le regole `rules-ai`; il revisore dell'area può anche aprire gli indirizzi ufficiali citati nel report, ed è di sola lettura come il generico. A fine lavoro ti dice di scrivere `/tollgate:finish`.
+Esegue il piano task per task con gli agenti `tollgate:implementer` e `tollgate:task-reviewer`, fino a quando tutti i task sono chiusi. Nessun argomento. È rientrante: dopo un `/clear` riparte dalla riga "prossimo passo" del checkpoint. Un solo implementatore scrive per volta, il coordinatore non scrive codice e ogni task passa da una revisione prima di chiudersi. Se il task tocca i percorsi di un profilo con agenti propri, i tipi sono quelli del profilo: per l'area `ai` (codice che usa modelli AI) sono `tollgate:implementer-ai` e `tollgate:reviewer-ai`, copie dei generici che precaricano anche le regole `rules-ai`; per l'area `infra` (configurazione e deploy su Vercel, Cloudflare e Docker) sono `tollgate:implementer-infra` e `tollgate:reviewer-infra`, con le regole `rules-infra`; il revisore di un'area può anche aprire gli indirizzi ufficiali citati nel report, ed è di sola lettura come il generico. Un task che tocca due aree usa gli agenti generici. A fine lavoro ti dice di scrivere `/tollgate:finish`.
 
 ### `/tollgate:finish`
 
@@ -121,7 +121,7 @@ Prepara l'installazione del gate su GitHub: misura la modalità (`protected` o `
 - Argomenti: `[--propose|--update] [--merges-per-month N] [--service NOME=IMMAGINE[,PORTA]]`
 - Chi lo lancia: tu o il modello.
 
-Prima installazione con `--propose`, aggiornamento con `--update` (propone solo i file che differiscono dal ramo predefinito). Propone anche i profili verticali approvati che hanno file nel repo: aggiunge blocchi `[profiles.<area>]` in coda al `tollgate.toml` proposto, senza riscrivere il tuo testo, e li descrive nella sezione «Profili proposti» del `README.md`. Un profilo che hai già dichiarato non lo tocca: ti scrive a terminale le righe da cambiare a mano (regole nuove, percorsi non coperti, agenti ora presenti). I passi sono in [installazione](installazione.md) e [emergenze e aggiornamenti](emergenze-e-aggiornamenti.md); come sceglie la modalità è in [modalità](modalita.md).
+Prima installazione con `--propose`, aggiornamento con `--update` (propone solo i file che differiscono dal ramo predefinito). Propone anche i profili verticali approvati che hanno file nel repo: aggiunge blocchi `[profiles.<area>]` in coda al `tollgate.toml` proposto, senza riscrivere il tuo testo, e li descrive nella sezione «Profili proposti» del `README.md`. Un profilo che hai già dichiarato non lo tocca: ti scrive a terminale le righe da cambiare a mano (regole nuove, percorsi non coperti, agenti ora presenti). I percorsi di un profilo possono avere tre forme: una cartella a qualunque profondità, una cartella alla radice del repo, il nome di un file; per le prime due `init` scrive la cartella trovata nel repo, per la terza il percorso esatto di ogni file (un `Dockerfile` o un `vercel.json` nuovo, anche nella stessa cartella, si aggiunge poi con le righe di `init --update`). I documenti (`.md`, `.mdx`, `.markdown`, `.rst`, `.txt`, `.adoc`) non accendono un profilo per la sola cartella in cui stanno. I file in `.github/workflows/` e `.github/actions/` non accendono nessun profilo. I passi sono in [installazione](installazione.md) e [emergenze e aggiornamenti](emergenze-e-aggiornamenti.md); come sceglie la modalità è in [modalità](modalita.md).
 
 ### `/tollgate:setup`
 
@@ -153,6 +153,10 @@ Le regole di base del passo «informati prima»: leggere i file e la documentazi
 ### `/tollgate:rules-ai`
 
 Le regole per il codice che usa modelli AI (Claude, Gemini, OpenAI, OpenRouter, Agno): il nome del modello in un solo punto, con l'indirizzo della pagina ufficiale e la data della verifica; l'ultimo modello stabile della famiglia; le note di migrazione lette prima di cambiare modello; un errore chiaro se un modello non è più disponibile. Le caricano gli agenti dell'area `ai`, quindi non serve lanciarla a mano. Le regole sono approvate dall'utente (2026-11-02): `init` propone il profilo `ai` dove trova codice che usa modelli AI.
+
+### `/tollgate:rules-infra`
+
+Le regole per la configurazione e il deploy su Vercel, Cloudflare (Wrangler) e Docker: leggere i file di deploy già presenti prima di parlare di deploy, citare la pagina ufficiale di ogni comando e di ogni proprietà di configurazione, nessun segreto nei file versionati, un solo file di configurazione per progetto Vercel, e nessuna pubblicazione fatta dal task. Le caricano gli agenti dell'area `infra`, quindi non serve lanciarla a mano. Le regole sono approvate dall'utente (2026-11-07): `init` propone il profilo `infra` dove trova file di configurazione o di deploy.
 
 ## La CLI
 

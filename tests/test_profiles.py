@@ -82,6 +82,21 @@ class RoutingTest(unittest.TestCase):
         self.assertFalse(r.split_candidate)
 
 
+class InfraAndAiRoutingTest(unittest.TestCase):
+    PROF = {
+        "infra": {"kind": "vertical", "paths": ["vercel.json"], "skills": [],
+                  "agent": "tollgate:implementer-infra", "reviewer": "tollgate:reviewer-infra"},
+        "ai": {"kind": "vertical", "paths": ["ai/**"], "skills": [],
+               "agent": "tollgate:implementer-ai", "reviewer": "tollgate:reviewer-ai"},
+    }
+
+    def test_infra_and_ai_routing_is_split_candidate(self):
+        r = profiles.task_routing(["vercel.json", "ai/x.py"], self.PROF)
+        self.assertEqual((r.implementer, r.reviewer),
+                         (profiles.DEFAULT_IMPLEMENTER, profiles.DEFAULT_REVIEWER))
+        self.assertTrue(r.split_candidate)
+
+
 class RulesTest(unittest.TestCase):
     PROF = {
         "web": {"rules": ["R-WEB-1", "R-WEB-2"], "blocking_rules": ["R-WEB-1"],

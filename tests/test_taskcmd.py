@@ -31,6 +31,18 @@ reviewer = "tollgate:reviewer-ai"
 rules = ["R-AI-01", "R-AI-02"]
 blocking_rules = ["R-AI-01"]
 """
+INFRA_BLOCK = """
+[profiles.infra]
+paths = ["vercel.json"]
+skills = []
+reviewer_skills = []
+agent = "tollgate:implementer-infra"
+reviewer = "tollgate:reviewer-infra"
+rules = ["R-INFRA-01", "R-INFRA-07"]
+blocking_rules = ["R-INFRA-01"]
+"""
+INFRA_TOML = DEFAULT_TOML + INFRA_BLOCK
+INFRA_AI_TOML = AI_TOML + INFRA_BLOCK
 
 
 class TaskCase(unittest.TestCase):
@@ -232,6 +244,34 @@ class TaskStartTest(TaskCase):
         brief = path.read_text()
         self.assertNotIn("rules-ai", brief)
         self.assertNotIn("Skill da usare\n\n- ", brief)
+
+    def test_infra_task_routed_to_area_agents(self):
+        """Un blocco `infra` scritto nel test (regole di una skill finta, non i file veri)."""
+        self.make(toml=INFRA_TOML, plan=plan_text("- Create: `vercel.json`"))
+        _, summary = self.start(2)
+        row = self.row(2)
+        self.assertEqual((row["agent_type"], row["reviewer_type"]),
+                         ("tollgate:implementer-infra", "tollgate:reviewer-infra"))
+        self.assertIn("tollgate:implementer-infra", summary)
+        self.assertIn("revisore: tollgate:reviewer-infra", summary)
+
+    def test_rules_infra_not_required(self):
+        """Decisione 8: `rules-infra` si precarica, non è una skill da usare."""
+        self.make(toml=INFRA_TOML, plan=plan_text("- Create: `vercel.json`"))
+        path, _ = self.start(2)
+        self.assertEqual(json.loads(self.row(2)["skills_required"]), [])
+        brief = path.read_text()
+        self.assertNotIn("rules-infra", brief)
+        self.assertNotIn("Skill da usare\n\n- ", brief)
+
+    def test_infra_and_ai_task_goes_generic(self):
+        """Due aree nello stesso task: agenti generici (il task è da dividere)."""
+        self.make(toml=INFRA_AI_TOML,
+                  plan=plan_text("- Create: `vercel.json`\n- Create: `ai/x.py`"))
+        self.start(2)
+        row = self.row(2)
+        self.assertEqual((row["agent_type"], row["reviewer_type"]),
+                         ("tollgate:implementer", "tollgate:task-reviewer"))
 
     def test_absent_skill_removed_from_required(self):
         self.make(toml=WEB_TOML, plan=plan_text("- Create: `web/page.tsx`"))
