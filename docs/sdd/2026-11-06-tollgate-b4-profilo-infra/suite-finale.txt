@@ -1,0 +1,24 @@
+corsa 1:
+== Python 3.11.16
+Ran 3668 tests in 1511.847s
+OK (skipped=7)
+== Python 3.13.5
+Ran 3668 tests in 1498.718s
+OK (skipped=5)
+EXIT 0
+corsa 2:
+== Python 3.11.16
+Ran 3668 tests in 1522.454s
+OK (skipped=7)
+== Python 3.13.5
+Ran 3668 tests in 1494.318s
+OK (skipped=5)
+EXIT 0
+corsa 3:
+== Python 3.11.16
+Ran 3668 tests in 2777.247s
+OK (skipped=7)
+== Python 3.13.5
+Ran 3668 tests in 1846.859s
+OK (skipped=5)
+EXIT 0

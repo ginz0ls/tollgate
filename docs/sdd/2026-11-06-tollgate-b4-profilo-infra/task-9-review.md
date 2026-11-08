@@ -1,0 +1,34 @@
+# Revisione Task 9 (Step 2-3): rapporto della prova reale e evidenze (commit 66e6dbf)
+
+Controlli fatti: rapporto letto per intero; verifiche su `registro-1/*`, `exit-codes`, `esito`, `argv` e, con script di lettura e `grep`, sugli stream `passo1` e `passo2` (evento `result`, report dell'implementatore, risposta del revisore, testo del task dato all'implementatore, risultati di strumento lunghi). Lanciati `python3 -B -m unittest tests.test_b1_scripts` e la stessa con `python3.11`: 77 test OK ciascuno. Non rilanciato nient'altro.
+
+### Aderenza
+- ✅ Passi, tentativi, uscite: `exit-codes.txt` (0, 0, un tentativo ciascuno); l'esito è dichiarato non composito.
+- ✅ Durate e costi: `result` passo1 85.247 ms, 18 turni, 0,462 USD; passo2 97.036 ms, 11 turni, 0,575 USD (rapporto: 85 s / 97 s, 0,46 + 0,57, circa 1,03).
+- ✅ Agenti: `tipi-task.txt` (implementer-infra / reviewer-infra), `stats.json` (55.260 + 38.021 = 93.281; veti, blocchi, giri 0), id `aaf5b158…` e `a9c1e6fe…` come in `events.jsonl`.
+- ✅ Precaricamento: `trascrizioni.txt` ha per entrambi gli agenti i due titoli con `isMeta: sì` e `no`; la spiegazione sul perché `precarico.txt` dice «indizio» è corretta (testo dello stesso file).
+- ✅ Nota e letture: `lookups.txt` (5 read + 1 fetch, 6 righe come in tabella), `eventi-ricerca.jsonl` (`ok: true`, seq 9, prima del commit `fb11710`), `research-1.md` (`esito: valida`), `grep-non-registrati.txt` (2 Grep, 5 read).
+- ✅ Verdetto: risposta del revisore nello stream: `approved`, `findings: []`; cita R-INFRA-01, 02, 03, 04, 05, 12 e R-BASE-01, 03, 10, 11 come scritto nel rapporto. Nessun `R-INFRA` dal vivo: detto.
+- ✅ Report dell'implementatore: indirizzo ufficiale di `headers` (https://vercel.com/docs/project-configuration/vercel-json) e riga R-INFRA-12 sulla prova non fatta con il motivo, entrambi nel JSON dell'implementatore.
+- ✅ Comandi: `comandi-modello.txt` coincide con la descrizione (nessun vercel/wrangler/docker/npx/npm/gh/curl/push); `comandi-rischiosi.txt` vuoto; conteggi strumenti uguali.
+- ✅ Scostamento (piano scritto nel passo 1, nome diverso da `PLAN_REL`): vero (`events.jsonl` seq 3, `argv.txt` passo2 con `2026-11-06-prova-b4.md`, risposta finale del passo 2). Limiti: R-INFRA-12 solo ramo «perché no», `limiti.txt` riportato, modalità `detect`, plugin dell'utente attivi.
+- ✅ Privacy: nessun nome utente, host, `/home/` diverso da `/home/USER` (le 2 occorrenze nude sono testo esplicativo nel rapporto), nessun token (`sk-ant`, `ghp_`, `github_pat_`, `Bearer`, `AKIA`), nessun id di sessione reale (solo `SESSIONE-1/2`), nessuna riga `init` o `SessionStart` di altri plugin negli stream, nessun nome di altri plugin se non `superpowers:writing-plans` (azione del modello, nome pubblico). Restano `/tmp/claude-1000` (dichiarato) e `rate_limit_event`/`request_id` (non identificanti).
+- ✅ Test: `test_committed_evidence_has_no_long_web_results` e il resto passano su due interpreti.
+- ⚠️ Non verificabile da qui: valori dei grep sul file originale prima della ripulitura, plan-check e variabili d'ambiente assenti (fatti del controller).
+
+### Punti di forza
+Rapporto nella forma di B3, in italiano semplice, con tabelle riscontrabili riga per riga. Distingue bene la prova automatica del precaricamento (indizio) da quella letta a mano. Dichiara onestamente che le regole che bloccano non sono scattate e che la prova è solo del ramo «perché no». I limiti di `--disallowedTools` sono riportati con precisione.
+
+### Rilievi
+
+**Important**
+1. `docs/verifiche/2026-11-06-b4-prova-flusso.md`, sezioni «Il report dell'implementatore», «Esito rispetto all'atteso» e «Scostamenti dall'atteso»: il rapporto non dice che il contenuto richiesto al report (file di deploy letti, indirizzo di `headers`, riga «prova non fatta perché il progetto non è collegato») era scritto parola per parola nel testo del task che l'implementatore ha ricevuto (`passo2/tentativo-1/claude.jsonl`, il task-1.md letto dall'implementatore, riga «Per il report (R-INFRA-01, 02, 03, 12)»). Quel piano l'ha scritto il modello nel passo 1, dopo aver letto `rules-infra`. Quindi le tre righe «sì» sul report non provano che sia il precaricamento a guidare l'implementatore: provano che ha eseguito il task. Inoltre lo scostamento dice che l'effetto del piano scritto nel passo 1 è «solo di tempi»: non è vero, perché il piano fisso dello script (che dettava testo e test) non è stato usato e il brief dell'agente è opera del modello. Correzione: aggiungere ai limiti e allo scostamento che (a) il testo del task chiedeva esplicitamente quelle righe, (b) il piano era del modello e non quello dello script, (c) la prova del precaricamento resta quella di `trascrizioni.txt` e del revisore che cita le regole R-INFRA senza che il task le nominasse tutte (nel task compaiono solo 01, 02, 03, 12; 04 e 05 le ha citate il revisore da sé, e questo è il segnale più forte).
+
+**Minor**
+2. `docs/verifiche/evidenze/b4/flusso/passo1/tentativo-1/claude.jsonl` (risultato `Web search results…`, 3.698 caratteri) e lo stesso file (lettura di una pagina Vercel salvata, righe 360-429, circa 2,7 KB), `passo2/tentativo-1/claude.jsonl` (anteprima `<persisted-output>` di 2 KB con l'intestazione e i link della pagina Vercel): sono testo di terzi sotto il tetto `MAX_WEB_RESULT` di 5.000, quindi il test passa, ma la regola del repo è «nessun testo copiato da pagine di terzi». Il risultato della ricerca contiene titoli e URL di siti terzi. La pagina conteneva anche un invito rivolto agli agenti a installare un plugin con `npx`: il modello non l'ha seguito (nessun `npx` in `comandi-modello.txt`), e questo vale la pena di una riga nel rapporto. Correzione facoltativa: sostituire quei tre blocchi con segnaposto (`flowreg` copre solo risultati sopra il tetto di strumento WebFetch/WebSearch; la lettura da file salvato e l'anteprima non rientrano nel suo controllo) oppure scrivere la lacuna come nota di rafforzamento della ripulitura.
+3. Rapporto, «Anonimizzazione»: dice che nel passo 2 resta la coppia di `SessionStart` di tollgate e non dice nulla del passo 1, dove nello stream non ce n'è nessuna (nemmeno di tollgate) pur essendo il plugin attivo. Una riga che spieghi se è stata tolta o non c'era.
+4. `registro-1/limiti.txt` e il piano (Step 2) nominano R-INFRA-11 per la regola «non pubblicare»; il rapporto usa giustamente R-INFRA-12 (carry). Nessuna azione, solo coerenza con il piano.
+
+### Valutazione
+**Qualità del task:** Da correggere (lieve).
+**Motivo:** i fatti del rapporto e la ripulitura reggono alle verifiche, ma manca un limite onesto: il report dell'implementatore seguiva un task scritto dal modello che gli chiedeva proprio quelle righe, e il piano non fissato dallo script non ha «solo effetto sui tempi». Basta una modifica al testo del rapporto (e, a scelta, tre segnaposto nelle evidenze).
