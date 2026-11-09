@@ -34,7 +34,7 @@ Ogni condizione si controlla leggendo un file o il transcript, senza interpretaz
 
 **Situazione B** (rinvio delle regole, decisione 15 del piano). Valgono tutte:
 1. `progress.md` ha una riga che comincia con `Task N: complete` per i Task 1, 2, 3 e 4, la riga `Task 5: rinviato dall'utente` e una riga che comincia con `Task 9 ridotto: complete`; i Task 6, 7 e 8 non si fanno e la prova reale non c'è.
-2. Il ramo `b5-parziale` esiste e `git log main..b5-parziale` mostra i commit con gli oggetti degli Step 5 dei Task 1 e 2 del piano («tollgate B5: un frammento può escludere cartelle dalla proposta», «tollgate B5: le scritture di Wrangler su KV, D1 e R2 e gli script dei monorepo sono effetti esterni») e il commit «tollgate B5 (parziale): spec rev 32 ridotta» (decisione 15).
+2. `progress.md` ha una riga che comincia con `b5-parziale: ` (uno sha e un oggetto) per ogni commit del ramo, scritte prima del merge; tra gli oggetti ci sono degli Step 5 dei Task 1 e 2 del piano («tollgate B5: un frammento può escludere cartelle dalla proposta», «tollgate B5: le scritture di Wrangler su KV, D1 e R2 e gli script dei monorepo sono effetti esterni») e il commit «tollgate B5 (parziale): spec rev 32 ridotta» (decisione 15).
 3. Le condizioni 4 e 5 della situazione A, per la revisione finale e le tre corse della suite fatte su `b5-parziale`.
 4. La condizione 6 della situazione A, con «Regole approvate» che dice «rinviate dall'utente» e «Prova reale» che dice «non fatta: regole rinviate», e la proposta di unire solo `b5-parziale`.
 5. La condizione 7 della situazione A, con il commit su `main` che comincia con `tollgate B5 (parziale):` e la riga della memoria che comincia con `- B5 parziale` al posto di `- B5 eseguito`.
