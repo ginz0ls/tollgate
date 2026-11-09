@@ -42,7 +42,7 @@ Prima del Task 1, un analista sonnet in sola lettura scrive `preflight-scan.md` 
 
 ## Ruling nel ledger e `carry.md`
 
-Il piano dà firme, test e valori; il corpo lo scrive l'implementatore. Se il piano contraddice il progetto o la spec, vince il progetto, poi la spec: decidi tu, scrivi `Ruling: <cosa> — <perché> — <costo se sbagliata>` nel ledger e vai avanti. Una correzione che cambia la spec va nella revisione 32, scritta dal Task 9. I rilievi minori vanno nel ledger come `Task N: minor (deferred): …`: la revisione finale ne fa il triage, e quelli che riguardano B6-B8 finiscono nel piano principale di B. **Una ruling che toglie o aggiunge un token a un elenco di eccezioni o di segnali del veto** (come `PACKAGE_COMMANDS` in B4, o i token della decisione 7 qui) si controlla contro i nomi comuni di cartelle e pacchetti dei monorepo prima di scriverla (lezione di B4). Le regole approvate (`rules-base`, `rules-ai`, `rules-infra`) e le loro pagine e rapporti **non si toccano**; `rules-backend`, dopo il Task 5, cambia solo con l'utente.
+Il piano dà firme, test e valori; il corpo lo scrive l'implementatore. Se il piano contraddice il progetto o la spec, vince il progetto, poi la spec: decidi tu, scrivi `Ruling: <cosa> — <perché> — <costo se sbagliata>` nel ledger e vai avanti. **Ogni** riga `Ruling:` ha il costo, anche quelle che registrano una verifica (`costo: nessuno`): il rapporto prima del merge le riporta tutte con il costo. Una correzione che cambia la spec va nella revisione 32, scritta dal Task 9. I rilievi minori vanno nel ledger come `Task N: minor (deferred): …`: la revisione finale ne fa il triage, e quelli che riguardano B6-B8 finiscono nel piano principale di B. **Una ruling che toglie o aggiunge un token a un elenco di eccezioni o di segnali del veto** (come `PACKAGE_COMMANDS` in B4, o i token della decisione 7 qui) si controlla contro i nomi comuni di cartelle e pacchetti dei monorepo prima di scriverla (lezione di B4). Le regole approvate (`rules-base`, `rules-ai`, `rules-infra`) e le loro pagine e rapporti **non si toccano**; `rules-backend`, dopo il Task 5, cambia solo con l'utente.
 
 ## Lezioni dei piani precedenti
 
@@ -103,6 +103,8 @@ Solo in questi casi:
 - un'operazione distruttiva o irreversibile, o un'operazione su GitHub fuori dall'eccezione 3;
 - un'azione fuori da questo worktree, come un merge su `main`;
 - un piano rotto al punto che ogni strada è un'ipotesi.
+
+Il messaggio all'utente di ognuna di queste fermate, salvo l'approvazione delle regole e il merge, comincia con la riga `Fermata: <caso>` (per esempio `Fermata: fatto smentito nel Task 3, Step 0`), così la condizione del brief corto la riconosce.
 
 Il resto si decide con una `Ruling:`. Miglioramenti utili, compatibili e a basso costo si fanno senza chiedere.
 

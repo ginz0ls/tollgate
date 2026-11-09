@@ -9,17 +9,17 @@ Esegui il piano `docs/superpowers/plans/2026-11-09-tollgate-b5-profilo-backend.m
 - sessione avviata dalla radice del repo;
 - regole di cautela nel brief di ogni subagente, al lancio.
 
-Scrivi nel ledger (`progress.md` del workspace) le righe esatte che le condizioni qui sotto cercano, con queste parole.
+Scrivi nel ledger le righe esatte che le condizioni qui sotto cercano, con queste parole. **Dove stanno i file:** il ledger è `progress.md` del workspace, nel worktree: `.claude/worktrees/b5/.superpowers/sdd/<cartella>/progress.md` (dopo il merge la sua copia è in `docs/sdd/2026-11-09-tollgate-b5-profilo-backend/progress.md` su `main`); `final-review.md` sta nella stessa cartella; `skills/rules-backend/SKILL.md`, `docs/profili/backend.md` e `docs/verifiche/2026-11-09-b5-prova-flusso.md` stanno nel worktree `.claude/worktrees/b5` prima del merge e su `main` dopo.
 
 ## Fermate previste (non sono la fine del lavoro)
 
 - **Task 5, Step 1:** mostri all'utente la pagina delle regole `docs/profili/backend.md`, in parole semplici, e aspetti che le approvi, le corregga, le tolga o rinvii.
 - **Prima del merge su `main`:** mandi il rapporto della condizione 6 e chiedi l'OK. Senza OK non si unisce niente.
-- Le altre fermate sono solo quelle della sezione «Quando fermarsi e chiedere» delle istruzioni d'esecuzione.
+- Le altre fermate sono solo quelle della sezione «Quando fermarsi e chiedere» delle istruzioni d'esecuzione; il messaggio all'utente di ognuna comincia con la riga `Fermata: <caso>`.
 
 ## Finito quando
 
-Ogni condizione si controlla leggendo un file o il transcript, senza interpretazioni. Le condizioni dipendono da **una sola** delle tre situazioni, scelta da ciò che è scritto: **A** (regole approvate: `skills/rules-backend/SKILL.md` ha una riga `approved: `), **B** (rinvio: `progress.md` ha una riga che comincia con `Task 5: rinviato dall'utente`), **C** (in attesa: l'ultimo messaggio della sessione all'utente mostra la pagina delle regole e chiede di approvarle, e l'utente non ha ancora risposto). In C il lavoro è finito per ora; quando l'utente risponde si passa ad A o a B.
+Ogni condizione si controlla leggendo un file o il transcript, senza interpretazioni. Le condizioni dipendono da **una sola** delle quattro situazioni, scelta da ciò che è scritto: **A** (regole approvate: `skills/rules-backend/SKILL.md` ha una riga `approved: `), **B** (rinvio: `progress.md` ha una riga che comincia con `Task 5: rinviato dall'utente`), **C** (in attesa: l'ultimo messaggio della sessione all'utente mostra la pagina delle regole e chiede di approvarle, e l'utente non ha ancora risposto). **D** (fermata per un altro caso: l'ultimo messaggio della sessione all'utente comincia con la riga `Fermata: ` e l'utente non ha ancora risposto). In C e in D il lavoro è finito per ora; quando l'utente risponde si riprende, e alla fine vale A o B.
 
 **Situazione A.** Valgono tutte:
 1. `progress.md` ha, per ciascuno dei Task 1-9, una riga che comincia con `Task N: complete`.
@@ -34,7 +34,7 @@ Ogni condizione si controlla leggendo un file o il transcript, senza interpretaz
 
 **Situazione B** (rinvio delle regole, decisione 15 del piano). Valgono tutte:
 1. `progress.md` ha una riga che comincia con `Task N: complete` per i Task 1, 2, 3 e 4, la riga `Task 5: rinviato dall'utente` e una riga che comincia con `Task 9 ridotto: complete`; i Task 6, 7 e 8 non si fanno e la prova reale non c'è.
-2. Il ramo `b5-parziale` esiste e contiene i commit dei Task 1 e 2 e quello del Task 9 ridotto (decisione 15).
+2. Il ramo `b5-parziale` esiste e `git log main..b5-parziale` mostra i commit con gli oggetti degli Step 5 dei Task 1 e 2 del piano («tollgate B5: un frammento può escludere cartelle dalla proposta», «tollgate B5: le scritture di Wrangler su KV, D1 e R2 e gli script dei monorepo sono effetti esterni») e il commit «tollgate B5 (parziale): spec rev 32 ridotta» (decisione 15).
 3. Le condizioni 4 e 5 della situazione A, per la revisione finale e le tre corse della suite fatte su `b5-parziale`.
 4. La condizione 6 della situazione A, con «Regole approvate» che dice «rinviate dall'utente» e «Prova reale» che dice «non fatta: regole rinviate», e la proposta di unire solo `b5-parziale`.
 5. La condizione 7 della situazione A, con il commit su `main` che comincia con `tollgate B5 (parziale):`.
