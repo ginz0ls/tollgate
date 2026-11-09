@@ -17,7 +17,7 @@ Esegui il piano `docs/superpowers/plans/2026-11-09-tollgate-b5-profilo-backend.m
 - il rapporto all'utente prima del merge è consegnato nella forma del punto 4 di «Chiusura» delle istruzioni (sezioni con il titolo, l'elenco completo delle `Ruling:` e dei minori rinviati, una voce per riga, la domanda finale sul merge);
 - **dopo il merge** (solo con l'OK dell'utente) i passi del punto 5 di «Chiusura» sono fatti e l'utente ha ricevuto il rapporto di chiusura che comincia con «Chiusura di B5».
 
-**Se l'utente rinvia l'approvazione** (decisione 15): i Task 1-4 sono già fatti; ti fermi al Task 5, Step 1, scrivi un Task 9 ridotto (la parte della revisione 32 che riguarda le decisioni 4, 6 e 7, e lo stato nel piano principale), fai la revisione finale e proponi all'utente di unire su `main` solo i commit dei Task 1-2 più quello del Task 9 ridotto; bozza, pagina e frammento di `backend` restano sul ramo. In quel caso il lavoro è finito quando quei commit sono rivisti, la suite è verde tre volte e il rapporto all'utente lo dice, nella stessa forma.
+**Se l'utente rinvia l'approvazione** (decisione 15): i Task 1-4 sono già fatti; ti fermi al Task 5, Step 1, scrivi un Task 9 ridotto (la parte della revisione 32 che riguarda le decisioni 4, 6 e 7, e lo stato nel piano principale), prepari il ramo `b5-parziale` da `main` con i commit dei Task 1-2 e quello del Task 9 ridotto (decisione 15), fai lì la revisione finale e le tre corse della suite, e proponi all'utente di unire su `main` solo `b5-parziale`; bozza, pagina e frammento di `backend` restano sul ramo `b5-profilo-backend`. In quel caso il lavoro è finito quando valgono le condizioni della situazione B del brief corto (`…-b5-brief-goal.md`).
 
 **Il merge su `main` non si fa senza l'OK dell'utente.**
 
