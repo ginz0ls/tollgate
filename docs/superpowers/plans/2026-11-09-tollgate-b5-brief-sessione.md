@@ -21,6 +21,8 @@ Esegui il piano `docs/superpowers/plans/2026-11-09-tollgate-b5-profilo-backend.m
 
 **Il merge su `main` non si fa senza l'OK dell'utente.**
 
+**Le condizioni esatte stanno nel brief corto** `docs/superpowers/plans/2026-11-09-tollgate-b5-brief-goal.md` (situazioni A-D, righe del ledger da scrivere con quelle parole). Il rapporto prima del merge finisce con la riga «Posso unire su `main`?». Ogni altra fermata della sezione «Quando fermarsi e chiedere» delle istruzioni ha un messaggio che comincia con la riga `Fermata: <caso>`; se l'utente risponde a una fermata con una domanda, si risponde e si ripete la richiesta della fermata.
+
 ## Da leggere, in quest'ordine
 
 1. `docs/superpowers/plans/2026-11-09-tollgate-b5-esecuzione.md`: le istruzioni.
