@@ -82,7 +82,7 @@ Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincol
 - Un commit dopo ogni task, con la riga `Co-Authored-By` del modello. Prima di ogni commit `tests/run` deve passare con `python3.11` e con `python3`.
 - Nessun `__pycache__` nel commit (`python3 -B`): controlla `git status` prima di `git add`.
 - Non toccare `skills/rules-base/SKILL.md`, `skills/rules-ai/SKILL.md`, `skills/rules-infra/SKILL.md`, `docs/profili/base.md`, `docs/profili/ai.md`, `docs/profili/infra.md` e i rapporti `docs/profili/verifiche/base-fonti.md`, `ai-fonti.md`, `infra-fonti.md`. `approved` in `skills/rules-backend/SKILL.md` si scrive solo nel Task 5, su indicazione del controller.
-- Lavora solo nel worktree `.claude/worktrees/b5` (ramo `b5-profilo-backend`), mai nel checkout principale né su `main`. Il percorso contiene spazi: virgolette sempre.
+- Lavora solo nel worktree `.claude/worktrees/b5` (ramo `b5-profilo-backend`), mai nel checkout principale né su `main`; solo nella variante del rinvio (decisione 15 del piano), anche nel worktree `.claude/worktrees/b5-parziale` (ramo `b5-parziale`), quando il controller lo dice nel brief. Il percorso contiene spazi: virgolette sempre.
 - Il repo è pubblico: nei file nuovi niente nomi di progetti privati dell'utente, niente nome utente né host, nessun token, nessun testo copiato da pagine o skill di terzi.
 - Risposte e messaggi in italiano; identificatori in inglese.
 
@@ -101,7 +101,7 @@ Solo in questi casi:
 - più di 3 tentativi di un passo della prova reale, o una variabile di credenziali nell'ambiente prima della prova (eccezione 2);
 - `/tmp` sotto 1 GB libero;
 - un'operazione distruttiva o irreversibile, o un'operazione su GitHub fuori dall'eccezione 3;
-- un'azione fuori da questo worktree, come un merge su `main`;
+- un'azione fuori da questo worktree (e da `.claude/worktrees/b5-parziale` nella variante del rinvio), come un merge su `main`;
 - un piano rotto al punto che ogni strada è un'ipotesi.
 
 Il messaggio all'utente di ognuna di queste fermate, salvo l'approvazione delle regole e il merge, comincia con la riga `Fermata: <caso>` (per esempio `Fermata: fatto smentito nel Task 3, Step 0`), così la condizione del brief corto la riconosce.
@@ -129,7 +129,7 @@ Il resto si decide con una `Ruling:`. Miglioramenti utili, compatibili e a basso
 5. Dopo il merge (con l'OK):
    - push di `main` (eccezione 3) e attesa della CI verde su `main`;
    - copia il registro dal worktree in `docs/sdd/2026-11-09-tollgate-b5-profilo-backend/` con un `README.md`, come per B4, dopo il controllo delle evidenze, e committalo su `main` (e push);
-   - aggiorna la memoria del progetto (`plugin-workflow-decisioni.md`) con una riga che comincia con `- B5 eseguito`: esito di B5, prossimo passo (scrivere il piano di B6, `frontend`);
+   - aggiorna la memoria del progetto (`plugin-workflow-decisioni.md`) con una riga che comincia con `- B5 eseguito` (nella variante del rinvio `- B5 parziale`, che dice cosa resta sul ramo): esito di B5, prossimo passo (scrivere il piano di B6, `frontend`);
    - **trascrizioni**: se una sessione del lavoro è partita dalla cartella del worktree, spostane i `.jsonl` (e le cartelle `<id>/`) con `mv -n` nella cartella della radice in `~/.claude/projects/`, mai il file della sessione attiva. Se tutte le sessioni sono partite dalla radice, dillo;
    - chiedi all'utente se rimuovere il worktree e il ramo `b5-profilo-backend` ormai uniti;
    - **rapporto di chiusura all'utente**, in un messaggio a sé che comincia con la riga «Chiusura di B5», con: il commit del merge su `main`, l'esito della CI di `main`, il percorso del registro, la riga della memoria aggiornata, cosa è successo alle trascrizioni, e la domanda sul worktree.
