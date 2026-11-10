@@ -59,8 +59,8 @@ Esegui il piano `docs/superpowers/plans/2026-11-10-tollgate-b6-profilo-frontend.
 ## Punti delicati del piano
 
 - **La forma `ext`** (decisione 2): zero segmenti letterali, si propone così com'è e solo per ultima; perde contro ogni cartella di un altro profilo, ed è voluto. Maiuscole rispettate, mai per un documento. `vertical_for` e `globs` non cambiano.
-- **La tabella delle precedenze** (decisione 4): ventiquattro casi, ognuno con un test `test_real_precedence_p<N>`; P2, P6, P10, P14, P15, P20, P23 e P24 sono costi scritti, non difetti. La revisione finale cerca un caso che manca.
-- **`[detect] exclude` di `frontend`** (decisione 7): le cartelle alla radice di `backend` e `infra` più `supabase/`; senza, `**/components/**` e i percorsi esatti dei file che importano il router vincerebbero dentro i server. `test_exclude_matches_root_folders_of_other_fragments` tiene l'elenco allineato ai frammenti approvati.
+- **La tabella delle precedenze** (decisione 4): trentuno casi, ognuno con un test `test_real_precedence_p<N>`; P2, P6, P8, P10, P13, P14, P15, P20, P23, P24, P26-P29 e P31 sono costi scritti, non difetti. La revisione finale cerca un caso che manca.
+- **`[detect] exclude` di `frontend`** (decisione 7): le cartelle alla radice di `backend` e `infra` più `supabase/`; senza, `**/components/**` e i percorsi esatti dei file che importano il router vincerebbero dentro i server. `test_real_exclude_matches_root_folders_of_other_fragments` tiene l'elenco allineato ai frammenti approvati.
 - **I marcatori** sono solo le righe di import delle librerie di rotte, con le due virgolette; `from 'react'` e `'use client'` non lo sono (decisione 5). Un marcatore senza una pagina ufficiale che lo mostri esce. Un `.ts` o `.js` che importa il router entra come percorso esatto e vince su ogni cartella fuori da quelle escluse (P23).
 - **`togli-pagine`** (Task 2): ogni `Bash` che nomina una copia salvata, senza elenco di lettori, anche `stderr`; le evidenze già committate restano verdi.
 - **Nessun `node`, gestore di pacchetti, server di sviluppo o browser**, mai, nemmeno dal controller: la prova reale si verifica con `html.parser`.
