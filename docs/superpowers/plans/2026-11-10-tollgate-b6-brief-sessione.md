@@ -49,7 +49,7 @@ Esegui il piano `docs/superpowers/plans/2026-11-10-tollgate-b6-profilo-frontend.
 
 - **`frontend` ha livello minimo L0** (progetto 4): per i lavori piccoli solo l'avviso.
 - **Le regole di accessibilità stanno dentro `rules-frontend`** come `R-FRONTEND-NN` (progetto 13): nessuna skill `rules-a11y`, nessun profilo trasversale.
-- **Rimedio per `routes/` d'interfaccia** (progetto 13): i marcatori delle librerie di rotte (TanStack Router, React Router, Remix), con la regola di I-1, tengono fuori da `backend` una cartella `routes/` i cui moduli le importano; se un solo file non le importa la cartella resta a `backend`, e la pagina spiega come toglierla a mano.
+- **Rimedio per `routes/` d'interfaccia** (progetto 13): i marcatori delle librerie di rotte (TanStack Router, React Router, Remix), con la regola di I-1, tengono fuori da `backend` una cartella `routes/` i cui moduli le importano; se un solo file non è trovato per contenuto (anche un test o un foglio di stile della cartella, P32 e P33) la cartella resta a `backend`, e la pagina spiega come toglierla a mano.
 - **`routes/` e `handlers/` restano di `backend` a qualunque profondità** (approvato il 10/11/2026, punto 5 della pagina di `backend`): B6 non cambia il frammento né la pagina di `backend`.
 - **Le cartelle `services/` non sono di `backend`** (progetto 12); B6 le lascia al generico (decisione 6, «mia scelta» portata all'utente nella pagina).
 - **Un file trovato per contenuto da un profilo non accende un altro profilo per la sola cartella** (correzione di I-1 di B5).
@@ -59,7 +59,7 @@ Esegui il piano `docs/superpowers/plans/2026-11-10-tollgate-b6-profilo-frontend.
 ## Punti delicati del piano
 
 - **La forma `ext`** (decisione 2): zero segmenti letterali, si propone così com'è e solo per ultima; perde contro ogni cartella di un altro profilo, ed è voluto. Maiuscole rispettate, mai per un documento. `vertical_for` e `globs` non cambiano.
-- **La tabella delle precedenze** (decisione 4): trentuno casi, ognuno con un test `test_real_precedence_p<N>`; P2, P6, P8, P10, P13, P14, P15, P20, P23, P24, P26-P29 e P31 sono costi scritti, non difetti. La revisione finale cerca un caso che manca.
+- **La tabella delle precedenze** (decisione 4): trentacinque casi, ognuno con un test `test_real_precedence_p<N>`; P2, P6, P8, P10, P13, P14, P15, P20, P23, P24, P26-P29 e P31-P35 sono costi scritti, non difetti. La revisione finale cerca un caso che manca.
 - **`[detect] exclude` di `frontend`** (decisione 7): le cartelle alla radice di `backend` e `infra` più `supabase/`; senza, `**/components/**` e i percorsi esatti dei file che importano il router vincerebbero dentro i server. `test_real_exclude_matches_root_folders_of_other_fragments` tiene l'elenco allineato ai frammenti approvati.
 - **I marcatori** sono solo le righe di import delle librerie di rotte, con le due virgolette; `from 'react'` e `'use client'` non lo sono (decisione 5). Un marcatore senza una pagina ufficiale che lo mostri esce. Un `.ts` o `.js` che importa il router entra come percorso esatto e vince su ogni cartella fuori da quelle escluse (P23).
 - **`togli-pagine`** (Task 2): ogni `Bash` che nomina una copia salvata, senza elenco di lettori, anche `stderr`; le evidenze già committate restano verdi.
