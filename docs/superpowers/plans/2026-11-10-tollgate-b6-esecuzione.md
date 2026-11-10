@@ -112,6 +112,7 @@ Solo in questi casi:
 - **l'approvazione delle regole** (Task 5, Step 1): fermata prevista; se l'utente toglie tutte le regole o rifiuta il profilo, vale come rinvio (`Task 5: rinviato dall'utente`, variante del rinvio), e il rapporto lo dice;
 - una pagina ufficiale che smentisce un fatto della tabella «Fatti verificati» del piano al punto da cambiare una decisione (per esempio una libreria di rotte i cui moduli non la importano, o un criterio WCAG con un livello diverso);
 - un caso della tabella delle precedenze (decisione 4) che, nella sonda dello scan pre-flight, dà un risultato diverso da quello scritto **e** tocca una scelta dell'utente (progetto 12 o 13): gli altri casi si decidono con una `Ruling:`;
+- un prefisso di `exclude` del frammento di `frontend` con esito `no` dal verificatore (Task 4): viene da un profilo approvato e non si toglie da solo;
 - più di 3 tentativi di un passo della prova reale, o una variabile di credenziali nell'ambiente prima della prova (eccezione 2);
 - `/tmp` sotto 1 GB libero;
 - un'operazione distruttiva o irreversibile, o un'operazione su GitHub fuori dall'eccezione 3;
