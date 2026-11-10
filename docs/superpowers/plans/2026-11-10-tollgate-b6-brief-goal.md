@@ -26,7 +26,7 @@ Ogni condizione si controlla leggendo un file o il transcript, senza interpretaz
 
 Le situazioni:
 - **A** (regole approvate): `skills/rules-frontend/SKILL.md` ha una riga `approved: `.
-- **B** (rinvio): `progress.md` ha una riga che comincia con `Task 5: rinviato dall'utente`.
+- **B** (rinvio, anche quando l'utente toglie tutte le regole o rifiuta il profilo): `progress.md` ha una riga che comincia con `Task 5: rinviato dall'utente`.
 - **C** (in attesa dell'utente sulle regole): l'ultimo messaggio della sessione all'utente mostra la pagina delle regole e chiede di approvarle, correggerle, toglierle o rinviarle, e l'utente non ha ancora risposto.
 - **D** (fermata per un altro caso): l'ultimo messaggio della sessione all'utente comincia con la riga `Fermata: ` e l'utente non ha ancora risposto.
 
@@ -47,5 +47,5 @@ In C e in D il lavoro è finito per ora; quando l'utente risponde si riprende, e
 1. `progress.md` ha una riga che comincia con `Task N: complete` per i Task 1, 2, 3 e 4, la riga `Task 5: rinviato dall'utente` e una riga che comincia con `Task 9 ridotto: complete`; i Task 6, 7 e 8 non si fanno e la prova reale non c'è.
 2. `progress.md` ha una riga che comincia con `b6-parziale: ` (uno sha e un oggetto) per ogni commit del ramo, scritte prima del merge; tra gli oggetti ci sono quelli degli Step 5 dei Task 1 e 2 del piano («tollgate B6: pattern per estensione nei frammenti e nella proposta», «tollgate B6: togli-pagine per ogni Bash su una copia salvata, anche stderr; intestazione dei limiti») e il commit «tollgate B6 (parziale): spec rev 33 ridotta».
 3. `progress.md` ha una riga che comincia con `Revisione finale b6-parziale (opus):` e, dopo, una che comincia con `Revisione finale b6-parziale chiusa: 0 critical, 0 important aperti`, e tre righe che cominciano con `Suite finale b6-parziale corsa 1: verde su python3.11 e python3`, `… corsa 2: …`, `… corsa 3: …` (righe distinte da quelle della situazione A, che restano per il ramo completo se l'utente approva più tardi).
-4. La condizione 6 della situazione A, con «Regole approvate» che dice «rinviate dall'utente» e «Prova reale» che dice «non fatta: regole rinviate», e la proposta di unire solo `b6-parziale`.
+4. La condizione 6 della situazione A, con «Rilievi minori rinviati» presi da `final-review-b6-parziale.md`, «Regole approvate» che dice «rinviate dall'utente» e «Prova reale» che dice «non fatta: regole rinviate», e la proposta di unire solo `b6-parziale`.
 5. La condizione 7 della situazione A, con il commit su `main` che comincia con `tollgate B6 (parziale):`, la riga della memoria che comincia con `- B6 parziale` al posto di `- B6 eseguito`, e la domanda sul worktree che riguarda solo `.claude/worktrees/b6-parziale` e il ramo `b6-parziale` (con il sì, `git worktree list` non mostra più `.claude/worktrees/b6-parziale`).
