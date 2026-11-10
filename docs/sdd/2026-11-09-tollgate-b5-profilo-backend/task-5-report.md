@@ -1,0 +1,5 @@
+# Task 5 report
+- approved: 2026-11-10 in skills/rules-backend/SKILL.md; pagina backend.md: riga "Approvata dall'utente il 2026-11-10.", sezione "Cosa hai deciso" (9 punti, "Hai approvato: resta la proposta"), "Come rispondere" sostituita da "Se vuoi cambiare qualcosa" (come infra); comandi.md con la data; backend-fonti.md: "Da decidere tu" -> "Cosa hai deciso".
+- Test: test_frontmatter invertito; aggiunti test_page_records_the_choices, test_page_approval_date_matches_skill, test_approved_skill_leaves_no_pending_decisions; test_page_choices_count_matches_list ora legge solo "Cosa hai deciso" (la sezione "Da decidere tu" non esiste piu'); test_real_backend_fragment_approved in test_fragments.py.
+- Scostamento: test_page_rinvio_says_what_stays_on_the_branch ora ha skip_if_approved (la pagina approvata non offre piu' il rinvio, come infra).
+- Esiti: claude plugin validate --strict . ok; tests/run con PYTHONWARNINGS=error::ResourceWarning: python3.11 OK (3730, skipped 10), python3 OK (3730, skipped 8), exit 0. Nessun test di init cambia esito.
