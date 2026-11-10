@@ -97,6 +97,33 @@ class InfraAndAiRoutingTest(unittest.TestCase):
         self.assertTrue(r.split_candidate)
 
 
+class BackendRoutingTest(unittest.TestCase):
+    """Guardie della decisione 5: lo smistamento legge solo `paths`, `agent` e `reviewer`."""
+    PROF = {
+        "backend": {"kind": "vertical", "paths": ["/api/**", "/server/**"], "skills": [],
+                    "agent": "tollgate:implementer-backend",
+                    "reviewer": "tollgate:reviewer-backend"},
+        "infra": {"kind": "vertical", "paths": ["api/vercel.json", "server/Dockerfile"],
+                  "skills": [], "agent": "tollgate:implementer-infra",
+                  "reviewer": "tollgate:reviewer-infra"},
+        "ai": {"kind": "vertical", "paths": ["server/ai/**"], "skills": [],
+               "agent": "tollgate:implementer-ai", "reviewer": "tollgate:reviewer-ai"},
+    }
+
+    def test_backend_and_infra_routing_is_split_candidate(self):
+        r = profiles.task_routing(["server/app.py", "server/Dockerfile"], self.PROF)
+        self.assertEqual((r.implementer, r.reviewer),
+                         (profiles.DEFAULT_IMPLEMENTER, profiles.DEFAULT_REVIEWER))
+        self.assertTrue(r.split_candidate)
+
+    def test_infra_file_inside_backend_folder_routes_to_infra(self):
+        self.assertEqual(profiles.vertical_for("api/vercel.json", self.PROF), "infra")
+        self.assertEqual(profiles.vertical_for("server/Dockerfile", self.PROF), "infra")
+
+    def test_ai_folder_inside_backend_routes_to_ai(self):
+        self.assertEqual(profiles.vertical_for("server/ai/x.py", self.PROF), "ai")
+
+
 class RulesTest(unittest.TestCase):
     PROF = {
         "web": {"rules": ["R-WEB-1", "R-WEB-2"], "blocking_rules": ["R-WEB-1"],

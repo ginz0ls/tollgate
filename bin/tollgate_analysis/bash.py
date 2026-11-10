@@ -998,7 +998,31 @@ _DEFAULT_EFFECTS = [("ssh",), ("scp",), ("rsync",), ("psql",), ("docker", "push"
                     ("wrangler", "pages", "deployment", "delete"),
                     ("wrangler", "pages", "secret", "put"),
                     ("wrangler", "pages", "secret", "bulk"),
-                    ("wrangler", "pages", "secret", "delete")]
+                    ("wrangler", "pages", "secret", "delete"),
+                    ("wrangler", "d1", "create"), ("wrangler", "d1", "delete"),
+                    ("wrangler", "d1", "time-travel", "restore")]
+# Gruppi di Wrangler che agiscono sempre sull'account: un comando con questo prefisso e'
+# un effetto, salvo che sia una lettura (vedi `_account_group_read`).
+ACCOUNT_GROUPS: tuple[tuple[str, ...], ...] = (
+    ("wrangler", "kv", "namespace"), ("wrangler", "kv:namespace"),
+    ("wrangler", "r2", "bucket"))
+# (prefisso, modo): `unless_local` e' un effetto salvo che il comando sia locale; `with_remote`
+# lo e' solo con `--remote` o `--preview`.
+FLAG_EFFECTS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("wrangler", "kv", "key", "put"), "unless_local"),
+    (("wrangler", "kv", "key", "delete"), "unless_local"),
+    (("wrangler", "kv", "bulk", "put"), "unless_local"),
+    (("wrangler", "kv", "bulk", "delete"), "unless_local"),
+    (("wrangler", "kv:key", "put"), "unless_local"),
+    (("wrangler", "kv:key", "delete"), "unless_local"),
+    (("wrangler", "kv:bulk", "put"), "unless_local"),
+    (("wrangler", "kv:bulk", "delete"), "unless_local"),
+    (("wrangler", "r2", "object", "put"), "unless_local"),
+    (("wrangler", "r2", "object", "delete"), "unless_local"),
+    (("wrangler", "d1", "execute"), "with_remote"),
+    (("wrangler", "d1", "migrations", "apply"), "with_remote"))
+_READ_WORDS = ("list", "get", "info")
+_WRITE_WORDS = ("create", "delete", "rename", "update")
 _SUPABASE_WRITE = {"db", "functions", "secrets", "link", "migration", "storage", "projects",
                    "orgs", "branches"}
 _SUPABASE_READ = {"list", "diff", "dump", "ls", "download", "--help", "-h"}
@@ -1136,6 +1160,78 @@ def _gh_write(a: list[str]) -> bool:
     return False
 
 
+def _flag_present(rest: list[str], name: str) -> bool:
+    """`--x` e' presente se c'e' `--x` non seguito da `false`, o `--x=<v>` con `<v>` != `false`.
+    La scansione si ferma al primo `--`: quel che segue e' un valore, non un'opzione."""
+    for i, tok in enumerate(rest):
+        if tok == "--":
+            return False
+        if tok == name:
+            if not (i + 1 < len(rest) and rest[i + 1] == "false"):
+                return True
+        elif tok.startswith(name + "=") and tok[len(name) + 1:] != "false":
+            return True
+    return False
+
+
+def _account_group_read(rest: list[str]) -> bool:
+    if not rest:
+        return False
+    if rest[0] in _READ_WORDS:
+        return True
+    return (not rest[0].startswith("-") and rest[0] not in _WRITE_WORDS
+            and len(rest) > 1 and rest[1] in _READ_WORDS)
+
+
+def _wrangler_data_reason(argv: list[str]) -> str | None:
+    for prefix in ACCOUNT_GROUPS:
+        if argv[:len(prefix)] == list(prefix) and not _account_group_read(argv[len(prefix):]):
+            return f"effetto esterno: {' '.join(prefix)}"
+    for prefix, mode in FLAG_EFFECTS:
+        if argv[:len(prefix)] != list(prefix):
+            continue
+        rest = argv[len(prefix):]
+        label = " ".join(prefix)
+        if mode == "unless_local":
+            local = (_flag_present(rest, "--local") and not _flag_present(rest, "--remote")
+                     and not _flag_present(rest, "--preview"))
+            if not local:
+                return f"effetto esterno: {label} (senza --local)"
+        else:
+            for flag in ("--remote", "--preview"):
+                if _flag_present(rest, flag):
+                    return f"effetto esterno: {label} con {flag}"
+    return None
+
+
+SCRIPT_VALUE_OPTIONS = ("-w", "--workspace", "-F", "--filter", "-C", "--dir", "--prefix",
+                        "--cwd")
+
+
+def script_name(argv: list[str]) -> str | None:
+    """Lo script di `npm`, `pnpm`, `yarn`, `bun`: il comando del gestore, dopo `run` o `workspace`."""
+    if not argv:
+        return None
+    manager = os.path.basename(argv[0])
+
+    def skip_options(i: int) -> int:
+        while i < len(argv) and argv[i].startswith("-"):
+            takes_value = argv[i] in SCRIPT_VALUE_OPTIONS and not (
+                manager == "pnpm" and argv[i] == "-w")
+            i += 2 if takes_value else 1
+        return i
+
+    i = skip_options(1)
+    if manager == "yarn" and i < len(argv) and argv[i] == "workspace":
+        i = skip_options(i + 2)
+    if i >= len(argv):
+        return None
+    if argv[i] in ("run", "run-script"):
+        i = skip_options(i + 1)
+        return argv[i] if i < len(argv) else None
+    return argv[i]
+
+
 def effect_reason(cmd: Cmd, cfg: EffectsCfg) -> str | None:
     a = cmd.argv
     if not a:
@@ -1150,6 +1246,9 @@ def effect_reason(cmd: Cmd, cfg: EffectsCfg) -> str | None:
         for prefix in _DEFAULT_EFFECTS:
             if argv[:len(prefix)] == list(prefix):
                 return f"effetto esterno: {' '.join(prefix)}"
+        reason = _wrangler_data_reason(argv)
+        if reason:
+            return reason
         if argv[0] == "supabase" and len(argv) > 1 and argv[1] in _SUPABASE_WRITE \
                 and not (len(argv) > 2 and argv[2] in _SUPABASE_READ):
             return "effetto esterno: supabase in scrittura"
@@ -1166,7 +1265,7 @@ def effect_reason(cmd: Cmd, cfg: EffectsCfg) -> str | None:
             if reason:
                 return reason
     if base in ("npm", "pnpm", "yarn", "bun") and len(a) > 1:
-        script = a[2] if a[1] == "run" and len(a) > 2 else a[1]
+        script = script_name(a)
         if script in cfg.project_scripts:
             return f"script del progetto: {script}"
     if base in ("make", "just") and any(x in cfg.project_scripts for x in a[1:]):
@@ -1229,6 +1328,11 @@ _E = r"(?=[\s;&|)`'\"]|$)"
 _TEXT_EFFECTS = [
     (re.compile(_B + r"\s+".join(re.escape(w) for w in prefix) + _E),
      "effetto esterno: " + " ".join(prefix)) for prefix in _DEFAULT_EFFECTS] + [
+    (re.compile(_B + r"\s+".join(re.escape(w) for w in prefix) + _E),
+     "effetto esterno: " + " ".join(prefix)) for prefix in ACCOUNT_GROUPS] + [
+    (re.compile(_B + r"\s+".join(re.escape(w) for w in prefix) + _E +
+                (r"[^;&|]*\s--(?:remote|preview)\b" if mode == "with_remote" else "")),
+     "effetto esterno: " + " ".join(prefix)) for prefix, mode in FLAG_EFFECTS] + [
     (re.compile(_B + r"supabase\s+(?:db|functions|secrets|link|migration|storage|projects|orgs|"
                 r"branches)\b(?!\s+(?:list|diff|dump|ls|download)\b)"),
      "effetto esterno: supabase in scrittura"),

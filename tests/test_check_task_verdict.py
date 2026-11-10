@@ -254,6 +254,38 @@ class InfraProfileNoStepTest(InfraProfileTest):
         self.assertEqual(self.outcome("R-INFRA-01"), "changes")
 
 
+class BackendProfileTest(Base):
+    """Il blocco `backend` (regole di una skill finta, scritto nel test): solo le `[blocca]`
+    fermano il task."""
+    research = True
+    toml = DEFAULT_TOML + """
+[profiles]
+active = ["backend"]
+[profiles.backend]
+paths = ["**"]
+rules = ["R-BACKEND-01", "R-BACKEND-02", "R-BACKEND-10"]
+blocking_rules = ["R-BACKEND-01"]
+"""
+
+    def outcome(self, rule):
+        self.stop(text=self.verdict(outcome="approved", findings=[dict(GOOD, rule=rule)]))
+        return self.task()["verdict"]
+
+    def test_backend_profile_blocking_rule_changes(self):
+        self.assertEqual(self.outcome("R-BACKEND-01"), "changes")
+
+    def test_backend_profile_non_blocking_rule_approves(self):
+        self.assertEqual(self.outcome("R-BACKEND-10"), "approved")
+
+
+class BackendProfileNoStepTest(BackendProfileTest):
+    """Senza il passo (nessuna nota) le `[blocca]` di `backend` fermano comunque."""
+    research = False
+
+    def test_backend_blocking_rule_without_step(self):
+        self.assertEqual(self.outcome("R-BACKEND-01"), "changes")
+
+
 class BaseRulesTest(Base):
     """Le `R-BASE-…` di `rules-base`: note sempre, bloccanti solo se `[blocca]`, con l'interruttore
     acceso e il passo di ricerca attivo nel lavoro."""

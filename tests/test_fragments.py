@@ -127,6 +127,31 @@ class FragmentsTest(unittest.TestCase):
                 with self.assertRaises(fragments.FragmentError):
                     fragments.load(self.root)
 
+    def test_exclude_parsed(self):
+        self.put("ai.toml", '[profile]\npaths = ["**/ai/**"]\n'
+                            '[detect]\nexclude = ["supabase/", "a/b/"]\n')
+        self.assertEqual(fragments.load(self.root)[0].exclude, ("supabase/", "a/b/"))
+        self.put("ai.toml", GOOD)
+        self.assertEqual(fragments.load(self.root)[0].exclude, ())
+
+    def test_exclude_rejects_bad_forms(self):
+        for value in ('["supabase"]', '["/supabase/"]', '["supa*/"]', '["../x/"]', '["./x/"]',
+                      '["a//b/"]', '[""]', '3', '[1]', '"supabase/"'):
+            with self.subTest(value=value):
+                self.put("ai.toml", f'[profile]\npaths = ["**/ai/**"]\n[detect]\nexclude = {value}\n')
+                with self.assertRaises(fragments.FragmentError) as cm:
+                    fragments.load(self.root)
+                self.assertIn("ai.toml", str(cm.exception))
+                self.assertIn("exclude", str(cm.exception))
+                self.assertNotIn("sconosciuta", str(cm.exception))
+
+    def test_detect_unknown_key_still_rejected(self):
+        self.put("ai.toml", '[profile]\npaths = ["**/ai/**"]\n[detect]\nother = []\n')
+        with self.assertRaises(fragments.FragmentError) as cm:
+            fragments.load(self.root)
+        self.assertIn("ai.toml", str(cm.exception))
+        self.assertIn("sconosciuta", str(cm.exception))
+
     def test_approved_needs_approved_skill(self):
         self.put("ai.toml", GOOD)
         f = fragments.load(self.root)[0]
@@ -207,6 +232,10 @@ class RealFragmentsTest(unittest.TestCase):
         self.assertIn("infra", found)
         self.assertEqual(found["infra"].profile["agent"], "tollgate:implementer-infra")
         self.assertFalse(found["infra"].detect)
+        self.assertIn("backend", found)
+        self.assertEqual(found["backend"].profile["agent"], "tollgate:implementer-backend")
+        self.assertTrue(found["backend"].detect)
+        self.assertEqual(found["backend"].exclude, ("supabase/",))
 
     def test_real_ai_fragment_approved(self):
         found = {f.area: f for f in fragments.load(ROOT)}
@@ -215,6 +244,10 @@ class RealFragmentsTest(unittest.TestCase):
     def test_real_infra_fragment_approved(self):
         found = {f.area: f for f in fragments.load(ROOT)}
         self.assertTrue(fragments.approved(found["infra"]))
+
+    def test_real_backend_fragment_approved(self):
+        found = {f.area: f for f in fragments.load(ROOT)}
+        self.assertTrue(fragments.approved(found["backend"]))
 
 
 if __name__ == "__main__":

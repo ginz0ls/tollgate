@@ -1,0 +1,6 @@
+reports/
+__pycache__/
+.vercel/
+.env*
+.dev.vars*
+.wrangler/

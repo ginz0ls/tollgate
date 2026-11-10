@@ -1,0 +1,11 @@
+# tentativo-1: sessione 1, cartella -tmp-tollgate-b1-flow
+nessuna trascrizione di subagente
+# tentativo-1: sessione 2, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-aggiungi-la-rotta-get-health-al-server
+agent-a02c045a459672b8c.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a02c045a459672b8c.jsonl: # Regole backend (versione 1) (isMeta: sì)
+agent-a02c045a459672b8c.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a02c045a459672b8c.jsonl: # Regole backend (versione 1) (isMeta: no)
+agent-a29c344fea2547e96.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a29c344fea2547e96.jsonl: # Regole backend (versione 1) (isMeta: sì)
+agent-a29c344fea2547e96.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a29c344fea2547e96.jsonl: # Regole backend (versione 1) (isMeta: no)

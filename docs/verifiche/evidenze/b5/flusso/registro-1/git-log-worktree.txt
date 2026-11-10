@@ -1,0 +1,4 @@
+5ea7b17 feat: aggiungi la rotta GET /health
+fe49212 docs: piano per la rotta GET /health (#1)
+185409b profilo backend proposto da init
+85acee9 base

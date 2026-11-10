@@ -1,0 +1,76 @@
+# Frammento del profilo `backend`: il codice che risponde alle richieste (server, API, funzioni di
+# Vercel e di Cloudflare Pages, rotte di Next.js, Worker di Cloudflare). `init` lo completa con
+# `rules` e `blocking_rules`, che calcola dalle righe `R-BACKEND-NN` di
+# skills/rules-backend/SKILL.md. Il profilo si propone solo dopo l'approvazione di quella skill
+# (campo `approved`). Restano fuori `services/` (client dell'interfaccia), la configurazione di
+# Wrangler e di Vercel (`infra`) e le funzioni di Supabase (`[detect] exclude`).
+
+[profile]
+kind = "vertical"
+min_level = "L0"
+# Le cartelle tipiche dei server; `init` le trasforma nei percorsi concreti del progetto.
+paths = [
+  # Vercel Functions fuori da Next.js: la cartella `api/` alla radice
+  # (https://vercel.com/docs/functions).
+  "api/**",
+  # Cartelle dei server per convenzione, alla radice del progetto (progetto di B, sezione 12).
+  "server/**",
+  "backend/**",
+  # Cloudflare Pages Functions: la cartella `functions/` alla radice del progetto Pages
+  # (https://developers.cloudflare.com/pages/functions/get-started/).
+  "functions/**",
+  # Rotte e gestori a qualunque profondità (catalogo 2.3, riga `backend`).
+  "**/routes/**",
+  "**/handlers/**",
+]
+# Vuoti di proposito: `rules-backend` la precaricano gli agenti dell'area; il comando dei test
+# delle API e il typecheck dipendono dal progetto e un `dod` scritto da `init` fallirebbe dove
+# il programma manca, quindi l'utente li aggiunge a mano.
+skills = []
+reviewer_skills = []
+commands = {}
+dod = []
+agent = "tollgate:implementer-backend"
+reviewer = "tollgate:reviewer-backend"
+
+# Server fuori dalle cartelle tipiche. Ogni voce è un pezzo di riga di import o di dichiarazione
+# che si cerca come testo fisso, mai il solo nome di un fornitore o di un framework.
+[detect]
+# Le edge function di Supabase sono dell'area `database` (progetto di B, sezione 12).
+exclude = ["supabase/"]
+content = [
+  # Worker di Cloudflare: modulo del runtime (https://developers.cloudflare.com/workers/runtime-apis/bindings/),
+  # classe di base in Python (https://developers.cloudflare.com/workers/languages/python/) e tipo del
+  # gestore `fetch` (https://developers.cloudflare.com/kv/get-started/).
+  "cloudflare:workers",
+  "from workers import",
+  "ExportedHandler<",
+  # Express (https://expressjs.com/en/starter/hello-world.html), nelle due forme di virgolette.
+  "require('express')",
+  "require(\"express\")",
+  "from 'express'",
+  "from \"express\"",
+  # Fastify (https://fastify.dev/docs/latest/Guides/Getting-Started/).
+  "from 'fastify'",
+  "from \"fastify\"",
+  "require('fastify')",
+  "require(\"fastify\")",
+  # Hono (https://hono.dev/docs/getting-started/cloudflare-workers).
+  "from 'hono'",
+  "from \"hono\"",
+  # Il modulo `http` di Node (https://nodejs.org/api/http.html).
+  "from 'node:http'",
+  "from \"node:http\"",
+  "require('node:http')",
+  "require(\"node:http\")",
+  # FastAPI (https://fastapi.tiangolo.com/tutorial/first-steps/) e Flask
+  # (https://flask.palletsprojects.com/en/stable/quickstart/).
+  "from fastapi import",
+  "from flask import",
+  # Deno (https://docs.deno.com/runtime/fundamentals/http_server/).
+  "Deno.serve(",
+  # Gestori di rotta di Next.js e di Vercel (https://vercel.com/docs/functions).
+  "export function GET(",
+  "export async function GET(",
+  "export async function POST(",
+]

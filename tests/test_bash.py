@@ -246,6 +246,115 @@ class EffectsTest(unittest.TestCase):
     def test_npm_project_scripts_unchanged(self):
         self.assertEqual(self.eff("npm run deploy"), "script del progetto: deploy")
 
+    def test_wrangler_data_writes_are_effects(self):
+        self.check_effects([
+            "wrangler kv key put K V", "wrangler kv key put K V --remote",
+            "wrangler kv key put K V --preview", "wrangler kv key put K V --local --remote",
+            "wrangler kv key put K V --local false",
+            "wrangler kv key delete K --namespace-id x",
+            "wrangler kv bulk put f.json --binding KV", "wrangler kv bulk delete f.json",
+            "wrangler kv:key put --binding KV k v", "wrangler kv:bulk delete f.json",
+            "wrangler kv:namespace create NS", "wrangler kv namespace create NS",
+            "wrangler kv namespace delete --binding KV",
+            "wrangler kv namespace rename a --new-name b",
+            "wrangler r2 object put b/k --file x", "wrangler r2 object delete b/k --remote",
+            "wrangler r2 object put b/k --file x --local=false",
+            "wrangler r2 bucket create b", "wrangler r2 bucket create list",
+            "wrangler r2 bucket delete b", "wrangler r2 bucket cors set b --file c.json",
+            "wrangler r2 bucket lifecycle add b r", "wrangler r2 bucket domain add b --domain x",
+            'wrangler d1 execute DB --remote --command "select 1"',
+            "wrangler d1 execute DB --remote=true --file x.sql",
+            "wrangler d1 execute DB --preview --file x.sql",
+            "wrangler d1 migrations apply DB --remote",
+            "wrangler d1 migrations apply DB --preview", "wrangler d1 create DB",
+            "wrangler d1 delete DB", "wrangler d1 time-travel restore DB --timestamp t",
+            "wrangler kv key put K V --local --remote=true",
+            "wrangler kv key put K V --local --preview=true",
+            "wrangler d1 execute DB --preview=true --file x",
+            "wrangler d1 execute DB --remote true --file x",
+            "wrangler kv key put K -- --local", "wrangler d1 execute DB --remote -- --local"],
+            True)
+
+    def test_wrangler_local_writes_pass(self):
+        self.check_effects([
+            "wrangler kv key put K V --local", "wrangler kv bulk put f.json --local=true",
+            "wrangler kv:key put --binding KV k v --local",
+            "wrangler r2 object put b/k --file x --local",
+            'wrangler d1 execute DB --command "select 1"',
+            "wrangler d1 execute DB --local --file x.sql",
+            "wrangler d1 execute DB --remote=false --file x.sql",
+            "wrangler d1 execute DB --remote false --file x.sql",
+            "wrangler d1 migrations apply DB", "wrangler d1 migrations apply DB --local",
+            "wrangler d1 migrations create DB init",
+            "wrangler kv key put K V --local -- x"], False)
+
+    def test_wrangler_data_reads_pass(self):
+        self.check_effects([
+            "wrangler kv key get K", "wrangler kv key list", "wrangler kv bulk get f.json",
+            "wrangler kv namespace list", "wrangler kv:namespace list", "wrangler d1 list",
+            "wrangler d1 info DB", "wrangler d1 export DB --output x.sql",
+            "wrangler d1 migrations list DB", "wrangler d1 time-travel info DB",
+            "wrangler r2 object get b/k", "wrangler r2 bucket list", "wrangler r2 bucket info b",
+            "wrangler r2 bucket cors list b"], False)
+
+    def test_flag_effects_behind_launchers(self):
+        self.check_effects([
+            "npx wrangler kv key put K V", "pnpm exec wrangler d1 execute DB --remote --file x.sql",
+            'npx -c "wrangler r2 object delete b/k"', "npx wrangler r2 bucket create b"], True)
+        self.check_effects(["npx wrangler kv key put K V --local",
+                            "pnpm dlx wrangler d1 migrations apply DB"], False)
+
+    def test_flag_effect_reason_names_prefix(self):
+        self.assertIn("wrangler kv key put", self.eff("wrangler kv key put K V"))
+        self.assertIn("--remote", self.eff("wrangler d1 execute DB --remote"))
+
+    def test_text_effect_flag_entries(self):
+        self.assertIsNotNone(bash.text_effect("x; wrangler kv key put K V --local"))
+        self.assertIsNotNone(bash.text_effect("x; wrangler r2 bucket create b"))
+        self.assertIsNotNone(bash.text_effect("x; wrangler d1 execute DB --remote --file y"))
+        self.assertIsNone(bash.text_effect("x; wrangler d1 execute DB --file y"))
+
+    def test_script_name(self):
+        for text, expected in [
+                ("npm -w web run deploy", "deploy"), ("npm run -w web deploy", "deploy"),
+                ("pnpm --filter web deploy", "deploy"), ("yarn workspace web run deploy", "deploy"),
+                ("yarn workspace web deploy", "deploy"), ("bun run --filter web deploy", "deploy"),
+                ("npm run --workspace=web release", "release"),
+                ("pnpm -w release", "release"), ("npm run-script deploy", "deploy"),
+                ("npm -C web run deploy", "deploy"), ("npm --dir web run deploy", "deploy"),
+                ("npm --prefix web run deploy", "deploy"), ("pnpm -C web deploy", "deploy"),
+                ("pnpm --dir web run deploy", "deploy"),
+                ("yarn workspace deploy build", "build"), ("npm --prefix deploy run build", "build"),
+                ("pnpm -C deploy build", "build"), ("pnpm --dir release build", "build"),
+                ("pnpm vitest run deploy", "vitest"), ("npm exec vitest run release", "exec")]:
+            with self.subTest(text=text):
+                self.assertEqual(bash.script_name(one(text).argv), expected)
+
+    def test_monorepo_deploy_scripts(self):
+        cfg = bash.EffectsCfg(project_scripts=["deploy", "release"])
+
+        def reason(text):
+            return bash.effect_reason(one(text), cfg)
+
+        for text in ["npm -w web run deploy", "npm run -w web deploy",
+                     "npm --workspace=web run release", "npm run --workspace=web release",
+                     "pnpm -F web run deploy", "pnpm --filter web run deploy",
+                     "pnpm run --filter web deploy", "pnpm -F web deploy",
+                     "yarn workspace web run deploy", "yarn workspace web deploy",
+                     "bun --filter web run deploy", "bun run --filter web deploy",
+                     "pnpm -w release", "npm run-script deploy", "npm -C web run deploy",
+                     "npm --dir web run deploy", "npm --prefix web run deploy",
+                     "pnpm --dir web run deploy"]:
+            with self.subTest(text=text):
+                self.assertIsNotNone(reason(text))
+        for text in ["npm -w web run build", "yarn workspace web build",
+                     "pnpm vitest run deploy", "npm exec vitest run release",
+                     "yarn vitest run deploy", "yarn workspace deploy build",
+                     "npm --prefix deploy run build", "pnpm -C deploy build",
+                     "pnpm --dir release build"]:
+            with self.subTest(text=text):
+                self.assertIsNone(reason(text))
+
     def test_commands_config_matches_launcher_text(self):
         cfg = bash.EffectsCfg(commands=["npx mytool"])
         self.assertIsNotNone(bash.effect_reason(one("npx mytool run"), cfg))

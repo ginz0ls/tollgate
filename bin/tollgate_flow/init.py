@@ -210,11 +210,12 @@ def _is_doc(name: str) -> bool:
     return bool(dot) and ext.lower() in DOC_EXTENSIONS
 
 
-def _match(path: str, patterns) -> tuple[str, str] | None:
+def _match(path: str, patterns, exclude=()) -> tuple[str, str] | None:
     """Decisioni 3 e 4: come un file accende un profilo. `("dir", <percorso fino alla cartella>)`
     per le forme a cartella (vince la più a sinistra; i documenti non le accendono), poi
-    `("file", <percorso>)` per la forma `name`; `None` se nessuna lo accende."""
-    if path.startswith(EXCLUDED_PREFIXES):
+    `("file", <percorso>)` per la forma `name`; `None` se nessuna lo accende.
+    `exclude` sono i prefissi che il frammento scarta, oltre a `EXCLUDED_PREFIXES`."""
+    if path.startswith(EXCLUDED_PREFIXES) or path.startswith(tuple(exclude)):
         return None
     parts = path.split("/")
     name = parts[-1]
@@ -232,19 +233,19 @@ def _match(path: str, patterns) -> tuple[str, str] | None:
     return None
 
 
-def concrete_for(path: str, patterns) -> str | None:
+def concrete_for(path: str, patterns, exclude=()) -> str | None:
     """Decisione 3: il percorso concreto (con l'escape) che accende `path`, o `None`."""
-    found = _match(path, patterns)
+    found = _match(path, patterns, exclude)
     if found is None:
         return None
     kind, raw = found
     return globs.escape(raw) + ("/**" if kind == "dir" else "")
 
 
-def _concrete_paths(patterns, files) -> list[str]:
+def _concrete_paths(patterns, files, exclude=()) -> list[str]:
     """Decisione 3: i percorsi concreti per `files`; un percorso a cartella già coperto da uno
     più corto si toglie, e un percorso esatto già coperto da uno a cartella."""
-    found = {m for f in files if (m := _match(f, patterns))}
+    found = {m for f in files if (m := _match(f, patterns, exclude))}
     dirs = {raw for kind, raw in found if kind == "dir"}
     kept = [d for d in dirs if not any(d != q and d.startswith(q + "/") for q in dirs)]
     folder_paths = [globs.escape(d) + "/**" for d in kept]
@@ -253,9 +254,10 @@ def _concrete_paths(patterns, files) -> list[str]:
     return sorted([*folder_paths, *exact])
 
 
-def _is_detectable(path: str, size: int | None) -> bool:
+def _is_detectable(path: str, size: int | None, exclude=()) -> bool:
     """Decisione 6: un file sorgente fuori dalle cartelle escluse, dai test e dai grandi."""
-    if size is None or size > MAX_DETECT_BYTES or path.startswith(EXCLUDED_PREFIXES):
+    if size is None or size > MAX_DETECT_BYTES \
+            or path.startswith(EXCLUDED_PREFIXES) or path.startswith(tuple(exclude)):
         return False
     parts = path.split("/")
     name = parts[-1]
@@ -283,7 +285,8 @@ def detect_files(repo, ref: str, frags, sizes: dict[str, int],
                 warnings.append(f"profilo {fragment.area}: rilevamento per contenuto non "
                                 f"riuscito ({_plain(str(e))}): proseguo senza file rilevati")
             continue
-        found[fragment.area] = sorted(f for f in hits if _is_detectable(f, sizes.get(f)))
+        found[fragment.area] = sorted(f for f in hits
+                                      if _is_detectable(f, sizes.get(f), fragment.exclude))
     return found
 
 
@@ -334,7 +337,7 @@ def _drift(area: str, decl: dict, fragment, rules: tuple[list[str], list[str]],
         uncovered_detected = [f for f in detected if f not in uncovered
                               and not globs.match_any(paths, f)
                               and not any(globs.match(n, f) for n in negations)]
-        proposed = sorted({*_concrete_paths(fragment.patterns, uncovered),
+        proposed = sorted({*_concrete_paths(fragment.patterns, uncovered, fragment.exclude),
                            *(globs.escape(f) for f in uncovered_detected)})
         for pattern in proposed:
             count = sum(1 for f in [*uncovered, *uncovered_detected] if globs.match(pattern, f))
@@ -363,16 +366,24 @@ def profile_blocks(files: dict[str, int], current_text: str, plugin_root: Path, 
     proposed: dict[str, dict] = {}     # i profili proposti prima, nella stessa corsa (D11)
     for fragment in fragments.load_approved(plugin_root):
         area = fragment.area
-        lighting = [f for f in candidates if concrete_for(f, fragment.patterns)]
+        skip = EXCLUDED_PREFIXES + fragment.exclude
+        # Un file che questo frammento accende solo per percorso e che il rilevamento per
+        # contenuto assegna a un altro frammento non lo accende (I-1 di B5).
+        mine = set((detected or {}).get(area, []))
+        taken = {f for other_area, files_found in (detected or {}).items()
+                 if other_area != area for f in files_found}
+        lighting = [f for f in candidates
+                    if concrete_for(f, fragment.patterns, fragment.exclude)
+                    and (f in mine or f not in taken)]
         found = sorted({f for f in (detected or {}).get(area, [])
-                        if not f.startswith(EXCLUDED_PREFIXES)} - set(lighting))
+                        if not f.startswith(skip)} - set(lighting))
         rules = fragments.rules(fragment)
         if area in declared:
             drift = _drift(area, declared[area], fragment, rules, lighting, found, plugin_root)
             lines += drift
             other += drift
             continue
-        concrete = _concrete_paths(fragment.patterns, lighting)
+        concrete = _concrete_paths(fragment.patterns, lighting, fragment.exclude)
         paths = sorted({*concrete, *(globs.escape(f) for f in found
                                      if not globs.match_any(concrete, f))})
         if not paths:

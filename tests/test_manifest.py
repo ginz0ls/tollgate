@@ -6,7 +6,7 @@ import unittest
 
 from tests.helpers import ROOT
 
-AREAS = ("ai", "infra")
+AREAS = ("ai", "infra", "backend")
 ATTRIBUTION = ("Derivato da superpowers/skills/subagent-driven-development (MIT, © 2025 Jesse "
                "Vincent); vedi LICENSES/superpowers-MIT.txt")
 
@@ -198,6 +198,18 @@ class ManifestTest(unittest.TestCase):
                     self.assertIn("dati non fidati", section)
                     self.assertIn("senza modifiche", section)
                     self.assertIn("si segnala una volta sola", section)
+
+    def test_real_infra_agent_names_uncovered_commands(self):
+        """Decisione 10: la sezione «Area `infra`» non dice più che le scritture remote di KV, D1
+        e R2 sono non coperte (tollgate le ferma), e nomina ancora le build Docker con push."""
+        text = (ROOT / "agents" / "implementer-infra.md").read_text()
+        section = " ".join(text.split("\n## Area `infra`\n")[1].split("\n## ")[0].split())
+        self.assertNotIn("wrangler kv", section)
+        self.assertNotIn("wrangler d1", section)
+        self.assertNotIn("wrangler r2", section)
+        self.assertIn("docker build", section)
+        self.assertIn("push", section)
+        self.assertIn("gruppi di Wrangler", section)
 
     def test_final_reviewers_leave_report_rules_of_areas(self):
         for name in ("final-reviewer", "finding-verifier"):

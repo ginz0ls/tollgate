@@ -936,6 +936,119 @@ class ProfileBlocksTest(PluginMixin, unittest.TestCase):
         for f in files:
             self.assertEqual(len([p for p in paths if globs.match(p, f)]), 1, f)
 
+    def test_concrete_for_exclude_default_is_b4(self):
+        pats = fragments.load(self.plugin(fragment=FRAGMENT_X.replace(
+            '["**/x/**"]', '["**/Dockerfile*", "**/x/**"]')))[0].patterns
+        self.assertEqual(init.concrete_for("services/api/Dockerfile", pats),
+                         "services/api/Dockerfile")
+        self.assertEqual(init.concrete_for("src/x/a.py", pats), "src/x/**")
+        self.assertEqual(init.concrete_for("src/x/a.py", pats, exclude=()), "src/x/**")
+
+    def test_concrete_for_with_exclude(self):
+        pats = fragments.load(self.plugin(fragment=FRAGMENT_X.replace(
+            '["**/x/**"]', '["**/handlers/**"]')))[0].patterns
+        path = "supabase/functions/a/handlers/h.ts"
+        self.assertEqual(init.concrete_for(path, pats), "supabase/functions/a/handlers/**")
+        self.assertIsNone(init.concrete_for(path, pats, exclude=("supabase/",)))
+
+    EXCL = FRAGMENT_X.replace('["**/x/**"]', '["**/handlers/**", "server/**"]') \
+        + '[detect]\ncontent = ["MARK"]\nexclude = ["supabase/"]\n'
+
+    def test_exclude_skips_paths_and_detect(self):
+        files = ["supabase/functions/a/handlers/h.ts", "supabase/functions/b/index.ts",
+                 "src/handlers/h.ts", "server/app.py"]
+        got = self.blocks(files, root=self.plugin(fragment=self.EXCL),
+                          detected={"x": ["supabase/functions/b/index.ts", "src/other.py"]})
+        paths = self.profile(got)["paths"]
+        self.assertEqual(paths, ["/server/**", "src/handlers/**", "src/other.py"])
+        self.assertIn("3 file", "\n".join(got.lines))
+        self.assertNotIn("supabase", got.text)
+
+    def test_exclude_only_for_its_fragment(self):
+        root = self.plugin(fragment=self.EXCL)
+        (root / "templates" / "profiles" / "y.toml").write_text(
+            '[profile]\npaths = ["**/handlers/**"]\n', encoding="utf-8")
+        (root / "skills" / "rules-y").mkdir()
+        (root / "skills" / "rules-y" / "SKILL.md").write_text(
+            SKILL_X.replace("rules-x", "rules-y").replace("R-X-", "R-Y-"), encoding="utf-8")
+        got = self.blocks(["supabase/functions/a/handlers/h.ts"], root=root)
+        self.assertEqual(tomllib.loads(BASE_TOML + got.text)["profiles"]["y"]["paths"],
+                         ["supabase/functions/a/handlers/**"])
+        self.assertNotIn("profiles.x]", got.text)
+
+    def test_exclude_respected_in_drift(self):
+        root = self.plugin(fragment=self.EXCL)
+        current = BASE_TOML + DECLARED_X
+        got = self.blocks(["src/x/a.py", "supabase/functions/a/handlers/h.ts",
+                           "supabase/functions/b/index.ts"], current=current, root=root,
+                          detected={"x": ["supabase/functions/b/index.ts"]})
+        self.assertFalse([l for l in got.lines if "paths: aggiungi" in l], got.lines)
+        got = self.blocks(["src/handlers/h.ts"], current=current, root=root)
+        self.assertTrue([l for l in got.lines if "paths: aggiungi" in l], got.lines)
+
+    def two_profiles(self):
+        """Il frammento `x` (`**/handlers/**`) e un frammento `y` (`**/ai/**`, con un marcatore)."""
+        root = self.plugin(fragment=FRAGMENT_X.replace('["**/x/**"]', '["**/handlers/**"]'))
+        (root / "templates" / "profiles" / "y.toml").write_text(
+            '[profile]\npaths = ["**/ai/**"]\n[detect]\ncontent = ["import y_sdk"]\n',
+            encoding="utf-8")
+        (root / "skills" / "rules-y").mkdir()
+        (root / "skills" / "rules-y" / "SKILL.md").write_text(
+            SKILL_X.replace("rules-x", "rules-y").replace("R-X-", "R-Y-"), encoding="utf-8")
+        return root
+
+    def test_path_only_light_skipped_when_content_goes_to_another_profile(self):
+        """I-1: `ai/handlers/tool.py` col marcatore di `y` resta a `y`, `x` non lo prende."""
+        root = self.two_profiles()
+        got = self.blocks(["ai/handlers/tool.py"], root=root,
+                          detected={"y": ["ai/handlers/tool.py"]})
+        self.assertNotIn("profiles.x]", got.text)
+        self.assertEqual(tomllib.loads(BASE_TOML + got.text)["profiles"]["y"]["paths"],
+                         ["/ai/**"])
+        self.assertTrue([l for l in got.lines if "profilo x" in l and "nessun file" in l],
+                        got.lines)
+
+    def test_path_only_light_kept_without_the_marker(self):
+        root = self.two_profiles()
+        got = self.blocks(["ai/handlers/tool.py"], root=root)
+        self.assertEqual(self.profile(got)["paths"], ["ai/handlers/**"])
+
+    def test_file_found_by_content_in_both_profiles_stays_in_both(self):
+        root = self.two_profiles()
+        got = self.blocks(["ai/handlers/tool.py"], root=root,
+                          detected={"x": ["ai/handlers/tool.py"], "y": ["ai/handlers/tool.py"]})
+        self.assertEqual(self.profile(got)["paths"], ["ai/handlers/**"])
+
+    def test_path_only_light_skipped_in_drift_too(self):
+        root = self.two_profiles()
+        got = self.blocks(["ai/handlers/tool.py"], current=BASE_TOML + DECLARED_X, root=root,
+                          detected={"y": ["ai/handlers/tool.py"]})
+        self.assertFalse([l for l in got.lines if "profiles.x" in l and "paths: aggiungi" in l],
+                         got.lines)
+
+    def test_real_content_match_of_ai_keeps_nested_routes_out_of_backend(self):
+        """I-1 coi frammenti veri: un file in `ai/routes/` con un marcatore vero di `ai`
+        non dà `src/ai/routes/**` a `backend`."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        (root / "templates" / "profiles").mkdir(parents=True)
+        for fr in fragments.load(ROOT):
+            shutil.copy(fr.source, root / "templates" / "profiles" / fr.source.name)
+            skill = root / "skills" / f"rules-{fr.area}"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text(
+                f"---\napproved: 2026-11-01\n---\nR-{fr.area.upper()}-01 [blocca] x\n",
+                encoding="utf-8")
+        path = "src/ai/routes/chat.ts"
+        got = init.profile_blocks({path: 10}, DEFAULT_TOML, root, detected={"ai": [path]})
+        profiles = tomllib.loads(DEFAULT_TOML + got.text)["profiles"]
+        self.assertEqual(profiles["ai"]["paths"], ["src/ai/**"])
+        self.assertNotIn("backend", profiles)
+        plain = init.profile_blocks({path: 10}, DEFAULT_TOML, root)
+        self.assertIn("src/ai/routes/**",
+                      tomllib.loads(DEFAULT_TOML + plain.text)["profiles"]["backend"]["paths"])
+
     def test_name_pattern_literal_is_exact_path(self):
         self.assertEqual(self.paths_of(["**/vercel.json"], ["vercel.json", "apps/web/vercel.json"]),
                          ["/vercel.json", "apps/web/vercel.json"])
@@ -1232,6 +1345,15 @@ class DetectTest(PluginMixin, InitCase):
         found = self.detect({".claude/agents/a.py": HIT, ".github/tollgate/bin/a.py": HIT,
                              f"{FOLDER}/files/b.py": HIT, "src/ok.py": HIT})
         self.assertEqual(found, ["src/ok.py"])
+
+    def test_detect_files_honours_exclude(self):
+        self.push({"supabase/functions/n/index.ts": HIT, "src/ok.py": HIT})
+        sizes = core_git.tree_sizes_at(self.fl.main, "origin/main")
+        got = init.detect_files(self.fl.main, "origin/main", fragments.load(self.root), sizes)
+        self.assertEqual(got["x"], ["src/ok.py", "supabase/functions/n/index.ts"])
+        root = self.plugin(fragment=FRAGMENT_XD + 'exclude = ["supabase/"]\n')
+        got = init.detect_files(self.fl.main, "origin/main", fragments.load(root), sizes)
+        self.assertEqual(got["x"], ["src/ok.py"])
 
     def test_detect_odd_names(self):
         self.assertEqual(self.detect({"src/è à.py": HIT}), ["src/è à.py"])

@@ -10,7 +10,8 @@
                               di sessione ricavate da `cwd` e `session_id` di ogni flusso; si stampano solo le righe col titolo
   tipi <tollgate.db>          (B3) agent_type e reviewer_type di ogni task (sola lettura)
   togli-pagine <stream.jsonl>...   (B3) UNICO comando che scrive: riscrive il flusso al suo posto, sostituendo il testo delle pagine dei
-                              fornitori (risultati lunghi di WebFetch e WebSearch, e qualunque risultato di Read/Grep su una copia salvata in `tool-results/`), quello delle skill che non sono di tollgate
+                              fornitori (risultati lunghi di WebFetch e WebSearch, e qualunque risultato di Read/Grep, o di un Bash che con cat, sed,
+                              head, tail o grep legge una copia salvata in `tool-results/`, anche nel suo `stdout`), quello delle skill che non sono di tollgate
                               (blocchi "Base directory for this skill:" lunghi) e le uscite degli hook SessionStart di altri
                               plugin (quelle il cui additionalContext non comincia con "tollgate:") con un segnaposto che dice
                               nome o URL e lunghezza
@@ -24,10 +25,12 @@ from pathlib import Path, PurePosixPath
 
 WANTED = ("research_note", "research_reminder", "veto")
 RULES_TITLE = "# Regole di base (versione 1)"
-AREA_TITLES = ("# Regole ai (versione 1)", "# Regole infra (versione 1)", RULES_TITLE)
+AREA_TITLES = ("# Regole ai (versione 1)", "# Regole infra (versione 1)", "# Regole backend (versione 1)", RULES_TITLE)
 WEB_TOOLS = ("WebFetch", "WebSearch")
-SAVED_TOOLS = ("Read", "Grep")  # su una copia salvata da Claude Code in tool-results/ portano lo stesso testo di terzi, a qualunque lunghezza
+SAVED_TOOLS = ("Read", "Grep", "Bash")  # su una copia salvata da Claude Code in tool-results/ portano lo stesso testo di terzi, a qualunque lunghezza
 SAVED_DIR = "tool-results"
+SAVED_PATH = re.compile(r"""(?:^|[\s'"=:(])((?:[^\s'"|;&<>()]*/)?tool-results/[^\s'"|;&<>()]+)""")
+SAVED_READERS = re.compile(r"\b(?:cat|sed|head|tail|grep|rg|awk|less|more|nl)\b")  # i Bash che leggono la copia
 PAGE_PLACEHOLDER = "[pagina di terzi tolta dalle evidenze:"
 MAX_WEB_RESULT = 5000  # caratteri: oltre, il risultato di WebFetch/WebSearch è una pagina di terzi e non entra nelle evidenze pubbliche
 
@@ -292,14 +295,19 @@ def _placeholder(url, length):
 
 
 def _saved_copy(tool_input):
-    """Il nome del file se Read/Grep puntano dentro una cartella `tool-results/` (copia salvata da Claude Code), altrimenti None."""
+    """Il nome del file se Read/Grep puntano dentro una cartella `tool-results/` (copia salvata da Claude Code), o se un Bash la legge
+    (il percorso si cerca nel testo del comando, che deve avere un lettore: cat, sed, head, tail, grep...), altrimenti None."""
+    command = tool_input.get("command")
+    if isinstance(command, str):
+        found = SAVED_READERS.search(command) and SAVED_PATH.search(command)
+        return PurePosixPath(found.group(1)).name if found else None
     path = str(tool_input.get("file_path") or tool_input.get("path") or "")
     parts = PurePosixPath(path).parts
     return parts[-1] if SAVED_DIR in parts[:-1] else None
 
 
 def _swap_saved(obj, block, marker):
-    """Scrive `marker` nel risultato (blocco e `tool_use_result`: `content`, `file.content` o stringa intera)."""
+    """Scrive `marker` nel risultato (blocco e `tool_use_result`: `content`, `stdout` di un Bash, `file.content` o stringa intera)."""
     block["content"] = marker
     res = obj.get("tool_use_result")
     if isinstance(res, str):
@@ -307,6 +315,8 @@ def _swap_saved(obj, block, marker):
     elif isinstance(res, dict):
         if isinstance(res.get("content"), str):
             res["content"] = marker
+        if isinstance(res.get("stdout"), str) and res["stdout"]:
+            res["stdout"] = marker
         if isinstance(res.get("file"), dict) and isinstance(res["file"].get("content"), str):
             res["file"]["content"] = marker
 
@@ -366,10 +376,14 @@ def _third_party(obj, names):
     for block in blocks:
         label = names.get(("salvata", block.get("tool_use_id"))) if isinstance(block, dict) and block.get("type") == "tool_result" else None
         text = _content_text(block.get("content")) if label else ""
-        if text and not text.startswith(PAGE_PLACEHOLDER):
-            def swap(block=block, label=label, text=text):
-                _swap_saved(obj, block, _placeholder(label, len(text)))
-            yield "copia salvata", len(text), swap
+        res = obj.get("tool_use_result")
+        stdout = res.get("stdout") if label and isinstance(res, dict) and isinstance(res.get("stdout"), str) else ""
+        # il blocco può essere già il segnaposto mentre `tool_use_result.stdout` ha ancora il testo (un Bash): si riscrive lo stesso
+        left = [x for x in (text, stdout) if x and not x.startswith(PAGE_PLACEHOLDER)]
+        if left:
+            def swap(block=block, label=label, text=text, size=len(left[0])):
+                _swap_saved(obj, block, text if text.startswith(PAGE_PLACEHOLDER) else _placeholder(label, size))
+            yield "copia salvata", len(left[0]), swap
     res = obj.get("tool_use_result")
     if not web and isinstance(res, dict) and isinstance(res.get("result"), str) and "codeText" in res and len(res["result"]) > MAX_WEB_RESULT:
         def swap(res=res):

@@ -1,0 +1,21 @@
+# lookups: id, work, task, agent_id, kind, target, at
+1	1	1	a02c045a459672b8c	read	.tollgate-run/1/task-1.md	2026-11-10T02:54:10.501815Z
+2	1	1	a02c045a459672b8c	read	server/app.py	2026-11-10T02:54:12.088154Z
+3	1	1	a02c045a459672b8c	read	tests/test_smoke.py	2026-11-10T02:54:14.509816Z
+4	1	1	a02c045a459672b8c	fetch	https://docs.python.org/3/library/http.server.html	2026-11-10T02:54:24.942983Z
+# per tipo
+fetch: 1
+read: 3
+# task: work, number, state, research_ok
+1	1	done	1
+# nota salvata, lavoro 1 task 1
+## Letto nel progetto
+- server/app.py
+- tests/test_smoke.py
+
+## Documentazione
+- https://docs.python.org/3/library/http.server.html — BaseHTTPRequestHandler: i do_*() sono scritti a mano nelle sottoclassi; send_response, send_header, end_headers. Il task non tocca Handler, usa solo la libreria standard (json).
+
+## Cosa ho trovato
+Il progetto non ha contratti formali (tipi o schemi): solo la tabella ROUTES in server/app.py con funzioni pure che restituiscono (stato, tipo, corpo), e dispatch che dà 404 per rotte o metodi sconosciuti. health() segue lo schema di hello(). Nessun campo o rotta esistente cambia, nessun input da validare, nessun dato toccato. Il test segue lo stile di test_smoke.py (unittest).
+

@@ -1,7 +1,7 @@
 # tollgate B: profili con «informati prima»
 
 Data: 27 ottobre 2026. Stato: **approvato dall'utente il 27 ottobre 2026**.
-Avanzamento: B1, B2, B3, B3-bis e B4 eseguite e unite su `main` (B3 il 03/11/2026, B3-bis il 06/11/2026, B4 il 09/11/2026 in un solo commit `a1098ea`). B4 (profilo `infra`) è stata eseguita tra il 06 e l'08/11/2026, con `rules-infra` approvata dall'utente il 07/11/2026 e la prova reale corta riuscita; vedi piano principale di B (`docs/superpowers/plans/2026-10-27-tollgate-b-piano-principale.md`).
+Avanzamento: B1, B2, B3, B3-bis e B4 eseguite e unite su `main` (B3 il 03/11/2026, B3-bis il 06/11/2026, B4 il 09/11/2026 in un solo commit `a1098ea`); B5 eseguita. B4 (profilo `infra`) è stata eseguita tra il 06 e l'08/11/2026, con `rules-infra` approvata dall'utente il 07/11/2026 e la prova reale corta riuscita. B5 (profilo `backend`) è sul ramo `b5-profilo-backend`, eseguita tra il 09 e il 10/11/2026, con `rules-backend` approvata dall'utente il 10/11/2026 e la prova reale corta riuscita, revisione finale e unione in attesa; vedi piano principale di B (`docs/superpowers/plans/2026-10-27-tollgate-b-piano-principale.md`).
 Sotto-progetto B di tollgate (spec del nucleo `2026-10-08-tollgate-nucleo-design.md`, rev 26, sezioni 1.3, 5, 6.3, 7.2, 8.1, 8.6, 11.4). Parte dal catalogo `2026-10-08-tollgate-profili-verticali.md` e lo restringe.
 
 Le scelte prese con l'utente nella conversazione del 26-27 ottobre sono marcate **(utente)**. Quelle prese da chi scrive, che l'utente può ribaltare, sono marcate **(mia scelta)**.

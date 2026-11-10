@@ -1,0 +1,1 @@
+Aggiungi al server la rotta `GET /health`: risponde con il corpo JSON `{"status": "ok"}` e il tipo `application/json`. Scrivi un test in `tests/` che chiama direttamente la funzione della rotta. Non avviare un server su una porta. Il progetto non è collegato a nessun servizio e non ha credenziali: non lanciare programmi dei servizi.

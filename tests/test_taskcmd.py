@@ -43,6 +43,19 @@ blocking_rules = ["R-INFRA-01"]
 """
 INFRA_TOML = DEFAULT_TOML + INFRA_BLOCK
 INFRA_AI_TOML = AI_TOML + INFRA_BLOCK
+BACKEND_BLOCK = """
+[profiles.backend]
+paths = ["server/**", "edge/**"]
+skills = []
+reviewer_skills = []
+agent = "tollgate:implementer-backend"
+reviewer = "tollgate:reviewer-backend"
+rules = ["R-BACKEND-01", "R-BACKEND-10"]
+blocking_rules = ["R-BACKEND-01"]
+"""
+BACKEND_TOML = DEFAULT_TOML + BACKEND_BLOCK
+BACKEND_INFRA_TOML = DEFAULT_TOML + BACKEND_BLOCK + INFRA_BLOCK.replace(
+    'paths = ["vercel.json"]', 'paths = ["wrangler.jsonc"]')
 
 
 class TaskCase(unittest.TestCase):
@@ -268,6 +281,34 @@ class TaskStartTest(TaskCase):
         """Due aree nello stesso task: agenti generici (il task è da dividere)."""
         self.make(toml=INFRA_AI_TOML,
                   plan=plan_text("- Create: `vercel.json`\n- Create: `ai/x.py`"))
+        self.start(2)
+        row = self.row(2)
+        self.assertEqual((row["agent_type"], row["reviewer_type"]),
+                         ("tollgate:implementer", "tollgate:task-reviewer"))
+
+    def test_backend_task_routed_to_area_agents(self):
+        """Un blocco `backend` scritto nel test (regole di una skill finta, non i file veri)."""
+        self.make(toml=BACKEND_TOML, plan=plan_text("- Create: `server/app.py`"))
+        _, summary = self.start(2)
+        row = self.row(2)
+        self.assertEqual((row["agent_type"], row["reviewer_type"]),
+                         ("tollgate:implementer-backend", "tollgate:reviewer-backend"))
+        self.assertIn("tollgate:implementer-backend", summary)
+        self.assertIn("revisore: tollgate:reviewer-backend", summary)
+
+    def test_rules_backend_not_required(self):
+        """`rules-backend` si precarica, non è una skill da usare."""
+        self.make(toml=BACKEND_TOML, plan=plan_text("- Create: `server/app.py`"))
+        path, _ = self.start(2)
+        self.assertEqual(json.loads(self.row(2)["skills_required"]), [])
+        brief = path.read_text()
+        self.assertNotIn("rules-backend", brief)
+        self.assertNotIn("Skill da usare\n\n- ", brief)
+
+    def test_backend_and_infra_task_goes_generic(self):
+        """Due aree nello stesso task (decisione 5): agenti generici."""
+        self.make(toml=BACKEND_INFRA_TOML,
+                  plan=plan_text("- Create: `wrangler.jsonc`\n- Create: `edge/index.ts`"))
         self.start(2)
         row = self.row(2)
         self.assertEqual((row["agent_type"], row["reviewer_type"]),

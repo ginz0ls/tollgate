@@ -19,6 +19,8 @@ _FOLDER = re.compile(r"\*\*/" + _SEGMENT + r"/\*\*")
 _ROOT_FOLDER = re.compile(_SEGMENT + r"/\*\*")
 # Nome di file: tratto letterale ASCII di almeno 2 caratteri con una lettera, al più un `*` finale.
 _NAME = re.compile(r"\*\*/(?=[A-Za-z0-9._-]*[A-Za-z])(?=[A-Za-z0-9._-]{2})([A-Za-z0-9._-]+\*?)")
+# Un prefisso di `[detect] exclude`: una o più cartelle letterali, con `/` finale.
+_EXCLUDE = re.compile(r"(?:" + _SEGMENT + r"/)+")
 _FORBIDDEN_KEYS = ("rules", "blocking_rules")
 
 
@@ -48,6 +50,7 @@ class Fragment:
     skill_path: Path
     source: Path
     patterns: tuple[Pattern, ...]
+    exclude: tuple[str, ...] = ()
 
 
 def _parse(path: Path, plugin_root: Path) -> Fragment:
@@ -85,17 +88,23 @@ def _parse(path: Path, plugin_root: Path) -> Fragment:
     if not isinstance(paths, list) or None in parsed:
         raise FragmentError(f"{name}: i pattern di paths devono avere la forma **/<cartella>/**, "
                             f"<cartella>/** o **/<nome-file>")
-    extra = sorted(set(detect) - {"content"})
+    extra = sorted(set(detect) - {"content", "exclude"})
     if extra:
         raise FragmentError(f"{name}: chiave sconosciuta in [detect]: {', '.join(extra)}")
     content = detect.get("content", [])
     if not isinstance(content, list) or not all(isinstance(c, str) and c for c in content):
         raise FragmentError(f"{name}: [detect] content deve essere una lista di stringhe")
+    exclude = detect.get("exclude", [])
+    if not isinstance(exclude, list) or not all(
+            isinstance(e, str) and _EXCLUDE.fullmatch(e) for e in exclude):
+        raise FragmentError(f"{name}: [detect] exclude deve essere una lista di cartelle "
+                            f"letterali con la barra finale (per esempio \"supabase/\")")
     if not paths:
         raise FragmentError(f"{name}: [profile] paths è obbligatorio e non vuoto "
                             f"(senza, il profilo si accenderebbe su ogni file)")
     skill = plugin_root / "skills" / f"rules-{area}" / "SKILL.md"
-    return Fragment(area, profile, tuple(content), skill, path, tuple(parsed))
+    return Fragment(area, profile, tuple(content), skill, path, tuple(parsed),
+                    tuple(exclude))
 
 
 def load(plugin_root) -> list[Fragment]:

@@ -50,7 +50,7 @@ Questo task tocca la configurazione o il deploy su Vercel, Cloudflare (Wrangler)
 
 Il revisore giudica alcune regole sul tuo report e non sul diff: sono quelle che `rules-infra` segna «Si giudica su: report» (`R-INFRA-01`, `R-INFRA-02`, `R-INFRA-03`, `R-INFRA-08`, `R-INFRA-12`). Scrivi nel report, nel campo `done`, ciò che serve: i file di deploy versionati che hai letto prima di scrivere, l'indirizzo ufficiale di ogni comando e di ogni proprietà di configurazione che scrivi o dai per un fatto, la pagina dei flag di compatibilità letta se cambi una data di compatibilità, la prova eseguita senza pubblicazione oppure il motivo per cui non c'è. Le altre si vedono nel diff.
 
-Non lanci comandi che pubblicano o cambiano un servizio. Tollgate ferma come effetti esterni quelli che la sua configurazione elenca (anche dietro un lanciatore come `npx`) e solo l'utente li approva. Quelli che non copre non li lanci comunque: per esempio le scritture remote di `wrangler kv`, `wrangler d1` e `wrangler r2`, e `docker build` o `docker buildx build` con l'opzione push. La prova senza pubblicazione è quella che le regole indicano, mai un comando di pubblicazione.
+Non lanci comandi che pubblicano o cambiano un servizio. Tollgate ferma come effetti esterni quelli che la sua configurazione elenca (anche dietro un lanciatore come `npx`) e solo l'utente li approva. Quelli che non copre non li lanci comunque: per esempio `docker build` o `docker buildx build` con l'opzione push, e gli altri gruppi di Wrangler (`queues`, `hyperdrive`, `vectorize` e simili). La prova senza pubblicazione è quella che le regole indicano, mai un comando di pubblicazione.
 
 ## Il lavoro
 
