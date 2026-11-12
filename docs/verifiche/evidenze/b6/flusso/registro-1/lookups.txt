@@ -1,0 +1,51 @@
+# lookups: id, work, task, agent_id, kind, target, at
+1	1	1	a738e6ee2554b5d0d	read	.tollgate-run/1/task-1.md	2026-11-11T17:07:58.585856Z
+2	1	1	a738e6ee2554b5d0d	read	web/index.html	2026-11-11T17:08:01.264203Z
+3	1	1	a738e6ee2554b5d0d	read	tests/test_page.py	2026-11-11T17:08:04.989312Z
+4	1	1	a738e6ee2554b5d0d	read	web/styles.css	2026-11-11T17:08:05.246598Z
+5	1	1	a738e6ee2554b5d0d	read	docs/superpowers/plans/2026-11-11-pulsante-salva.md	2026-11-11T17:08:05.794284Z
+6	1	1	a738e6ee2554b5d0d	read	src/components/StatusBadge.tsx	2026-11-11T17:08:06.124148Z
+7	1	2	ada7861907f78db34	read	.tollgate-run/1/task-2.md	2026-11-11T17:09:14.205004Z
+8	1	2	ada7861907f78db34	read	src/components/StatusBadge.tsx	2026-11-11T17:09:18.047168Z
+9	1	2	ada7861907f78db34	read	tests/test_save_button.py	2026-11-11T17:09:18.297097Z
+10	1	2	ada7861907f78db34	bash_read	web/index.html	2026-11-11T17:09:20.907123Z
+11	1	2	ada7861907f78db34	bash_read	web/app.js	2026-11-11T17:09:20.907123Z
+12	1	2	ada7861907f78db34	bash_read	web/styles.css	2026-11-11T17:09:20.907123Z
+13	1	2	ada7861907f78db34	bash_read	tollgate.toml	2026-11-11T17:09:20.907123Z
+14	1	2	ada7861907f78db34	bash_read	config.toml	2026-11-11T17:09:20.907123Z
+15	1	2	ada7861907f78db34	fetch	https://react.dev/reference/react-dom/components/common	2026-11-11T17:09:28.085853Z
+# per tipo
+bash_read: 5
+fetch: 1
+read: 9
+# task: work, number, state, research_ok
+1	1	done	1
+1	2	done	1
+# nota salvata, lavoro 1 task 1
+## Letto nel progetto
+- web/index.html
+- web/styles.css
+- tests/test_page.py
+- src/components/StatusBadge.tsx
+- docs/superpowers/plans/2026-11-11-pulsante-salva.md
+
+## Nessuna fonte esterna
+Il diff usa solo HTML, JavaScript del browser senza librerie (getElementById, textContent) e unittest della libreria standard Python: nessuna libreria o servizio esterno.
+
+## Cosa ho trovato
+Il modulo #appunto ha un solo submit "Invia" e nessuno script. styles.css ha gia' stili per button e focus-visible con variabili: non serve modificarlo. Aggiungo button#salva type=button con aria-label e span aria-hidden, p#salvato role=status vuoto, script defer, e web/app.js che scrive "Salvato". Test nuovi in tests/test_save_button.py con un parser html.parser; il test esistente di test_page non va toccato. Il test del componente SaveButton.tsx e' del Task 2, fuori scope qui. Nessun componente nuovo in questo task (solo markup statico).
+
+# nota salvata, lavoro 1 task 2
+## Letto nel progetto
+- src/components/StatusBadge.tsx
+- tests/test_save_button.py
+- web/index.html
+- web/app.js
+- web/styles.css
+
+## Documentazione
+- https://react.dev/reference/react-dom/components/common — onClick riceve una funzione; gli attributi aria-* si scrivono come in HTML (aria-label su un button con sola icona).
+
+## Cosa ho trovato
+Non c'è package.json: la versione di React non è dichiarata (documentazione corrente react.dev). Il markup del pulsante è già in web/index.html (type=button, aria-label=Salva, span aria-hidden con 💾); il componente lo replica con onClick={onSave}. StatusBadge usa props tipizzate con type e export function: lo seguo. Nessuno stile in linea né colori a mano. Il repo non ha test dei componenti tsx (solo Python sul testo), quindi il test richiesto è quello testuale del task.
+

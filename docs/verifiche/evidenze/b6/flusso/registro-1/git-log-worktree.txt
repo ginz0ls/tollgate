@@ -1,0 +1,5 @@
+d360da3 feat: componente SaveButton accanto a StatusBadge
+4b991ab feat: pulsante Salva a sola icona con messaggio Salvato
+8ad7a20 docs: piano per il pulsante Salva (issue #1)
+e5c5df6 profilo frontend proposto da init
+b500d43 base

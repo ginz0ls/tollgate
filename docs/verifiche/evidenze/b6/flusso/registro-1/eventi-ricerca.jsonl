@@ -1,0 +1,2 @@
+{"at": "2026-11-11T17:08:11.437055Z", "data": {"ok": true, "problems": [], "task": 1}, "host": "HOST", "issue": 1, "repo_key": "/tmp/tollgate-b1/origin", "seq": 10, "session": null, "type": "research_note", "v": 1, "work": 1}
+{"at": "2026-11-11T17:09:35.009234Z", "data": {"ok": true, "problems": [], "task": 2}, "host": "HOST", "issue": 1, "repo_key": "/tmp/tollgate-b1/origin", "seq": 22, "session": null, "type": "research_note", "v": 1, "work": 1}

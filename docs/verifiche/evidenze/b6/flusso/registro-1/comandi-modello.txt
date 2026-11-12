@@ -1,0 +1,36 @@
+# docs/verifiche/evidenze/b6/flusso/passo1/tentativo-1/claude.jsonl
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" start 1 --level L1; echo "exit=$?"
+bash: git ls-files && echo --- && for f in web/index.html web/app.js web/*.css src/components/*.tsx; do echo "=== $f"; cat "$f"; done; echo ---; ls tests docs 2>&1; cat tollgate.toml CLAUDE.md 2>&1 | head -60
+bash: git ls-files
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" plan-check; echo "exit=$?"
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" status
+bash: git add docs/superpowers/plans/2026-11-11-pulsante-salva.md
+bash: git commit -m "docs: piano per il pulsante Salva (issue #1) ⏎  ⏎ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+# docs/verifiche/evidenze/b6/flusso/passo2/tentativo-1/claude.jsonl
+bash: pwd; git status --short; ls docs/superpowers/plans/ 2>&1; git log --oneline -5 -- docs/superpowers/plans/
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" status --checkpoint; git status --short
+bash: cat docs/superpowers/reviews/1/checkpoint.md; git status --short
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" status --checkpoint --note "Piano controllato: nessuna contraddizione, task 2 dipende dal markup del task 1 (ordine rispettato)." >/dev/null; python3 "/tmp/tollgate-b1/plugin/bin/tollgate" task start 1
+bash (subagente): git ls-files && ls src 2>&1 | head
+bash (subagente): python3 /tmp/tollgate-b1/plugin/bin/tollgate research submit 1 <<'NOTA_DI_RICERCA_FINE' ⏎ ## Letto nel progetto ⏎ - web/index.html ⏎ - web/styles.css ⏎ - tests/test_page.py ⏎ - src/components/StatusBadge.tsx ⏎ - docs/superpowers/plans/2026-11-11-pulsante-salva.md ⏎  ⏎ ## Nessuna fonte esterna ⏎ Il diff usa solo HTML, JavaScript del browser senza librerie (getElementById, textContent) e unittest della libreria standard Python: nessuna libreria o servizio esterno. ⏎  ⏎ ## Cosa ho trovato ⏎ Il modulo #appunto ha un solo submit "Invia" e nessuno script. styles.css ha gia' stili per button e focus-visible con variabili: non serve modificarlo. Aggiungo button#salva type=button con aria-label e span aria-hidden, p#salvato role=status vuoto, script defer, e web/app.js che scrive "Salvato". Test nuovi in tests/test_save_button.py con un parser html.parser; il test esistente di test_page non va toccato. Il test del componente SaveButton.tsx e' del Task 2, fuori scope qui. Nessun componente nuovo in questo task (solo markup statico). ⏎ NOTA_DI_RICERCA_FINE
+bash (subagente): python3 -m unittest tests.test_save_button 2>&1 | tail -15
+bash (subagente): python3 -m unittest discover -s tests -t . 2>&1 | tail -8; git add tests/test_save_button.py web/index.html web/app.js && git commit -q -m "feat: pulsante Salva a sola icona con messaggio Salvato ⏎  ⏎ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>" && python3 /tmp/tollgate-b1/plugin/bin/tollgate verify 2>&1 | tail -8
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" task review-prepare 1
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" task done 1 && python3 "/tmp/tollgate-b1/plugin/bin/tollgate" task start 2
+bash (subagente): ls -a . src/components tests web; cat package.json 2>/dev/null
+bash (subagente): cat web/index.html web/app.js web/styles.css; ls docs docs/*; grep -rn "dependenc\|react" tollgate.toml config.toml | head
+bash (subagente): python3 /tmp/tollgate-b1/plugin/bin/tollgate research submit 2 <<'NOTA_DI_RICERCA_FINE' ⏎ ## Letto nel progetto ⏎ - src/components/StatusBadge.tsx ⏎ - tests/test_save_button.py ⏎ - web/index.html ⏎ - web/app.js ⏎ - web/styles.css ⏎  ⏎ ## Documentazione ⏎ - https://react.dev/reference/react-dom/components/common — onClick riceve una funzione; gli attributi aria-* si scrivono come in HTML (aria-label su un button con sola icona). ⏎  ⏎ ## Cosa ho trovato ⏎ Non c'è package.json: la versione di React non è dichiarata (documentazione corrente react.dev). Il markup del pulsante è già in web/index.html (type=button, aria-label=Salva, span aria-hidden con 💾); il componente lo replica con onClick={onSave}. StatusBadge usa props tipizzate con type e export function: lo seguo. Nessuno stile in linea né colori a mano. Il repo non ha test dei componenti tsx (solo Python sul testo), quindi il test richiesto è quello testuale del task. ⏎ NOTA_DI_RICERCA_FINE
+bash (subagente): python3 - <<'EOF' ⏎ p="tests/test_save_button.py" ⏎ s=open(p,encoding="utf-8").read() ⏎ s=s.replace("import unittest\n","import re\nimport unittest\n",1) ⏎ s=s.replace(''' ⏎  ⏎ if __name__''',''' ⏎     def test_componente_savebutton_esportato(self): ⏎         componente = ROOT / "src" / "components" / "SaveButton.tsx" ⏎         self.assertTrue(componente.is_file()) ⏎         testo = componente.read_text(encoding="utf-8") ⏎         self.assertTrue(re.search(r"export\\s+(function|const)\\s+SaveButton\\b", testo)) ⏎         self.assertIn('aria-label="Salva"', testo) ⏎         self.assertIn('type="button"', testo) ⏎  ⏎  ⏎ if __name__''',1) ⏎ open(p,"w",encoding="utf-8").write(s) ⏎ EOF ⏎ python3 -m unittest tests.test_save_button.SaveButtonTest.test_componente_savebutton_esportato 2>&1 | tail -4 ⏎ cat > src/components/SaveButton.tsx <<'EOF' ⏎ type SaveButtonProps = { ⏎   onSave: () => void; ⏎ }; ⏎  ⏎ export function SaveButton({ onSave }: SaveButtonProps) { ⏎   return ( ⏎     <button type="button" id="salva" aria-label="Salva" onClick={onSave}> ⏎       <span aria-hidden="true">💾</span> ⏎     </button> ⏎   ); ⏎ } ⏎ EOF ⏎ python3 -m unittest discover -s tests -t . 2>&1 | tail -4 ⏎ git add src/components/SaveButton.tsx tests/test_save_button.py && git commit -qm "feat: componente SaveButton accanto a StatusBadge ⏎  ⏎ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>" && python3 /tmp/tollgate-b1/plugin/bin/tollgate verify
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" task review-prepare 2
+bash: python3 "/tmp/tollgate-b1/plugin/bin/tollgate" task done 2 && python3 "/tmp/tollgate-b1/plugin/bin/tollgate" status --checkpoint | tail -1; git status --short; git log --oneline -4
+# strumenti del modello (totale, di cui da subagenti)
+Agent: 4 (0)
+Bash: 23 (8)
+Edit: 2 (2)
+EnterWorktree: 1 (0)
+Glob: 1 (1)
+Read: 24 (15)
+Skill: 4 (1)
+ToolSearch: 1 (0)
+WebFetch: 1 (1)
+Write: 3 (2)

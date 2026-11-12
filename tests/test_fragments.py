@@ -91,7 +91,7 @@ class FragmentsTest(unittest.TestCase):
                 self.assertIn(name, str(cm.exception))
 
     def test_load_rejects_other_pattern_forms(self):
-        for pat in ("**/*.sql", "src/ai/**", "**/a/b/**", "**/**", "!**/ai/**",
+        for pat in ("src/ai/**", "**/a/b/**", "**/**", "!**/ai/**",
                     "**/a*/**", ""):
             with self.subTest(pat=pat):
                 self.put("ai.toml", f'[profile]\npaths = [{self.q(pat)}]\n')
@@ -180,12 +180,34 @@ class FragmentsTest(unittest.TestCase):
                 self.assertEqual(fragments.parse_pattern(pat), want)
 
     def test_parse_pattern_rejects(self):
-        for pat in ("**/*", "**/**", "**", "**/*.sql", "**/*.json", "**/*.Dockerfile", "**/a*b",
+        for pat in ("**/*", "**/**", "**", "**/a*b",
                     "**/a*", "**/Dockerfile**", "**/x", "**/a/b", "src/x/**", "/infra/**",
                     "vercel.json", "**/.", "**/..", "**/./**", "**/a?b", "**/a[b]", "**/a\\b",
                     "!**/x/**", "**/*.{tsx,jsx}", "**/", "**/ x", "**/\u00e8.json", "**/a*/**"):
             with self.subTest(pat=pat):
                 self.assertIsNone(fragments.parse_pattern(pat))
+
+    def test_ext_pattern_parsed(self):
+        P = fragments.Pattern
+        for pat, want in (("**/*.tsx", P("ext", "tsx")), ("**/*.CSS", P("ext", "CSS")),
+                          ("**/*.sql", P("ext", "sql")), ("**/*.json", P("ext", "json")),
+                          ("**/*.Dockerfile", P("ext", "Dockerfile"))):
+            with self.subTest(pat=pat):
+                self.assertEqual(fragments.parse_pattern(pat), want)
+        self.put("ai.toml", '[profile]\npaths = ["**/*.tsx", "**/components/**"]\n')
+        (f,) = fragments.load(self.root)
+        self.assertEqual(f.patterns, (P("ext", "tsx"), P("folder", "components")))
+
+    def test_ext_rejects_bad_forms(self):
+        for pat in ("**/*.", "**/*.module.css", "**/*.ts*", "**/x*.tsx", "*.tsx",
+                    "src/**/*.tsx", "**/*.{tsx,jsx}", "**/**.tsx", "**/*.t-x"):
+            with self.subTest(pat=pat):
+                self.assertIsNone(fragments.parse_pattern(pat))
+                self.put("ai.toml", f'[profile]\npaths = [{self.q(pat)}]\n')
+                with self.assertRaises(fragments.FragmentError) as cm:
+                    fragments.load(self.root)
+                self.assertIn("ai.toml", str(cm.exception))
+                self.assertIn("**/*.<estensione>", str(cm.exception))
 
     def test_load_accepts_three_forms(self):
         self.put("infra.toml", '[profile]\npaths = ["**/ai/**", "infra/**", "**/vercel.json"]\n')
@@ -236,6 +258,10 @@ class RealFragmentsTest(unittest.TestCase):
         self.assertEqual(found["backend"].profile["agent"], "tollgate:implementer-backend")
         self.assertTrue(found["backend"].detect)
         self.assertEqual(found["backend"].exclude, ("supabase/",))
+        self.assertIn("frontend", found)
+        self.assertEqual(found["frontend"].profile["agent"], "tollgate:implementer-frontend")
+        self.assertTrue(found["frontend"].detect)
+        self.assertEqual(found["frontend"].patterns[2], fragments.Pattern("ext", "tsx"))
 
     def test_real_ai_fragment_approved(self):
         found = {f.area: f for f in fragments.load(ROOT)}
@@ -248,6 +274,10 @@ class RealFragmentsTest(unittest.TestCase):
     def test_real_backend_fragment_approved(self):
         found = {f.area: f for f in fragments.load(ROOT)}
         self.assertTrue(fragments.approved(found["backend"]))
+
+    def test_real_frontend_fragment_approved(self):
+        found = {f.area: f for f in fragments.load(ROOT)}
+        self.assertTrue(fragments.approved(found["frontend"]))
 
 
 if __name__ == "__main__":

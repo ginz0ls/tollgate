@@ -213,7 +213,8 @@ def _is_doc(name: str) -> bool:
 def _match(path: str, patterns, exclude=()) -> tuple[str, str] | None:
     """Decisioni 3 e 4: come un file accende un profilo. `("dir", <percorso fino alla cartella>)`
     per le forme a cartella (vince la più a sinistra; i documenti non le accendono), poi
-    `("file", <percorso>)` per la forma `name`; `None` se nessuna lo accende.
+    `("file", <percorso>)` per la forma `name`, infine `("ext", "**/*.<estensione>")` per la forma
+    `ext` (confronto esatto sul suffisso; i documenti non la accendono); `None` se nessuna.
     `exclude` sono i prefissi che il frammento scarta, oltre a `EXCLUDED_PREFIXES`."""
     if path.startswith(EXCLUDED_PREFIXES) or path.startswith(tuple(exclude)):
         return None
@@ -230,6 +231,10 @@ def _match(path: str, patterns, exclude=()) -> tuple[str, str] | None:
         if p.kind == "name" and not (doc and "*" in p.name) \
                 and fnmatch.fnmatchcase(name, p.name):
             return "file", path
+    if not doc:
+        for p in patterns:
+            if p.kind == "ext" and name.endswith("." + p.name):
+                return "ext", f"**/*.{p.name}"
     return None
 
 
@@ -239,6 +244,8 @@ def concrete_for(path: str, patterns, exclude=()) -> str | None:
     if found is None:
         return None
     kind, raw = found
+    if kind == "ext":
+        return raw
     return globs.escape(raw) + ("/**" if kind == "dir" else "")
 
 
@@ -251,7 +258,7 @@ def _concrete_paths(patterns, files, exclude=()) -> list[str]:
     folder_paths = [globs.escape(d) + "/**" for d in kept]
     exact = [globs.escape(raw) for kind, raw in found
              if kind == "file" and not globs.match_any(folder_paths, raw)]
-    return sorted([*folder_paths, *exact])
+    return sorted([*folder_paths, *exact, *(raw for kind, raw in found if kind == "ext")])
 
 
 def _is_detectable(path: str, size: int | None, exclude=()) -> bool:

@@ -6,7 +6,7 @@ import unittest
 
 from tests.helpers import ROOT
 
-AREAS = ("ai", "infra", "backend")
+AREAS = ("ai", "infra", "backend", "frontend")
 ATTRIBUTION = ("Derivato da superpowers/skills/subagent-driven-development (MIT, © 2025 Jesse "
                "Vincent); vedi LICENSES/superpowers-MIT.txt")
 
@@ -210,6 +210,16 @@ class ManifestTest(unittest.TestCase):
         self.assertIn("docker build", section)
         self.assertIn("push", section)
         self.assertIn("gruppi di Wrangler", section)
+
+    def test_real_frontend_agent_names_forbidden_tools(self):
+        """La sezione «Area `frontend`» dell'implementatore vieta node, i gestori di pacchetti, un
+        server di sviluppo e un browser, e dice come si verifica senza: i test del progetto."""
+        text = (ROOT / "agents" / "implementer-frontend.md").read_text()
+        section = " ".join(text.split("\n## Area `frontend`\n")[1].split("\n## ")[0].split())
+        for word in ("node", "npm", "npx", "pnpm", "yarn", "bun", "vite", "next dev",
+                     "python3 -m http.server", "browser", "test del progetto"):
+            self.assertIn(word, section)
+        self.assertIn("Non lanci", section)
 
     def test_final_reviewers_leave_report_rules_of_areas(self):
         for name in ("final-reviewer", "finding-verifier"):

@@ -13,12 +13,14 @@ from tollgate_core import config
 FRAGMENTS_DIR = ("templates", "profiles")
 RESERVED = ("base", "active")
 _AREA = re.compile(r"[a-z0-9-]+")
-# Le tre forme di pattern di un frammento (B4, decisione 2): una regex per forma.
+# Le quattro forme di pattern di un frammento (B4, decisione 2; B6, decisione 2): una regex per forma.
 _SEGMENT = r"(?!\.{1,2}/)([^/*?\[\]!\\]+)"
 _FOLDER = re.compile(r"\*\*/" + _SEGMENT + r"/\*\*")
 _ROOT_FOLDER = re.compile(_SEGMENT + r"/\*\*")
 # Nome di file: tratto letterale ASCII di almeno 2 caratteri con una lettera, al più un `*` finale.
 _NAME = re.compile(r"\*\*/(?=[A-Za-z0-9._-]*[A-Za-z])(?=[A-Za-z0-9._-]{2})([A-Za-z0-9._-]+\*?)")
+# Estensione: `**/*.<estensione>`, di sole lettere e cifre ASCII (maiuscole e minuscole contano).
+_EXT = re.compile(r"\*\*/\*\.([A-Za-z0-9]+)")
 # Un prefisso di `[detect] exclude`: una o più cartelle letterali, con `/` finale.
 _EXCLUDE = re.compile(r"(?:" + _SEGMENT + r"/)+")
 _FORBIDDEN_KEYS = ("rules", "blocking_rules")
@@ -30,13 +32,14 @@ class FragmentError(ValueError):
 
 @dataclass(frozen=True)
 class Pattern:
-    kind: str  # "folder" | "root_folder" | "name"
+    kind: str  # "folder" | "root_folder" | "name" | "ext" (`**/*.<estensione>`)
     name: str
 
 
 def parse_pattern(pattern: str) -> Pattern | None:
-    """La forma di un pattern di frammento, o `None` se non è una delle tre ammesse."""
-    for kind, regex in (("folder", _FOLDER), ("root_folder", _ROOT_FOLDER), ("name", _NAME)):
+    """La forma di un pattern di frammento, o `None` se non è una delle quattro ammesse."""
+    for kind, regex in (("folder", _FOLDER), ("root_folder", _ROOT_FOLDER), ("name", _NAME),
+                        ("ext", _EXT)):
         if m := regex.fullmatch(pattern):
             return Pattern(kind, m.group(1))
     return None
@@ -87,7 +90,8 @@ def _parse(path: Path, plugin_root: Path) -> Fragment:
               for p in (paths if isinstance(paths, list) else [None])]
     if not isinstance(paths, list) or None in parsed:
         raise FragmentError(f"{name}: i pattern di paths devono avere la forma **/<cartella>/**, "
-                            f"<cartella>/** o **/<nome-file>")
+                            f"<cartella>/**, **/<nome-file> o "
+                            f"**/*.<estensione>")
     extra = sorted(set(detect) - {"content", "exclude"})
     if extra:
         raise FragmentError(f"{name}: chiave sconosciuta in [detect]: {', '.join(extra)}")

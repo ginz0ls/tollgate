@@ -33,6 +33,33 @@ class ProfilesTest(unittest.TestCase):
         self.assertEqual(profiles.min_level(["web", "admin"], PROFILES), "L1")
 
 
+class ExtPatternPrecedenceTest(unittest.TestCase):
+    """Decisione 4 di B6: un pattern per estensione (`**/*.tsx`) non ha segmenti letterali."""
+
+    @staticmethod
+    def prof(**paths):
+        return {name: {"kind": "vertical", "paths": p} for name, p in paths.items()}
+
+    def test_ext_pattern_loses_to_any_folder(self):
+        a = self.prof(backend=["/server/**"], frontend=["**/*.tsx"])
+        b = self.prof(frontend=["**/*.tsx"], backend=["/server/**"])
+        for p in (a, b):
+            self.assertEqual(profiles.vertical_for("server/app.tsx", p), "backend")
+
+    def test_nested_components_beats_root_folder(self):
+        p = self.prof(backend=["/server/**"], frontend=["server/components/**", "**/*.tsx"])
+        self.assertEqual(profiles.vertical_for("server/components/m.tsx", p), "frontend")
+
+    def test_exact_infra_file_beats_web_folder(self):
+        p = self.prof(frontend=["/web/**"], infra=["web/vercel.json"])
+        self.assertEqual(profiles.vertical_for("web/vercel.json", p), "infra")
+
+    def test_ext_pattern_wins_over_nothing(self):
+        p = self.prof(backend=["/server/**"], infra=["web/vercel.json"],
+                      frontend=["**/*.tsx"])
+        self.assertEqual(profiles.vertical_for("src/main.tsx", p), "frontend")
+
+
 class RoutingTest(unittest.TestCase):
     PROF = {
         "web": {"kind": "vertical", "paths": ["web/**"], "skills": ["ui-ux-pro-max"],
@@ -122,6 +149,24 @@ class BackendRoutingTest(unittest.TestCase):
 
     def test_ai_folder_inside_backend_routes_to_ai(self):
         self.assertEqual(profiles.vertical_for("server/ai/x.py", self.PROF), "ai")
+
+
+class FrontendRoutingTest(unittest.TestCase):
+    """Guardia: lo smistamento legge solo `paths`, `agent` e `reviewer`."""
+    PROF = {
+        "backend": {"kind": "vertical", "paths": ["/server/**"], "skills": [],
+                    "agent": "tollgate:implementer-backend",
+                    "reviewer": "tollgate:reviewer-backend"},
+        "frontend": {"kind": "vertical", "paths": ["src/components/**", "**/*.tsx"], "skills": [],
+                     "agent": "tollgate:implementer-frontend",
+                     "reviewer": "tollgate:reviewer-frontend"},
+    }
+
+    def test_frontend_and_backend_routing_is_split_candidate(self):
+        r = profiles.task_routing(["server/app.py", "src/components/Button.tsx"], self.PROF)
+        self.assertEqual((r.implementer, r.reviewer),
+                         (profiles.DEFAULT_IMPLEMENTER, profiles.DEFAULT_REVIEWER))
+        self.assertTrue(r.split_candidate)
 
 
 class RulesTest(unittest.TestCase):

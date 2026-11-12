@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# spikes/run-b1-flow.sh — prova reale di un lavoro L1 con la nota di ricerca di B1 (Task 9). Lo esegue solo il controller.
+# spikes/run-b1-flow.sh — prova reale di un lavoro L1 con la nota di ricerca di B1. Lo esegue solo il controller.
 # Deriva da spikes/run-p4-flow.sh e spikes/run-p3a-flow.sh, senza GitHub: `gh` finto (tests/fakegh.py), `origin` nudo locale.
 # Modo `controlla`: nessuna rete, nessun `claude`, nessuna scrittura: stampa i passi e i comandi.
 # Uso: run-b1-flow.sh controlla | prepara | passo1 | passo2 | registra
@@ -16,6 +16,10 @@
 # pacchetti, e `registra` li cerca nello stream. Il progetto di prova non è collegato a nessun servizio e non ha credenziali.
 # `backend` (B5, decisione 14): come `infra`, col progetto di spikes/b5/flow e il profilo `backend` (le uscite vanno in
 # docs/verifiche/evidenze/b5/flusso); `--disallowedTools` nega gli stessi programmi di `infra` più supabase, deno e node.
+# `frontend` (B6, decisione 15): come `backend`, col progetto di spikes/b6/flow e il profilo `frontend` (le uscite vanno in
+# docs/verifiche/evidenze/b6/flusso); `--disallowedTools` nega anche vite, next, tsc, eslint, vitest, playwright, i browser e
+# `python3 -m http.server` (e `python -m http.server`), e `registra` li cerca nello stream. I file .tsx, .css, .html e .js
+# del progetto di prova sono solo testo: non si eseguono né si servono.
 #
 #   controlla  stampa i passi e i comandi `claude`, controlla i file (nessuna scrittura)
 #   prepara    copia il plugin in /tmp/tollgate-b1/plugin e vi aggiunge SOLO NELLA COPIA skills/rules-base/SKILL.md con
@@ -45,13 +49,14 @@ DEFAULT_TMP=/tmp/tollgate-b1
 CHECK="${B1_FLOW_CHECK:-0}"                              # 1 solo nei test: permette un'altra radice
 TMP="${B1_FLOW_ROOT:-$DEFAULT_TMP}"
 RULES="${B1_FLOW_RULES:-prova}"                          # prova (B1) | vere (B2, decisione 12)
-CASE="${B1_FLOW_CASE:-b1}"                               # b1 | ai (B3, decisione 16) | infra (B4, decisione 14) | backend (B5, decisione 14)
+CASE="${B1_FLOW_CASE:-b1}"                               # b1 | ai (B3, decisione 16) | infra (B4, decisione 14) | backend (B5, decisione 14) | frontend (B6, decisione 15)
 SRC="$root"                                              # la radice da copiare; un'altra solo nei test
 OUT="$root/docs/verifiche/evidenze/b1/flusso"
 [ "$RULES" = vere ] && OUT="$root/docs/verifiche/evidenze/b2/flusso"
 [ "$CASE" = ai ] && OUT="$root/docs/verifiche/evidenze/b3/flusso"
 [ "$CASE" = infra ] && OUT="$root/docs/verifiche/evidenze/b4/flusso"
 [ "$CASE" = backend ] && OUT="$root/docs/verifiche/evidenze/b5/flusso"
+[ "$CASE" = frontend ] && OUT="$root/docs/verifiche/evidenze/b6/flusso"
 PLUGIN="$TMP/plugin"
 [ "$CHECK" = 1 ] && { OUT="${B1_FLOW_OUT:-$OUT}"; PLUGIN="${B1_FLOW_PLUGIN-$PLUGIN}"; SRC="${B1_FLOW_SRC:-$SRC}"; }
 REPO="$TMP/flow"
@@ -91,6 +96,13 @@ if [ "$CASE" = backend ]; then
   PROJ_FILES="tollgate.toml config.toml issue-1.md piano-L1.md server/__init__.py server/app.py edge/index.ts supabase/functions/hello/index.ts tests/__init__.py tests/test_smoke.py .gitignore"
   PROFILE_AREA=backend; PROFILE_FILE=server/app.py
 fi
+if [ "$CASE" = frontend ]; then
+  PROJ="$here/b6/flow"
+  PLAN_REL=docs/superpowers/plans/2026-11-10-prova-b6.md
+  ISSUE_TITLE="Aggiungi il pulsante Salva al modulo"
+  PROJ_FILES="tollgate.toml config.toml issue-1.md piano-L1.md web/index.html web/styles.css src/components/StatusBadge.tsx src/routes/home.tsx tests/__init__.py tests/test_page.py .gitignore"
+  PROFILE_AREA=frontend; PROFILE_FILE=web/index.html
+fi
 PLAN_SRC="$PROJ/piano-L1.md"
 # la risposta sulla protezione nei dati del gh finto (solo nel caso `ai`): Free, repo privato, `init` sceglie `detect`
 PROTECTION_KEY='repos/{owner}/{repo}/branches/main/protection'
@@ -106,16 +118,22 @@ Bash(curl:*),Bash(wget:*),Bash(*/curl:*),Bash(*/wget:*)"
 # B4, decisione 14: la prova di `infra` nega anche i programmi dei servizi e i lanciatori di pacchetti (le credenziali di Vercel e
 # di Cloudflare possono stare in file della cartella dell'utente), da soli, con un percorso, dopo `command` e dopo `env`;
 # B5, decisione 14: la prova di `backend` aggiunge supabase, deno e node
+# B6, decisione 15: la prova di `frontend` aggiunge gli strumenti dell'interfaccia e i browser, e il server statico di Python
+# (due parole: si negano in un ciclo a parte)
 DEPLOY_CLIS="vercel wrangler docker npx bunx pnpx bun npm pnpm yarn"
-[ "$CASE" = backend ] && DEPLOY_CLIS="$DEPLOY_CLIS supabase deno node"
-if [ "$CASE" = infra ] || [ "$CASE" = backend ]; then
+[ "$CASE" = backend ] || [ "$CASE" = frontend ] && DEPLOY_CLIS="$DEPLOY_CLIS supabase deno node"
+[ "$CASE" = frontend ] && DEPLOY_CLIS="$DEPLOY_CLIS vite next tsc eslint vitest playwright chromium chromium-browser google-chrome firefox"
+if [ "$CASE" = infra ] || [ "$CASE" = backend ] || [ "$CASE" = frontend ]; then
   for p in $DEPLOY_CLIS; do DISALLOWED="$DISALLOWED,Bash($p:*),Bash(*/$p:*),Bash(command $p:*),Bash(env $p:*)"; done
+fi
+if [ "$CASE" = frontend ]; then
+  for p in "python3 -m http.server" "python -m http.server"; do DISALLOWED="$DISALLOWED,Bash($p:*),Bash(*/$p:*),Bash(command $p:*),Bash(env $p:*)"; done
 fi
 
 die() { echo "ERRORE: $*" >&2; exit 1; }
 
 case "$RULES" in prova|vere) ;; *) die "B1_FLOW_RULES vale '$RULES': i valori ammessi sono prova e vere" ;; esac
-case "$CASE" in b1|ai|infra|backend) ;; *) die "B1_FLOW_CASE vale '$CASE': i valori ammessi sono b1, ai, infra e backend" ;; esac
+case "$CASE" in b1|ai|infra|backend|frontend) ;; *) die "B1_FLOW_CASE vale '$CASE': i valori ammessi sono b1, ai, infra, backend e frontend" ;; esac
 [ "$CASE" = b1 ] || [ "$RULES" = vere ] || die "B1_FLOW_CASE=$CASE richiede B1_FLOW_RULES=vere (vale '$RULES'): il profilo $CASE usa le regole vere"
 [ "$CHECK" = 1 ] || [ -z "${B1_FLOW_SRC:-}" ] || die "B1_FLOW_SRC vale solo con B1_FLOW_CHECK=1"
 
@@ -181,7 +199,7 @@ modo_controlla() {
   echo "radice sorgente: $SRC"
   echo "cartella delle uscite: $OUT"
   echo "--- i passi"
-  if [ "$CASE" = ai ] || [ "$CASE" = infra ] || [ "$CASE" = backend ]; then
+  if [ "$CASE" = ai ] || [ "$CASE" = infra ] || [ "$CASE" = backend ] || [ "$CASE" = frontend ]; then
     echo "  prepara   copia del plugin in $DEFAULT_TMP/plugin (regole vere), progetto di ${PROJ#"$root"/} in $DEFAULT_TMP/flow, poi init --propose sulla copia e commit del blocco [profiles.$PROFILE_AREA]"
   elif [ "$RULES" = vere ]; then
     echo "  prepara   copia del plugin in $DEFAULT_TMP/plugin con la skills/rules-base/SKILL.md vera (si ferma se non accende l'interruttore); progetto in $DEFAULT_TMP/flow"
@@ -210,7 +228,7 @@ modo_controlla() {
 
 # ---------------------------------------------------------------- prepara
 
-# scrivi_dati_gh <sha>: i dati del gh finto; con <sha> vuoto senza gli stati. Nei casi `ai`, `infra` e `backend` c'è anche la risposta sulla
+# scrivi_dati_gh <sha>: i dati del gh finto; con <sha> vuoto senza gli stati. Nei casi `ai`, `infra`, `backend` e `frontend` c'è anche la risposta sulla
 # protezione (la chiave letterale con {owner}/{repo}, come la usa tests/fakegh.py), perché `init` determini la modalità
 scrivi_dati_gh() {
   python3 -B - "$GH_DATA" "$1" "$PROJ/issue-1.md" "$ISSUE_TITLE" "$CASE" "$PROTECTION_KEY" "$DETECT_MSG" <<'PY'
@@ -220,7 +238,7 @@ data = {"auth": True,
         "issues": {"1": {"number": 1, "title": title, "state": "OPEN", "body": pathlib.Path(issue).read_text().strip(),
                          "labels": [], "author_association": "OWNER"}},
         "prs": [], "issue_list": []}
-if case in ("ai", "infra", "backend"):
+if case in ("ai", "infra", "backend", "frontend"):
     data["api_status"] = {key: {"status": 403, "message": msg, "body": {"message": msg}}}
 if sha:
     data["statuses"] = {sha: {"statuses": [{"context": "tollgate/guard", "state": "success"},
@@ -229,7 +247,7 @@ pathlib.Path(path).write_text(json.dumps(data))
 PY
 }
 
-# proponi_profilo <area> <file> (casi `ai`, `infra` e `backend`): init --propose sulla copia del plugin, col gh finto; il tollgate.toml proposto
+# proponi_profilo <area> <file> (casi `ai`, `infra`, `backend` e `frontend`): init --propose sulla copia del plugin, col gh finto; il tollgate.toml proposto
 # (con il blocco [profiles.<area>] che copre <file>) si copia nel repo, si committa e si spinge; la cartella della proposta si sposta fuori dal repo (start avvisa se resta)
 proponi_profilo() {
   local area="$1" file="$2" out="$TMP/init-propose.txt" prop="$REPO/docs/superpowers/tollgate-init"
@@ -405,7 +423,7 @@ modo_passo2() {
 
 scrivi_limiti() { # limiti.txt: ciò che i divieti a prefisso non chiudono e ciò che la raccolta non dice
   cat > "$1" <<'TESTO'
-Limiti della prova reale del Task 9 (da citare nel rapporto)
+Limiti della prova reale (da citare nel rapporto)
 - I divieti di --disallowedTools sono a prefisso (Bash(<comando>:*)) e non chiudono ogni forma: restano aperti `git -C x push ...`,
   `git push --force-with-lease`, `git remote set-url` seguito da un push, `env gh`, `bash -c '...'`. Il modello è cooperativo; lo
   script non lo impedisce: lo rileva a posteriori in comandi-rischiosi.txt (git ... push, gh, curl, wget nei comandi Bash).
@@ -418,17 +436,33 @@ Limiti della prova reale del Task 9 (da citare nel rapporto)
 - Il tetto di 3 tentativi vale per tutta la prova (anche i tentativi spostati da prepara in <passo>.prev-*); registra legge solo i
   tentativi della preparazione corrente.
 TESTO
-  if [ "$CASE" = infra ] || [ "$CASE" = backend ]; then
+  if [ "$CASE" = infra ] || [ "$CASE" = backend ] || [ "$CASE" = frontend ]; then
     cat >> "$1" <<'TESTO'
-- (infra, backend) DISALLOWED nega vercel, wrangler, docker, npx, bunx, pnpx, bun, npm, pnpm e yarn da soli, con un percorso, dopo `command`
+- (infra, backend, frontend) DISALLOWED nega vercel, wrangler, docker, npx, bunx, pnpx, bun, npm, pnpm e yarn da soli, con un percorso, dopo `command`
   e dopo `env`, ma non chiude `env VAR=... <programma>`, `sudo`, `xargs`, `bash -c '...'`. La difesa vera è l'hook `effects` di
   tollgate più un progetto di prova senza credenziali (nessun .vercel, .env, .dev.vars o file di Wrangler).
 TESTO
   fi
+  if [ "$CASE" = backend ] || [ "$CASE" = frontend ]; then
+    cat >> "$1" <<'TESTO'
+- (backend, frontend) in più nega supabase, deno e node, con le stesse quattro forme.
+TESTO
+  fi
   if [ "$CASE" = backend ]; then
     cat >> "$1" <<'TESTO'
-- (backend) in più nega supabase, deno e node, con le stesse quattro forme. I file .ts del progetto di prova sono solo testo: nessun
-  programma li esegue e il test della rotta chiama la funzione, senza aprire una porta.
+- (backend) I file .ts del progetto di prova sono solo testo: nessun programma li esegue e il test della rotta chiama la funzione,
+  senza aprire una porta.
+TESTO
+  fi
+  if [ "$CASE" = frontend ]; then
+    cat >> "$1" <<'TESTO'
+- (frontend) in più nega vite, next, tsc, eslint, vitest, playwright, chromium, chromium-browser, google-chrome, firefox,
+  `python3 -m http.server` e `python -m http.server`, con le stesse quattro forme. I file .tsx, .css, .html e .js del progetto di
+  prova sono solo testo: nessun programma li esegue né li serve e il test legge la pagina con html.parser. Un test di una pagina
+  statica non prova il comportamento in un browser.
+- (frontend) --disallowedTools non copre le forme con opzioni prima di `-m` né altri interpreti (`python3 -B -m http.server`,
+  `python3.11 -m http.server`, `python3 -c "import http.server..."`): `registra` cerca `http.server` in qualunque punto dei comandi
+  Bash dello stream e li riporta in comandi-rischiosi.txt.
 TESTO
   fi
 }
@@ -469,7 +503,7 @@ modo_registra() {
       echo "nessun flusso di claude -p da esaminare" > "$d/precarico.txt"
     fi
   fi
-  if [ "$CASE" != b1 ]; then # B3, B4 e B5: i titoli delle regole nelle trascrizioni dei subagenti (solo le cartelle di questa prova) e i tipi dei task
+  if [ "$CASE" != b1 ]; then # B3, B4, B5 e B6: i titoli delle regole nelle trascrizioni dei subagenti (solo le cartelle di questa prova) e i tipi dei task
     if [ "${#files[@]}" -gt 0 ]; then
       python3 -B "$here/b1/flowreg.py" trascrizioni "$HOME" "${files[@]}" > "$d/trascrizioni.txt" 2> "$d/trascrizioni.err"; fallisce trascrizioni $?
     else
@@ -477,12 +511,14 @@ modo_registra() {
     fi
     python3 -B "$here/b1/flowreg.py" tipi "$STATE/tollgate.db" > "$d/tipi-task.txt" 2> "$d/tipi-task.err"; fallisce tipi-task $?
   fi
-  # B4 e B5 (decisione 14): con `infra` e `backend` si cercano anche i programmi dei servizi e i lanciatori, ma solo in posizione di comando (dopo
+  # B4, B5 e B6 (decisione 14 e 15): con `infra`, `backend` e `frontend` si cercano anche i programmi dei servizi e i lanciatori, ma solo in posizione di comando (dopo
   # `bash: `, `;`, `&&`, `||`, `|`, `(`, un apice, `command `, `env ` o un percorso che finisce con `/`): `cat vercel.json` non conta
   local risky='^bash.*(git[^|;&]*push|gh |curl|wget)'
-  if [ "$CASE" = infra ] || [ "$CASE" = backend ]; then
+  if [ "$CASE" = infra ] || [ "$CASE" = backend ] || [ "$CASE" = frontend ]; then
     risky="$risky|^bash( \\(subagente\\))?: ((.*[;&|('\"/]|(.*[[:space:]])?(command|env)[[:space:]]+))?[[:space:]]*($(echo "$DEPLOY_CLIS" | tr ' ' '|'))([[:space:]]|\$)"
   fi
+  # B6 (decisione 15): il server statico di Python si cerca come `http.server` in qualunque punto del comando
+  [ "$CASE" = frontend ] && risky="$risky|^bash( \\(subagente\\))?: .*http\\.server"
   grep -E "$risky" "$d/comandi-modello.txt" > "$d/comandi-rischiosi.txt" 2>&1
   wt="$(worktree_lavoro 2>/dev/null)" && {
     git -C "$wt" log --format='%h %s' > "$d/git-log-worktree.txt" 2>&1

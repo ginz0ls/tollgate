@@ -53,7 +53,7 @@ json_str() {
 # appartengono a nessun task e Python non deve partire. Elenco fisso, mai per prefisso: un tipo
 # sconosciuto passa da Python.
 UNNAMED_TOOLS=""
-READONLY_TYPES="tollgate:task-reviewer tollgate:reviewer-ai tollgate:reviewer-infra tollgate:reviewer-backend tollgate:final-reviewer tollgate:finding-verifier tollgate:plan-adversary tollgate:spec-adversary tollgate:spec-auditor"
+READONLY_TYPES="tollgate:task-reviewer tollgate:reviewer-ai tollgate:reviewer-infra tollgate:reviewer-backend tollgate:reviewer-frontend tollgate:final-reviewer tollgate:finding-verifier tollgate:plan-adversary tollgate:spec-adversary tollgate:spec-auditor"
 if [ "$EVENT" = "PostToolUse" ]; then
   TOOL="$(json_str tool_name)"
   case "$TOOL" in

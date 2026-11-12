@@ -1,0 +1,64 @@
+# Frammento del profilo `frontend`: il codice d'interfaccia (componenti, pagine, stili, moduli di
+# rotta d'interfaccia). `init` lo completa con `rules` e `blocking_rules`, che calcola dalle righe
+# `R-FRONTEND-NN` di skills/rules-frontend/SKILL.md. Il profilo si propone solo dopo
+# l'approvazione di quella skill (campo `approved`). Restano fuori la configurazione degli
+# strumenti (`vite.config.*`, `tsconfig.json`, `eslint.config.*`), i client delle API in
+# `services/` e i `hooks/` scritti in `.ts`, e le cartelle dei server (`[detect] exclude`).
+# I pattern per estensione (`**/*.tsx` e gli altri) non hanno segmenti letterali: a runtime
+# perdono contro ogni cartella e ogni file di un altro profilo.
+
+[profile]
+kind = "vertical"
+min_level = "L0"
+paths = [
+  # Cartelle dei componenti, a qualunque profondità (catalogo 2.3, riga `frontend`).
+  "**/components/**",
+  # Cartella `web/` alla radice del progetto (catalogo 2.3, riga `frontend`).
+  "web/**",
+  # React: file dei componenti in JSX; Next.js ammette `.js`, `.jsx` e `.tsx` per le pagine
+  # (https://nextjs.org/docs/app/api-reference/file-conventions/page); le pagine in `.js` restano
+  # al generico.
+  "**/*.tsx",
+  "**/*.jsx",
+  # Vue: componenti a file singolo (https://vuejs.org/guide/scaling-up/sfc.html).
+  "**/*.vue",
+  # Svelte: file dei componenti (https://svelte.dev/docs/svelte/svelte-files).
+  "**/*.svelte",
+  # Astro: pagine e componenti (https://docs.astro.build/en/basics/astro-pages/).
+  "**/*.astro",
+  # Fogli di stile (catalogo 2.3, riga `frontend`); `.sass` e `.less` restano al generico.
+  "**/*.css",
+  "**/*.scss",
+]
+# Vuoti di proposito: `rules-frontend` la precaricano gli agenti dell'area; lint, typecheck e test
+# dei componenti dipendono dal progetto e un `dod` scritto da `init` fallirebbe dove il programma
+# manca, quindi l'utente li aggiunge a mano.
+skills = []
+reviewer_skills = []
+commands = {}
+dod = []
+agent = "tollgate:implementer-frontend"
+reviewer = "tollgate:reviewer-frontend"
+
+# I moduli di rotta d'interfaccia, fuori dalle cartelle tipiche: si cerca la riga di import della
+# libreria di rotte come testo fisso, mai il solo nome della libreria. Un file che la importa non
+# accende `backend` per la sola cartella `routes/` (regola di I-1).
+[detect]
+# Le cartelle alla radice dei pattern di `backend` e di `infra`, più le funzioni di Supabase
+# (`database`): senza, `**/components/**` accenderebbe i loro file con un segmento in più.
+exclude = ["server/", "api/", "backend/", "functions/", "infra/", "supabase/"]
+content = [
+  # TanStack Router (https://tanstack.com/router/latest/docs/framework/react/routing/routing-concepts),
+  # nelle due forme di virgolette.
+  "from '@tanstack/react-router'",
+  "from \"@tanstack/react-router\"",
+  # React Router 7, modo framework (https://reactrouter.com/start/framework/route-module).
+  "from 'react-router'",
+  "from \"react-router\"",
+  # React Router 6 (https://reactrouter.com/6.30.1/start/tutorial).
+  "from 'react-router-dom'",
+  "from \"react-router-dom\"",
+  # Remix (https://v2.remix.run/docs/route/loader).
+  "from '@remix-run/react'",
+  "from \"@remix-run/react\"",
+]

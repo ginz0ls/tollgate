@@ -1,0 +1,9 @@
+modalità del gate: detect
+profilo ai: nessun file del repo corrisponde ai suoi percorsi: non proposto
+profilo backend: nessun file del repo corrisponde ai suoi percorsi: non proposto
+profilo frontend: proposto con paths = ["**/*.tsx", "/web/**", "src/components/**"]; lo accendono 4 file: src/components/StatusBadge.tsx, src/routes/home.tsx, web/index.html, web/styles.css
+profilo infra: nessun file del repo corrisponde ai suoi percorsi: non proposto
+proposta scritta in docs/superpowers/tollgate-init/ (140 file)
+leggi docs/superpowers/tollgate-init/README.md: i passi li fai tu, tollgate non scrive i suoi file nel repo
+plan-check: ok []
+pronto: /tmp/tollgate-b1/flow (plugin: /tmp/tollgate-b1/plugin, stato: /tmp/tollgate-b1/state)

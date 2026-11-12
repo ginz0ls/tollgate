@@ -25,12 +25,11 @@ from pathlib import Path, PurePosixPath
 
 WANTED = ("research_note", "research_reminder", "veto")
 RULES_TITLE = "# Regole di base (versione 1)"
-AREA_TITLES = ("# Regole ai (versione 1)", "# Regole infra (versione 1)", "# Regole backend (versione 1)", RULES_TITLE)
+AREA_TITLES = ("# Regole ai (versione 1)", "# Regole infra (versione 1)", "# Regole backend (versione 1)", "# Regole frontend (versione 1)", RULES_TITLE)
 WEB_TOOLS = ("WebFetch", "WebSearch")
 SAVED_TOOLS = ("Read", "Grep", "Bash")  # su una copia salvata da Claude Code in tool-results/ portano lo stesso testo di terzi, a qualunque lunghezza
 SAVED_DIR = "tool-results"
-SAVED_PATH = re.compile(r"""(?:^|[\s'"=:(])((?:[^\s'"|;&<>()]*/)?tool-results/[^\s'"|;&<>()]+)""")
-SAVED_READERS = re.compile(r"\b(?:cat|sed|head|tail|grep|rg|awk|less|more|nl)\b")  # i Bash che leggono la copia
+SAVED_PATH = re.compile(r"""(?:^|[\s'"=:(<>,{\[@])((?:[^\s'"|;&<>()]*/)?tool-results(?:/[^\s'"|;&<>()]*)?)(?![^\s'"|;&<>()])""")
 PAGE_PLACEHOLDER = "[pagina di terzi tolta dalle evidenze:"
 MAX_WEB_RESULT = 5000  # caratteri: oltre, il risultato di WebFetch/WebSearch è una pagina di terzi e non entra nelle evidenze pubbliche
 
@@ -295,11 +294,11 @@ def _placeholder(url, length):
 
 
 def _saved_copy(tool_input):
-    """Il nome del file se Read/Grep puntano dentro una cartella `tool-results/` (copia salvata da Claude Code), o se un Bash la legge
-    (il percorso si cerca nel testo del comando, che deve avere un lettore: cat, sed, head, tail, grep...), altrimenti None."""
+    """Il nome del file se Read/Grep puntano dentro una cartella `tool-results/` (copia salvata da Claude Code), o se un Bash la nomina
+    (il percorso si cerca nel testo del comando, con qualunque lettore o redirezione; anche la sola cartella), altrimenti None."""
     command = tool_input.get("command")
     if isinstance(command, str):
-        found = SAVED_READERS.search(command) and SAVED_PATH.search(command)
+        found = SAVED_PATH.search(command)
         return PurePosixPath(found.group(1)).name if found else None
     path = str(tool_input.get("file_path") or tool_input.get("path") or "")
     parts = PurePosixPath(path).parts
@@ -307,7 +306,7 @@ def _saved_copy(tool_input):
 
 
 def _swap_saved(obj, block, marker):
-    """Scrive `marker` nel risultato (blocco e `tool_use_result`: `content`, `stdout` di un Bash, `file.content` o stringa intera)."""
+    """Scrive `marker` nel risultato (blocco e `tool_use_result`: `content`, `stdout` e `stderr` di un Bash, `file.content` o stringa intera)."""
     block["content"] = marker
     res = obj.get("tool_use_result")
     if isinstance(res, str):
@@ -315,8 +314,9 @@ def _swap_saved(obj, block, marker):
     elif isinstance(res, dict):
         if isinstance(res.get("content"), str):
             res["content"] = marker
-        if isinstance(res.get("stdout"), str) and res["stdout"]:
-            res["stdout"] = marker
+        for key in ("stdout", "stderr"):
+            if isinstance(res.get(key), str) and res[key]:
+                res[key] = marker
         if isinstance(res.get("file"), dict) and isinstance(res["file"].get("content"), str):
             res["file"]["content"] = marker
 
@@ -377,9 +377,9 @@ def _third_party(obj, names):
         label = names.get(("salvata", block.get("tool_use_id"))) if isinstance(block, dict) and block.get("type") == "tool_result" else None
         text = _content_text(block.get("content")) if label else ""
         res = obj.get("tool_use_result")
-        stdout = res.get("stdout") if label and isinstance(res, dict) and isinstance(res.get("stdout"), str) else ""
-        # il blocco può essere già il segnaposto mentre `tool_use_result.stdout` ha ancora il testo (un Bash): si riscrive lo stesso
-        left = [x for x in (text, stdout) if x and not x.startswith(PAGE_PLACEHOLDER)]
+        streams = [res.get(k) for k in ("stdout", "stderr") if label and isinstance(res, dict) and isinstance(res.get(k), str)]
+        # il blocco può essere già il segnaposto mentre `tool_use_result.stdout` o `.stderr` hanno ancora il testo (un Bash): si riscrive lo stesso
+        left = [x for x in (text, *streams) if x and not x.startswith(PAGE_PLACEHOLDER)]
         if left:
             def swap(block=block, label=label, text=text, size=len(left[0])):
                 _swap_saved(obj, block, text if text.startswith(PAGE_PLACEHOLDER) else _placeholder(label, size))

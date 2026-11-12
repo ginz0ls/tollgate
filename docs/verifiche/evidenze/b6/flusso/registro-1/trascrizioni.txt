@@ -1,0 +1,19 @@
+# tentativo-1: sessione 1, cartella -tmp-tollgate-b1-flow
+nessuna trascrizione di subagente
+# tentativo-1: sessione 2, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-aggiungi-il-pulsante-salva-al-modulo
+agent-a3ad75d235217f933.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a3ad75d235217f933.jsonl: # Regole frontend (versione 1) (isMeta: sì)
+agent-a3ad75d235217f933.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a3ad75d235217f933.jsonl: # Regole frontend (versione 1) (isMeta: no)
+agent-a738e6ee2554b5d0d.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a738e6ee2554b5d0d.jsonl: # Regole frontend (versione 1) (isMeta: sì)
+agent-a738e6ee2554b5d0d.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a738e6ee2554b5d0d.jsonl: # Regole frontend (versione 1) (isMeta: no)
+agent-ac4946d570d210c7c.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-ac4946d570d210c7c.jsonl: # Regole frontend (versione 1) (isMeta: sì)
+agent-ac4946d570d210c7c.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-ac4946d570d210c7c.jsonl: # Regole frontend (versione 1) (isMeta: no)
+agent-ada7861907f78db34.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-ada7861907f78db34.jsonl: # Regole frontend (versione 1) (isMeta: sì)
+agent-ada7861907f78db34.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-ada7861907f78db34.jsonl: # Regole frontend (versione 1) (isMeta: no)

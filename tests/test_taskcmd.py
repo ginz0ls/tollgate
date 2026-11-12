@@ -54,6 +54,18 @@ rules = ["R-BACKEND-01", "R-BACKEND-10"]
 blocking_rules = ["R-BACKEND-01"]
 """
 BACKEND_TOML = DEFAULT_TOML + BACKEND_BLOCK
+FRONTEND_BLOCK = """
+[profiles.frontend]
+paths = ["src/components/**", "**/*.tsx"]
+skills = []
+reviewer_skills = []
+agent = "tollgate:implementer-frontend"
+reviewer = "tollgate:reviewer-frontend"
+rules = ["R-FRONTEND-01", "R-FRONTEND-10"]
+blocking_rules = ["R-FRONTEND-01"]
+"""
+FRONTEND_TOML = DEFAULT_TOML + FRONTEND_BLOCK
+BACKEND_FRONTEND_TOML = DEFAULT_TOML + BACKEND_BLOCK + FRONTEND_BLOCK
 BACKEND_INFRA_TOML = DEFAULT_TOML + BACKEND_BLOCK + INFRA_BLOCK.replace(
     'paths = ["vercel.json"]', 'paths = ["wrangler.jsonc"]')
 
@@ -309,6 +321,34 @@ class TaskStartTest(TaskCase):
         """Due aree nello stesso task (decisione 5): agenti generici."""
         self.make(toml=BACKEND_INFRA_TOML,
                   plan=plan_text("- Create: `wrangler.jsonc`\n- Create: `edge/index.ts`"))
+        self.start(2)
+        row = self.row(2)
+        self.assertEqual((row["agent_type"], row["reviewer_type"]),
+                         ("tollgate:implementer", "tollgate:task-reviewer"))
+
+    def test_frontend_task_routed_to_area_agents(self):
+        """Un blocco `frontend` scritto nel test (regole di una skill finta, non i file veri)."""
+        self.make(toml=FRONTEND_TOML, plan=plan_text("- Create: `src/components/Button.tsx`"))
+        _, summary = self.start(2)
+        row = self.row(2)
+        self.assertEqual((row["agent_type"], row["reviewer_type"]),
+                         ("tollgate:implementer-frontend", "tollgate:reviewer-frontend"))
+        self.assertIn("tollgate:implementer-frontend", summary)
+        self.assertIn("revisore: tollgate:reviewer-frontend", summary)
+
+    def test_rules_frontend_not_required(self):
+        """`rules-frontend` si precarica, non è una skill da usare."""
+        self.make(toml=FRONTEND_TOML, plan=plan_text("- Create: `src/components/Button.tsx`"))
+        path, _ = self.start(2)
+        self.assertEqual(json.loads(self.row(2)["skills_required"]), [])
+        brief = path.read_text()
+        self.assertNotIn("rules-frontend", brief)
+        self.assertNotIn("Skill da usare\n\n- ", brief)
+
+    def test_frontend_and_backend_task_goes_generic(self):
+        """Due aree nello stesso task: agenti generici (il task è da dividere)."""
+        self.make(toml=BACKEND_FRONTEND_TOML,
+                  plan=plan_text("- Create: `server/app.py`\n- Create: `src/components/Button.tsx`"))
         self.start(2)
         row = self.row(2)
         self.assertEqual((row["agent_type"], row["reviewer_type"]),

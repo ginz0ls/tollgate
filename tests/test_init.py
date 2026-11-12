@@ -17,7 +17,7 @@ from tests.helpers import ROOT, git
 from tests.hookkit import DEFAULT_FILES, DEFAULT_TOML
 from tests.test_gate_workflows import PINNED, uses_of
 from tests.test_protection import DETECT_MSG, PATH as PROTECTION_PATH, good
-from tollgate_analysis import globs, research
+from tollgate_analysis import globs, profiles, research
 from tollgate_core import VERSION, clock, config, fragments, phases, receipts
 from tollgate_core import git as core_git
 from tollgate_flow import init
@@ -677,6 +677,25 @@ DECLARED_X = ('[profiles.x]\npaths = ["src/x/**"]\nrules = ["R-X-01", "R-X-02"]\
               'reviewer = "tollgate:reviewer-x"\n')
 
 
+def _real_fragments_root(test, areas=None) -> Path:
+    """Una radice temporanea con i frammenti veri di `templates/profiles/` (quelli di `areas`, o
+    tutti) e, per ciascuno, una skill finta già approvata: `init.profile_blocks` li propone."""
+    tmp = tempfile.TemporaryDirectory()
+    test.addCleanup(tmp.cleanup)
+    root = Path(tmp.name)
+    (root / "templates" / "profiles").mkdir(parents=True)
+    for fr in fragments.load(ROOT):
+        if areas is not None and fr.area not in areas:
+            continue
+        shutil.copy(fr.source, root / "templates" / "profiles" / fr.source.name)
+        skill = root / "skills" / f"rules-{fr.area}"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text(
+            f"---\napproved: 2026-11-01\n---\nR-{fr.area.upper()}-01 [blocca] x\n",
+            encoding="utf-8")
+    return root
+
+
 class PluginMixin:
     """Un plugin temporaneo con il frammento `x`, la sua skill e i suoi agenti."""
 
@@ -944,6 +963,66 @@ class ProfileBlocksTest(PluginMixin, unittest.TestCase):
         self.assertEqual(init.concrete_for("src/x/a.py", pats), "src/x/**")
         self.assertEqual(init.concrete_for("src/x/a.py", pats, exclude=()), "src/x/**")
 
+    def test_existing_forms_unchanged(self):
+        pats = fragments.load(self.plugin(fragment=FRAGMENT_X.replace(
+            '["**/x/**"]', '["**/Dockerfile*", "**/x/**"]')))[0].patterns
+        self.assertEqual(init.concrete_for("services/api/Dockerfile", pats),
+                         "services/api/Dockerfile")
+        self.assertEqual(init.concrete_for("Dockerfile.prod", pats), "/Dockerfile.prod")
+        self.assertEqual(init.concrete_for("src/x/a.py", pats), "src/x/**")
+        self.assertEqual(init.concrete_for("src/x/a.py", pats, exclude=()), "src/x/**")
+        self.assertIsNone(init.concrete_for("src/y/a.py", pats))
+
+    def ext_patterns(self, patterns):
+        return fragments.load(self.plugin(fragment=FRAGMENT_X.replace(
+            '["**/x/**"]', json.dumps(patterns))))[0].patterns
+
+    def test_concrete_for_ext(self):
+        pats = self.ext_patterns(["**/components/**", "**/*.tsx"])
+        self.assertEqual(init.concrete_for("src/main.tsx", pats), "**/*.tsx")
+        self.assertEqual(init.concrete_for("src/components/a.tsx", pats), "src/components/**")
+        self.assertIsNone(init.concrete_for("src/Foo.TSX", pats))
+        self.assertIsNone(init.concrete_for(".github/tollgate/x.tsx", pats))
+        self.assertIsNone(init.concrete_for("docs/a.md", self.ext_patterns(["**/*.md"])))
+        self.assertIsNone(init.concrete_for("supabase/x.tsx", pats, exclude=("supabase/",)))
+
+    def test_ext_proposed_once(self):
+        paths = self.paths_of(["**/*.tsx"], ["src/a.tsx", "app/b/c.tsx", "web/d.tsx"])
+        self.assertEqual(paths, ["**/*.tsx"])
+
+    def test_ext_not_proposed_when_folder_covers_all(self):
+        paths = self.paths_of(["**/components/**", "**/*.tsx"],
+                              ["src/components/a.tsx", "src/components/b/c.tsx"])
+        self.assertEqual(paths, ["src/components/**"])
+
+    def test_ext_in_drift(self):
+        toml = FRAGMENT_X.replace('["**/x/**"]', '["**/components/**", "**/*.css"]')
+        current = BASE_TOML + DECLARED_X.replace("src/x/**", "src/components/**")
+        got = self.blocks(["src/components/a.tsx", "src/main.css"], current=current,
+                          root=self.plugin(fragment=toml))
+        self.assertIn('profilo x: [profiles.x] paths: aggiungi "**/*.css" (1 file)', got.lines)
+
+    def test_content_found_file_covered_by_ext(self):
+        toml = FRAGMENT_X.replace('["**/x/**"]', '["**/*.tsx"]') \
+            + '[detect]\ncontent = ["MARK"]\n'
+        got = self.blocks(["src/a.tsx", "src/b.ts"], root=self.plugin(fragment=toml),
+                          detected={"x": ["src/a.tsx", "src/b.ts"]})
+        self.assertEqual(self.profile(got)["paths"], ["**/*.tsx", "src/b.ts"])
+
+    def test_exclude_multi_segment_prefix(self):
+        toml = FRAGMENT_X.replace('["**/x/**"]', '["**/*.tsx"]') \
+            + '[detect]\nexclude = ["apps/api/"]\n'
+        pats = fragments.load(self.plugin(fragment=toml))[0]
+        self.assertIsNone(init.concrete_for("apps/api/x.tsx", pats.patterns, pats.exclude))
+        self.assertEqual(init.concrete_for("apps/web/y.tsx", pats.patterns, pats.exclude),
+                         "**/*.tsx")
+        got = self.blocks(["apps/api/x.tsx"], root=self.plugin(fragment=toml))
+        self.assertEqual(got.text, "")
+        got = self.blocks(["apps/api/x.tsx", "apps/web/y.tsx"], root=self.plugin(fragment=toml))
+        # `exclude` decide solo se il pattern si propone; a runtime `**/*.tsx` copre anche
+        # `apps/api/` (decisione 2), e l'elenco dei file accesi lo mostra.
+        self.assertEqual(self.profile(got)["paths"], ["**/*.tsx"])
+
     def test_concrete_for_with_exclude(self):
         pats = fragments.load(self.plugin(fragment=FRAGMENT_X.replace(
             '["**/x/**"]', '["**/handlers/**"]')))[0].patterns
@@ -1148,17 +1227,7 @@ class ProfileBlocksTest(PluginMixin, unittest.TestCase):
         if not real:
             self.skipTest("templates/profiles/ non ha ancora frammenti: il test si attiva "
                           "quando ce n'è uno")
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        root = Path(tmp.name)
-        (root / "templates" / "profiles").mkdir(parents=True)
-        for fr in real:
-            shutil.copy(fr.source, root / "templates" / "profiles" / fr.source.name)
-            skill = root / "skills" / f"rules-{fr.area}"
-            skill.mkdir(parents=True)
-            (skill / "SKILL.md").write_text(
-                f"---\napproved: 2026-11-01\n---\nR-{fr.area.upper()}-01 [blocca] x\n",
-                encoding="utf-8")
+        root = _real_fragments_root(self)
         installed = install.files(ROOT, default_branch="main", services={})
         cli_pushed = {*DEFAULT_FILES, *JUNIT_FILES, *GATE_FILES, ".github/tollgate/VERSION",
                       "package.json", ".github/workflows/ci.yml", "tollgate.toml"}
@@ -1170,6 +1239,247 @@ class ProfileBlocksTest(PluginMixin, unittest.TestCase):
                 got = init.profile_blocks({p: 1 for p in paths}, DEFAULT_TOML, root)
                 self.assertEqual(got.text, "")
                 self.assertFalse([l for l in got.lines if "proposto con" in l], got.lines)
+
+
+class FrontendPrecedenceTest(unittest.TestCase):
+    """La tabella delle precedenze di `frontend` (B6, decisione 4), con i frammenti veri: per ogni
+    caso i `paths` che `init` propone per ogni profilo («Proposta»; un profilo non proposto non ha
+    un blocco) e il profilo che `vertical_for` dà a ogni file dopo aver messo i blocchi proposti in
+    un `tollgate.toml` («Runtime»). `detected` è ciò che il rilevamento per contenuto
+    trova: lo dà il test, senza i file sotto un `exclude` (come farebbe `detect_files`)."""
+
+    def check(self, files, proposal, runtime=None, detected=None):
+        root = _real_fragments_root(self)
+        got = init.profile_blocks({f: 10 for f in files}, DEFAULT_TOML, root, detected=detected)
+        declared = tomllib.loads(DEFAULT_TOML + got.text).get("profiles", {})
+        self.assertEqual({a: sorted(p["paths"]) for a, p in declared.items()},
+                         {a: sorted(p) for a, p in proposal.items()}, "Proposta")
+        if runtime is not None:
+            got_runtime = {f: profiles.vertical_for(f, declared) for f in runtime}
+            self.assertEqual(got_runtime, runtime, "Runtime")
+
+    def test_real_precedence_p1(self):
+        self.check(["src/components/Button.tsx"], {"frontend": ["src/components/**"]},
+                   {"src/components/Button.tsx": "frontend"})
+
+    def test_real_precedence_p2(self):
+        self.check(["server/app.py", "server/components/Mail.tsx"], {"backend": ["/server/**"]},
+                   {"server/app.py": "backend", "server/components/Mail.tsx": "backend"})
+
+    def test_real_precedence_p3(self):
+        self.check(["server/app.tsx", "src/main.tsx"],
+                   {"backend": ["/server/**"], "frontend": ["**/*.tsx"]},
+                   {"server/app.tsx": "backend", "src/main.tsx": "frontend"})
+
+    def test_real_precedence_p4(self):
+        self.check(["src/ai/agent.py", "src/ai/components/Chat.tsx"],
+                   {"ai": ["src/ai/**"], "frontend": ["src/ai/components/**"]},
+                   {"src/ai/components/Chat.tsx": "frontend"})
+
+    def test_real_precedence_p5(self):
+        self.check(["src/ai/agent.py", "src/ai/components/Chat.tsx"], {"ai": ["src/ai/**"]},
+                   {"src/ai/components/Chat.tsx": "ai"},
+                   detected={"ai": ["src/ai/components/Chat.tsx"]})
+
+    def test_real_precedence_p6(self):
+        self.check(["src/ai/agent.py", "src/ai/components/Chat.tsx",
+                    "src/ai/components/Button.tsx"],
+                   {"ai": ["src/ai/**"], "frontend": ["src/ai/components/**"]},
+                   {"src/ai/components/Chat.tsx": "frontend",
+                    "src/ai/components/Button.tsx": "frontend"},
+                   detected={"ai": ["src/ai/components/Chat.tsx"]})
+
+    def test_real_precedence_p7(self):
+        self.check(["api/og.tsx"], {"backend": ["/api/**"]}, {"api/og.tsx": "backend"})
+
+    def test_real_precedence_p8(self):
+        self.check(["src/app/api/og/route.tsx", "src/app/page.tsx"],
+                   {"backend": ["src/app/api/og/route.tsx"], "frontend": ["**/*.tsx"]},
+                   {"src/app/api/og/route.tsx": "backend", "src/app/page.tsx": "frontend"},
+                   detected={"backend": ["src/app/api/og/route.tsx"]})
+
+    def test_real_precedence_p9(self):
+        files = ["src/routes/index.tsx", "src/routes/about.tsx"]
+        self.check(files, {"frontend": ["**/*.tsx"]}, {f: "frontend" for f in files},
+                   detected={"frontend": files})
+
+    def test_real_precedence_p10(self):
+        files = ["src/routes/index.tsx", "src/routes/about.tsx", "src/routes/utils.ts"]
+        self.check(files, {"backend": ["src/routes/**"], "frontend": ["**/*.tsx"]},
+                   {f: "backend" for f in files}, detected={"frontend": files[:2]})
+
+    def test_real_precedence_p11(self):
+        self.check(["src/services/api.ts", "src/services/Widget.tsx"],
+                   {"frontend": ["**/*.tsx"]},
+                   {"src/services/api.ts": None, "src/services/Widget.tsx": "frontend"})
+
+    def test_real_precedence_p12(self):
+        self.check(["web/vercel.json", "web/index.css"],
+                   {"infra": ["web/vercel.json"], "frontend": ["/web/**"]},
+                   {"web/vercel.json": "infra", "web/index.css": "frontend"})
+
+    def test_real_precedence_p13(self):
+        self.check(["prompts/Card.tsx"], {"ai": ["/prompts/**"], "frontend": ["**/*.tsx"]},
+                   {"prompts/Card.tsx": "ai"})
+
+    def test_real_precedence_p14(self):
+        self.check(["supabase/functions/og/index.tsx", "src/main.tsx"],
+                   {"frontend": ["**/*.tsx"]},
+                   {"supabase/functions/og/index.tsx": "frontend", "src/main.tsx": "frontend"})
+
+    def test_real_precedence_p15(self):
+        files = ["src/routes/+page.svelte", "src/routes/+page.server.ts"]
+        self.check(files, {"backend": ["src/routes/**"], "frontend": ["**/*.svelte"]},
+                   {f: "backend" for f in files})
+
+    def test_real_precedence_p16(self):
+        self.check([".github/tollgate/x.css", ".claude/x.tsx",
+                    "docs/superpowers/tollgate-init/files/x.tsx"], {})
+
+    def test_real_precedence_p17(self):
+        self.check(["docs/components/guida.md", "src/components/README.md"], {})
+
+    def test_real_precedence_p18(self):
+        self.check(["src/Foo.TSX"], {}, {"src/Foo.TSX": None})
+
+    def test_real_precedence_p19(self):
+        self.check(["app/routes/home.tsx", "app/routes.ts"], {"frontend": ["**/*.tsx"]},
+                   {"app/routes/home.tsx": "frontend"},
+                   detected={"frontend": ["app/routes/home.tsx"]})
+
+    def test_real_precedence_p20(self):
+        self.check(["src/ai/agent.py", "src/ai/components/retriever.py"],
+                   {"ai": ["src/ai/**"], "frontend": ["src/ai/components/**"]},
+                   {"src/ai/components/retriever.py": "frontend"})
+
+    def test_real_precedence_p21(self):
+        files = ["infra/main.ts", "infra/components/vpc.ts"]
+        self.check(files, {"infra": ["/infra/**"]}, {f: "infra" for f in files})
+
+    def test_real_precedence_p22(self):
+        """`server/entry.ts` sta anche nel `detected` di `frontend`: è `exclude` a tenerlo fuori,
+        come fa `profile_blocks` con `skip`."""
+        files = ["server/app.py", "server/entry.ts"]
+        self.check(files, {"backend": ["/server/**"]}, {f: "backend" for f in files},
+                   detected={"frontend": ["server/entry.ts"]})
+
+    def test_real_precedence_p23(self):
+        files = ["app/routes/home.tsx", "app/routes/api.users.ts"]
+        self.check(files, {"frontend": ["**/*.tsx", "app/routes/api.users.ts"]},
+                   {f: "frontend" for f in files}, detected={"frontend": files})
+
+    def test_real_precedence_p24(self):
+        self.check(["pages/api/hello.tsx", "src/main.tsx"], {"frontend": ["**/*.tsx"]},
+                   {"pages/api/hello.tsx": "frontend"})
+
+    def test_real_precedence_p25(self):
+        self.check(["src/ai/agent.py", "src/ai/routes/chat.tsx"],
+                   {"ai": ["src/ai/**"], "frontend": ["**/*.tsx"]},
+                   {"src/ai/routes/chat.tsx": "ai"},
+                   detected={"frontend": ["src/ai/routes/chat.tsx"]})
+
+    def test_real_precedence_p26(self):
+        self.check(["src/ai/agent.py", "src/ai/routes/chat.ts"],
+                   {"ai": ["src/ai/**"], "frontend": ["src/ai/routes/chat.ts"]},
+                   {"src/ai/routes/chat.ts": "frontend"},
+                   detected={"frontend": ["src/ai/routes/chat.ts"]})
+
+    def test_real_precedence_p27(self):
+        self.check(["src/ai/agent.py", "src/ai/routes/chat.tsx"],
+                   {"ai": ["src/ai/**"], "backend": ["src/ai/routes/**"],
+                    "frontend": ["**/*.tsx"]},
+                   {"src/ai/routes/chat.tsx": "backend"})
+
+    def test_real_precedence_p28(self):
+        self.check(["src/components/Button.tsx", "src/components/ai/ChatBubble.tsx"],
+                   {"ai": ["src/components/ai/**"], "frontend": ["src/components/**"]},
+                   {"src/components/ai/ChatBubble.tsx": "ai"})
+
+    def test_real_precedence_p29(self):
+        self.check(["src/components/Button.tsx", "src/components/routes/Nav.tsx"],
+                   {"backend": ["src/components/routes/**"], "frontend": ["src/components/**"]},
+                   {"src/components/routes/Nav.tsx": "backend"})
+
+    def test_real_precedence_p30(self):
+        self.check(["src/components/Button.tsx", "src/components/Chat.tsx"],
+                   {"ai": ["src/components/Chat.tsx"], "frontend": ["src/components/**"]},
+                   {"src/components/Chat.tsx": "ai", "src/components/Button.tsx": "frontend"},
+                   detected={"ai": ["src/components/Chat.tsx"]})
+
+    def test_real_precedence_p31(self):
+        self.check(["src/app/page.tsx", "src/app/agents/page.tsx"],
+                   {"ai": ["src/app/agents/**"], "frontend": ["**/*.tsx"]},
+                   {"src/app/agents/page.tsx": "ai"})
+
+    def test_real_precedence_p32(self):
+        files = ["src/routes/index.tsx", "src/routes/index.test.tsx"]
+        self.check(files, {"backend": ["src/routes/**"], "frontend": ["**/*.tsx"]},
+                   {f: "backend" for f in files}, detected={"frontend": files[:1]})
+
+    def test_real_precedence_p33(self):
+        files = ["src/routes/index.tsx", "src/routes/index.module.css"]
+        self.check(files, {"backend": ["src/routes/**"], "frontend": ["**/*.css", "**/*.tsx"]},
+                   {f: "backend" for f in files}, detected={"frontend": files[:1]})
+
+    def test_real_precedence_p34(self):
+        self.check(["src/routes/index.tsx", "src/routes/api.ts"],
+                   {"backend": ["src/routes/**"],
+                    "frontend": ["**/*.tsx", "src/routes/api.ts"]},
+                   {"src/routes/api.ts": "frontend", "src/routes/index.tsx": "backend"},
+                   detected={"frontend": ["src/routes/index.tsx", "src/routes/api.ts"],
+                             "backend": ["src/routes/api.ts"]})
+
+    def test_real_precedence_p35(self):
+        self.check(["web/index.html", "web/functions/api.ts"], {"frontend": ["/web/**"]},
+                   {"web/functions/api.ts": "frontend"})
+
+    def test_real_precedence_p36(self):
+        files = ["src/main.tsx", "src/a.css", ".claude/skills/x/template.tsx",
+                 ".github/tollgate/x.css", ".github/actions/a/index.css",
+                 "docs/superpowers/tollgate-init/files/x.tsx"]
+        self.check(files, {"frontend": ["**/*.css", "**/*.tsx"]}, {f: "frontend" for f in files})
+
+    def test_real_precedence_p37(self):
+        """A parità di segmenti vince il primo blocco dichiarato; in una sola corsa `init` li scrive
+        in ordine alfabetico (`backend` prima di `frontend`), con `--update` li aggiunge in coda."""
+        path = "src/lib/server.ts"
+        self.check([path], {"backend": [path], "frontend": [path]}, {path: "backend"},
+                   detected={"frontend": [path], "backend": [path]})
+
+    def test_real_precedence_p38(self):
+        files = ["src/components/Form/Form.tsx", "src/components/Form/handlers/onSubmit.ts"]
+        self.check(files, {"backend": ["src/components/Form/handlers/**"],
+                           "frontend": ["src/components/**"]},
+                   {"src/components/Form/Form.tsx": "frontend",
+                    "src/components/Form/handlers/onSubmit.ts": "backend"})
+
+    def test_real_precedence_p39(self):
+        """Con il blocco `backend` di B5 già dichiarato (`src/routes/**`), `init --update` propone
+        `frontend` ma non toglie la cartella a `backend`: a runtime vince `backend`."""
+        files = ["src/routes/index.tsx", "src/routes/about.tsx"]
+        root = _real_fragments_root(self)
+        current = DEFAULT_TOML + '[profiles.backend]\npaths = ["src/routes/**"]\n'
+        got = init.profile_blocks({f: 10 for f in files}, current, root,
+                                  detected={"frontend": files})
+        declared = tomllib.loads(current + got.text)["profiles"]
+        self.assertEqual(declared["frontend"]["paths"], ["**/*.tsx"])
+        self.assertEqual(declared["backend"]["paths"], ["src/routes/**"])
+        self.assertFalse(any("src/routes/**" in line and "togli" in line for line in got.lines),
+                         "init non deve proporre di togliere la cartella a backend")
+        self.assertEqual({f: profiles.vertical_for(f, declared) for f in files},
+                         {f: "backend" for f in files}, "Runtime")
+
+    def test_real_frontend_exclude_several_prefixes(self):
+        """Sei prefissi di `exclude` (quelli di `backend`, di `infra` e `supabase/`) tengono fuori
+        ogni file: `frontend` non è proposto; con un `.tsx` fuori da essi, sì."""
+        files = ["server/components/a.tsx", "infra/components/b.ts", "api/c.tsx",
+                 "functions/d.tsx", "backend/e.tsx", "supabase/functions/f/index.tsx"]
+        root = _real_fragments_root(self)
+        got = init.profile_blocks({f: 10 for f in files}, DEFAULT_TOML, root)
+        self.assertNotIn("frontend", tomllib.loads(DEFAULT_TOML + got.text).get("profiles", {}))
+        got = init.profile_blocks({f: 10 for f in [*files, "src/main.tsx"]}, DEFAULT_TOML, root)
+        proposed = tomllib.loads(DEFAULT_TOML + got.text)["profiles"]["frontend"]
+        self.assertEqual(proposed["paths"], ["**/*.tsx"])
 
 
 class ProfilesProposeTest(PluginMixin, InitCase):

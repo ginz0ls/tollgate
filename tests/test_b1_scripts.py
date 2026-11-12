@@ -501,22 +501,22 @@ class FlowBench(Bench):
     def claude_p(self):
         return [c for c in self.calls() if c["args"][:1] == ["-p"]]
 
-    def src_repo(self, *, approved=True, case="b1", ai_approved=True, infra_approved=True, backend_approved=True):
+    def src_repo(self, *, approved=True, case="b1", ai_approved=True, infra_approved=True, backend_approved=True, frontend_approved=True):
         """Un piccolo repo git che traccia `bin/` del repo e una `skills/rules-base/SKILL.md`: la radice sorgente (`B1_FLOW_SRC`).
-        Con `case="ai"`, `case="infra"` o `case="backend"` copia invece i file veri (e tracciati) che servono a `init --propose`:
-        `bin/`, `templates/`, `gate/`, `agents/`, `skills/rules-base/`, `skills/rules-ai/`, `skills/rules-infra/` e
-        `skills/rules-backend/`; con `ai_approved=False`, `infra_approved=False` o `backend_approved=False` toglie `approved` dalla skill
-        dell'area (solo quella del caso)."""
+        Con `case="ai"`, `case="infra"`, `case="backend"` o `case="frontend"` copia invece i file veri (e tracciati) che servono a
+        `init --propose`: `bin/`, `templates/`, `gate/`, `agents/`, `skills/rules-base/`, `skills/rules-ai/`, `skills/rules-infra/`,
+        `skills/rules-backend/` e `skills/rules-frontend/`; con `ai_approved=False`, `infra_approved=False`, `backend_approved=False` o
+        `frontend_approved=False` toglie `approved` dalla skill dell'area (solo quella del caso)."""
         src = self.dir / "src"
         (src / "skills" / "rules-base").mkdir(parents=True)
         parts = ("bin",) if case == "b1" else ("bin", "templates", "gate", "agents", "skills/rules-base", "skills/rules-ai",
-                                               "skills/rules-infra", "skills/rules-backend", ".claude-plugin")
+                                               "skills/rules-infra", "skills/rules-backend", "skills/rules-frontend", ".claude-plugin")
         tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z", "--", *parts], capture_output=True, check=True).stdout
         for rel in filter(None, tracked.decode().split("\0")):
             (src / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / rel, src / rel)
-        if case in ("ai", "infra", "backend"):
-            if not {"ai": ai_approved, "infra": infra_approved, "backend": backend_approved}[case]:
+        if case in ("ai", "infra", "backend", "frontend"):
+            if not {"ai": ai_approved, "infra": infra_approved, "backend": backend_approved, "frontend": frontend_approved}[case]:
                 skill = src / "skills" / f"rules-{case}" / "SKILL.md"
                 skill.write_text(re.sub(r"(?m)^approved:.*\n", "", skill.read_text()))
         else:
@@ -1655,6 +1655,173 @@ class FlowScriptTest(unittest.TestCase):
         self.assertIn("env VAR", limits)
         self.assertIn("supabase, deno e node", limits)
 
+    # ------------------------------------------------------------------ il caso `frontend` (B6, Task 7)
+
+    FRONTEND_EXTRA = dict(B1_FLOW_CASE="frontend", B1_FLOW_RULES="vere")
+    FRONTEND_PROJECT = ROOT / "spikes" / "b6" / "flow"
+    BACKEND_CLIS = ("vercel", "wrangler", "docker", "npx", "bunx", "pnpx", "bun", "npm", "pnpm", "yarn", "supabase", "deno", "node")
+    UI_CLIS = ("vite", "next", "tsc", "eslint", "vitest", "playwright", "chromium", "chromium-browser", "google-chrome", "firefox",
+               "python3 -m http.server", "python -m http.server")
+
+    def frontend_src(self, **kw):
+        return self.b.src_repo(case="frontend", **kw)
+
+    def frontend_prepara(self, **kw):
+        return self.b.run("prepara", B1_FLOW_SRC=str(self.frontend_src(**kw)), **self.FRONTEND_EXTRA)
+
+    def test_flow_case_frontend_out_dir(self):
+        r = self.b.run("controlla", B1_FLOW_OUT="", **self.FRONTEND_EXTRA)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("CONTROLLA: ok", r.stdout)
+        self.assertIn("B1_FLOW_CASE: frontend", r.stdout)
+        self.assertIn("[profiles.frontend]", r.stdout)
+        self.assertIn(f"cartella delle uscite: {ROOT}/docs/verifiche/evidenze/b6/flusso", r.stdout)
+        self.assertEqual(r.stderr, "")
+
+    def test_flow_case_frontend_requires_real_rules(self):
+        for rules in (None, "prova"):
+            for mode in ("controlla", "prepara", "passo1", "passo2", "registra"):
+                with self.subTest(rules=rules, mode=mode):
+                    extra = {} if rules is None else {"B1_FLOW_RULES": rules}
+                    r = self.b.run(mode, B1_FLOW_CASE="frontend", **extra)
+                    self.assertNotEqual(r.returncode, 0)
+                    self.assertIn("B1_FLOW_RULES", r.stderr)
+        self.assertEqual(self.b.calls(), [])
+        self.assertFalse(self.b.root.exists())
+
+    def test_flow_case_unknown_value_names_frontend(self):
+        r = self.b.run("controlla", B1_FLOW_CASE="altro")
+        self.assertNotEqual(r.returncode, 0)
+        for value in ("b1", "ai", "infra", "backend", "frontend"):
+            self.assertIn(value, r.stderr)
+
+    def test_real_flow_case_frontend_prepara_proposes_profile(self):
+        marker_file = self.FRONTEND_PROJECT / "src" / "routes" / "home.tsx"
+        fragment = tomllib.loads((ROOT / "templates" / "profiles" / "frontend.toml").read_text())
+        self.assertTrue([m for m in fragment["detect"]["content"] if m in marker_file.read_text()],
+                        "src/routes/home.tsx deve contenere un marcatore del frammento vero")
+        r = self.frontend_prepara()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("plan-check: ok", r.stdout)
+        text = (self.b.flow / "tollgate.toml").read_text()
+        profiles = tomllib.loads(text)["profiles"]
+        for path in ("**/*.tsx", "/web/**", "src/components/**"):
+            self.assertIn(path, profiles["frontend"]["paths"])
+        self.assertNotIn("backend", profiles, "P9 dal vivo: src/routes/home.tsx, trovato per contenuto, non accende backend")
+        self.assertIn('mode = "detect"', text)
+        for part in ("web/index.html", "web/styles.css", "src/components/StatusBadge.tsx", "src/routes/home.tsx", "tests/__init__.py", "tests/test_page.py"):
+            self.assertTrue((self.b.flow / part).is_file(), part)
+        self.assertFalse((self.b.flow / "docs" / "superpowers" / "tollgate-init").exists(), "la cartella della proposta si toglie")
+        self.assertTrue(list(self.b.root.glob("tollgate-init.proposta-*")))
+        git = ["git", "-C", str(self.b.flow)]
+        self.assertEqual(subprocess.run([*git, "status", "--porcelain"], capture_output=True, text=True).stdout, "")
+        self.assertEqual(subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True).stdout,
+                         subprocess.run([*git, "rev-parse", "origin/main"], capture_output=True, text=True).stdout)
+        data = json.loads((self.b.root / "fakegh-data.json").read_text())
+        self.assertIn("Salva", data["issues"]["1"]["title"])
+        self.assertIn("Salvato", data["issues"]["1"]["body"])
+        self.assertIn("repos/{owner}/{repo}/branches/main/protection", data["api_status"])
+        sha = subprocess.run([*git, "rev-parse", "origin/main"], capture_output=True, text=True).stdout.strip()
+        self.assertIn(sha, data["statuses"])
+        self.assertEqual(self.b.calls(), [])
+
+    def test_real_flow_case_frontend_prepara_refuses_without_profile(self):
+        r = self.frontend_prepara(frontend_approved=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("profiles.frontend", r.stderr)
+
+    def test_real_flow_case_frontend_project_verifies(self):
+        r = self.frontend_prepara()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        verify = re.search(r'(?m)^verify = "(.*)"$', (self.b.flow / "tollgate.toml").read_text()).group(1)
+        self.assertIn("unittest", verify)
+        self.assertEqual((self.FRONTEND_PROJECT / "tollgate.toml").read_text(), (B1 / "flow" / "tollgate.toml").read_text())
+        cmd = verify.replace("python3 ", "python3 -B ", 1)
+        v = subprocess.run(cmd, shell=True, cwd=self.b.flow, capture_output=True, text=True, env=clean_env(PATH=os.environ["PATH"]))
+        self.assertEqual(v.returncode, 0, v.stdout + v.stderr)
+        self.assertFalse(list(self.b.flow.rglob("__pycache__")))
+
+    def test_flow_disallows_ui_tools_frontend(self):
+        denied = self.disallowed(**self.FRONTEND_EXTRA)
+        for prog in self.BACKEND_CLIS + self.UI_CLIS:
+            for form in (f"Bash({prog}:*)", f"Bash(*/{prog}:*)", f"Bash(command {prog}:*)", f"Bash(env {prog}:*)"):
+                self.assertIn(form, denied)
+        self.assertIn("Bash(*/gh:*)", denied)
+        backend = self.disallowed(**self.BACKEND_EXTRA)
+        self.assertFalse([x for x in backend if any(p in x for p in self.UI_CLIS)], "i programmi dell'interfaccia sono del solo caso frontend")
+
+    def test_real_flow_case_frontend_project_has_no_credentials(self):
+        project = self.FRONTEND_PROJECT
+        found = [p.relative_to(project).as_posix() for p in project.rglob("*")
+                 if p.name in (".vercel", ".wrangler", "node_modules", "package-lock.json", "package.json")
+                 or p.name.startswith((".env", ".dev.vars", "wrangler", "vercel"))]
+        self.assertEqual(found, [])
+        for part in ("web/index.html", "web/styles.css", "src/components/StatusBadge.tsx", "src/routes/home.tsx", "tests/test_page.py"):
+            self.assertTrue((project / part).is_file(), part)
+        ignore = (project / ".gitignore").read_text().split()
+        for entry in (".env*", "node_modules/", "dist/", "__pycache__/", "reports/"):
+            self.assertIn(entry, ignore)
+
+    def test_real_flow_case_frontend_task_does_not_list_rule_requirements(self):
+        """Lezione di B4 e B5 (decisione 15): il lavoro chiede il pulsante, il messaggio e il test, ma non nomina ciò che le regole
+        chiedono (nome accessibile, regione del messaggio, componenti simili, indirizzo della documentazione), così compare solo se
+        le regole sono state lette."""
+        for name in ("issue-1.md", "piano-L1.md"):
+            with self.subTest(name):
+                text = " ".join((self.FRONTEND_PROJECT / name).read_text().split())
+                self.assertIn("Salva", text)
+                self.assertIn("Salvato", text)
+                self.assertIn("SaveButton", text)
+                self.assertRegex(text, r"(?i)\btest\b")
+                self.assertRegex(text, r"(?i)non si avviano server né browser")
+                for word in (r"aria", r"aria-label", r"etichett\w*", r"nome accessibile", r"role", r"componenti simili", r"indirizz\w*", r"documentazione"):
+                    self.assertNotRegex(text, rf"(?i)(?<![\w-]){word}(?![\w-])", word)
+
+    def test_real_registra_reads_frontend_title(self):
+        self.assertEqual(self.frontend_prepara().returncode, 0)
+        self.assertEqual(self.b.run("passo1", **self.FRONTEND_EXTRA).returncode, 0)
+        cwd = "/tmp/prova.uno due/flow"
+        stream = [{"type": "system", "subtype": "init", "cwd": cwd, "session_id": "sess-uno"}]
+        (self.b.out / "passo1" / "tentativo-1" / "claude.jsonl").write_text("".join(json.dumps(x) + "\n" for x in stream))
+        self._transcripts(self.b.dir / "home", cwd, "sess-uno", {"a1": [
+            {"isMeta": True, "message": {"role": "user", "content": "# Regole di base (versione 1)\n- R-BASE-01 ..."}},
+            {"isMeta": True, "message": {"role": "user", "content": "# Regole frontend (versione 1)\n- R-FRONTEND-01 ..."}},
+            {"message": {"role": "user", "content": "SEGRETO-DEL-COMPITO nel brief"}}]})
+        r = self.b.run("registra", **self.FRONTEND_EXTRA)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = self.b.out / "registro-1"
+        text = (d / "trascrizioni.txt").read_text()
+        self.assertIn("agent-a1.jsonl: # Regole frontend (versione 1) (isMeta: sì)", text)
+        self.assertIn("# Regole di base (versione 1)", text)
+        self.assertNotIn("SEGRETO", text)
+        self.assertNotIn("R-FRONTEND-01", text)
+        self.assertIn("agent_type", (d / "tipi-task.txt").read_text())
+        self.assertEqual((d / "fallimenti.txt").read_text(), "")
+
+    def test_real_registra_flags_ui_tools_frontend(self):
+        self.assertEqual(self.frontend_prepara().returncode, 0)
+        flagged = ["npx vite", "chromium --headless x", "python3 -m http.server 8000", "python -m http.server", "ls && tsc --noEmit",
+                   "/usr/bin/google-chrome x.html", "env firefox x.html", "node app.js",
+                   "python3 -mhttp.server", "python3 -B -m http.server", "python3.11 -m http.server 8000",
+                   'python3 -c "import http.server; http.server.test()"']
+        d = self._flow_stream(flagged + ["cat web/index.html", "git add web/styles.css", "ls web/vite.config.txt", "python3 -m unittest discover"],
+                              **self.FRONTEND_EXTRA)
+        risky = (d / "comandi-rischiosi.txt").read_text()
+        for cmd in flagged:
+            self.assertIn(f"bash: {cmd}\n", risky)
+        for cmd in ("cat web/index.html", "git add web", "ls web/vite", "python3 -m unittest"):
+            self.assertNotIn(cmd, risky)
+        limits = (d / "limiti.txt").read_text()
+        self.assertIn("env VAR", limits)
+        self.assertIn("http.server", limits)
+        self.assertIn("python3.11 -m http.server", limits)
+
+    def test_real_scrivi_limiti_heading_is_generic_frontend(self):
+        self.assertEqual(self.frontend_prepara().returncode, 0)
+        d = self._flow_stream(["ls"], **self.FRONTEND_EXTRA)
+        self.assertEqual((d / "limiti.txt").read_text().splitlines()[0], "Limiti della prova reale (da citare nel rapporto)")
+
+
     def bash_saved_stream(self):
         """Flusso finto con quattro `Bash`: tre leggono una copia salvata (percorso in `tool-results/`), uno legge un file normale."""
         copy = "/home/USER/.claude/projects/X/SESSIONE-1/tool-results/toolu_FAKE.txt"
@@ -1703,6 +1870,92 @@ class FlowScriptTest(unittest.TestCase):
         self.assertNotIn("TERZI", stream.read_text())
         self.assertEqual(json.loads(stream.read_text().splitlines()[1])["tool_use_result"]["stdout"], marker)
         self.assertEqual(flowreg.third_party_blocks(stream), [])
+
+    def saved_stream(self, command, stdout="", stderr="", content=None):
+        """Flusso finto con un solo `Bash`; il testo di terzi sta in `stdout`, in `stderr` o nel blocco."""
+        return [{"type": "assistant", "parent_tool_use_id": None, "message": {"content": [
+                    {"type": "tool_use", "id": "b0", "name": "Bash", "input": {"command": command}}]}},
+                {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "b0",
+                                                                          "content": stdout or stderr if content is None else content}]},
+                 "tool_use_result": {"stdout": stdout, "stderr": stderr, "interrupted": False}}]
+
+    def write_stream(self, lines):
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-b6-flowreg-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        stream = tmp / "claude.jsonl"
+        stream.write_text("".join(json.dumps(x) + "\n" for x in lines))
+        return stream
+
+    def test_togli_pagine_bash_any_reader(self):
+        flowreg = self.flowreg_module()
+        for command, name in (("python3 -c \"print(open('/x/tool-results/toolu_a.txt').read())\"", "toolu_a.txt"),
+                              ("jq . /x/tool-results/toolu_b.json", "toolu_b.json"),
+                              ("cat</x/tool-results/a.txt", "a.txt"), ("jq . < /x/tool-results/b.json", "b.json")):
+            with self.subTest(command):
+                stream = self.write_stream(self.saved_stream(command, stdout="TERZI-BASH riga"))
+                self.assertEqual(len(flowreg.third_party_blocks(stream)), 1)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(flowreg.togli_pagine([str(stream)]), 1)
+                self.assertNotIn("TERZI", stream.read_text())
+                out = [json.loads(x) for x in stream.read_text().splitlines()]
+                marker = f"[pagina di terzi tolta dalle evidenze: copia salvata da Claude Code ({name}), 15 caratteri]"
+                self.assertEqual(out[1]["message"]["content"][0]["content"], marker)
+                self.assertEqual(out[1]["tool_use_result"]["stdout"], marker)
+
+    def test_togli_pagine_bash_on_the_folder_alone(self):
+        flowreg = self.flowreg_module()
+        for command in ("ls /x/tool-results/", "ls /x/tool-results"):
+            with self.subTest(command):
+                stream = self.write_stream(self.saved_stream(command, stdout="TERZI-BASH riga"))
+                self.assertEqual(len(flowreg.third_party_blocks(stream)), 1)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(flowreg.togli_pagine([str(stream)]), 1)
+                self.assertNotIn("TERZI", stream.read_text())
+
+    def test_togli_pagine_bash_stderr(self):
+        flowreg = self.flowreg_module()
+        stream = self.write_stream(self.saved_stream("cat /x/tool-results/toolu_c.txt 1>&2", stderr="TERZI-ERR riga"))
+        self.assertEqual(len(flowreg.third_party_blocks(stream)), 1)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(flowreg.togli_pagine([str(stream)]), 1)
+            self.assertEqual(flowreg.togli_pagine([str(stream)]), 0, "idempotente")
+        self.assertNotIn("TERZI", stream.read_text())
+        out = json.loads(stream.read_text().splitlines()[1])
+        marker = "[pagina di terzi tolta dalle evidenze: copia salvata da Claude Code (toolu_c.txt), 14 caratteri]"
+        self.assertEqual(out["message"]["content"][0]["content"], marker)
+        self.assertEqual(out["tool_use_result"]["stderr"], marker)
+        self.assertEqual(out["tool_use_result"]["stdout"], "")
+
+    def test_third_party_detects_bash_stderr(self):
+        flowreg = self.flowreg_module()
+        marker = "[pagina di terzi tolta dalle evidenze: copia salvata da Claude Code (toolu_c.txt), 14 caratteri]"
+        stream = self.write_stream(self.saved_stream("cat /x/tool-results/toolu_c.txt 1>&2", stderr="TERZI-ERR riga", content=marker))
+        self.assertEqual(flowreg.third_party_blocks(stream), ["2: copia salvata (14)"])
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(flowreg.togli_pagine([str(stream)]), 1)
+        self.assertNotIn("TERZI", stream.read_text())
+        self.assertEqual(flowreg.third_party_blocks(stream), [])
+
+    def test_togli_pagine_leaves_plain_bash(self):
+        flowreg = self.flowreg_module()
+        stream = self.write_stream(self.saved_stream("cat app.py", stdout="NORMALE riga"))
+        before = stream.read_text()
+        self.assertEqual(flowreg.third_party_blocks(stream), [])
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(flowreg.togli_pagine([str(stream)]), 0)
+        self.assertEqual(stream.read_text(), before)
+
+    def test_scrivi_limiti_heading_is_generic(self):
+        self.assertNotIn("Task 9", FLOW_SCRIPT.read_text())
+        heading = "Limiti della prova reale (da citare nel rapporto)"
+        self.b.prepara()
+        d = self._flow_stream(["ls"])
+        self.assertEqual((d / "limiti.txt").read_text().splitlines()[0], heading)
+
+    def test_real_scrivi_limiti_heading_is_generic_backend(self):
+        self.assertEqual(self.backend_prepara().returncode, 0)
+        d = self._flow_stream(["ls"], **self.BACKEND_EXTRA)
+        self.assertEqual((d / "limiti.txt").read_text().splitlines()[0], "Limiti della prova reale (da citare nel rapporto)")
 
 
 if __name__ == "__main__":
