@@ -6,7 +6,7 @@ Esegui il piano `docs/superpowers/plans/2026-11-12-tollgate-b7-profilo-database.
 - **Spec del nucleo:** `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md`, oggi alla revisione 33. La revisione 34 la scrive il Task 9.
 - **Piano principale di B:** `docs/superpowers/plans/2026-10-27-tollgate-b-piano-principale.md`, sezioni 1, 2, 3 (righe B5→B6-B7 e B6→B7), 9 (blocchi «A B4-B7, da B3», «A B5-B8, da B4», «A B6-B8, da B5», «A B7-B8, da B6») e 15.
 - **Registro modello del metodo:** `docs/sdd/2026-11-10-tollgate-b6-profilo-frontend/` (il più recente). Da riusare, adattati: `implementer-rules.md`, `reviewer-rules.md`, `rereview-rules.md`, `cautele.md`, la forma di `progress.md`, `carry.md`, `preflight-brief.md` e `preflight-scan.md`, `task-4-fonti-brief.md` (verificatore delle fonti, con l'uscita scritta su file), `task-8-rapporto-brief.md` (rapporto della prova), `final-review-brief.md`, `final-review.md` e `final-rulings.md`.
-- **Sonda della tabella delle precedenze:** il piano è stato scritto con una sonda (`init.profile_blocks` + `profiles.vertical_for` sui frammenti veri di `main` e su un frammento `database` scritto come nelle decisioni 2-4, 8, 10). Lo scan pre-flight la riscrive nel workspace (mai nel repo) e la rilancia sui 41 casi della decisione 5.
+- **Sonda della tabella delle precedenze:** il piano è stato scritto con una sonda (`init.profile_blocks` + `profiles.vertical_for` sui frammenti veri di `main` e su un frammento `database` scritto come nelle decisioni 2-4, 8, 10). Lo scan pre-flight la riscrive nel workspace (mai nel repo) e la rilancia sui 44 casi della decisione 5.
 
 ## Dove lavorare
 

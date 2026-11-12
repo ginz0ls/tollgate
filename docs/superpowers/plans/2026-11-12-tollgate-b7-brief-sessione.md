@@ -60,7 +60,7 @@ Le altre scelte del piano (pattern, `**/schema.*` fuori, `supabase/` solo alla r
 
 ## Punti delicati del piano
 
-- **La tabella delle precedenze** (decisione 5): quarantuno casi, ognuno con un test `test_real_precedence_q<N>`; **P14 di `frontend` cambia** (l'edge function in `.tsx` va a `database`) e `test_real_precedence_p14` si aggiorna; nessun altro caso di B6 deve cambiare. I casi segnati come costo sono costi scritti, non difetti. La revisione finale cerca un caso che manca.
+- **La tabella delle precedenze** (decisione 5): quarantaquattro casi, ognuno con un test `test_real_precedence_q<N>`; **P14 di `frontend` cambia** (l'edge function in `.tsx` va a `database`) e `test_real_precedence_p14` si aggiorna; nessun altro caso di B6 deve cambiare. I casi segnati come costo sono costi scritti, non difetti. La revisione finale cerca un caso che manca.
 - **Le regole di PostgreSQL e Supabase dicono il loro ambito** (decisione 9): `**/migrations/**` porta nel profilo anche D1, Laravel e Django, dove quelle regole «non si applicano».
 - **Un `.sql` in una cartella di un altro profilo resta a quel profilo** (forma `ext`), ma il profilo `database` diventa **attivo** e il lavoro **sale a L2**: è voluto e la pagina lo dice.
 - **Gli effetti di Supabase** (decisione 6): la regola è chiusa verso il sicuro (un gruppo che non sta nelle liste chiede il permesso); liste: sempre locali, `with_remote`, `unless_local`, letture; le opzioni globali prima del sottocomando non devono far passare una scrittura; tutto vale dietro un lanciatore. `test_launcher_local_service_commands_ask` si riscrive.
