@@ -1,0 +1,15 @@
+# Registro dell'esecuzione del piano B6 (profilo `frontend`)
+
+Copia del workspace di subagent-driven-development del piano `docs/superpowers/plans/2026-11-10-tollgate-b6-profilo-frontend.md` (ramo `b6-profilo-frontend`, 14 commit `f3ca4a2..0e82c40`, unito su `main` il 12 novembre 2026 con l'OK dell'utente in un solo commit, `747829f`, come per B3, B4 e B5; 3895 test). Nome utente e host non compaiono (i percorsi sono scritti con `USER`).
+
+- `progress.md`: il ledger. Contiene la baseline (3760 test), lo Step 0 del Task 3 (pagine ufficiali e copie locali delle fonti, fatto in anticipo), lo scan dei conflitti prima del Task 1 (decisioni D1-D10, la tabella delle precedenze P1-P36 provata con i frammenti veri), i 9 task con i giri di correzione, la verifica delle fonti, l'approvazione di `rules-frontend` da parte dell'utente («Approva e tieni tutto», 11 novembre 2026), la prova reale, le 33 righe `Ruling:` con il costo se sbagliate, i minori rinviati, la revisione finale con la scelta dell'utente sulle due frasi della pagina («Correggi ora»), il giro di correzione finale, le tre corse finali della suite, il merge.
+- `carry.md` (e `carry-task-3.txt`, le voci copiate nel dispatch del Task 3): le decisioni del controller portate nei singoli task.
+- `preflight-brief.md` e `preflight-scan.md`: la richiesta e l'esito dello scan dei conflitti del piano.
+- File dati ai subagenti: `decisions.md`, `global-constraints.md`, `review-focus.md`, `coverage.md`, `file-map.md`, `fatti-verificati.md`, `cautele.md`, `plan-path`; regole di ruolo `implementer-rules.md`, `reviewer-rules.md`, `rereview-rules.md`.
+- Testo, report e revisioni dei task: `task-N-brief.md`, `task-N-report.md`, `task-N-review.md`, `task-N-rereview-N.md`.
+- Verifica delle fonti di `rules-frontend` (Task 4, Step 1): `task-4-fonti-brief.md` e `task-4-fonti.md` (verificatore Explore sonnet: regole 31 voci, 29 ok e 2 no, corrette togliendo la parte senza fonte; pattern 9 ok; marcatori 4 ok, uno per import; esclusione 6 ok). Le copie delle fonti (`fonti/frontend/`) non sono nel repo.
+- Prova reale (Task 8): `task-8-rapporto-brief.md`, `task-8-report.md`, `task-8-review.md`, `task-8-rereview-1.md`; rapporto in `docs/verifiche/2026-11-10-b6-prova-flusso.md`, evidenze in `docs/verifiche/evidenze/b6/flusso/`.
+- Revisione finale dell'intero ramo: `final-review-brief.md` e `final-review.md` (opus: pronto per il merge, 0 critical, 0 important, 4 minor, con 13 casi di precedenza cercati e il triage dei 28 minori rinviati: 7 da correggere, 18 nessuna azione, 3 rinviati); `final-deferred.md` e `final-rulings.md`; `final-fix-report.md` (il giro di correzione); `final-rereview-1.md` (sonnet: tutti i rilievi indirizzati).
+- `suite-finale.txt`: le tre corse finali di `PYTHONWARNINGS=error::ResourceWarning tests/run` su `0e82c40` (python3.11 e python3).
+
+Non sono stati copiati: i pacchetti di revisione (`.diff`, si rigenerano con `git diff`), i log delle corse della suite e dei test rossi, le copie delle fonti (`fonti/frontend/`, testo di terzi), l'uscita grezza di `prepara` (la copia ripulita è nelle evidenze) e gli elenchi di `/tmp` prima e dopo le corse.

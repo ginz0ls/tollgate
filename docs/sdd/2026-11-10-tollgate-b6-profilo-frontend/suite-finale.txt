@@ -1,0 +1,26 @@
+# Tre corse finali della suite su 0e82c40
+
+Comando: PYTHONWARNINGS=error::ResourceWarning tests/run (python3.11 e python3).
+
+## Corsa 1
+Ran 3895 tests in 1967.385s
+OK (skipped=13)
+Ran 3895 tests in 3086.662s
+OK (skipped=11)
+exit 0
+
+## Corsa 2
+Ran 3895 tests in 2342.558s
+OK (skipped=13)
+Ran 3895 tests in 3423.309s
+OK (skipped=11)
+exit 0
+
+## Corsa 3
+Ran 3895 tests in 1857.694s
+OK (skipped=13)
+Ran 3895 tests in 1546.316s
+OK (skipped=11)
+exit 0
+
+Nessun «unclosed». Cartelle nuove in /tmp: nessuna della suite (dopo la corsa 1 due profili di un browser di un'altra sessione dell'utente, vedi progress.md).
