@@ -1,0 +1,49 @@
+Q1: OK  proposta={'database': ['/supabase/**']} runtime={'supabase/migrations/20240101000000_init.sql': 'database', 'supabase/config.toml': 'database'}
+Q2: OK  proposta={'database': ['/supabase/**'], 'frontend': ['**/*.tsx']} runtime={'supabase/functions/og/index.tsx': 'database', 'src/main.tsx': 'frontend'}
+Q3: OK  proposta={'database': ['/supabase/**']} runtime={'supabase/functions/hello/index.ts': 'database'}
+Q4: OK  proposta={'ai': ['supabase/functions/chat/index.ts'], 'database': ['/supabase/**']} runtime={'supabase/functions/chat/index.ts': 'ai', 'supabase/migrations/1_a.sql': 'database'}
+Q5: OK  proposta={'backend': ['/server/**'], 'database': ['**/*.sql']} runtime={'server/app.py': 'backend', 'server/db/schema.sql': 'backend'}
+Q6: OK  proposta={'backend': ['/server/**'], 'database': ['server/migrations/**']} runtime={'server/app.py': 'backend', 'server/migrations/001.sql': 'database'}
+Q7: OK  proposta={'ai': ['src/ai/**'], 'database': ['**/*.sql']} runtime={'src/ai/agent.py': 'ai', 'src/ai/queries.sql': 'ai'}
+Q8: OK  proposta={'database': ['**/*.sql'], 'infra': ['/infra/**']} runtime={'infra/main.ts': 'infra', 'infra/init.sql': 'infra'}
+Q9: OK  proposta={'database': ['src/db/schema.ts']} runtime={'src/db/schema.ts': 'database', 'src/main.ts': None}
+Q10: OK  proposta={'backend': ['/server/**'], 'database': ['/prisma/**']} runtime={'prisma/schema.prisma': 'database', 'prisma/migrations/2024_init/migration.sql': 'database', 'server/app.ts': 'backend'}
+Q11: OK  proposta={'backend': ['apps/api/supabase/functions/x/index.ts'], 'database': ['apps/api/supabase/migrations/**']} runtime={'apps/api/supabase/functions/x/index.ts': 'backend', 'apps/api/supabase/migrations/1_a.sql': 'database'}
+Q12: OK  proposta={'database': ['database/migrations/**']} runtime={'database/migrations/2024_create_users.php': 'database', 'app/Models/User.php': None}
+Q13: OK  proposta={} runtime={'alembic/versions/1975_create.py': None, 'app/main.py': None}
+Q14: OK  proposta={'database': ['**/*.sql']} runtime={'scripts/backfill.sql': 'database', 'docs/queries.sql': 'database'}
+Q15: OK  proposta={'database': ['src/components/migrations/**'], 'frontend': ['src/components/**']} runtime={'src/components/migrations/List.tsx': 'database'}
+Q16: OK  proposta={'backend': ['/api/**'], 'database': ['api/migrations/**']} runtime={'api/users.ts': 'backend', 'api/migrations/001.sql': 'database'}
+Q17: OK  proposta={'database': ['/supabase/**']} runtime={'supabase/functions/og/index.tsx': 'database', 'supabase/functions/_shared/cors.ts': 'database', 'supabase/seed.sql': 'database'}
+Q18: OK  proposta={'database': ['**/*.sql']} runtime={'.github/tollgate/x.sql': 'database', '.claude/q.sql': 'database', 'db/a.sql': 'database'}
+Q19: OK  proposta={'database': ['/supabase/**'], 'frontend': ['**/*.tsx']} runtime={'supabase/migrations/1.sql': 'database', 'src/routes/index.tsx': 'frontend'}
+Q20: OK  proposta={'database': ['/supabase/**'], 'frontend': ['/web/**']} runtime={'web/supabase.ts': 'frontend', 'src/lib/supabase.ts': None}
+Q21: OK  proposta={'backend': ['/server/**'], 'database': ['server/blog/migrations/**']} runtime={'server/app.py': 'backend', 'server/blog/migrations/0001_initial.py': 'database'}
+Q22: OK  proposta={'backend': ['/server/**'], 'database': ['/drizzle.config.ts', 'server/db/schema.ts']} runtime={'server/app.ts': 'backend', 'server/db/schema.ts': 'database', 'drizzle.config.ts': 'database'}
+Q23: OK  proposta={'database': ['apps/web/supabase/migrations/**']} runtime={'apps/web/supabase/migrations/1.sql': 'database', 'apps/web/supabase/config.toml': None}
+Q24: OK  proposta={'ai': ['src/ai/**'], 'database': ['src/ai/migrations/**']} runtime={'src/ai/migrations/1.sql': 'database'}
+Q25: OK  proposta={'database': ['/supabase/**']} runtime={'supabase/tests/rls.test.sql': 'database', 'supabase/migrations/1.sql': 'database'}
+Q26: OK  proposta={'backend': ['src/routes/**'], 'database': ['**/*.sql']} runtime={'src/routes/users.ts': 'backend', 'src/routes/queries.sql': 'backend'}
+Q27: OK  proposta={'database': ['infra/migrations/**'], 'infra': ['/infra/**']} runtime={'infra/migrations/1.sql': 'database'}
+Q28: OK  proposta={'database': ['**/*.sql'], 'frontend': ['/web/**']} runtime={'web/index.html': 'frontend', 'web/schema.sql': 'frontend'}
+Q29: OK  proposta={'database': ['**/*.sql']} runtime={'docs/schema.sql': 'database', 'docs/migrations/guida.md': None}
+Q30: OK  proposta={'backend': ['/api/**'], 'database': ['/supabase/**']} runtime={'api/x.ts': 'backend', 'supabase/functions/f/index.ts': 'database', 'supabase/migrations/1.sql': 'database'}
+Q31: OK  proposta={'ai': ['supabase/functions/agents/**'], 'database': ['/supabase/**']} runtime={'supabase/functions/agents/index.ts': 'ai'}
+Q32: OK  proposta={'ai': ['supabase/functions/chat/prompts/**'], 'database': ['/supabase/**']} runtime={'supabase/functions/chat/prompts/system.ts': 'ai'}
+Q33: OK  proposta={'database': ['/supabase/**'], 'infra': ['supabase/functions/Dockerfile']} runtime={'supabase/functions/Dockerfile': 'infra'}
+Q34: OK  proposta={'database': ['docs/migrations/**']} runtime={'docs/migrations/guida.md': 'database', 'docs/migrations/esempio.sql': 'database'}
+Q35: OK  proposta={'backend': ['/server/**'], 'database': ['**/*.sql']} runtime={'tests/fixtures/schema.sql': 'database'}
+Q36: OK  proposta={'database': ['packages/db/prisma/migrations/**']} runtime={'packages/db/prisma/schema.prisma': None, 'packages/db/prisma/migrations/1/migration.sql': 'database'}
+Q37: OK  proposta={'database': ['app/migrations/**'], 'frontend': ['**/*.tsx']} runtime={'app/migrations/page.tsx': 'database'}
+Q38: OK  proposta={'database': ['/migrations/**'], 'infra': ['/wrangler.toml']} runtime={'migrations/0001_init.sql': 'database'}
+Q39: OK  proposta={'database': ['/supabase/**'], 'infra': ['supabase/docker/docker-compose.yml']} runtime={'supabase/docker/docker-compose.yml': 'infra'}
+Q40: OK  proposta={'ai': ['prisma/seed.ts'], 'database': ['/prisma/**']} runtime={'prisma/seed.ts': 'ai'}
+Q41: OK  proposta={'database': ['tests/migrations/**']} runtime={'tests/migrations/test_0001.py': 'database'}
+Q42: OK  proposta={'database': ['web/supabase/migrations/**'], 'frontend': ['/web/**']} runtime={'web/supabase/functions/f/index.ts': 'frontend', 'web/supabase/config.toml': 'frontend', 'web/supabase/migrations/1.sql': 'database'}
+Q43: OK  proposta={'backend': ['/server/**'], 'database': ['server/prisma/migrations/**']} runtime={'server/prisma/schema.prisma': 'backend', 'server/prisma/migrations/1/migration.sql': 'database'}
+Q44: OK  proposta={'backend': ['src/index.ts'], 'database': ['src/index.ts']} runtime={'src/index.ts': 'backend'}
+Q45: OK  proposta={'database': ['**/*.sql', '/drizzle.config.ts', 'src/db/schema.ts']} runtime={'drizzle/0000_init.sql': 'database', 'drizzle.config.ts': 'database', 'src/db/schema.ts': 'database', 'drizzle/meta/_journal.json': None, 'drizzle/meta/0000_snapshot.json': None}
+Q46a: OK  proposta={'ai': ['src/ai/**'], 'database': ['src/ai/db.ts']} runtime={'src/ai/db.ts': 'database', 'src/ai/agent.py': 'ai'}
+Q46b: OK  proposta={'database': ['src/components/db.ts'], 'frontend': ['src/components/**']} runtime={'src/components/db.ts': 'database'}
+Q47: OK  proposta={'ai': ['prisma/ai/**', 'src/ai/**'], 'database': ['/prisma/**']} runtime={'prisma/ai/seed.sql': 'ai', 'prisma/schema.prisma': 'database'}
+differenze: 0

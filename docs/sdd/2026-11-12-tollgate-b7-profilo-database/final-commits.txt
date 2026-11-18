@@ -1,0 +1,17 @@
+db2af0e tollgate B7: prove, spec rev 34, catalogo e piano principale
+30e9f6b tollgate B7: il rapporto della prova non nomina cartelle private nella tabella dei controlli
+0528610 tollgate B7: prova reale L2 con il profilo database e lo specialista finale
+2d1441c tollgate B7: giro di correzione in una sessione nuova (implementatore non raggiungibile)
+048173e tollgate B7: il progetto di prova L2 scrive il rapporto junit per contare i test dei must-have
+bf7892d tollgate B7: prova reale L2 con il profilo database, script e progetto di prova
+356ad9d tollgate B7: agenti implementer-database e reviewer-database, specialista final-database
+b2e773c tollgate B7: rules-database approvata dall'utente
+eec75d2 tollgate B7: giro 1 del Task 4, introduzione dichiarata, costi mancanti, secondo passaggio delle fonti
+a906346 tollgate B7: fonti di rules-database verificate e pagina per l'utente
+4603ade tollgate B7: bozza di rules-database, frammento del profilo database e tabella delle precedenze
+88ee27c tollgate B7: Supabase, --local come valore di un'opzione, --remote false, --local=<v>; test piu' solidi
+8db63e2 tollgate B7: togli-pagine per la sola cartella tool-results; init senza percorsi esatti coperti da un'estensione
+ca09c16 tollgate B7: comandi locali di Supabase senza permesso, scritture remote salvo --local; Prisma e Drizzle
+ tests/test_rules_database.py                       | 784 +++++++++++++++++++++
+ tests/test_taskcmd.py                              |  33 +
+ 120 files changed, 6916 insertions(+), 144 deletions(-)

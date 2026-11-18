@@ -1,0 +1,27 @@
+## Corsa 1 (su 33968ca)
+== Python 3.11.16
+Ran 4062 tests in 1614.066s
+OK (skipped=13)
+== Python 3.13.5
+Ran 4062 tests in 1568.712s
+OK (skipped=11)
+exit 0
+
+## Corsa 2 (su 33968ca)
+== Python 3.11.16
+Ran 4062 tests in 1972.200s
+OK (skipped=13)
+== Python 3.13.5
+Ran 4062 tests in 1974.940s
+OK (skipped=11)
+exit 0
+
+## Corsa 3 (su 33968ca)
+== Python 3.11.16
+Ran 4062 tests in 1986.419s
+OK (skipped=13)
+== Python 3.13.5
+Ran 4062 tests in 1613.382s
+OK (skipped=11)
+exit 0
+
