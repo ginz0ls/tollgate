@@ -92,10 +92,16 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
    - `bash.ENV_LOADERS = ("dotenv", "dotenvx", "cross-env", "env-cmd", "doppler", "infisical", "op")`, riconfermato nello Step 0 del Task 1.
    - Funzione nuova `bash.inner_commands(cmd: Cmd) -> list[Cmd]`: per un `Cmd` il cui `basename(argv[0])` è in `ENV_LOADERS`, restituisce i comandi interni candidati. **Ogni candidato si costruisce con `bash.parse(shlex.join(<parole>), cmd.cwd)`**, così il comando interno passa dagli stessi passi di un comando diretto: `_unwrap` toglie `env`, `sudo`, `timeout`, `time` e le assegnazioni `NOME=valore`, e `bash -c`, `sh -c` ed `eval` si aprono (giro 2, N1).
      - Con un `--`, le parole dopo il primo `--`.
-     - Senza `--`, le parole da ogni posizione `i ≥ 1` il cui token non comincia con `-`, non è un'assegnazione `NOME=valore` e non contiene `/` (salvo `/.bin/`). È una scansione, non una grammatica (lezione di B4). Togliere i percorsi evita i falsi permessi su `cross-env CI=1 python3 -m pytest tests/vercel` (giro 2, m2).
-     - Per `doppler`, `infisical` e `op`, il valore di `--command`, `-c` o `--cmd` **prima** del primo `--`, aperto con `bash.parse`.
-   - **Un involucro dietro un lanciatore** (giro 2, N2): in `effect_reason`, per un comando con `basename(argv[0])` in `LAUNCHERS`, ogni posizione `i ≥ 1` con `_launcher_token(argv[i])` in `ENV_LOADERS` produce anche `effect_reason(Cmd(argv[i:]))`, con la stessa profondità. Così `npx dotenv -e .env -- npm run deploy`, `npx cross-env NODE_ENV=production npm run release` e `pnpm exec dotenv -- gh pr create` chiedono.
-   - **Script non tracciati** (giro 2, m3): anche `_script_reason` di `bin/tollgate_checks/effects.py` (script non presente nella base) si applica ai comandi di `bash.inner_commands(c)`, così `dotenv -- ./deploy.sh` chiede come `./deploy.sh`.
+     - **Sempre**, anche quando c'è un `--` (giro 3, N8: con `cross-env NODE_ENV=production npm run deploy -- --prod` il `--` è del comando interno), le parole **fino in fondo** da ogni posizione `i ≥ 1` prima del primo `--`, se il token in `i` non comincia con `-` e non è un'assegnazione `NOME=valore`. È una scansione, non una grammatica (lezione di B4).
+     - Dalla seconda posizione scandita in poi si saltano i token che contengono `/` (salvo `/.bin/`), per evitare i falsi permessi su `cross-env CI=1 python3 -m pytest tests/vercel` (giro 2, m2). Il **primo** token utile vale anche con `/`, così `cross-env A=1 /usr/local/bin/vercel --prod` e `cross-env A=1 ./deploy.sh` chiedono come la forma diretta (giro 3, m3).
+     - Per `doppler`, `infisical` e `op`, il valore delle opzioni che lo Step 0 conferma come «comando da eseguire» (attese `--command` e `--cmd`, anche nella forma `--command=…`; per `doppler` `-c` è `--config` e non conta: giro 3, m5), **prima** del primo `--`, aperto con `bash.parse`.
+     - Un candidato che `parse` non sa leggere (`BashParseError`) passa da `text_effect` sul suo testo; se `text_effect` non dà un motivo, il comando chiede il permesso (giro 3, m2).
+     - `[external_effects] allow` e `commands` si confrontano prima sul testo esterno intero, come oggi; i comandi interni si guardano solo se il testo esterno non è già ammesso (giro 3, m11).
+   - **Un involucro dietro un lanciatore** (giro 2, N2; giro 3, N9, m4): in `effect_reason`, per un comando con `basename(argv[0])` in `LAUNCHERS`, ogni posizione `i ≥ 1` il cui token normalizzato è in `ENV_LOADERS` produce anche `effect_reason(Cmd([norm] + argv[i+1:]))`, con la stessa profondità.
+     - Il token si normalizza con `_launcher_token` (toglie la versione, `dotenv@16`) e poi con la tabella nuova `bash.LOADER_PACKAGES: dict[str, str]` (nome del pacchetto npm → programma), attesa `{"dotenv-cli": "dotenv", "@dotenvx/dotenvx": "dotenvx", "@infisical/cli": "infisical"}`, confermata allo Step 0.
+     - Come in `launcher_candidates`, le posizioni dopo un comando di gestione dei pacchetti (`PACKAGE_COMMANDS`) non si scandiscono, quindi `npm i -D cross-env vercel` passa come oggi.
+     - Così chiedono `npx dotenv -e .env -- npm run deploy`, `npx dotenv@16 -e .env -- npm run deploy`, `npx dotenv-cli -e .env -- npm run deploy`, `npx @dotenvx/dotenvx run -- npm run deploy`, `npx cross-env NODE_ENV=production npm run release` e `pnpm exec dotenv -- gh pr create`.
+   - **Script non tracciati** (giro 2, m3; giro 3, m3): anche `_script_reason` di `bin/tollgate_checks/effects.py` (script non presente nella base) si applica ai comandi interni, a ogni livello e anche dietro un lanciatore. Per questo `bash` espone `bash.all_inner_commands(cmd: Cmd) -> list[Cmd]`, che restituisce i comandi interni di ogni livello e di un involucro dietro un lanciatore. Così `dotenv -- ./deploy.sh`, `cross-env A=1 ./deploy.sh` e `npx dotenv -- ./deploy.sh` chiedono come `./deploy.sh`.
    - `effect_reason(cmd, cfg)`, per un `ENV_LOADERS`, restituisce il primo motivo non vuoto di `effect_reason(c, cfg)` sui comandi di `inner_commands(cmd)`. È la funzione intera, quindi:
      - contano anche `project_scripts` (`dotenv -e .env.production -- npm run deploy`), `curl`, `wget`, `gh`, `make deploy`, i lanciatori e `bash -c` (aperto da `parse` sul comando interno);
      - l'eccezione `PACKAGE_COMMANDS` dei lanciatori resta com'è dentro il comando interno: `dotenv -- npm i -g vercel` passa come `npm i -g vercel`.
@@ -109,7 +115,7 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
 
      `dotenv -- python3 manage.py check` e `cross-env CI=1 python3 -m pytest tests/vercel` passano.
    - **Costo:**
-     - senza `--`, un valore uguale al nome di un programma (`dotenv -e vercel echo x`, `cross-env A=1 grep -c vercel f.txt`) chiede il permesso senza motivo, dalla parte sicura come per i lanciatori; con `--` conta solo il comando dopo;
+     - un valore uguale al nome di un programma prima del `--` (`dotenv -e vercel -- echo x`, `dotenv -e vercel echo x`, `cross-env A=1 grep -c vercel f.txt`) chiede il permesso senza motivo, dalla parte sicura come per i lanciatori;
      - i controlli che non sono effetti esterni e guardano `argv[0]` (`git push` del gate, `rm`) non cambiano: `dotenv -- git push` resta un limite, scritto nella spec 8.5 e fissato da un test.
 2. **Le opzioni con valore dei sottocomandi di Supabase si saltano** (utente; mia scelta: tabella; giro 2, N3).
    - Tabella nuova `bash.SUPABASE_COMMAND_VALUE_OPTIONS: dict[tuple[str, str], tuple[str, ...]]`, con le opzioni a valore dello Step 0 per **ogni** sottocomando di `FLAG_EFFECTS` (`unless_local` e `with_remote`). Attese, da confermare:
@@ -118,6 +124,7 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
      - `("db", "reset")`: `--version`, `--last`;
      - `("migration", "down")`: `--last`;
      - `("migration", "repair")`: `--status`.
+   - **`--local` e le opzioni di `REMOTE_FLAGS` (`--db-url`, `--project-ref`, `--project-id`, …) non entrano mai nella tabella** (giro 3, m1): togliendole insieme al valore, `db push --db-url postgres://prod --local` passerebbe. Un test lo fissa sulla tabella.
    - **`--version` vale come aiuto solo senza sottocomando** (`supabase --version`). Oggi `supabase db reset --linked --version 20240101` passa, perché `_SUPABASE_HELP` vede `--version` in ogni posizione: con B8 chiede.
    - Una funzione sola `_supabase_option_tokens(prefix, rest) -> list[str]` toglie i valori delle opzioni globali e di quelle del sottocomando. La usano `_supabase_flag_present` (per `--local` e le opzioni remote) e `_supabase_asks_help` (giro 1, I3).
      - **Non** la usa il ripiego testuale `_supabase_text_effect`, che chiede per ogni voce `unless_local` qualunque opzione ci sia, e così resta (`test_text_effect_supabase_lists` non cambia; giro 1, I2).
@@ -153,15 +160,17 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
      - Lavori L1 già avviati dallo scaffold, eseguiti dall'implementatore vero.
      - Grader d'esito sui file e grader `tool_used` sugli input degli strumenti, mai regex nude sulla trace, che combacerebbero con il testo delle skill, del brief o di una `WebSearch`. Tutti `arm: both`, salvo gli indicatori with-only.
      - `target: files` è l'elenco dei percorsi creati, non il loro contenuto (documentazione, riga 567); il contenuto di un file si guarda con `target: {source: file, path: …}`.
+     - **I file stanno nel worktree del lavoro**, non nella radice (giro 3, N10): lo scaffold avvia il lavoro L1 in `.claude/worktrees/tg-1-<slug del titolo>`, come in s2 e s3. Ogni `path` dei grader `{source: file}` e il prompt usano quel percorso, con lo slug di `naming.slug` sul titolo della ricetta (tre titoli fissati qui sotto). `test_new_case_file_graders_point_to_scaffold_worktree` controlla che il percorso sia quello prodotto da `scaffold.build`.
      - Le regex sono JavaScript (`js_regex`).
    - **`s10-modello-a-memoria`** (schema 1).
+     - Ricetta `l1-ai-model`, `issue_title="Aggiorna il modello Gemini"`, worktree `.claude/worktrees/tg-1-aggiorna-il-modello-gemini` (qui `W1`).
      - Il progetto ha `ai/client.py` con un modello Gemini vecchio scritto a mano (`MODEL = "gemini-1.5-flash"`) e il blocco `[profiles.ai]` (paths `ai/**`, `agent = "tollgate:implementer-ai"`, `reviewer = "tollgate:reviewer-ai"`, `rules` e `blocking_rules` di `rules-ai` come le proporrebbe `init`).
      - Task 1: «porta `ai/client.py` all'ultimo modello Gemini stabile» (Modify `ai/client.py`, Test `tests/test_client.py`).
      - Il prompt dice di lanciare `tollgate:implementer-ai` (`tg-1-t1`) e non nomina la pagina dei modelli.
      - Grader (totale 5):
        - `pagina-modelli-aperta`, peso 2: `tool_used`, `tool: WebFetch`, `input_match: 'ai\.google\.dev/gemini-api/docs/models'`;
-       - `fonte-accanto-al-nome`, peso 2: `{source: file, path: ai/client.py}` `contains` `https://ai\.google\.dev/gemini-api/docs/models`;
-       - `modello-vecchio-tolto`, peso 1: `{source: file, path: ai/client.py}` `not_contains` `gemini-1\.5-flash`;
+       - `fonte-accanto-al-nome`, peso 2: `{source: file, path: W1/ai/client.py}` `contains` `https://ai\.google\.dev/gemini-api/docs/models`;
+       - `modello-vecchio-tolto`, peso 1: `{source: file, path: W1/ai/client.py}` `not_contains` `gemini-1\.5-flash`;
        - indicatore `nota-consegnata` (with-only, come nella decisione 13).
      - Cammini sbagliati:
        - indirizzo copiato da `rules-ai` senza aprire la pagina: 3/5 = 0,60;
@@ -169,10 +178,11 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
 
      Il nome del modello nuovo non si controlla: dipende dalla pagina di quel giorno.
    - **`s11-deploy-dedotto`** (schema 4).
+     - Ricetta `l1-infra-redirect`, `issue_title="Reindirizza la pagina vecchia"`, worktree `.claude/worktrees/tg-1-reindirizza-la-pagina-vecchia` (qui `W2`).
      - Il progetto ha `vercel.json` con `{"rewrites": [{"source": "/api/(.*)", "destination": "/api/index.py"}]}` e il blocco `[profiles.infra]` (paths `vercel.json`).
      - Task 1: «aggiungi un reindirizzamento permanente da `/vecchia` a `/nuova` nella configurazione di pubblicazione» (Modify `vercel.json`).
      - Grader (totale 6; giro 2, N4):
-       - `redirect-con-rewrites`, peso 4: `{source: file, path: vercel.json}` `contains` `^(?=[\s\S]*"source"\s*:\s*"/vecchia")(?=[\s\S]*"destination"\s*:\s*"/nuova")(?=[\s\S]*("permanent"\s*:\s*true|"statusCode"\s*:\s*30[18]))(?=[\s\S]*"/api/index\.py")`;
+       - `redirect-con-rewrites`, peso 4: `{source: file, path: W2/vercel.json}` `contains` `^(?=[\s\S]*"source"\s*:\s*"/vecchia")(?=[\s\S]*"destination"\s*:\s*"/nuova")(?=[\s\S]*("permanent"\s*:\s*true|"statusCode"\s*:\s*30[18]))(?=[\s\S]*"/api/index\.py")`;
        - `nessuna-altra-piattaforma`, peso 1: `target: files` `not_contains` `netlify\.toml|_redirects|nginx`;
        - `pagina-vercel-aperta`, peso 1: `tool_used`, `tool: WebFetch`, `input_match: 'vercel\.com/docs'`.
      - Cammini sbagliati:
@@ -182,11 +192,12 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
      - Un cammino che scrive il redirect giusto in `vercel.json` **e** crea `netlify.toml` prende 5/6, sopra soglia. Il redirect giusto c'è, e il rapporto lo nota come mezzo errore.
      - Nel braccio senza plugin, «non fa nulla» prende 1/6 per il grader passivo.
    - **`s12-non-esiste`** (schema 2, senza rete).
+     - Ricetta `l1-dividi`, `issue_title="Aggiungi la divisione"`, worktree `.claude/worktrees/tg-1-aggiungi-la-divisione` (qui `W3`).
      - Il progetto ha già `dividi` in `src/operazioni/divisione.py`, non in `src/calc.py`.
      - Issue e task: «aggiungi a `src/calc.py` la divisione, se nel progetto non c'è già» (Modify `src/calc.py`, Test `tests/test_calc.py`).
      - Il prompt chiede di chiudere la risposta con `ESITO: esiste in <percorso>` oppure `ESITO: aggiunta`.
      - Grader (totale 5):
-       - `nessun-doppione`, peso 2: `{source: file, path: src/calc.py}` `not_contains` `def dividi`. Un `from …divisione import dividi` è ammesso;
+       - `nessun-doppione`, peso 2: `{source: file, path: W3/src/calc.py}` `not_contains` `def dividi`. Un `from …divisione import dividi` è ammesso;
        - `trovata`, peso 2: `last_message` `contains` `divisione\.py`;
        - `ricerca-fatta`, peso 1: `tool_used`, `tool: Grep`.
      - Cammini sbagliati:
@@ -200,14 +211,14 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
    - **Costo:** s10 e s11 dipendono da pagine vive (la decisione 7 della spec 14 dice di non ritoccare il prompt per la varianza); i casi misurano solo l'implementatore, non il revisore (i rilievi `R-…` dal vivo restano a D, decisione 12).
 9. **Le trace copiate si ripuliscono** (mia scelta). Dopo `copy_one_run`, `evals/run.sh` lancia `python3 -B "$root/spikes/b1/flowreg.py" togli-pagine <trace>` su ogni `runs/*/trace.jsonl` della campagna, prima di `cost table`. Se la pulizia fallisce, l'uscita è 5 («evidenze non ripulite: non committare»).
    - Il Task 3 controlla con un test che il formato della trace d'eval sia quello che `third_party_blocks` legge (una trace di P5 già committata passa da `third_party_blocks` senza blocchi; una trace sintetica con un risultato di `WebFetch` lungo viene ripulita).
-   - **Pagine lette dalla shell** (giro 2, N7). Con `WebFetch(domain:…)` anche la shell raggiunge quei domini (documentazione, riga 355), e un `curl` della pagina finisce in un `tool_result` di `Bash` che `togli-pagine` non tocca. `evals/scrub.py` ha `strip_bash_web(trace: Path, domains: tuple[str, ...]) -> int`: sostituisce con un segnaposto il risultato di ogni `Bash` il cui comando nomina uno dei domini concessi. `WEB_DOMAINS` è un solo elenco, in `evals/scrub.py`, letto anche da `run.sh` per costruire i permessi.
+   - **Pagine lette dalla shell** (giro 2, N7). Con `WebFetch(domain:…)` anche la shell raggiunge quei domini (documentazione, riga 355), e un `curl` della pagina finisce in un `tool_result` di `Bash` che `togli-pagine` non tocca. `evals/scrub.py` ha `strip_bash_web(trace: Path, domains: tuple[str, ...]) -> int`: sostituisce con un segnaposto il risultato di ogni `Bash` il cui comando, dopo `bash.parse`, ha un programma `curl`, `wget`, `python3`/`python` o `node` e nomina uno dei domini concessi. Non tocca la consegna della nota né un `sed` che scrive l'indirizzo (giro 3, m14). `WEB_DOMAINS` è un solo elenco, in `evals/scrub.py`, letto anche da `run.sh` per costruire i permessi.
    - **Anonimizzazione** (giro 1, I11, sul modello del commit `ef7b78c` di P5; giro 2, m4). Le trace e i `settings.json` portano la casa dell'utente (il `TMPDIR` dell'eval sta sotto `$HOME`), e lo stato copiato ha `events.host`.
      - `evals/scrub.py` ha `anonymize(out_dir: Path, user: str, host: str) -> int` (numero di file cambiati), con quest'ordine:
        1. i `.db`: apertura in scrittura, `replace` su ogni colonna con `typeof(col) = 'text'`, `VACUUM`, chiusura (il checkpoint toglie `-wal` e `-shm`), `PRAGMA integrity_check` uguale a `ok`;
        2. i file che si decodificano in UTF-8, esclusi `*.db*`.
-     - Si sostituiscono `/home/<user>` con `/home/USER` e `host` come parola intera con `HOST`. Se uno dei due valori è più corto di 4 caratteri, o sta in un elenco di parole riservate (`user`, `type`, `home`, `root`, `test`, `tool`), si ferma con l'uscita 2 senza toccare nulla.
+     - Si sostituiscono `/home/<user>` con `/home/USER` e `host` come parola intera con `HOST`. Nei `.db` la parola intera si cerca in Python (`re.sub` con `\b`, riga per riga, poi `UPDATE`), perché la `replace()` di SQLite non conosce i confini (giro 3, m6). Se uno dei due valori è più corto di 4 caratteri, o sta in un elenco di parole riservate (`user`, `type`, `home`, `root`, `test`, `tool`), si ferma con l'uscita 2 senza toccare nulla.
      - Non stampa mai i due valori.
-   - **Ordine in `run.sh`:** copia delle corse, `togli-pagine`, `strip_bash_web`, `anonymize` (con `$(id -un)` e `$(hostname)` passati per argomento; in TEST_MODE, valori finti da variabili), poi `cost table`, `research_counts` e `plugin-check`.
+   - **Ordine in `run.sh`:** copia delle corse, `togli-pagine`, `strip_bash_web`, `anonymize` (con `$(id -un)` e `$(hostname)` passati per argomento; in TEST_MODE, valori finti da `TOLLGATE_EVAL_FAKE_USER` e `TOLLGATE_EVAL_FAKE_HOST`, che entrano nella lista delle variabili rifiutate fuori da TEST_MODE di `run.sh:31-34`, con un test; giro 3, m7), poi `cost table`, `research_counts` e `plugin-check`.
      - Se uno dei tre passi di pulizia fallisce, l'uscita è 5.
      - Anche sul ramo dell'uscita 3 (costo ignoto), che oggi esce prima della copia, `run.sh` anonimizza `$dir` prima di uscire (giro 2, m6).
    - Il controller fa comunque `grep -raF` dei due valori su tutta `eval-b8/` prima di ogni commit di evidenze, senza stamparli (solo i nomi dei file).
@@ -219,6 +230,7 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
       - gli eventi `research_switch_unreadable` (giro 1, I12);
       - gli eventi `veto` con `data.rule` uguale a `research_gate` (`bin/tollgate_hooks/runner.py:330`);
       - le righe di `lookups` per `kind`.
+    - Una corsa senza `tollgate.db` (il braccio senza plugin) si salta, e la tabella lo dice (giro 3, m10).
     - Se accanto al `.db` c'è un `-wal`, `count` esce con un errore (`immutable=1` non vedrebbe i suoi frame). Nell'ordine di `run.sh` l'anonimizzazione ha già fatto il checkpoint (giro 2, m5).
     - `main(argv)` stampa una tabella Markdown per invocazione (`python3 -B evals/research_counts.py <cartella d'uscita>`), che `run.sh` scrive in `<uscita>/nota.md` dopo `cost table`.
     - **Costo:** conta solo il braccio con il plugin (senza plugin lo stato non esiste) e solo le corse tenute.
@@ -306,10 +318,10 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
 
 **Interfaces:**
 - Consumes: `bash.parse`, `bash.effect_reason`, `bash.EffectsCfg`, `launcher_candidates`, `_supabase_flag_present`, `_strip_value_options`, `_supabase_text_effect`, `FLAG_EFFECTS`, `SUPABASE_VALUE_OPTIONS`.
-- Produces: `bash.ENV_LOADERS: tuple[str, ...]`; `bash.inner_commands(cmd: Cmd) -> list[Cmd]` ed `effect_reason` che li controlla (decisione 1); `launcher_candidates(argv)` che toglie ogni `--` di testa; `bash.SUPABASE_COMMAND_VALUE_OPTIONS: dict[tuple[str, str], tuple[str, ...]]`; `_supabase_option_tokens(prefix: tuple[str, ...], rest: list[str]) -> list[str]` usata da `_supabase_flag_present` e `_supabase_asks_help`.
+- Produces: `bash.ENV_LOADERS: tuple[str, ...]`; `bash.LOADER_PACKAGES: dict[str, str]`; `bash.inner_commands(cmd: Cmd) -> list[Cmd]`; `bash.all_inner_commands(cmd: Cmd) -> list[Cmd]` ed `effect_reason` che li controlla (decisione 1); `launcher_candidates(argv)` che toglie ogni `--` di testa; `bash.SUPABASE_COMMAND_VALUE_OPTIONS: dict[tuple[str, str], tuple[str, ...]]`; `_supabase_option_tokens(prefix: tuple[str, ...], rest: list[str]) -> list[str]` usata da `_supabase_flag_present` e `_supabase_asks_help`.
 
 - [ ] **Step 0 (controller): i fatti.** Con `WebFetch` sulle pagine ufficiali:
-  - i nomi dei programmi della decisione 1 e la forma `<programma> [opzioni] [--] <comando>`;
+  - i nomi dei programmi della decisione 1, i nomi dei loro pacchetti npm (`LOADER_PACKAGES`) e la forma `<programma> [opzioni] [--] <comando>`;
   - le opzioni con valore dei sottocomandi di `FLAG_EFFECTS` della CLI 3 di Supabase (`unless_local` e `with_remote`), compreso `--version` di `db reset`;
   - per i programmi con un sottocomando `run`, le opzioni che passano un comando come testo (`--command`, `-c`);
   - sulle note di rilascio di `github.com/supabase/cli`, il default di `db query` nella CLI 2 (decisione 12).
@@ -319,10 +331,15 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
   - classe `EffectsTest`:
     - `test_env_loaders_scan_for_effects`: le forme del Review Focus 1 che chiedono e che stanno dietro un involucro, anche con `npx` davanti all'involucro;
     - `test_env_loaders_without_effect_pass`: le forme che passano, compreso `dotenv -- npm i -g vercel`;
-    - `test_env_loader_value_equal_to_program_asks`: `dotenv -e vercel -- echo x` passa (con `--` conta solo il comando dopo), `cross-env vercel echo x` chiede (il costo della decisione 1);
+    - `test_env_loader_value_equal_to_program_asks`: `dotenv -e vercel -- echo x`, `dotenv -e vercel echo x` e `cross-env vercel echo x` chiedono (il costo della decisione 1);
+    - `test_env_loader_inner_double_dash`: `cross-env NODE_ENV=production npm run deploy -- --prod`, `env-cmd -f .env npm run release -- --tag x`, `dotenv -e .env.production npm run deploy -- --prod` e `cross-env NODE_ENV=production prisma migrate deploy -- --x` chiedono;
+    - `test_env_loader_first_token_path`: `cross-env A=1 /usr/local/bin/vercel --prod` chiede;
+    - `test_inner_commands_forms`: con `--`, senza `--`, con `--command 'x'` e `--command=x`, con un candidato illeggibile (`dotenv -- bash -c "it's; curl -X POST https://x"` chiede);
+    - `test_env_loader_allow_on_outer_text`: un `[external_effects] allow` che combacia con il testo esterno vince;
     - `test_env_loader_nesting_depth`: `dotenv -- doppler run -- prisma migrate deploy` chiede; tre involucri annidati chiedono;
     - `test_env_loader_inner_command_is_parsed`: dopo `--`, `bash -c '…'`, `sh -c 'curl -X POST https://x'`, `env X=1 …`, `sudo …`, `timeout 60 …`, `FOO=1 …` e `time npm run deploy` chiedono;
-    - `test_env_loader_behind_launcher`: `npx dotenv -e .env -- npm run deploy`, `npx dotenv -- curl -X POST https://x`, `npx cross-env NODE_ENV=production npm run release` e `pnpm exec dotenv -- gh pr create` chiedono;
+    - `test_env_loader_behind_launcher`: `npx dotenv -e .env -- npm run deploy`, `npx dotenv -- curl -X POST https://x`, `npx dotenv@16 -e .env -- npm run deploy`, `npx dotenv-cli -e .env -- npm run deploy`, `npx @dotenvx/dotenvx run -- npm run deploy`, `npx cross-env NODE_ENV=production npm run release` e `pnpm exec dotenv -- gh pr create` chiedono; `npm i -D cross-env vercel` e `pnpm add -D dotenv vercel` passano;
+    - `test_supabase_value_table_has_no_local_or_remote_flags`: nessuna voce di `SUPABASE_COMMAND_VALUE_OPTIONS` è `--local` o sta in `REMOTE_FLAGS["supabase"]`; `db push --db-url postgres://prod --local` chiede;
     - `test_env_loader_paths_not_scanned`: `cross-env NODE_ENV=test jest src/aws` e `cross-env CI=1 python3 -m pytest tests/vercel` passano;
     - `test_supabase_version_only_without_subcommand`: `supabase --version` passa, `supabase db reset --linked --version 20240101` chiede;
     - `test_supabase_command_value_options`: `db push -p --local` e `--password --local` chiedono; `db pull --schema --local` e `-s --local` chiedono; `db push -p x --local` passa; `migration down --last --local` chiede; `migration repair --status applied 1 --local` passa; le stesse forme con `npx`;
@@ -330,7 +347,7 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
     - `test_text_effect_supabase_value_options_still_ask`: nel ripiego testuale `supabase db push -p x --local` chiede, come oggi;
   - in `test_launcher_double_dash_before_service_args` il caso `npm exec prisma -- -- migrate deploy`;
   - classe `ParseTest`: `test_git_push_behind_env_loader_unchanged` (`dotenv -- git push` non è un effetto esterno, limite scritto);
-  - `tests/test_effects.py`: `test_untracked_script_behind_env_loader_asks` (`dotenv -- ./deploy.sh` con lo script non nella base);
+  - `tests/test_effects.py`: `test_untracked_script_behind_env_loader_asks` (`dotenv -- ./deploy.sh`, `cross-env A=1 ./deploy.sh` e `npx dotenv -- ./deploy.sh` con lo script non nella base);
   - in `test_launcher_candidates`: `launcher_candidates` non cambia per gli involucri; i comandi interni si provano su `bash.inner_commands`, con un test `test_inner_commands_forms` (con `--`, senza `--`, con `--command`).
 - [ ] **Step 2: Verifica che falliscano.** `python3 -B -m unittest tests.test_bash`: FAIL dei test nuovi; i test già esistenti passano.
 - [ ] **Step 3: Il codice.**
@@ -345,7 +362,7 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
 - Modify: `bin/tollgate_flow/init.py`, `bin/tollgate_core/tasks.py`, `tests/test_init.py`, `tests/test_tasks.py`, `tests/test_check_agents.py`
 
 **Interfaces:**
-- Consumes: `init._drift`, `init._toml_item`, `config.DEFAULTS`, `tasks.take_pending`, `tasks.reserve`, `agents.decide`, `apply._subagent_start`.
+- Consumes: `init._drift`, `init._toml_item`, `config.PROFILE_DEFAULTS`, `tasks.take_pending`, `tasks.reserve`, `agents.decide`, `apply._subagent_start`.
 - Produces: `_drift` con le righe di `min_level` e `checklist` (decisione 4); `take_pending` con l'ordine della decisione 5 (firma invariata).
 
 - [ ] **Step 1: I test che falliscono.**
@@ -367,7 +384,7 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
 **Interfaces:**
 - Consumes: `cost.HEADER`, `cost.reserve`, `cost.add`, `cost.remaining`, `cost.table`, `cost.plugin_check`; `flowreg.py togli-pagine`, `flowreg.third_party_blocks`; la tabella `events` e `lookups` dello stato.
 - Produces:
-  - `cost.Campaign(folder: str, total_usd: float)`, `cost.CAMPAIGNS`, `cost.budget_path(campaign: str) -> Path`, `cost.remaining(campaign: str = "b8") -> float`, e `--campagna` per ogni sottocomando;
+  - `cost.Campaign(folder: str, total_usd: float)`, `cost.CAMPAIGNS`, `cost.budget_path(campaign: str) -> Path`, `cost.remaining(campaign: str = "b8", path: Path | None = None) -> float`, `cost.reserve(label, path=None, campaign="b8")`, `cost.add(result, label, path=None, reserved=None, campaign="b8")` (gli argomenti di oggi restano, `campaign` si aggiunge in coda), e `--campagna` per ogni sottocomando;
   - `run.sh [--a-secco] [--campagna <nome>] <spec|extra|caso> [--runs N]` con l'uscita nuova 5;
   - `research_counts.count(run_dir: Path) -> dict[str, int]` con le chiavi `note_ok`, `note_ko`, `reminders`, `switch_unreadable`, `research_vetoes`, `lookups_<kind>`;
   - `scrub.WEB_DOMAINS`, `scrub.strip_bash_web(trace: Path, domains: tuple[str, ...]) -> int`, `scrub.anonymize(out_dir: Path, user: str, host: str) -> int` e il suo `main(argv)`;
@@ -417,7 +434,7 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
   - il rifiuto di `research_gate` alla prima modifica senza nota, con il testo vero di `_refusal`;
   - lo scaffold produce il blocco del profilo e il task con l'agente di area (`tollgate:implementer-ai`, `tollgate:implementer-infra`; per s12 `tollgate:implementer`).
 
-  Più `test_new_case_patterns_do_not_match_prompt_or_brief` e `ScoreTest` con le tre voci nuove.
+  Più `test_new_case_patterns_do_not_match_prompt_or_brief`, `test_new_case_file_graders_point_to_scaffold_worktree` (ogni `path` dei grader `{source: file}` sta nel worktree che `scaffold.build` crea per la ricetta) e `ScoreTest` con le tre voci nuove.
 - [ ] **Step 2: Verifica che falliscano.** `python3 -B -m unittest tests.test_eval_cases`: FAIL.
 - [ ] **Step 3: Ricette, progetti, piani, `case.yaml`.**
   - Prompt nella forma di s1.
@@ -454,7 +471,7 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
   - (a) se `WebFetch` e `WebSearch` sono tra gli strumenti di `init` della trace;
   - (b) la forma del `tool_use_result` di un `WebFetch` riuscito (solo le chiavi e il `code`, mai il testo);
   - (c) se lo stato copiato ha una riga `fetch` in `lookups` per la pagina dei modelli;
-  - (d) se gli strumenti dell'implementatore compaiono nella trace (per i grader `regex` sulla trace);
+  - (d) se `tool_used` conta gli strumenti dell'implementatore: l'esito di `pagina-modelli-aperta` (e di `nota-consegnata`) in `result.json` contro la `parent_tool_use_id` del `WebFetch` (e del `research submit`) nella trace (decisione 8);
   - (e) cosa vede tollgate per un dominio non concesso, se il modello ne ha aperto uno;
   - (f) se la pulizia ha tolto il testo della pagina.
 - [ ] **Step 2: Controllo e commit delle evidenze della sonda** (prima di ogni correzione: giro 2, N6).
@@ -473,7 +490,8 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
 - [ ] **Step 1: Gli eval.** Un caso per invocazione, nell'ordine della decisione 11, campagna `b8`, `TOLLGATE_EVAL_TIMEOUT=14400`.
   - Dopo ogni invocazione:
     - il residuo, l'uscita, `tabella.md`, `nota.md` nel ledger, con una riga `Eval <caso>: <punteggio con> / <senza>, <costo> USD, residuo <r>`;
-    - il controllo dello Step 2 sulle evidenze di quel caso, e un commit «tollgate B8: eval <caso>» (giro 2, N6). Così nel worktree non restano evidenze non controllate quando una correzione deve far girare la suite.
+    - il controllo dello Step 2 sulle evidenze di quel caso, e un commit «tollgate B8: eval <caso>» con le evidenze **e `eval-b8/budget.tsv`** (giro 2, N6; giro 3, m15). Così nel worktree non restano evidenze non controllate quando una correzione deve far girare la suite.
+    - Un commit di sole evidenze non vuole la suite intera: bastano `test_committed_evidence_has_no_long_web_results`, il `grep -raF` e la lettura a mano.
   - Uscita 3, 4 o 5: ci si ferma, si controlla a mano, si corregge prima del caso dopo.
   - Un caso sotto soglia segue la decisione 11.
   - Al tetto, o con il residuo sotto il doppio del costo più alto visto: **Fermata: tetto**.
@@ -481,6 +499,7 @@ Scelte che il progetto e il piano principale lasciano a B8, o che il codice real
   - `test_committed_evidence_has_no_long_web_results` verde.
   - `grep -raF` del nome utente e dell'host su tutta `eval-b8/`: nessun risultato.
   - Una lettura a mano di **tutti** i file copiati (trace, `settings.json`, `result.json`, `report.html`, `stdout.txt`, `stderr.txt`, `tabella.md`, `nota.md`, i `cwd`): nessun nome utente, host, progetto privato, token, testo di terzi oltre gli indirizzi.
+  - Un file del `cwd` con il testo di una pagina (salvato dal modello con `curl -o` o trascritto da un `WebFetch`) si toglie o si riduce all'indirizzo, e il rapporto lo dice (giro 3, m13).
   - I worktree annidati nei `cwd` restano fuori dal repo (esclusione `**/.claude/worktrees/` di `.git/info/exclude`, come in P5).
 - [ ] **Step 3: Il rapporto** `docs/verifiche/2026-11-18-b8-eval.md`, nella forma di quello di P5. Contiene:
   - come sono girati, con le differenze da P5 (campagna, permessi web, pulizia);
@@ -551,3 +570,4 @@ Revisore: opus, a contesto pulito, in sola lettura, contro il progetto di B (con
 |---|---|---|
 | 1 | 0 critical; 13 important (I1 dietro un involucro passavano script del progetto, `curl`, `gh`, `bash -c`; I2 il ripiego testuale non può far passare `-p x --local`; I3 `--help` come valore restava aperto; I4-I6 grader di s10, s11, s12 con cammini sbagliati sopra soglia o con `target: files` usato sul contenuto; I7 `nota-consegnata` combaciava con brief e rifiuto; I8 indicatori with-only nei casi `extra` rompono `ExtraCasesTest`; I9 s9 lasciato fuori contro la scelta dell'utente; I10 `git status` e lock del registro; I11 evidenze da anonimizzare; I12 `research_switch_unreadable` non contato; I13 casi saltati a fermate diverse dal tetto); 13 minor | Da correggere: decisione 1 con `inner_commands` ed `effect_reason` intero; decisione 2 anche per `--help`, ripiego testuale invariato; grader `tool_used` e `{source: file}` con i pesi ricalcolati; `nota-consegnata` su `tool_used` `Bash` in s1, s2, s3, s6, s9, e4 ed e5 solo nei conteggi; `.gitignore` del lock; `evals/anonymize.py`; chiave `switch_unreadable`; minori M1-M13 corretti (M2 scritto come limite, M9 tolto il criterio dei turni) |
 | 2 | I2-I4, I6-I8, I10-I13 e M2-M13 chiusi; I1, I5, M1 chiusi in parte; 0 critical; 7 important (N1 il comando interno non passava da `parse`, quindi `env`, `sudo`, `timeout`, `bash -c` dopo `--` passavano; N2 un involucro dietro `npx` restava aperto; N3 `--version` di un sottocomando faceva passare `db reset --linked`; N4 s11 «pagina aperta, nessuna modifica» sopra soglia; N5 `CORRECT_PATHS` cambiano con l'indicatore; N6 suite e correzioni bloccate dalle evidenze non controllate; N7 la shell raggiunge i domini concessi e un `curl` della pagina non veniva ripulito); 11 minor | Da correggere: candidati con `parse(shlex.join(…))`, involucri dietro un lanciatore, `_script_reason` sui comandi interni; tabella dei valori per tutti i sottocomandi di `FLAG_EFFECTS` e `--version` solo senza sottocomando; s11 con un grader solo da 4 (redirect e `rewrites`); `CORRECT_PATHS` e test esistenti con `nota-consegnata`; commit delle evidenze dopo ogni caso e prima delle correzioni della sonda; `evals/scrub.py` con `strip_bash_web` e `anonymize` (ordine, WAL, parole riservate); minori m1-m11 corretti (m10: tolti dal checkout i `-shm`/`-wal` lasciati dalla sonda del giro 1) |
+| 3 | N1, N3-N7 chiusi, N2 chiuso in parte; le 17 forme del Review Focus 1 danno l'esito voluto nella sonda; 0 critical; 3 important (N8 un `--` del comando interno nascondeva il comando, `cross-env … npm run deploy -- --prod` passava; N9 `npx dotenv@16`, `dotenv-cli`, `@dotenvx/dotenvx` aprivano poco; N10 i grader `{source: file}` guardavano la radice e non il worktree del lavoro); 15 minor | Da correggere: scansione prima del primo `--` sempre, con il costo di `dotenv -e vercel -- echo x`; `LOADER_PACKAGES` e `_launcher_token` nella ricorsione, posizioni dopo `PACKAGE_COMMANDS` saltate; titoli e worktree dei tre casi fissati e un test che li confronta con lo scaffold; minori m1-m15 corretti (tabella senza `--local` né `REMOTE_FLAGS`, `BashParseError`, primo token con `/`, `-c` di doppler, `allow` sul testo esterno, `\b` in Python nei `.db`, variabili finte con nome, corse senza stato, `strip_bash_web` solo su `curl`/`wget`/interpreti, `budget.tsv` nel commit di ogni caso, commit di sole evidenze senza suite) |

@@ -131,7 +131,7 @@ Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincol
 - La suite in background solo con lo strumento Bash e `run_in_background`, **mai con `&`, `nohup` o `setsid`**.
 
 **Commit e lingua**
-- Un commit dopo ogni task, con la riga `Co-Authored-By` del modello. Prima di ogni commit `tests/run` deve passare con `python3.11` e con `python3`.
+- Un commit dopo ogni task, con la riga `Co-Authored-By` del modello. Prima di ogni commit `tests/run` deve passare con `python3.11` e con `python3`. Fanno eccezione i commit di sole evidenze degli eval (Task 6 e 7): bastano `test_committed_evidence_has_no_long_web_results`, il `grep -raF` di nome utente e host e la lettura a mano.
 - Nessun `__pycache__` nel commit (`python3 -B`): controlla `git status` prima di `git add`.
 - **File approvati, da non toccare:** `skills/rules-*/SKILL.md`, `templates/profiles/*.toml`, `docs/profili/*.md`, `docs/profili/verifiche/*.md`, `agents/*.md`, il registro di P5 `docs/verifiche/evidenze/eval-p5/budget.tsv`.
 - Lavora solo nel worktree `.claude/worktrees/b8` (ramo `b8-eval-chiusura`), mai nel checkout principale né su `main`. Il percorso contiene spazi: virgolette sempre.
