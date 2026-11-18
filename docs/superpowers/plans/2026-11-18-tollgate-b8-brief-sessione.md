@@ -10,7 +10,7 @@ Esegui il piano `docs/superpowers/plans/2026-11-18-tollgate-b8-eval-chiusura.md`
 
 - tutti gli 8 task sono `complete` nel ledger, i Task 1-5 e 8 ognuno con la revisione pulita;
 - la sonda del Task 6 ha le sue righe `Sonda:` nel ledger, e le correzioni che ne sono nate hanno un test;
-- gli eval del Task 7 sono girati nel tetto di 20 USD, e il rapporto `docs/verifiche/2026-11-18-b8-eval.md` ha la riga `Esito:`. Fa eccezione una fermata per il tetto, per la sonda o per un caso: in quel caso vale ciò che ha scelto l'utente;
+- gli eval del Task 7 sono girati nel tetto di 20 USD, e il rapporto `docs/verifiche/2026-11-18-b8-eval.md` ha la riga `Esito:`. Fa eccezione una fermata per il tetto, per la sonda o per un caso: in quel caso vale ciò che ha scelto l'utente, e i casi saltati stanno nella riga `Eval saltati dall'utente:` del ledger;
 - le evidenze degli eval sono ripulite, verificate a mano prima del rapporto (anche i risultati di `WebFetch` sotto i 5000 caratteri, letti uno per uno), e `test_committed_evidence_has_no_long_web_results` è verde;
 - la revisione finale (opus) è chiusa, con i rilievi `critical` e `important` corretti e ri-revisionati;
 - la suite è verde tre volte su `python3.11` e `python3`, con `PYTHONWARNINGS=error::ResourceWarning`;
@@ -56,7 +56,7 @@ Esegui il piano `docs/superpowers/plans/2026-11-18-tollgate-b8-eval-chiusura.md`
 
 - **Eval minimi con e senza plugin, tetto di 20 USD di costo stimato** (progetto 7). I dollari sono equivalenti: con l'abbonamento non c'è addebito.
 - **B8 chiude i buchi dei comandi rimasti da B7** (progetto 15): involucri dell'ambiente, opzioni con valore di Supabase, doppio `--`, `init --update`, `SubagentStart` con due task dello stesso tipo. Restano fuori Wrangler e le pagine approvate che invecchiano.
-- **Tre casi nuovi e tutti i 13 casi di P5** (progetto 15), circa 10-12 USD stimati.
+- **Tre casi nuovi e tutti i 13 casi di P5** (progetto 15), circa 10-13 USD stimati.
 - **Profili e regole approvati non si toccano**: `base`, `ai`, `infra`, `backend`, `frontend`, `database`. Le pagine che invecchiano vanno nel rapporto finale e nel piano principale.
 - **Il profilo `security`, gli altri profili, gli eval estesi e il kanban sono fuori da B** (progetto 2).
 - **Il repo `ginz0ls/tollgate` è pubblico:** niente nomi di progetti privati, nome utente, host, token; niente testo di pagine di terzi nelle evidenze.
@@ -74,8 +74,9 @@ Le altre scelte del piano sono «mia scelta», e la revisione finale le può con
 - **La sonda del Task 6 viene prima di tutti gli eval.** I grader di s10 e s11 e il passo `fetch` della prova a secco poggiano su fatti che solo una corsa vera mostra: `WebFetch` tra gli strumenti, la forma del risultato, la lettura registrata, gli strumenti dell'implementatore nella trace. Un fatto diverso si corregge con un test prima del Task 7.
 - **Le pagine vive.** s10 e s11 aprono `ai.google.dev` e `vercel.com` dal vivo: il nome del modello non si controlla, la varianza non si corregge ritoccando il prompt.
 - **Il registro di P5 non cambia mai**: la campagna predefinita è `b8`, e `p5` resta solo per leggere la storia.
-- **Le trace degli eval contengono testo di pagine**: `run.sh` le ripulisce subito; il controller rilegge a mano ciò che resta sotto i 5000 caratteri.
-- **Gli eval girano con il worktree pulito**, uno per invocazione e senza implementatori al lavoro: `run.sh` copia il plugin dal worktree.
+- **Le trace degli eval contengono testo di pagine, la casa dell'utente e l'host**: `run.sh` le ripulisce e le anonimizza subito; il controller rilegge a mano tutti i file copiati e fa `grep -raF` di nome utente e host prima di ogni commit.
+- **Gli eval girano con il worktree pulito** (salvo le evidenze di `eval-b8/` già prodotte), uno per invocazione e senza implementatori al lavoro: `run.sh` copia il plugin dal worktree.
+- **s9** riceve l'indicatore della nota (scelta dell'utente: s9 ridisegnato), ed e4 ed e5 contano la nota solo nei conteggi: un grader with-only nei casi `extra` rompe `ExtraCasesTest`.
 - **`ANTHROPIC_API_KEY` non deve essere impostata** prima di un eval (si guarda solo se c'è).
 - **Il rapporto prima del merge** ha l'elenco unico delle pagine approvate che invecchiano: è l'ultima occasione di B per dirlo all'utente.
 

@@ -45,7 +45,7 @@ Una corsa di `tests/run` dura da 25 a 90 minuti (due interpreti).
   - Paralleli possibili:
     - revisione del Task 1 con il Task 2 (`bash.py` e `test_bash.py` contro `init.py`, `tasks.py` e i loro test);
     - revisione del Task 2 con il Task 3.
-  - **Gli eval (Task 6, 7) girano da soli**: nessun implementatore lavora nel worktree mentre `run.sh` copia il plugin, perché il bersaglio è la copia del worktree in quel momento.
+  - **Gli eval (Task 6, 7) girano da soli**: nessun implementatore lavora nel worktree mentre `run.sh` copia il plugin, perché il bersaglio è la copia del worktree in quel momento. Nessuna suite gira mentre ci sono evidenze non ancora controllate nel worktree.
 
 ## Scan pre-flight
 
@@ -70,7 +70,7 @@ Lo giudichi tu: una `Ruling:` nel ledger e una voce in `carry.md` per ogni confl
 
 1. **Task 1, 2, 3, 4, 5, 8:** implementatore sonnet. Il piano dà firme e test, non il codice: niente haiku. Scrittore unico, nell'ordine 1, 2, 3, 4, 5.
 2. **Task 1, Step 0** è del controller (fatti dalle pagine ufficiali), prima di lanciare l'implementatore del Task 1. Si può fare mentre gira lo scan o la baseline.
-3. **Task 6 e 7:** del controller (eval), dopo il Task 5 e la sua revisione, con il worktree pulito (`git status` vuoto).
+3. **Task 6 e 7:** del controller (eval), dopo il Task 5 e la sua revisione, con il worktree pulito (`git status` vuoto al primo eval; poi solo le evidenze di `eval-b8/`).
    - Il rapporto del Task 7 lo può scrivere un implementatore sonnet, con un brief sul modello di `task-8-rapporto-brief.md` di B7, dopo la verifica a mano del controller (Task 7, Step 2).
    - **Task 8** dopo il Task 7.
 4. **Revisioni:** revisore di ogni task sonnet; ri-revisioni mirate sonnet; **revisione finale dell'intero ramo opus**. I Task 6 e 7 non hanno un revisore di task: le loro evidenze le guarda la revisione finale.
@@ -97,7 +97,8 @@ Il piano dà firme, test e valori; il corpo lo scrive l'implementatore.
   - Le trace contengono i risultati di `WebFetch` e `WebSearch`. `togli-pagine` lascia quelli sotto i 5000 caratteri: **il controller li legge a mano prima del rapporto, e il rapporto lo dice**.
   - Poi `grep` del nome utente, dell'host, di `/home/`, degli id di sessione e delle forme di token.
   - Il rapporto non dice «ripulito» per ciò che non ha controllato.
-  - Le evidenze grezze non ancora ripulite non stanno mai nel worktree mentre gira una suite (B7: facevano fallire `test_committed_evidence_has_no_long_web_results`). `run.sh` le ripulisce subito; se esce con 5, si spostano nel workspace finché non sono pulite.
+  - Le evidenze grezze non ancora ripulite non stanno mai nel worktree mentre gira una suite (B7: facevano fallire `test_committed_evidence_has_no_long_web_results`). `run.sh` le ripulisce e le anonimizza subito; se esce con 5, si spostano nel workspace finché non sono pulite.
+  - **Anonimizzazione** (P5, `ef7b78c`): trace, `settings.json` e lo stato copiato portano la casa e l'host. Prima di ogni commit di evidenze, `grep -raF` dei due valori su tutta `eval-b8/` senza stamparli: deve essere vuoto.
 - **Mai asserzioni che al fallimento mostrino `os.environ`** (B3-bis). Il brief di ogni implementatore lo dice.
 - **Il brief del revisore contiene il report dell'implementatore.**
 - **Workspace e registro.** Il workspace SDD si copia in `docs/sdd/` alla chiusura, senza i `.diff`, i log della suite e le copie delle pagine.
@@ -144,7 +145,7 @@ Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincol
    - **Prima di ogni invocazione.**
      - Che nell'ambiente **non** ci sia `ANTHROPIC_API_KEY` (solo se è impostata, mai il valore): con la chiave Claude Code userebbe la chiave al posto dell'abbonamento. Se c'è, ti fermi e chiedi.
      - `df -h /tmp` (il bersaglio sta in `/tmp/tollgate-eval-target`).
-     - `git status` vuoto nel worktree.
+     - `git status` senza modifiche fuori da `docs/verifiche/evidenze/eval-b8/`: le evidenze degli eval già girati restano fino al commit del Task 7, e il lock del registro è ignorato da `.gitignore`.
    - **Uscite.** 3, 4 o 5: ti fermi e controlli. Al tetto: fermata.
    - **Divieti.** Mai `--max-cost-usd` a mano, mai la campagna `p5`, mai `--concurrency` sopra 1.
 3. **Push di `main` su `https://github.com/ginz0ls/tollgate.git`.**
