@@ -1,0 +1,12 @@
+{"argv": ["api", "--include", "repos/{owner}/{repo}/branches/main/protection"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["auth", "status"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["api", "repos/{owner}/{repo}/issues/1"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["api", "--paginate", "repos/{owner}/{repo}/pulls?state=all&per_page=100", "--jq", ".[] | {number, headRefName: .head.ref, state: (if .merged_at then \"MERGED\" else (.state | ascii_upcase) end), url: .html_url}"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["api", "repos/{owner}/{repo}/commits/e57de4aae84fab07bfcf6b44de7126bcc02df1f4/status"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["api", "repos/{owner}/{repo}/actions/permissions"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["api", "--paginate", "--jq", ".[] | select(.pull_request == null and .title == \"tollgate: merge non verificato\") | {number, title, url: .html_url}", "repos/{owner}/{repo}/issues?state=open&per_page=100"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["api", "repos/{owner}/{repo}/issues/1"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["pr", "list", "--head", "tg/1-aggiungi-i-tag-alle-note", "--state", "all", "--limit", "100", "--json", "number,state,url,headRefOid,mergedAt,isCrossRepository"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["api", "repos/{owner}/{repo}/issues/1"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["pr", "create", "--head", "tg/1-aggiungi-i-tag-alle-note", "--base", "main", "--title", "#1 aggiungi i tag alle note", "--body-file", "/tmp/tollgate-b1/flow/.claude/worktrees/tg-1-aggiungi-i-tag-alle-note/.tollgate-run/1/pr-body.md"], "cwd": "/tmp/tollgate-b1/flow"}
+{"argv": ["pr", "list", "--head", "tg/1-aggiungi-i-tag-alle-note", "--state", "all", "--limit", "100", "--json", "number,state,url,headRefOid,mergedAt,isCrossRepository"], "cwd": "/tmp/tollgate-b1/flow"}

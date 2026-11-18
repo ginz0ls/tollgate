@@ -6,7 +6,9 @@ import unittest
 
 from tests.helpers import ROOT
 
-AREAS = ("ai", "infra", "backend", "frontend")
+AREAS = ("ai", "infra", "backend", "frontend", "database")
+# Le aree con uno specialista della revisione finale (decisione 11 di B7).
+FINAL_AREAS = ("database",)
 ATTRIBUTION = ("Derivato da superpowers/skills/subagent-driven-development (MIT, © 2025 Jesse "
                "Vincent); vedi LICENSES/superpowers-MIT.txt")
 
@@ -120,14 +122,21 @@ class ManifestTest(unittest.TestCase):
                 with self.subTest(agent=name):
                     fm = frontmatter(ROOT / "agents" / f"{name}.md")
                     self.assertEqual(fm.get("skills"), f"[rules-base, rules-{area}]")
+        for area in FINAL_AREAS:
+            with self.subTest(agent=f"final-{area}"):
+                fm = frontmatter(ROOT / "agents" / f"final-{area}.md")
+                self.assertEqual(fm.get("skills"), f"[rules-base, rules-{area}]")
 
     def test_area_agents_derive_from_generic(self):
         """Decisioni 10 e 11: la copia contiene ogni paragrafo del corpo del generico (dopo la
-        riga di attribuzione), con `model` uguale; `tools` uguali, più `WebFetch` al revisore."""
-        cases = [(f"{kind}-{area}", generic, extra) for area in AREAS
+        riga di attribuzione), con `model` uguale; `tools` uguali, più `WebFetch` al revisore
+        (non allo specialista finale, che deriva da `final-reviewer` e ha i suoi stessi `tools`)."""
+        cases = [(f"{kind}-{area}", generic, extra, ATTRIBUTION) for area in AREAS
                  for kind, generic, extra in (("implementer", "implementer", []),
                                               ("reviewer", "task-reviewer", ["WebFetch"]))]
-        for name, generic, extra in cases:
+        cases += [(f"final-{area}", "final-reviewer", [], FINAL_ATTRIBUTION)
+                  for area in FINAL_AREAS]
+        for name, generic, extra, attribution in cases:
             with self.subTest(agent=name):
                 gpath, apath = ROOT / "agents" / f"{generic}.md", ROOT / "agents" / f"{name}.md"
                 gfm, afm = frontmatter(gpath), frontmatter(apath)
@@ -141,7 +150,7 @@ class ManifestTest(unittest.TestCase):
                 self.assertEqual(afm.get("maxTurns"), gfm.get("maxTurns"))
                 self.assertNotEqual(afm["description"], gfm["description"])
                 self.assertRegex(afm["description"], r"\b%s\b" % name.split("-")[1])
-                body = gpath.read_text().split(ATTRIBUTION, 1)[1]
+                body = gpath.read_text().split(attribution, 1)[1]
                 copy = apath.read_text()
                 for paragraph in [p for p in body.split("\n\n") if p.strip()]:
                     self.assertIn(paragraph.strip(), copy)
@@ -150,6 +159,10 @@ class ManifestTest(unittest.TestCase):
         for name in [f"{k}-{a}" for a in AREAS for k in ("implementer", "reviewer")]:
             with self.subTest(agent=name):
                 self.assertIn(ATTRIBUTION, (ROOT / "agents" / f"{name}.md").read_text())
+        for area in FINAL_AREAS:
+            with self.subTest(agent=f"final-{area}"):
+                self.assertIn(FINAL_ATTRIBUTION,
+                              (ROOT / "agents" / f"final-{area}.md").read_text())
 
     def test_area_agents_name_area_rules(self):
         """Decisione 9: nella sezione «Area `<area>`» l'insieme degli id `R-<AREA>-nn` nominati è
@@ -198,6 +211,24 @@ class ManifestTest(unittest.TestCase):
                     self.assertIn("dati non fidati", section)
                     self.assertIn("senza modifiche", section)
                     self.assertIn("si segnala una volta sola", section)
+            if area not in FINAL_AREAS:
+                continue
+            with self.subTest(agent=f"final-{area}"):
+                # lo specialista finale vede solo il diff: nomina le sole regole che si giudicano
+                # sul diff, con una sola frase «si giudicano sul diff», e lascia le altre al
+                # revisore del task senza nominarne gli id (come `final-reviewer`)
+                text = (ROOT / "agents" / f"final-{area}.md").read_text()
+                self.assertEqual(text.count(f"\n## Area `{area}`\n"), 1)
+                raw = text.split(f"\n## Area `{area}`\n")[1].split("\n## ")[0]
+                section = " ".join(raw.split())
+                self.assertIn(f"rules-{area}", section)
+                self.assertEqual(named(section), ids - on_report)
+                dif = [s for s in sentences(raw) if "si giudicano sul diff" in s]
+                self.assertEqual(len(dif), 1)
+                self.assertEqual(named(dif[0]), ids - on_report)
+                self.assertFalse([s for s in sentences(raw) if "si giudicano sul report" in s])
+                self.assertIn("revisore del task", section)
+                self.assertIn("lista di controllo", section.lower())
 
     def test_real_infra_agent_names_uncovered_commands(self):
         """Decisione 10: la sezione «Area `infra`» non dice più che le scritture remote di KV, D1
@@ -220,6 +251,16 @@ class ManifestTest(unittest.TestCase):
                      "python3 -m http.server", "browser", "test del progetto"):
             self.assertIn(word, section)
         self.assertIn("Non lanci", section)
+
+    def test_real_database_agent_names_forbidden_tools(self):
+        """Decisione 11 di B7: la sezione «Area `database`» dell'implementatore vieta `supabase`,
+        `psql`, `docker`, `prisma`, `drizzle-kit` e un lanciatore di pacchetti, e dice che le
+        prove passano da `<programma> verify`."""
+        text = (ROOT / "agents" / "implementer-database.md").read_text()
+        section = " ".join(text.split("\n## Area `database`\n")[1].split("\n## ")[0].split())
+        for word in ("supabase", "psql", "docker", "prisma", "drizzle-kit", "npx", "npm", "pnpm",
+                     "yarn", "bunx", "verify", "dod", "Non lanci"):
+            self.assertIn(word, section)
 
     def test_final_reviewers_leave_report_rules_of_areas(self):
         for name in ("final-reviewer", "finding-verifier"):

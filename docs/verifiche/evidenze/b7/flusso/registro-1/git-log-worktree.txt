@@ -1,0 +1,18 @@
+18896e6 la funzione notes legge i tag
+afdd9db indice su tags.note_id e verifica di (select auth.uid()) nel test
+3ce626f tabella tags con RLS e policy select
+4e36e4c approvazione del piano
+d611ba4 report giro avversariale piano 4
+32b1a6a piano: regex ancorate per i blocchi tags (giro avversariale 3)
+c05ceda piano: delimitazione del blocco policy e passo rosso (giro avversariale 2)
+cc71121 piano: policy select, nome migrazione e regex dalla spec (giro avversariale 1)
+c88bf8e piano: tag per le note (prova b7)
+32cb93f spec approvata: approvazione e report (spec 1)
+99c1203 report giro avversariale spec 5
+6547e42 spec: policy di sola lettura, tags.note_id, limite dei test; report giro 4
+77ce7d0 spec: indice su note_id e test M2; report giro 3
+4decc03 spec: test della policy, indice, fetta unica; report giro 2
+f4303d8 spec: policy, schema e forma della lettura dei tag; report giro 1
+de29f85 spec: tag per le note
+e57de4a profilo database proposto da init
+82270fe base

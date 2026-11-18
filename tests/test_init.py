@@ -1132,6 +1132,13 @@ class ProfileBlocksTest(PluginMixin, unittest.TestCase):
         self.assertEqual(self.paths_of(["**/vercel.json"], ["vercel.json", "apps/web/vercel.json"]),
                          ["/vercel.json", "apps/web/vercel.json"])
 
+    def test_name_path_dropped_when_ext_covers(self):
+        files = ["vercel.json", "apps/web/vercel.json", "apps/web/tsconfig.json"]
+        paths = self.paths_of(["**/vercel.json", "**/*.json"], files)
+        self.assertEqual(paths, ["**/*.json"])
+        for f in files:
+            self.assertTrue(globs.match(paths[0], f), f)
+
     def test_name_pattern_dir_escaped(self):
         paths = self.paths_of(["**/vercel.json"], ["app/[id]/vercel.json"])
         self.assertEqual(paths, ["app/\\[id\\]/vercel.json"])
@@ -1323,9 +1330,11 @@ class FrontendPrecedenceTest(unittest.TestCase):
                    {"prompts/Card.tsx": "ai"})
 
     def test_real_precedence_p14(self):
+        """Con `database` (B7, caso Q2) `supabase/` è dell'area `database`: la funzione che
+        prima andava a `frontend` va a `database`, per un segmento letterale contro zero."""
         self.check(["supabase/functions/og/index.tsx", "src/main.tsx"],
-                   {"frontend": ["**/*.tsx"]},
-                   {"supabase/functions/og/index.tsx": "frontend", "src/main.tsx": "frontend"})
+                   {"database": ["/supabase/**"], "frontend": ["**/*.tsx"]},
+                   {"supabase/functions/og/index.tsx": "database", "src/main.tsx": "frontend"})
 
     def test_real_precedence_p15(self):
         files = ["src/routes/+page.svelte", "src/routes/+page.server.ts"]
@@ -1480,6 +1489,338 @@ class FrontendPrecedenceTest(unittest.TestCase):
         got = init.profile_blocks({f: 10 for f in [*files, "src/main.tsx"]}, DEFAULT_TOML, root)
         proposed = tomllib.loads(DEFAULT_TOML + got.text)["profiles"]["frontend"]
         self.assertEqual(proposed["paths"], ["**/*.tsx"])
+
+
+class DatabasePrecedenceTest(unittest.TestCase):
+    """La tabella delle precedenze di `database` (B7, decisione 5), con i frammenti veri: stessa
+    forma di `FrontendPrecedenceTest` (la `Proposta` di `init` per ogni profilo e il `Runtime` di
+    `vertical_for`). `detected` è ciò che il rilevamento per contenuto trova: lo dà il test, senza
+    i file sotto un `exclude` di un altro frammento (come farebbe `detect_files`)."""
+
+    check = FrontendPrecedenceTest.check
+
+    def test_real_precedence_q1(self):
+        self.check(["supabase/migrations/20240101000000_init.sql", "supabase/config.toml"],
+                   {"database": ["/supabase/**"]},
+                   {"supabase/migrations/20240101000000_init.sql": "database",
+                    "supabase/config.toml": "database"})
+
+    def test_real_precedence_q2(self):
+        self.check(["supabase/functions/og/index.tsx", "src/main.tsx"],
+                   {"database": ["/supabase/**"], "frontend": ["**/*.tsx"]},
+                   {"supabase/functions/og/index.tsx": "database", "src/main.tsx": "frontend"})
+
+    def test_real_precedence_q3(self):
+        self.check(["supabase/functions/hello/index.ts"],
+                   {"database": ["/supabase/**"]},
+                   {"supabase/functions/hello/index.ts": "database"})
+
+    def test_real_precedence_q4(self):
+        self.check(["supabase/functions/chat/index.ts", "supabase/migrations/1_a.sql"],
+                   {"ai": ["supabase/functions/chat/index.ts"], "database": ["/supabase/**"]},
+                   {"supabase/functions/chat/index.ts": "ai",
+                    "supabase/migrations/1_a.sql": "database"},
+                   detected={"ai": ["supabase/functions/chat/index.ts"]})
+
+    def test_real_precedence_q5(self):
+        self.check(["server/app.py", "server/db/schema.sql"],
+                   {"backend": ["/server/**"], "database": ["**/*.sql"]},
+                   {"server/app.py": "backend", "server/db/schema.sql": "backend"})
+
+    def test_real_precedence_q6(self):
+        self.check(["server/app.py", "server/migrations/001.sql"],
+                   {"backend": ["/server/**"], "database": ["server/migrations/**"]},
+                   {"server/app.py": "backend", "server/migrations/001.sql": "database"})
+
+    def test_real_precedence_q7(self):
+        self.check(["src/ai/agent.py", "src/ai/queries.sql"],
+                   {"ai": ["src/ai/**"], "database": ["**/*.sql"]},
+                   {"src/ai/agent.py": "ai", "src/ai/queries.sql": "ai"})
+
+    def test_real_precedence_q8(self):
+        self.check(["infra/main.ts", "infra/init.sql"],
+                   {"database": ["**/*.sql"], "infra": ["/infra/**"]},
+                   {"infra/main.ts": "infra", "infra/init.sql": "infra"})
+
+    def test_real_precedence_q9(self):
+        self.check(["src/db/schema.ts", "src/main.ts"],
+                   {"database": ["src/db/schema.ts"]},
+                   {"src/db/schema.ts": "database", "src/main.ts": None},
+                   detected={"database": ["src/db/schema.ts"]})
+
+    def test_real_precedence_q10(self):
+        self.check(["prisma/schema.prisma",
+                    "prisma/migrations/2024_init/migration.sql",
+                    "server/app.ts"],
+                   {"backend": ["/server/**"], "database": ["/prisma/**"]},
+                   {"prisma/schema.prisma": "database",
+                    "prisma/migrations/2024_init/migration.sql": "database",
+                    "server/app.ts": "backend"})
+
+    def test_real_precedence_q11(self):
+        self.check(["apps/api/supabase/functions/x/index.ts",
+                    "apps/api/supabase/migrations/1_a.sql"],
+                   {"backend": ["apps/api/supabase/functions/x/index.ts"],
+                    "database": ["apps/api/supabase/migrations/**"]},
+                   {"apps/api/supabase/functions/x/index.ts": "backend",
+                    "apps/api/supabase/migrations/1_a.sql": "database"},
+                   detected={"backend": ["apps/api/supabase/functions/x/index.ts"]})
+
+    def test_real_precedence_q12(self):
+        self.check(["database/migrations/2024_create_users.php", "app/Models/User.php"],
+                   {"database": ["database/migrations/**"]},
+                   {"database/migrations/2024_create_users.php": "database",
+                    "app/Models/User.php": None})
+
+    def test_real_precedence_q13(self):
+        self.check(["alembic/versions/1975_create.py", "app/main.py"],
+                   {},
+                   {"alembic/versions/1975_create.py": None, "app/main.py": None})
+
+    def test_real_precedence_q14(self):
+        self.check(["scripts/backfill.sql", "docs/queries.sql"],
+                   {"database": ["**/*.sql"]},
+                   {"scripts/backfill.sql": "database", "docs/queries.sql": "database"})
+
+    def test_real_precedence_q15(self):
+        self.check(["src/components/Table.tsx", "src/components/migrations/List.tsx"],
+                   {"database": ["src/components/migrations/**"],
+                    "frontend": ["src/components/**"]},
+                   {"src/components/migrations/List.tsx": "database"})
+
+    def test_real_precedence_q16(self):
+        self.check(["api/users.ts", "api/migrations/001.sql"],
+                   {"backend": ["/api/**"], "database": ["api/migrations/**"]},
+                   {"api/users.ts": "backend", "api/migrations/001.sql": "database"})
+
+    def test_real_precedence_q17(self):
+        self.check(["supabase/functions/og/index.tsx",
+                    "supabase/functions/_shared/cors.ts",
+                    "supabase/seed.sql"],
+                   {"database": ["/supabase/**"]},
+                   {"supabase/functions/og/index.tsx": "database",
+                    "supabase/functions/_shared/cors.ts": "database",
+                    "supabase/seed.sql": "database"})
+
+    def test_real_precedence_q18(self):
+        self.check([".github/tollgate/x.sql", ".claude/q.sql", "db/a.sql"],
+                   {"database": ["**/*.sql"]},
+                   {".github/tollgate/x.sql": "database",
+                    ".claude/q.sql": "database",
+                    "db/a.sql": "database"})
+
+    def test_real_precedence_q19(self):
+        self.check(["supabase/migrations/1.sql", "src/routes/index.tsx"],
+                   {"database": ["/supabase/**"], "frontend": ["**/*.tsx"]},
+                   {"supabase/migrations/1.sql": "database", "src/routes/index.tsx": "frontend"},
+                   detected={"frontend": ["src/routes/index.tsx"]})
+
+    def test_real_precedence_q20(self):
+        self.check(["web/supabase.ts", "src/lib/supabase.ts", "supabase/migrations/1.sql"],
+                   {"database": ["/supabase/**"], "frontend": ["/web/**"]},
+                   {"web/supabase.ts": "frontend", "src/lib/supabase.ts": None})
+
+    def test_real_precedence_q21(self):
+        self.check(["server/app.py", "server/blog/migrations/0001_initial.py"],
+                   {"backend": ["/server/**"], "database": ["server/blog/migrations/**"]},
+                   {"server/app.py": "backend",
+                    "server/blog/migrations/0001_initial.py": "database"})
+
+    def test_real_precedence_q22(self):
+        self.check(["server/app.ts", "server/db/schema.ts", "drizzle.config.ts"],
+                   {"backend": ["/server/**"],
+                    "database": ["/drizzle.config.ts", "server/db/schema.ts"]},
+                   {"server/app.ts": "backend",
+                    "server/db/schema.ts": "database",
+                    "drizzle.config.ts": "database"},
+                   detected={"database": ["server/db/schema.ts", "drizzle.config.ts"]})
+
+    def test_real_precedence_q23(self):
+        self.check(["apps/web/supabase/migrations/1.sql", "apps/web/supabase/config.toml"],
+                   {"database": ["apps/web/supabase/migrations/**"]},
+                   {"apps/web/supabase/migrations/1.sql": "database",
+                    "apps/web/supabase/config.toml": None})
+
+    def test_real_precedence_q24(self):
+        self.check(["src/ai/agent.py", "src/ai/migrations/1.sql"],
+                   {"ai": ["src/ai/**"], "database": ["src/ai/migrations/**"]},
+                   {"src/ai/migrations/1.sql": "database"})
+
+    def test_real_precedence_q25(self):
+        self.check(["supabase/tests/rls.test.sql", "supabase/migrations/1.sql"],
+                   {"database": ["/supabase/**"]},
+                   {"supabase/tests/rls.test.sql": "database",
+                    "supabase/migrations/1.sql": "database"})
+
+    def test_real_precedence_q26(self):
+        self.check(["src/routes/users.ts", "src/routes/queries.sql"],
+                   {"backend": ["src/routes/**"], "database": ["**/*.sql"]},
+                   {"src/routes/users.ts": "backend", "src/routes/queries.sql": "backend"})
+
+    def test_real_precedence_q27(self):
+        self.check(["infra/main.ts", "infra/migrations/1.sql"],
+                   {"database": ["infra/migrations/**"], "infra": ["/infra/**"]},
+                   {"infra/migrations/1.sql": "database"})
+
+    def test_real_precedence_q28(self):
+        self.check(["web/index.html", "web/schema.sql"],
+                   {"database": ["**/*.sql"], "frontend": ["/web/**"]},
+                   {"web/index.html": "frontend", "web/schema.sql": "frontend"})
+
+    def test_real_precedence_q29(self):
+        self.check(["docs/schema.sql", "docs/migrations/guida.md"],
+                   {"database": ["**/*.sql"]},
+                   {"docs/schema.sql": "database", "docs/migrations/guida.md": None})
+
+    def test_real_precedence_q30(self):
+        self.check(["api/x.ts", "supabase/functions/f/index.ts", "supabase/migrations/1.sql"],
+                   {"backend": ["/api/**"], "database": ["/supabase/**"]},
+                   {"api/x.ts": "backend",
+                    "supabase/functions/f/index.ts": "database",
+                    "supabase/migrations/1.sql": "database"})
+
+    def test_real_precedence_q31(self):
+        self.check(["supabase/functions/agents/index.ts", "supabase/migrations/1.sql"],
+                   {"ai": ["supabase/functions/agents/**"], "database": ["/supabase/**"]},
+                   {"supabase/functions/agents/index.ts": "ai"})
+
+    def test_real_precedence_q32(self):
+        self.check(["supabase/functions/chat/prompts/system.ts", "supabase/migrations/1.sql"],
+                   {"ai": ["supabase/functions/chat/prompts/**"], "database": ["/supabase/**"]},
+                   {"supabase/functions/chat/prompts/system.ts": "ai"})
+
+    def test_real_precedence_q33(self):
+        self.check(["supabase/functions/Dockerfile", "supabase/migrations/1.sql"],
+                   {"database": ["/supabase/**"], "infra": ["supabase/functions/Dockerfile"]},
+                   {"supabase/functions/Dockerfile": "infra"})
+
+    def test_real_precedence_q34(self):
+        self.check(["docs/migrations/guida.md", "docs/migrations/esempio.sql", "README.md"],
+                   {"database": ["docs/migrations/**"]},
+                   {"docs/migrations/guida.md": "database",
+                    "docs/migrations/esempio.sql": "database"})
+
+    def test_real_precedence_q35(self):
+        self.check(["server/app.py", "tests/fixtures/schema.sql", "tests/test_app.py"],
+                   {"backend": ["/server/**"], "database": ["**/*.sql"]},
+                   {"tests/fixtures/schema.sql": "database"})
+
+    def test_real_precedence_q36(self):
+        self.check(["packages/db/prisma/schema.prisma",
+                    "packages/db/prisma/migrations/1/migration.sql"],
+                   {"database": ["packages/db/prisma/migrations/**"]},
+                   {"packages/db/prisma/schema.prisma": None,
+                    "packages/db/prisma/migrations/1/migration.sql": "database"})
+
+    def test_real_precedence_q37(self):
+        self.check(["app/migrations/page.tsx", "app/page.tsx"],
+                   {"database": ["app/migrations/**"], "frontend": ["**/*.tsx"]},
+                   {"app/migrations/page.tsx": "database"})
+
+    def test_real_precedence_q38(self):
+        self.check(["migrations/0001_init.sql", "wrangler.toml", "src/index.ts"],
+                   {"database": ["/migrations/**"], "infra": ["/wrangler.toml"]},
+                   {"migrations/0001_init.sql": "database"})
+
+    def test_real_precedence_q39(self):
+        self.check(["supabase/docker/docker-compose.yml", "supabase/migrations/1.sql"],
+                   {"database": ["/supabase/**"], "infra": ["supabase/docker/docker-compose.yml"]},
+                   {"supabase/docker/docker-compose.yml": "infra"})
+
+    def test_real_precedence_q40(self):
+        self.check(["prisma/seed.ts", "prisma/schema.prisma"],
+                   {"ai": ["prisma/seed.ts"], "database": ["/prisma/**"]},
+                   {"prisma/seed.ts": "ai"},
+                   detected={"ai": ["prisma/seed.ts"]})
+
+    def test_real_precedence_q41(self):
+        self.check(["tests/migrations/test_0001.py", "app/models.py"],
+                   {"database": ["tests/migrations/**"]},
+                   {"tests/migrations/test_0001.py": "database"})
+
+    def test_real_precedence_q42(self):
+        self.check(["web/supabase/functions/f/index.ts",
+                    "web/supabase/config.toml",
+                    "web/supabase/migrations/1.sql",
+                    "web/app/page.tsx"],
+                   {"database": ["web/supabase/migrations/**"], "frontend": ["/web/**"]},
+                   {"web/supabase/functions/f/index.ts": "frontend",
+                    "web/supabase/config.toml": "frontend",
+                    "web/supabase/migrations/1.sql": "database"})
+
+    def test_real_precedence_q43(self):
+        self.check(["server/prisma/schema.prisma",
+                    "server/prisma/migrations/1/migration.sql",
+                    "server/app.ts"],
+                   {"backend": ["/server/**"], "database": ["server/prisma/migrations/**"]},
+                   {"server/prisma/schema.prisma": "backend",
+                    "server/prisma/migrations/1/migration.sql": "database"})
+
+    def test_real_precedence_q44(self):
+        self.check(["src/index.ts"],
+                   {"backend": ["src/index.ts"], "database": ["src/index.ts"]},
+                   {"src/index.ts": "backend"},
+                   detected={"backend": ["src/index.ts"], "database": ["src/index.ts"]})
+
+    def test_real_precedence_q45(self):
+        """La cartella d'uscita di Drizzle: i suoi `.sql` sono schema, i `.json` di `drizzle-kit`
+        no; la configurazione e lo schema, trovati per contenuto, entrano come percorsi esatti."""
+        self.check(["drizzle/0000_init.sql",
+                    "drizzle/meta/_journal.json",
+                    "drizzle/meta/0000_snapshot.json",
+                    "drizzle.config.ts",
+                    "src/db/schema.ts"],
+                   {"database": ["**/*.sql", "/drizzle.config.ts", "src/db/schema.ts"]},
+                   {"drizzle/0000_init.sql": "database",
+                    "drizzle.config.ts": "database",
+                    "src/db/schema.ts": "database",
+                    "drizzle/meta/_journal.json": None,
+                    "drizzle/meta/0000_snapshot.json": None},
+                   detected={"database": ["drizzle.config.ts", "src/db/schema.ts"]})
+
+    def test_real_precedence_q46(self):
+        """Lo schema di Drizzle dentro la cartella di `ai` o di `frontend`: il percorso esatto
+        trovato per contenuto vince sulla cartella."""
+        with self.subTest(area="ai"):
+            self.check(["src/ai/db.ts", "src/ai/agent.py"],
+                       {"ai": ["src/ai/**"], "database": ["src/ai/db.ts"]},
+                       {"src/ai/db.ts": "database", "src/ai/agent.py": "ai"},
+                       detected={"database": ["src/ai/db.ts"]})
+        with self.subTest(area="frontend"):
+            self.check(["src/components/db.ts", "src/components/Table.tsx"],
+                       {"database": ["src/components/db.ts"], "frontend": ["src/components/**"]},
+                       {"src/components/db.ts": "database"},
+                       detected={"database": ["src/components/db.ts"]})
+
+    def test_real_precedence_q47(self):
+        """Un `.sql` dentro una cartella di `ai` annidata in `prisma/`: due segmenti contro uno."""
+        self.check(["prisma/ai/seed.sql", "prisma/schema.prisma", "src/ai/agent.py"],
+                   {"ai": ["prisma/ai/**", "src/ai/**"], "database": ["/prisma/**"]},
+                   {"prisma/ai/seed.sql": "ai", "prisma/schema.prisma": "database"})
+
+
+class DatabaseAgentsProposeTest(unittest.TestCase):
+    """Decisione 10 di B7: `init` propone `final_specialist` solo se `agents/final-database.md`
+    esiste nel plugin (`_agent_exists`); con i file veri del plugin c'è."""
+
+    def test_real_database_proposes_final_specialist(self):
+        root = _real_fragments_root(self, areas=("database",))
+        (root / "agents").mkdir()
+        for name in ("implementer-database", "reviewer-database"):
+            shutil.copy(ROOT / "agents" / f"{name}.md", root / "agents" / f"{name}.md")
+        files = {"supabase/migrations/20260101000000_init.sql": 10}
+        got = init.profile_blocks(files, DEFAULT_TOML, root)
+        prof = tomllib.loads(DEFAULT_TOML + got.text)["profiles"]["database"]
+        self.assertNotIn("final_specialist", prof)
+        self.assertTrue(any("final_specialist" in l and "final-database.md" in l
+                            for l in got.lines), got.lines)
+        shutil.copy(ROOT / "agents" / "final-database.md", root / "agents" / "final-database.md")
+        got = init.profile_blocks(files, DEFAULT_TOML, root)
+        prof = tomllib.loads(DEFAULT_TOML + got.text)["profiles"]["database"]
+        self.assertEqual((prof["agent"], prof["reviewer"], prof["final_specialist"]),
+                         ("tollgate:implementer-database", "tollgate:reviewer-database",
+                          "tollgate:final-database"))
+        self.assertTrue(prof["checklist"])
 
 
 class ProfilesProposeTest(PluginMixin, InitCase):

@@ -1,0 +1,48 @@
+# tentativo-1: sessione 1, cartella -tmp-tollgate-b1-flow
+nessuna trascrizione di subagente
+# tentativo-1: sessione 2, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-aggiungi-i-tag-alle-note
+nessuna trascrizione di subagente
+# tentativo-1: sessione 3, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-aggiungi-i-tag-alle-note
+agent-a7b41719d9c39451b.jsonl: nessun titolo
+agent-a8c3a940b923b9bfc.jsonl: nessun titolo
+agent-af361124e1815e159.jsonl: nessun titolo
+agent-af954ac8ad050497b.jsonl: nessun titolo
+# tentativo-1: sessione 4, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-aggiungi-i-tag-alle-note
+nessuna trascrizione di subagente
+# tentativo-1: sessione 5, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-aggiungi-i-tag-alle-note
+agent-a867d8f2c999c6825.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a867d8f2c999c6825.jsonl: # Regole database (versione 1) (isMeta: sì)
+agent-a867d8f2c999c6825.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a867d8f2c999c6825.jsonl: # Regole database (versione 1) (isMeta: no)
+agent-a89a61fce317d9bc6.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a89a61fce317d9bc6.jsonl: # Regole database (versione 1) (isMeta: sì)
+agent-a89a61fce317d9bc6.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a89a61fce317d9bc6.jsonl: # Regole database (versione 1) (isMeta: no)
+# tentativo-1: sessione 6, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-aggiungi-i-tag-alle-note
+agent-a0718f3134ea10f81.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a0718f3134ea10f81.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a7d25581b75540a30.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a7d25581b75540a30.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-ae29541732c3200e7.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-ae29541732c3200e7.jsonl: # Regole database (versione 1) (isMeta: sì)
+agent-ae29541732c3200e7.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-ae29541732c3200e7.jsonl: # Regole database (versione 1) (isMeta: no)
+# tentativo-1: sessione 7, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-aggiungi-i-tag-alle-note
+nessuna trascrizione di subagente
+# tentativo-1: sessione 8, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-aggiungi-i-tag-alle-note
+agent-a07490e3a9efd511a.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a07490e3a9efd511a.jsonl: # Regole database (versione 1) (isMeta: sì)
+agent-a07490e3a9efd511a.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a07490e3a9efd511a.jsonl: # Regole database (versione 1) (isMeta: no)
+agent-a201241a7e9657abe.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a201241a7e9657abe.jsonl: # Regole database (versione 1) (isMeta: sì)
+agent-a201241a7e9657abe.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a201241a7e9657abe.jsonl: # Regole database (versione 1) (isMeta: no)
+agent-a48e8021060871bfe.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a48e8021060871bfe.jsonl: # Regole database (versione 1) (isMeta: sì)
+agent-a48e8021060871bfe.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a48e8021060871bfe.jsonl: # Regole database (versione 1) (isMeta: no)
+agent-a5bd58beb94f440a6.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a5bd58beb94f440a6.jsonl: # Regole database (versione 1) (isMeta: sì)
+agent-a5bd58beb94f440a6.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a5bd58beb94f440a6.jsonl: # Regole database (versione 1) (isMeta: no)

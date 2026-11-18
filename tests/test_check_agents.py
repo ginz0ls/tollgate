@@ -169,6 +169,78 @@ class ResumeTaskTest(unittest.TestCase):
         self.assertEqual((row["resumes"], row["fingerprint"]), (1, before))
 
 
+class RelaunchInNewSessionTest(unittest.TestCase):
+    """Giro di correzione quando la sessione dell'implementatore è finita (SendMessage non arriva)."""
+
+    def setUp(self):
+        self.lab = Lab()
+        with_scope(self.lab)
+        tasks.assign(self.lab.conn, self.lab.work, 1, implementer="tg-7-t1", agent_type=IMPL,
+                     pending="launch", now=self.lab.now)
+
+    def tearDown(self):
+        self.lab.close()
+
+    def to_resume(self, session=None):
+        start(self.lab, "a1")
+        subagents.finish(self.lab.conn, "a1", state="done", declared_status="DONE",
+                         now=self.lab.now)
+        if session is not None:
+            self.lab.conn.execute("UPDATE subagents SET session = ? WHERE id = 'a1'", (session,))
+            self.lab.conn.commit()
+        tasks.assign(self.lab.conn, self.lab.work, 1, implementer="tg-7-t1", agent_type=IMPL,
+                     pending="resume", now=self.lab.now)
+
+    def reserved(self):
+        return tasks.get_task(self.lab.conn, self.lab.work, 1)["reserved_at"]
+
+    def test_other_session_relaunch_allowed_and_reserves(self):
+        self.to_resume(session="sessione-finita")
+        r = self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1"))
+        self.assertEqual(r.exit, 0)
+        self.assertIsNotNone(self.reserved())
+        self.assertEqual(tasks.get_task(self.lab.conn, self.lab.work, 1)["pending"], "resume")
+
+    def test_same_session_relaunch_denied_with_sendmessage_hint(self):
+        self.to_resume()
+        r = self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1"))
+        self.assertEqual(r.exit, 2)
+        self.assertIn("SendMessage", r.stderr)
+        self.assertIsNone(self.reserved())
+
+    def test_other_session_with_different_name_denied(self):
+        self.to_resume(session="sessione-finita")
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "altro-nome")).exit, 2)
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL)).exit, 2)
+
+    def test_other_session_background_and_reservation_still_checked(self):
+        self.to_resume(session="sessione-finita")
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1", bg=True)).exit, 2)
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1")).exit, 0)
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1")).exit, 2)
+
+    def test_resume_without_any_subagent_allowed(self):
+        tasks.assign(self.lab.conn, self.lab.work, 1, implementer="tg-7-t1", agent_type=IMPL,
+                     pending="resume", now=self.lab.now)
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1")).exit, 0)
+
+    def test_new_launch_binds_to_task_and_clears_pending(self):
+        self.to_resume(session="sessione-finita")
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t1")).exit, 0)
+        start(self.lab, "a2")
+        row = subagents.get(self.lab.conn, "a2")
+        self.assertEqual(row["task"], 1)
+        self.assertEqual(row["session"], SESSION)
+        t = tasks.get_task(self.lab.conn, self.lab.work, 1)
+        self.assertIsNone(t["pending"])
+        self.assertIsNone(t["reserved_at"])
+
+    def test_new_launch_does_not_take_a_launch_task_of_other_type(self):
+        self.to_resume(session="sessione-finita")
+        start(self.lab, "a2", atype="probe:implementer-frontend")
+        self.assertEqual(tasks.get_task(self.lab.conn, self.lab.work, 1)["pending"], "resume")
+
+
 class StartAndResumeTest(unittest.TestCase):
     def setUp(self):
         self.lab = Lab()

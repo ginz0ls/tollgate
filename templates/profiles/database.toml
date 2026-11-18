@@ -1,0 +1,61 @@
+# Frammento del profilo `database`: migrazioni, schema, policy di accesso, funzioni del database e
+# edge function di Supabase. `init` lo completa con `rules` e `blocking_rules`, che calcola dalle
+# righe `R-DATABASE-NN` di skills/rules-database/SKILL.md. Il profilo si propone solo dopo
+# l'approvazione di quella skill (campo `approved`). Restano fuori il codice che usa il database
+# (un client di Supabase, le query di un server), le migrazioni di Alembic e di Rails e i file
+# `drizzle/meta/*.json` che scrive `drizzle-kit`. Nessun `[detect] exclude`: le cartelle
+# `migrations/` dentro `server/`, `api/` o `infra/` e uno schema di Drizzle dentro `server/` devono
+# andare a `database`. I `.sql` dentro le cartelle di un altro profilo restano a quel profilo: il
+# pattern per estensione non ha segmenti letterali e a runtime perde contro ogni cartella e ogni
+# file di un altro profilo. Le edge function di Supabase sono di questo profilo: `backend` e
+# `frontend` escludono `supabase/`.
+
+[profile]
+kind = "vertical"
+# Un cambio di schema è delicato: il lavoro sale a L2 (progetto di B, sezione 4).
+min_level = "L2"
+paths = [
+  # Supabase: la cartella `supabase/` alla radice, da versionare, con `config.toml`, le migrazioni
+  # in `supabase/migrations/`, `seed.sql`, i test e le edge function in `supabase/functions/`
+  # (https://supabase.com/docs/guides/local-development/cli/getting-started); solo alla radice, le
+  # cartelle annidate sono di chi le contiene.
+  "supabase/**",
+  # Cartelle delle migrazioni a qualunque profondità (catalogo 2.1, riga `database`): Supabase
+  # (https://supabase.com/docs/guides/deployment/database-migrations), Prisma
+  # (https://www.prisma.io/docs/orm/prisma-migrate/understanding-prisma-migrate/migration-histories)
+  # e gli altri strumenti che le chiamano `migrations/`. Può accendere anche una cartella con quel
+  # nome che non è di database: la pagina del profilo lo dice.
+  "**/migrations/**",
+  # Prisma: `prisma/schema.prisma` e `prisma/migrations/` alla radice
+  # (https://www.prisma.io/docs/orm/prisma-migrate/understanding-prisma-migrate/migration-histories).
+  "prisma/**",
+  # File SQL a qualunque profondità (catalogo 2.1, riga `database`); un `.sql` dentro la cartella di
+  # un altro profilo resta a quel profilo.
+  "**/*.sql",
+]
+# Vuoti di proposito: `rules-database` la precaricano gli agenti dell'area; applicare e annullare
+# una migrazione vuole lo stack locale di Supabase o un PostgreSQL, che dipendono dal progetto, e
+# un `dod` scritto da `init` fallirebbe dove il programma manca, quindi l'utente li aggiunge a mano.
+skills = []
+reviewer_skills = []
+commands = {}
+dod = []
+agent = "tollgate:implementer-database"
+reviewer = "tollgate:reviewer-database"
+# Lo specialista della revisione finale (catalogo 2.1) e la lista di controllo che `finalreview`
+# mette nel suo brief e in quello del revisore generale.
+final_specialist = "tollgate:final-database"
+checklist = "migrazioni reversibili e dati esistenti; con PostgreSQL anche RLS sulle tabelle nuove e indici delle policy e delle chiavi esterne"
+
+# Solo le definizioni di schema e la configurazione di Drizzle, come testo fisso nelle due forme di
+# virgolette. Non sono marcatori i client del database (`@supabase/supabase-js`, `pg`,
+# `@prisma/client` e simili): toglierebbero il file a `frontend`, `backend` o `ai`.
+[detect]
+content = [
+  # Tabelle di Drizzle per PostgreSQL (https://orm.drizzle.team/docs/get-started/supabase-new).
+  "from 'drizzle-orm/pg-core'",
+  "from \"drizzle-orm/pg-core\"",
+  # Configurazione delle migrazioni di Drizzle (https://orm.drizzle.team/docs/drizzle-config-file).
+  "from 'drizzle-kit'",
+  "from \"drizzle-kit\"",
+]

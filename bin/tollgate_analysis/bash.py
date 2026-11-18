@@ -1000,14 +1000,24 @@ _DEFAULT_EFFECTS = [("ssh",), ("scp",), ("rsync",), ("psql",), ("docker", "push"
                     ("wrangler", "pages", "secret", "bulk"),
                     ("wrangler", "pages", "secret", "delete"),
                     ("wrangler", "d1", "create"), ("wrangler", "d1", "delete"),
-                    ("wrangler", "d1", "time-travel", "restore")]
+                    ("wrangler", "d1", "time-travel", "restore"),
+                    # Prisma e Drizzle (decisione 7): scrivono sul database di DATABASE_URL.
+                    ("prisma", "migrate", "dev"), ("prisma", "migrate", "deploy"),
+                    ("prisma", "migrate", "reset"), ("prisma", "migrate", "resolve"),
+                    ("prisma", "db", "push"), ("prisma", "db", "execute"),
+                    ("prisma", "db", "seed"), ("prisma", "studio"),
+                    ("prisma", "db", "init"), ("prisma", "db", "update"),
+                    ("prisma", "db", "migrate"), ("prisma", "db", "sign"),
+                    ("drizzle-kit", "push"), ("drizzle-kit", "push:pg"),
+                    ("drizzle-kit", "push:mysql"), ("drizzle-kit", "push:sqlite"),
+                    ("drizzle-kit", "migrate"), ("drizzle-kit", "studio")]
 # Gruppi di Wrangler che agiscono sempre sull'account: un comando con questo prefisso e'
 # un effetto, salvo che sia una lettura (vedi `_account_group_read`).
 ACCOUNT_GROUPS: tuple[tuple[str, ...], ...] = (
     ("wrangler", "kv", "namespace"), ("wrangler", "kv:namespace"),
     ("wrangler", "r2", "bucket"))
 # (prefisso, modo): `unless_local` e' un effetto salvo che il comando sia locale; `with_remote`
-# lo e' solo con `--remote` o `--preview`.
+# lo e' solo con un'opzione remota del programma (`REMOTE_FLAGS`).
 FLAG_EFFECTS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("wrangler", "kv", "key", "put"), "unless_local"),
     (("wrangler", "kv", "key", "delete"), "unless_local"),
@@ -1020,12 +1030,45 @@ FLAG_EFFECTS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("wrangler", "r2", "object", "put"), "unless_local"),
     (("wrangler", "r2", "object", "delete"), "unless_local"),
     (("wrangler", "d1", "execute"), "with_remote"),
-    (("wrangler", "d1", "migrations", "apply"), "with_remote"))
+    (("wrangler", "d1", "migrations", "apply"), "with_remote"),
+    # Supabase (decisione 6): locali per default (la CLI 3 usa `--remote`), con un'opzione
+    # remota agiscono sul progetto collegato.
+    (("supabase", "db", "reset"), "with_remote"), (("supabase", "db", "lint"), "with_remote"),
+    (("supabase", "db", "query"), "with_remote"),
+    (("supabase", "db", "advisors"), "with_remote"),
+    (("supabase", "db", "diff"), "with_remote"), (("supabase", "db", "dump"), "with_remote"),
+    (("supabase", "migration", "list"), "with_remote"),
+    (("supabase", "migration", "squash"), "with_remote"),
+    (("supabase", "gen", "types"), "with_remote"), (("supabase", "test", "db"), "with_remote"),
+    (("supabase", "inspect", "db"), "with_remote"),
+    (("supabase", "inspect", "report"), "with_remote"),
+    (("supabase", "seed", "buckets"), "with_remote"),
+    # Scelta dell'utente (progetto 14): scrivono sul progetto collegato salvo `--local`.
+    (("supabase", "db", "push"), "unless_local"), (("supabase", "db", "pull"), "unless_local"),
+    (("supabase", "migration", "up"), "unless_local"),
+    (("supabase", "migration", "down"), "unless_local"),
+    (("supabase", "migration", "repair"), "unless_local"),
+    (("supabase", "migration", "fetch"), "unless_local"))
+# Le opzioni che puntano al servizio vero, per programma.
+REMOTE_FLAGS: dict[str, tuple[str, ...]] = {
+    "wrangler": ("--remote", "--preview"),
+    "supabase": ("--remote", "--linked", "--db-url", "--project-ref", "--project-id")}
+# Supabase: tutto cio' che non sta in queste liste o in `FLAG_EFFECTS` chiede il permesso.
+SUPABASE_LOCAL: tuple[tuple[str, ...], ...] = (
+    ("init",), ("start",), ("stop",), ("status",), ("db", "start"), ("services",), ("help",),
+    ("completion",), ("migration", "new"), ("functions", "new"), ("functions", "serve"),
+    ("test", "new"), ("gen", "signing-key"), ("gen", "bearer-jwt"))
+# Letture del progetto collegato. `branches get` e `snippets download` no (credenziali, file).
+SUPABASE_READS: tuple[tuple[str, ...], ...] = (
+    ("functions", "list"), ("functions", "download"), ("secrets", "list"),
+    ("projects", "list"), ("orgs", "list"), ("branches", "list"), ("snippets", "list"))
+# Opzioni globali della CLI: con un valore (anche `--x=v`) e senza.
+SUPABASE_VALUE_OPTIONS = ("--agent", "--dns-resolver", "--network-id", "-o", "--output",
+                          "--output-format", "--profile", "--workdir")
+SUPABASE_GLOBAL_OPTIONS = ("--debug", "--experimental", "--yes")
+_SUPABASE_HELP = ("--help", "-h", "--version")
 _READ_WORDS = ("list", "get", "info")
 _WRITE_WORDS = ("create", "delete", "rename", "update")
-_SUPABASE_WRITE = {"db", "functions", "secrets", "link", "migration", "storage", "projects",
-                   "orgs", "branches"}
-_SUPABASE_READ = {"list", "diff", "dump", "ls", "download", "--help", "-h"}
 # Lanciatori di pacchetti (decisione 17): i comandi di servizio dietro di loro sono effetti.
 LAUNCHERS = ("npx", "bunx", "pnpx", "npm", "pnpm", "yarn", "bun")
 _PACKAGE_MANAGERS = ("npm", "pnpm", "yarn", "bun")
@@ -1059,7 +1102,10 @@ def launcher_candidates(argv: list[str]) -> list[list[str]]:
     for i, tok in enumerate(argv):
         norm = _launcher_token(os.path.basename(tok) if i == 0 else tok)
         if i >= 1 and not package_command_seen and norm in programs:
-            out.append([norm] + argv[i + 1:])
+            rest = argv[i + 1:]
+            if rest[:1] == ["--"]:  # il separatore dei lanciatori non è un argomento del programma
+                rest = rest[1:]
+            out.append([norm] + rest)
         if manager_seen and tok in PACKAGE_COMMANDS:
             package_command_seen = True
         if norm in _PACKAGE_MANAGERS:
@@ -1183,25 +1229,111 @@ def _account_group_read(rest: list[str]) -> bool:
             and len(rest) > 1 and rest[1] in _READ_WORDS)
 
 
-def _wrangler_data_reason(argv: list[str]) -> str | None:
+_SUPABASE_TRUE = ("true", "1", "t", "T", "TRUE", "True")
+
+
+def _supabase_flag_present(rest: list[str], name: str) -> bool:
+    """pflag: l'opzione c'e' se compare (`--x` o `--x=<v>`), qualunque sia il valore.
+    `--local` conta solo con un valore vero. Si ferma al primo `--`."""
+    for tok in rest:
+        if tok == "--":
+            return False
+        if tok == name:
+            return True
+        if tok.startswith(name + "="):
+            return name != "--local" or tok[len(name) + 1:] in _SUPABASE_TRUE
+    return False
+
+
+def _flag_data_reason(argv: list[str]) -> str | None:
+    """Scritture sui dati di un servizio: gruppi dell'account di Wrangler e `FLAG_EFFECTS`."""
     for prefix in ACCOUNT_GROUPS:
         if argv[:len(prefix)] == list(prefix) and not _account_group_read(argv[len(prefix):]):
             return f"effetto esterno: {' '.join(prefix)}"
+    remote_flags = REMOTE_FLAGS.get(argv[0], ())
+    present = _supabase_flag_present if argv[0] == "supabase" else _flag_present
     for prefix, mode in FLAG_EFFECTS:
         if argv[:len(prefix)] != list(prefix):
             continue
         rest = argv[len(prefix):]
         label = " ".join(prefix)
         if mode == "unless_local":
-            local = (_flag_present(rest, "--local") and not _flag_present(rest, "--remote")
-                     and not _flag_present(rest, "--preview"))
+            local = present(rest, "--local") and not any(present(rest, f) for f in remote_flags)
             if not local:
                 return f"effetto esterno: {label} (senza --local)"
         else:
-            for flag in ("--remote", "--preview"):
-                if _flag_present(rest, flag):
+            for flag in remote_flags:
+                if present(rest, flag):
                     return f"effetto esterno: {label} con {flag}"
     return None
+
+
+def _supabase_args(argv: list[str]) -> list[str] | None:
+    """I comandi dopo `supabase` senza le opzioni globali iniziali; `None` se un'opzione e'
+    sconosciuta (chiede il permesso)."""
+    i = 1
+    while i < len(argv) and argv[i].startswith("-") and argv[i] != "--":
+        tok = argv[i]
+        if tok in SUPABASE_VALUE_OPTIONS:
+            i += 2
+        elif tok in SUPABASE_GLOBAL_OPTIONS or tok.split("=", 1)[0] in SUPABASE_VALUE_OPTIONS:
+            i += 1
+        else:
+            return None
+    return argv[i:]
+
+
+def _strip_value_options(tokens: list[str]) -> list[str]:
+    """Toglie le opzioni globali a valore con il loro valore (anche `--x=v`), fino al primo `--`."""
+    out: list[str] = []
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok == "--":
+            return out + tokens[i:]
+        if tok in SUPABASE_VALUE_OPTIONS:
+            i += 2
+        elif "=" in tok and tok.split("=", 1)[0] in SUPABASE_VALUE_OPTIONS:
+            i += 1
+        else:
+            out.append(tok)
+            i += 1
+    return out
+
+
+def _supabase_asks_help(argv: list[str]) -> bool:
+    """`--help`, `-h`, `--version` fuori dai valori delle opzioni e prima del primo `--`."""
+    for tok in _strip_value_options(argv[1:]):
+        if tok == "--":
+            return False
+        if tok in _SUPABASE_HELP:
+            return True
+    return False
+
+
+def _startswith_any(words: list[str], table) -> bool:
+    return any(words[:len(entry)] == list(entry) for entry in table)
+
+
+def _supabase_reason(argv: list[str]) -> str | None:
+    """Regola chiusa (decisione 6): passa solo cio' che sta nelle liste e rispetta la condizione."""
+    if _supabase_asks_help(argv):
+        return None
+    words = _supabase_args(argv)
+    if words is None:
+        return "effetto esterno: supabase con un'opzione sconosciuta prima del sottocomando"
+    words = _strip_value_options(words)
+    if not words:
+        return None
+    if _startswith_any(words, SUPABASE_LOCAL):
+        return None
+    norm = ["supabase"] + words
+    if any(norm[:len(prefix)] == list(prefix) for prefix, _ in FLAG_EFFECTS
+           if prefix[0] == "supabase"):
+        return _flag_data_reason(norm)
+    if _startswith_any(words, SUPABASE_READS):
+        return None
+    return "effetto esterno: supabase " + " ".join(w for w in words[:2] if not w.startswith("-"))
 
 
 SCRIPT_VALUE_OPTIONS = ("-w", "--workspace", "-F", "--filter", "-C", "--dir", "--prefix",
@@ -1246,12 +1378,9 @@ def effect_reason(cmd: Cmd, cfg: EffectsCfg) -> str | None:
         for prefix in _DEFAULT_EFFECTS:
             if argv[:len(prefix)] == list(prefix):
                 return f"effetto esterno: {' '.join(prefix)}"
-        reason = _wrangler_data_reason(argv)
+        reason = _supabase_reason(argv) if argv[0] == "supabase" else _flag_data_reason(argv)
         if reason:
             return reason
-        if argv[0] == "supabase" and len(argv) > 1 and argv[1] in _SUPABASE_WRITE \
-                and not (len(argv) > 2 and argv[2] in _SUPABASE_READ):
-            return "effetto esterno: supabase in scrittura"
     for call_text in _launcher_call_texts(a) if base in LAUNCHERS else ():
         try:
             inner = parse(call_text, cmd.cwd)
@@ -1331,11 +1460,10 @@ _TEXT_EFFECTS = [
     (re.compile(_B + r"\s+".join(re.escape(w) for w in prefix) + _E),
      "effetto esterno: " + " ".join(prefix)) for prefix in ACCOUNT_GROUPS] + [
     (re.compile(_B + r"\s+".join(re.escape(w) for w in prefix) + _E +
-                (r"[^;&|]*\s--(?:remote|preview)\b" if mode == "with_remote" else "")),
-     "effetto esterno: " + " ".join(prefix)) for prefix, mode in FLAG_EFFECTS] + [
-    (re.compile(_B + r"supabase\s+(?:db|functions|secrets|link|migration|storage|projects|orgs|"
-                r"branches)\b(?!\s+(?:list|diff|dump|ls|download)\b)"),
-     "effetto esterno: supabase in scrittura"),
+                (r"[^;&|]*\s(?:" + "|".join(REMOTE_FLAGS[prefix[0]]) + r")\b"
+                 if mode == "with_remote" else "")),
+     "effetto esterno: " + " ".join(prefix))
+    for prefix, mode in FLAG_EFFECTS if prefix[0] != "supabase"] + [
     (re.compile(_B + r"gh\s+(?:(?:-R|--repo)\s+\S+\s+)?(?:pr\s+(?:create|edit|review|close|merge)|"
                 r"workflow\s+run|issue\s+(?:edit|close|create)|release|secret|project)" + _E),
      "gh in scrittura"),
@@ -1349,9 +1477,37 @@ _TEXT_EFFECTS = [
 ]
 
 
+_SUPABASE_TEXT = re.compile(_B + r"supabase\s+([^;&|]*)")
+
+
+def _supabase_text_effect(raw: str) -> str | None:
+    """Supabase nel ripiego testuale: le una o due parole dopo `supabase` con le stesse liste,
+    senza saltare opzioni (un'opzione subito dopo `supabase` chiede)."""
+    for m in _SUPABASE_TEXT.finditer(raw):
+        words = [w.strip("'\"`)") for w in m.group(1).split()]
+        if not words:
+            continue
+        label = "effetto esterno: supabase " + " ".join(words[:2])
+        if words[0].startswith("-"):
+            return "effetto esterno: supabase con un'opzione prima del sottocomando"
+        if _startswith_any(words, SUPABASE_LOCAL):
+            continue
+        entry = next(((p, mode) for p, mode in FLAG_EFFECTS
+                      if p[0] == "supabase" and words[:len(p) - 1] == list(p[1:])), None)
+        if entry:
+            if entry[1] == "unless_local" or any(
+                    w.split("=", 1)[0] in REMOTE_FLAGS["supabase"] for w in words):
+                return label
+            continue
+        if _startswith_any(words, SUPABASE_READS):
+            continue
+        return label
+    return None
+
+
 def text_effect(raw: str) -> str | None:
     """Ripiego per i comandi che shlex non legge: effetti esterni cercati per testo."""
     for rx, label in _TEXT_EFFECTS:
         if rx.search(raw):
             return label
-    return None
+    return _supabase_text_effect(raw)

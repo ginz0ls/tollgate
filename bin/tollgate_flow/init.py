@@ -251,14 +251,16 @@ def concrete_for(path: str, patterns, exclude=()) -> str | None:
 
 def _concrete_paths(patterns, files, exclude=()) -> list[str]:
     """Decisione 3: i percorsi concreti per `files`; un percorso a cartella già coperto da uno
-    più corto si toglie, e un percorso esatto già coperto da uno a cartella."""
+    più corto si toglie, e un percorso esatto già coperto da uno a cartella o da un
+    `**/*.<estensione>` proposto dello stesso frammento."""
     found = {m for f in files if (m := _match(f, patterns, exclude))}
     dirs = {raw for kind, raw in found if kind == "dir"}
     kept = [d for d in dirs if not any(d != q and d.startswith(q + "/") for q in dirs)]
     folder_paths = [globs.escape(d) + "/**" for d in kept]
+    ext_paths = sorted({raw for kind, raw in found if kind == "ext"})
     exact = [globs.escape(raw) for kind, raw in found
-             if kind == "file" and not globs.match_any(folder_paths, raw)]
-    return sorted([*folder_paths, *exact, *(raw for kind, raw in found if kind == "ext")])
+             if kind == "file" and not globs.match_any([*folder_paths, *ext_paths], raw)]
+    return sorted([*folder_paths, *exact, *ext_paths])
 
 
 def _is_detectable(path: str, size: int | None, exclude=()) -> bool:

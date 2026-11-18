@@ -1,0 +1,16 @@
+[
+  {
+    "issue": 1,
+    "repo_key": "/tmp/tollgate-b1/origin",
+    "level": "L2",
+    "level_cap": null,
+    "phase": "pr_open",
+    "phase_before_block": null,
+    "branch": "tg/1-aggiungi-i-tag-alle-note",
+    "blocks": [],
+    "tasks": {
+      "done": 2
+    },
+    "stopped_by": []
+  }
+]

@@ -75,8 +75,9 @@ DEFAULTS: dict = {
     "review": {
         "readonly_agents": ["tollgate:task-reviewer", "tollgate:reviewer-ai",
                             "tollgate:reviewer-infra", "tollgate:reviewer-backend",
-                            "tollgate:reviewer-frontend",
-                            "tollgate:final-reviewer", "tollgate:finding-verifier",
+                            "tollgate:reviewer-frontend", "tollgate:reviewer-database",
+                            "tollgate:final-reviewer", "tollgate:final-database",
+                            "tollgate:finding-verifier",
                             "tollgate:plan-adversary", "tollgate:spec-adversary",
                             "tollgate:spec-auditor", "Explore"],
         "output_dirs": ["reports/", "coverage/"], "max_findings": 15,

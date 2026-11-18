@@ -90,8 +90,7 @@ def _parse(path: Path, plugin_root: Path) -> Fragment:
               for p in (paths if isinstance(paths, list) else [None])]
     if not isinstance(paths, list) or None in parsed:
         raise FragmentError(f"{name}: i pattern di paths devono avere la forma **/<cartella>/**, "
-                            f"<cartella>/**, **/<nome-file> o "
-                            f"**/*.<estensione>")
+                            "<cartella>/**, **/<nome-file> o **/*.<estensione>")
     extra = sorted(set(detect) - {"content", "exclude"})
     if extra:
         raise FragmentError(f"{name}: chiave sconosciuta in [detect]: {', '.join(extra)}")

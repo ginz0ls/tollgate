@@ -1,0 +1,5 @@
+# Configurazione di prova del progetto Supabase locale: solo testo, mai eseguita.
+project_id = "prova-b7"
+
+[db]
+major_version = 15

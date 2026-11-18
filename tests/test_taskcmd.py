@@ -65,6 +65,18 @@ rules = ["R-FRONTEND-01", "R-FRONTEND-10"]
 blocking_rules = ["R-FRONTEND-01"]
 """
 FRONTEND_TOML = DEFAULT_TOML + FRONTEND_BLOCK
+DATABASE_BLOCK = """
+[profiles.database]
+paths = ["supabase/**", "**/*.sql"]
+skills = []
+reviewer_skills = []
+agent = "tollgate:implementer-database"
+reviewer = "tollgate:reviewer-database"
+rules = ["R-DATABASE-01", "R-DATABASE-08"]
+blocking_rules = ["R-DATABASE-01"]
+"""
+DATABASE_TOML = DEFAULT_TOML + DATABASE_BLOCK
+BACKEND_DATABASE_TOML = DEFAULT_TOML + BACKEND_BLOCK + DATABASE_BLOCK
 BACKEND_FRONTEND_TOML = DEFAULT_TOML + BACKEND_BLOCK + FRONTEND_BLOCK
 BACKEND_INFRA_TOML = DEFAULT_TOML + BACKEND_BLOCK + INFRA_BLOCK.replace(
     'paths = ["vercel.json"]', 'paths = ["wrangler.jsonc"]')
@@ -349,6 +361,27 @@ class TaskStartTest(TaskCase):
         """Due aree nello stesso task: agenti generici (il task è da dividere)."""
         self.make(toml=BACKEND_FRONTEND_TOML,
                   plan=plan_text("- Create: `server/app.py`\n- Create: `src/components/Button.tsx`"))
+        self.start(2)
+        row = self.row(2)
+        self.assertEqual((row["agent_type"], row["reviewer_type"]),
+                         ("tollgate:implementer", "tollgate:task-reviewer"))
+
+    def test_database_task_routed_to_area_agents(self):
+        """Un blocco `database` scritto nel test (regole di una skill finta, non i file veri)."""
+        self.make(toml=DATABASE_TOML,
+                  plan=plan_text("- Create: `supabase/migrations/20260101000000_init.sql`"))
+        _, summary = self.start(2)
+        row = self.row(2)
+        self.assertEqual((row["agent_type"], row["reviewer_type"]),
+                         ("tollgate:implementer-database", "tollgate:reviewer-database"))
+        self.assertIn("tollgate:implementer-database", summary)
+        self.assertIn("revisore: tollgate:reviewer-database", summary)
+
+    def test_database_and_backend_task_goes_generic(self):
+        """Due aree nello stesso task: agenti generici (il task è da dividere)."""
+        self.make(toml=BACKEND_DATABASE_TOML,
+                  plan=plan_text("- Create: `server/app.py`\n"
+                                 "- Create: `supabase/migrations/20260101000000_init.sql`"))
         self.start(2)
         row = self.row(2)
         self.assertEqual((row["agent_type"], row["reviewer_type"]),

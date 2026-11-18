@@ -1,0 +1,6 @@
+passo: passo1
+tentativo: 1
+inizio: 2026-11-17T16:35:55
+fine: 2026-11-17T16:39:58
+uscita: 0
+esito: claude uscito con 0 (l'esito del prodotto lo dice registra)

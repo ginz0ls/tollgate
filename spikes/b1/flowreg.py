@@ -25,11 +25,12 @@ from pathlib import Path, PurePosixPath
 
 WANTED = ("research_note", "research_reminder", "veto")
 RULES_TITLE = "# Regole di base (versione 1)"
-AREA_TITLES = ("# Regole ai (versione 1)", "# Regole infra (versione 1)", "# Regole backend (versione 1)", "# Regole frontend (versione 1)", RULES_TITLE)
+AREA_TITLES = ("# Regole ai (versione 1)", "# Regole infra (versione 1)", "# Regole backend (versione 1)", "# Regole frontend (versione 1)",
+               "# Regole database (versione 1)", RULES_TITLE)
 WEB_TOOLS = ("WebFetch", "WebSearch")
 SAVED_TOOLS = ("Read", "Grep", "Bash")  # su una copia salvata da Claude Code in tool-results/ portano lo stesso testo di terzi, a qualunque lunghezza
 SAVED_DIR = "tool-results"
-SAVED_PATH = re.compile(r"""(?:^|[\s'"=:(<>,{\[@])((?:[^\s'"|;&<>()]*/)?tool-results(?:/[^\s'"|;&<>()]*)?)(?![^\s'"|;&<>()])""")
+SAVED_PATH = re.compile(r"""(?:^|[\s'"=:(<>,{\[@])((?:[^\s'"|;&<>()]*/)?tool-results(?:/[^\s'"|;&<>()]*)?)(?![^\s'"|;&<>(),}\]:\\])""")
 PAGE_PLACEHOLDER = "[pagina di terzi tolta dalle evidenze:"
 MAX_WEB_RESULT = 5000  # caratteri: oltre, il risultato di WebFetch/WebSearch è una pagina di terzi e non entra nelle evidenze pubbliche
 

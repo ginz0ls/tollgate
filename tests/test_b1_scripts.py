@@ -501,22 +501,26 @@ class FlowBench(Bench):
     def claude_p(self):
         return [c for c in self.calls() if c["args"][:1] == ["-p"]]
 
-    def src_repo(self, *, approved=True, case="b1", ai_approved=True, infra_approved=True, backend_approved=True, frontend_approved=True):
+    def src_repo(self, *, approved=True, case="b1", ai_approved=True, infra_approved=True, backend_approved=True, frontend_approved=True,
+                 database_approved=True):
         """Un piccolo repo git che traccia `bin/` del repo e una `skills/rules-base/SKILL.md`: la radice sorgente (`B1_FLOW_SRC`).
-        Con `case="ai"`, `case="infra"`, `case="backend"` o `case="frontend"` copia invece i file veri (e tracciati) che servono a
-        `init --propose`: `bin/`, `templates/`, `gate/`, `agents/`, `skills/rules-base/`, `skills/rules-ai/`, `skills/rules-infra/`,
-        `skills/rules-backend/` e `skills/rules-frontend/`; con `ai_approved=False`, `infra_approved=False`, `backend_approved=False` o
-        `frontend_approved=False` toglie `approved` dalla skill dell'area (solo quella del caso)."""
+        Con `case="ai"`, `case="infra"`, `case="backend"`, `case="frontend"` o `case="database"` copia invece i file veri (e tracciati)
+        che servono a `init --propose`: `bin/`, `templates/`, `gate/`, `agents/`, `skills/rules-base/`, `skills/rules-ai/`,
+        `skills/rules-infra/`, `skills/rules-backend/`, `skills/rules-frontend/` e `skills/rules-database/`; con `ai_approved=False`,
+        `infra_approved=False`, `backend_approved=False`, `frontend_approved=False` o `database_approved=False` toglie `approved`
+        dalla skill dell'area (solo quella del caso)."""
         src = self.dir / "src"
         (src / "skills" / "rules-base").mkdir(parents=True)
         parts = ("bin",) if case == "b1" else ("bin", "templates", "gate", "agents", "skills/rules-base", "skills/rules-ai",
-                                               "skills/rules-infra", "skills/rules-backend", "skills/rules-frontend", ".claude-plugin")
+                                               "skills/rules-infra", "skills/rules-backend", "skills/rules-frontend", "skills/rules-database",
+                                               ".claude-plugin")
         tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z", "--", *parts], capture_output=True, check=True).stdout
         for rel in filter(None, tracked.decode().split("\0")):
             (src / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / rel, src / rel)
-        if case in ("ai", "infra", "backend", "frontend"):
-            if not {"ai": ai_approved, "infra": infra_approved, "backend": backend_approved, "frontend": frontend_approved}[case]:
+        if case in ("ai", "infra", "backend", "frontend", "database"):
+            if not {"ai": ai_approved, "infra": infra_approved, "backend": backend_approved, "frontend": frontend_approved,
+                    "database": database_approved}[case]:
                 skill = src / "skills" / f"rules-{case}" / "SKILL.md"
                 skill.write_text(re.sub(r"(?m)^approved:.*\n", "", skill.read_text()))
         else:
@@ -1572,6 +1576,16 @@ class FlowScriptTest(unittest.TestCase):
         self.assertIn(sha, data["statuses"])
         self.assertEqual(self.b.calls(), [])
 
+    def test_real_flow_case_backend_proposal_has_database_block(self):
+        """Ruling: con `database` approvato (B7) la proposta del progetto di B5 ha anche il blocco `database`, per `supabase/`: il
+        progetto di B5 non cambia e il blocco `backend` resta senza `supabase/`."""
+        r = self.backend_prepara()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        profiles = tomllib.loads((self.b.flow / "tollgate.toml").read_text())["profiles"]
+        self.assertIn("/supabase/**", profiles["database"]["paths"])
+        self.assertEqual(profiles["database"]["min_level"], "L2")
+        self.assertEqual([x for x in profiles["backend"]["paths"] if x.lstrip("/").startswith("supabase")], [])
+
     def test_real_flow_case_backend_prepara_refuses_without_profile(self):
         r = self.backend_prepara(backend_approved=False)
         self.assertNotEqual(r.returncode, 0)
@@ -1735,7 +1749,6 @@ class FlowScriptTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         verify = re.search(r'(?m)^verify = "(.*)"$', (self.b.flow / "tollgate.toml").read_text()).group(1)
         self.assertIn("unittest", verify)
-        self.assertEqual((self.FRONTEND_PROJECT / "tollgate.toml").read_text(), (B1 / "flow" / "tollgate.toml").read_text())
         cmd = verify.replace("python3 ", "python3 -B ", 1)
         v = subprocess.run(cmd, shell=True, cwd=self.b.flow, capture_output=True, text=True, env=clean_env(PATH=os.environ["PATH"]))
         self.assertEqual(v.returncode, 0, v.stdout + v.stderr)
@@ -1821,6 +1834,335 @@ class FlowScriptTest(unittest.TestCase):
         d = self._flow_stream(["ls"], **self.FRONTEND_EXTRA)
         self.assertEqual((d / "limiti.txt").read_text().splitlines()[0], "Limiti della prova reale (da citare nel rapporto)")
 
+    # ------------------------------------------------------------------ il caso `database` (B7, Task 7)
+
+    DATABASE_EXTRA = dict(B1_FLOW_CASE="database", B1_FLOW_RULES="vere")
+    DATABASE_PROJECT = ROOT / "spikes" / "b7" / "flow"
+    DATABASE_INPUT = ROOT / "spikes" / "b7" / "input"
+    DATABASE_ONLY = ("psql", "postgres", "pg_ctl", "pg_dump", "prisma", "drizzle-kit")
+    DATABASE_STEPS = ("passo1", "passo2", "passo3", "passo4", "passo5", "passo6")
+
+    def database_src(self, **kw):
+        return self.b.src_repo(case="database", **kw)
+
+    def database_prepara(self, **kw):
+        return self.b.run("prepara", B1_FLOW_SRC=str(self.database_src(**kw)), **self.DATABASE_EXTRA)
+
+    def database_flow(self):
+        """prepara e il worktree del lavoro: ritorna il worktree."""
+        self.assertEqual(self.database_prepara().returncode, 0)
+        return self.b.worktree()
+
+    def test_flow_case_database_out_dir(self):
+        r = self.b.run("controlla", B1_FLOW_OUT="", **self.DATABASE_EXTRA)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("CONTROLLA: ok", r.stdout)
+        self.assertIn("B1_FLOW_CASE: database", r.stdout)
+        self.assertIn("[profiles.database]", r.stdout)
+        self.assertIn(f"cartella delle uscite: {ROOT}/docs/verifiche/evidenze/b7/flusso", r.stdout)
+        self.assertEqual(r.stderr, "")
+
+    def test_flow_case_database_requires_real_rules(self):
+        for rules in (None, "prova"):
+            for mode in ("controlla", "prepara", *self.DATABASE_STEPS, "libero", "registra"):
+                with self.subTest(rules=rules, mode=mode):
+                    extra = {} if rules is None else {"B1_FLOW_RULES": rules}
+                    r = self.b.run(mode, B1_FLOW_CASE="database", **extra)
+                    self.assertNotEqual(r.returncode, 0)
+                    self.assertIn("B1_FLOW_RULES", r.stderr)
+        self.assertEqual(self.b.calls(), [])
+        self.assertFalse(self.b.root.exists())
+
+    def test_flow_case_unknown_value_names_database(self):
+        r = self.b.run("controlla", B1_FLOW_CASE="altro")
+        self.assertNotEqual(r.returncode, 0)
+        for value in ("b1", "ai", "infra", "backend", "frontend", "database"):
+            self.assertIn(value, r.stderr)
+
+    def test_flow_case_database_steps_only_for_database(self):
+        for mode in ("passo3", "passo4", "passo5", "passo6", "libero"):
+            with self.subTest(mode=mode):
+                r = self.b.run(mode, B1_FLOW_CASE="frontend", B1_FLOW_RULES="vere")
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn("B1_FLOW_CASE=database", r.stderr)
+        self.assertEqual(self.b.calls(), [])
+
+    def test_real_flow_case_database_prepara_proposes_profile(self):
+        fragment = tomllib.loads((ROOT / "templates" / "profiles" / "database.toml").read_text())
+        r = self.database_prepara()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("plan-check: ok", r.stdout)
+        self.assertIn("spec-check: ok", r.stdout)
+        text = (self.b.flow / "tollgate.toml").read_text()
+        profiles = tomllib.loads(text)["profiles"]
+        profile = profiles["database"]
+        self.assertIn("/supabase/**", profile["paths"])
+        self.assertEqual(profile["min_level"], "L2")
+        self.assertEqual(profile["final_specialist"], "tollgate:final-database")
+        self.assertEqual(profile["checklist"], fragment["profile"]["checklist"])
+        self.assertTrue(profile["checklist"])
+        self.assertNotIn("backend", profiles, "supabase/functions/notes/index.ts è del solo profilo database")
+        self.assertIn('mode = "detect"', text)
+        for part in ("supabase/config.toml", "supabase/migrations/20261112000000_notes.sql", "supabase/functions/notes/index.ts",
+                     "tests/__init__.py", "tests/test_migrations.py"):
+            self.assertTrue((self.b.flow / part).is_file(), part)
+        for part in ("issue-1.md", "piano-L2.md", "spec-L2.md"):
+            self.assertFalse((self.b.flow / part).exists(), part)
+        self.assertFalse((self.b.flow / "docs" / "superpowers" / "tollgate-init").exists(), "la cartella della proposta si toglie")
+        self.assertTrue(list(self.b.root.glob("tollgate-init.proposta-*")))
+        git = ["git", "-C", str(self.b.flow)]
+        self.assertEqual(subprocess.run([*git, "status", "--porcelain"], capture_output=True, text=True).stdout, "")
+        self.assertEqual(subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True).stdout,
+                         subprocess.run([*git, "rev-parse", "origin/main"], capture_output=True, text=True).stdout)
+        data = json.loads((self.b.root / "fakegh-data.json").read_text())
+        self.assertIn("tag", data["issues"]["1"]["title"])
+        self.assertIn("tags", data["issues"]["1"]["body"])
+        self.assertIn("repos/{owner}/{repo}/branches/main/protection", data["api_status"])
+        sha = subprocess.run([*git, "rev-parse", "origin/main"], capture_output=True, text=True).stdout.strip()
+        self.assertIn(sha, data["statuses"])
+        self.assertEqual(self.b.calls(), [])
+
+    def test_real_flow_case_database_prepara_refuses_without_profile(self):
+        r = self.database_prepara(database_approved=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("profiles.database", r.stderr)
+
+    def test_real_flow_case_database_prepara_checks_l2_plan(self):
+        """`prepara` controlla il piano di prova con `level="L2"` e rifiuta un piano L2 senza must-have."""
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-b7-script-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / "tests").mkdir()
+        shutil.copy2(ROOT / "tests" / "fakegh.py", tmp / "tests" / "fakegh.py")
+        spikes = tmp / "spikes"
+        shutil.copytree(ROOT / "spikes" / "b1", spikes / "b1", ignore=shutil.ignore_patterns("__pycache__"))
+        shutil.copytree(ROOT / "spikes" / "b7", spikes / "b7")
+        shutil.copy2(FLOW_SCRIPT, spikes / "run-b1-flow.sh")
+        plan = spikes / "b7" / "input" / "piano-L2.md"
+        plan.write_text(re.sub(r"(?m)^- M\d\..*\n", "", plan.read_text()))
+        r = subprocess.run(["bash", str(spikes / "run-b1-flow.sh"), "prepara"], capture_output=True, text=True,
+                           env=self.b.env(B1_FLOW_SRC=str(self.database_src()), **self.DATABASE_EXTRA), timeout=300)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("il piano di prova non passa plan-check", r.stderr)
+        self.assertIn("must-have", r.stdout)
+        self.assertEqual(self.b.calls(), [])
+
+    def test_real_flow_case_database_project_verifies(self):
+        """Il `verify` del progetto (da `spikes/b7/flow`, in una copia temporanea) passa, fa girare almeno un test e scrive
+        `reports/junit.xml` con gli id nella forma dei must-have (`classname::name`)."""
+        r = self.database_prepara()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        verify = re.search(r'(?m)^verify = "(.*)"$', (self.DATABASE_PROJECT / "tollgate.toml").read_text()).group(1)
+        self.assertEqual(verify, "python3 tools/unittest_junit.py")
+        copy = Path(tempfile.mkdtemp(prefix="tollgate-b7-project-"))
+        self.addCleanup(shutil.rmtree, copy, ignore_errors=True)
+        shutil.copytree(self.DATABASE_PROJECT, copy / "flow", ignore=shutil.ignore_patterns("__pycache__", "reports"))
+        cmd = verify.replace("python3 ", "python3 -B ", 1)
+        v = subprocess.run(cmd, shell=True, cwd=copy / "flow", capture_output=True, text=True, env=clean_env(PATH=os.environ["PATH"]))
+        self.assertEqual(v.returncode, 0, v.stdout + v.stderr)
+        ran = re.search(r"Ran (\d+) tests?", v.stderr)
+        self.assertTrue(ran and int(ran.group(1)) >= 1, "il verify deve far girare almeno un test")
+        xml = (copy / "flow" / "reports" / "junit.xml").read_text()
+        self.assertIn('classname="tests.test_migrations.MigrationsTest" name="test_every_table_has_row_level_security"', xml)
+        self.assertFalse(list((copy / "flow").rglob("__pycache__")))
+        # il progetto copiato da `prepara` ha lo stesso `verify` e lo stesso `report`
+        text = (self.b.flow / "tollgate.toml").read_text()
+        self.assertIn(f'verify = "{verify}"', text)
+        self.assertIn('report = "junit:reports/junit.xml"', text)
+        self.assertTrue((self.b.flow / "tools" / "unittest_junit.py").is_file())
+
+    def test_real_flow_case_database_project_declares_junit_report(self):
+        """In L2 i test dei must-have si contano solo con un rapporto: il `tollgate.toml` lo dichiara e il progetto ha lo script."""
+        cfg = tomllib.loads((self.DATABASE_PROJECT / "tollgate.toml").read_text())
+        self.assertEqual(cfg["commands"]["report"], "junit:reports/junit.xml")
+        self.assertEqual(cfg["commands"]["verify"], "python3 tools/unittest_junit.py")
+        self.assertTrue((self.DATABASE_PROJECT / "tools" / "unittest_junit.py").is_file())
+        self.assertIn("reports/", (self.DATABASE_PROJECT / ".gitignore").read_text().split())
+        self.assertIn("tools/unittest_junit.py", (self.DATABASE_INPUT / "spec-L2.md").read_text())
+        self.assertIn("tools/unittest_junit.py", FLOW_SCRIPT.read_text())
+
+    def test_flow_disallows_db_tools_database(self):
+        denied = self.disallowed(**self.DATABASE_EXTRA)
+        for prog in self.BACKEND_CLIS + self.DATABASE_ONLY:
+            for form in (f"Bash({prog}:*)", f"Bash(*/{prog}:*)", f"Bash(command {prog}:*)", f"Bash(env {prog}:*)"):
+                self.assertIn(form, denied)
+        self.assertIn("Bash(*/gh:*)", denied)
+        for case in ("backend", "frontend"):
+            other = self.disallowed(B1_FLOW_CASE=case, B1_FLOW_RULES="vere")
+            self.assertFalse([x for x in other if any(p in x for p in self.DATABASE_ONLY)],
+                             "i programmi del database sono del solo caso database")
+
+    def test_real_flow_case_database_project_has_no_credentials(self):
+        project = self.DATABASE_PROJECT
+        found = [p.relative_to(project).as_posix() for p in project.rglob("*")
+                 if p.name in (".vercel", ".wrangler", ".temp", ".branches", "node_modules", "package.json", "package-lock.json")
+                 or p.name.startswith((".env", ".dev.vars", "wrangler", "vercel", ".npmrc"))]
+        self.assertEqual(found, [])
+        for part in ("supabase/config.toml", "supabase/migrations/20261112000000_notes.sql", "supabase/functions/notes/index.ts",
+                     "tests/test_migrations.py", "tollgate.toml", "issue-1.md"):
+            self.assertTrue((project / part).is_file(), part)
+        ignore = (project / ".gitignore").read_text().split()
+        for entry in ("reports/", "__pycache__/", ".env*", "supabase/.temp/", "supabase/.branches/", "supabase/functions/.env"):
+            self.assertIn(entry, ignore)
+        for path in project.rglob("*"):
+            if path.is_file():
+                text = path.read_text(errors="replace")
+                self.assertFalse(re.search(r"eyJ[A-Za-z0-9_-]{10,}|postgres(?:ql)?://\S+:\S+@|sbp_[A-Za-z0-9]{10,}", text),
+                                 f"{path.name}: un valore che somiglia a una credenziale")
+
+    def test_real_flow_case_database_plan_does_not_list_rule_requirements(self):
+        """Il piano, la spec e l'issue di prova chiedono le tabelle e i test, ma non nominano ciò che le regole chiedono (il valore
+        dell'utente nella policy, l'indice sulla chiave esterna e sulla colonna della policy, una migrazione nuova invece di
+        modificare quella esistente, come si annulla), così compare solo se le regole sono state lette."""
+        forbidden = (r"auth\.uid", r"select auth", r"indic[ei]\b", r"\bindex\b(?!\.ts)", r"chiav\w* estern\w*", r"foreign key",
+                     r"annull\w*", r"rollback", r"\bdown\b", r"reversibil\w*", r"migrazion\w* nuov\w*", r"nuov\w* migrazion\w*",
+                     r"modific\w* (la |le |quella )?(migrazion\w*|esistent\w*)", r"policy", r"politic\w*", r"security definer")
+        for path in (self.DATABASE_INPUT / "piano-L2.md", self.DATABASE_INPUT / "spec-L2.md", self.DATABASE_PROJECT / "issue-1.md"):
+            text = " ".join(path.read_text().split())
+            self.assertIn("tags", text)
+            self.assertRegex(text, r"(?i)\btest\b")
+            for word in forbidden:
+                self.assertNotRegex(text, rf"(?i){word}", f"{path.name}: {word}")
+
+    def test_real_flow_case_database_spec_has_one_slice(self):
+        sys.path.insert(0, str(ROOT / "bin"))
+        try:
+            from tollgate_analysis import specdoc
+        finally:
+            sys.path.remove(str(ROOT / "bin"))
+        spec = (self.DATABASE_INPUT / "spec-L2.md").read_text()
+        self.assertEqual(len(specdoc.slice_titles(spec)), 1)
+        self.assertEqual(specdoc.slices(spec), 1)
+        self.assertEqual(specdoc.pitch_problems(spec), [])
+        self.assertEqual(len(re.findall(r"(?m)^- M\d\. .* — test: \S+::\S+$", spec)), 2)
+
+    def test_flow_case_database_has_six_steps(self):
+        r = self.b.run("controlla", **self.DATABASE_EXTRA)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        for step in (*self.DATABASE_STEPS, "libero"):
+            self.assertRegex(r.stdout, rf"(?m)^  {step} ", step)
+            self.assertRegex(r.stdout, rf"(?m)^  {step} \(cwd ", step)
+        wt = self.database_flow()
+        for step in self.DATABASE_STEPS:
+            self.assertEqual(self.b.run(step, **self.DATABASE_EXTRA).returncode, 0, step)
+        self.assertEqual(self.b.run("libero", "/tollgate:execute sul task di correzione", **self.DATABASE_EXTRA).returncode, 0)
+        calls = self.b.claude_p()
+        self.assertEqual(len(calls), 7)
+        prompts = [c["args"][-1] for c in calls]
+        spec = (self.DATABASE_INPUT / "spec-L2.md").read_text().rstrip("\n")
+        plan = (self.DATABASE_INPUT / "piano-L2.md").read_text().rstrip("\n")
+        self.assertTrue(prompts[0].startswith("/tollgate:start #1 L2\n"))
+        self.assertIn(f"<<<SPEC\n{spec}\nSPEC>>>", prompts[0])
+        self.assertIn("Write", prompts[0])
+        self.assertIn("nel worktree del lavoro", prompts[0])
+        self.assertIn("docs/superpowers/specs/2026-11-12-prova-b7.md", prompts[0])
+        self.assertIn("/tollgate:approve spec 1", prompts[0])
+        self.assertEqual(prompts[1], "/tollgate:approve spec 1")
+        self.assertIn(f"<<<PIANO\n{plan}\nPIANO>>>", prompts[2])
+        self.assertIn("Write", prompts[2])
+        self.assertIn("docs/superpowers/plans/2026-11-12-prova-b7.md", prompts[2])
+        self.assertIn("/tollgate:approve plan", prompts[2])
+        self.assertEqual(prompts[3], "/tollgate:approve plan")
+        self.assertTrue(prompts[4].startswith("/tollgate:execute\n"))
+        self.assertEqual(prompts[5], "/tollgate:finish")
+        self.assertEqual(prompts[6], "/tollgate:execute sul task di correzione")
+        for i, prompt in enumerate(prompts[:5]):
+            for m in re.finditer(r"/tollgate:finish", prompt):
+                self.assertTrue(prompt[:m.start()].endswith("Non lanciare "), f"passo{i + 1}: nessun finish prima del passo 6")
+        self.assertEqual(Path(calls[0]["cwd"]).resolve(), self.b.flow.resolve())
+        for call in calls[1:]:
+            self.assertEqual(Path(call["cwd"]).resolve(), wt.resolve())
+        for step in self.DATABASE_STEPS:
+            self.assertTrue((self.b.out / step / "tentativo-1" / "claude.jsonl").is_file(), step)
+        self.assertTrue((self.b.out / "libero-1" / "tentativo-1" / "claude.jsonl").is_file())
+        # un secondo `libero` ha la sua cartella numerata; senza prompt si rifiuta
+        self.assertEqual(self.b.run("libero", "/tollgate:finish", **self.DATABASE_EXTRA).returncode, 0)
+        self.assertTrue((self.b.out / "libero-2" / "tentativo-1" / "claude.jsonl").is_file())
+        r = self.b.run("libero", **self.DATABASE_EXTRA)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("libero", r.stderr)
+
+    def test_flow_case_database_rot_moves_every_step(self):
+        src = self.database_src()
+        prepara = lambda: self.b.run("prepara", B1_FLOW_SRC=str(src), **self.DATABASE_EXTRA)
+        self.assertEqual(prepara().returncode, 0)
+        for name in (*self.DATABASE_STEPS, "libero-1", "libero-2"):
+            (self.b.out / name / "tentativo-1").mkdir(parents=True)
+        self.assertEqual(prepara().returncode, 0)
+        for name in (*self.DATABASE_STEPS, "libero-1", "libero-2"):
+            with self.subTest(name):
+                self.assertFalse((self.b.out / name).exists(), "la cartella si sposta")
+                self.assertEqual(len(list(self.b.out.glob(f"{name}.prev-*"))), 1)
+                self.assertEqual(len(list(self.b.out.glob(f"{name}.prev-*/tentativo-1"))), 1)
+        # un terzo prepara non sposta di nuovo le cartelle già spostate
+        before = sorted(p.name for p in self.b.out.iterdir())
+        self.assertEqual(prepara().returncode, 0)
+        self.assertEqual(sorted(p.name for p in self.b.out.iterdir()), before)
+
+    def test_flow_case_database_registra_reads_every_step(self):
+        self.assertEqual(self.database_prepara().returncode, 0)
+        self.b.worktree()
+        for step in ("passo1", "passo5"):
+            self.assertEqual(self.b.run(step, **self.DATABASE_EXTRA).returncode, 0)
+        self.assertEqual(self.b.run("libero", "/tollgate:finish", **self.DATABASE_EXTRA).returncode, 0)
+        long_page = "PAGINA-DI-TERZI " * 600
+        bash = [{"type": "assistant", "parent_tool_use_id": None, "message": {"content": [
+            {"type": "tool_use", "name": "Bash", "input": {"command": "npx supabase db reset"}}]}}]
+        web = [{"type": "assistant", "parent_tool_use_id": None, "message": {"content": [
+                   {"type": "tool_use", "id": "w1", "name": "WebFetch", "input": {"url": "https://example.org/x"}}]}},
+               {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "w1", "content": long_page}]}}]
+        (self.b.out / "passo5" / "tentativo-1" / "claude.jsonl").write_text("".join(json.dumps(x) + "\n" for x in bash))
+        (self.b.out / "libero-1" / "tentativo-1" / "claude.jsonl").write_text("".join(json.dumps(x) + "\n" for x in web))
+        r = self.b.run("registra", **self.DATABASE_EXTRA)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = self.b.out / "registro-1"
+        self.assertIn("bash: npx supabase db reset\n", (d / "comandi-rischiosi.txt").read_text())
+        stream = (self.b.out / "libero-1" / "tentativo-1" / "claude.jsonl").read_text()
+        self.assertNotIn("PAGINA-DI-TERZI", stream)
+        self.assertIn("pagina di terzi tolta", stream)
+        self.assertIn("WebFetch", (d / "comandi-modello.txt").read_text())
+        self.assertEqual((d / "fallimenti.txt").read_text(), "")
+
+    def test_real_registra_reads_database_title(self):
+        self.assertEqual(self.database_prepara().returncode, 0)
+        self.assertEqual(self.b.run("passo1", **self.DATABASE_EXTRA).returncode, 0)
+        cwd = "/tmp/prova.uno due/flow"
+        stream = [{"type": "system", "subtype": "init", "cwd": cwd, "session_id": "sess-uno"}]
+        (self.b.out / "passo1" / "tentativo-1" / "claude.jsonl").write_text("".join(json.dumps(x) + "\n" for x in stream))
+        self._transcripts(self.b.dir / "home", cwd, "sess-uno", {"a1": [
+            {"isMeta": True, "message": {"role": "user", "content": "# Regole di base (versione 1)\n- R-BASE-01 ..."}},
+            {"isMeta": True, "message": {"role": "user", "content": "# Regole database (versione 1)\n- R-DATABASE-01 ..."}},
+            {"message": {"role": "user", "content": "SEGRETO-DEL-COMPITO nel brief"}}]})
+        r = self.b.run("registra", **self.DATABASE_EXTRA)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = self.b.out / "registro-1"
+        text = (d / "trascrizioni.txt").read_text()
+        self.assertIn("agent-a1.jsonl: # Regole database (versione 1) (isMeta: sì)", text)
+        self.assertIn("# Regole di base (versione 1)", text)
+        self.assertNotIn("SEGRETO", text)
+        self.assertNotIn("R-DATABASE-01", text)
+        self.assertIn("agent_type", (d / "tipi-task.txt").read_text())
+        self.assertEqual((d / "fallimenti.txt").read_text(), "")
+
+    def test_real_registra_flags_db_tools_database(self):
+        self.assertEqual(self.database_prepara().returncode, 0)
+        flagged = ["npx supabase db reset", "supabase functions deploy notes", "psql -f x.sql", "ls && pg_dump prova", "/usr/bin/postgres -D x",
+                   "env pg_ctl start", "prisma migrate dev", "npx drizzle-kit push", "docker compose up db", "node app.js"]
+        d = self._flow_stream(flagged + ["cat supabase/migrations/20261112000000_notes.sql", "git add supabase/functions/notes/index.ts",
+                                         "ls supabase/migrations", "python3 -m unittest discover -s tests -t ."], **self.DATABASE_EXTRA)
+        risky = (d / "comandi-rischiosi.txt").read_text()
+        for cmd in flagged:
+            self.assertIn(f"bash: {cmd}\n", risky)
+        for cmd in ("cat supabase/migrations", "git add supabase", "ls supabase", "python3 -m unittest"):
+            self.assertNotIn(cmd, risky)
+        limits = (d / "limiti.txt").read_text()
+        self.assertIn("env VAR", limits)
+        self.assertIn("psql, postgres, pg_ctl, pg_dump, prisma e drizzle-kit", limits)
+        self.assertIn("non prova che la migrazione giri su PostgreSQL", limits)
+
+    def test_real_scrivi_limiti_heading_is_generic_database(self):
+        self.assertEqual(self.database_prepara().returncode, 0)
+        d = self._flow_stream(["ls"], **self.DATABASE_EXTRA)
+        self.assertEqual((d / "limiti.txt").read_text().splitlines()[0], "Limiti della prova reale (da citare nel rapporto)")
 
     def bash_saved_stream(self):
         """Flusso finto con quattro `Bash`: tre leggono una copia salvata (percorso in `tool-results/`), uno legge un file normale."""
@@ -1890,7 +2232,10 @@ class FlowScriptTest(unittest.TestCase):
         flowreg = self.flowreg_module()
         for command, name in (("python3 -c \"print(open('/x/tool-results/toolu_a.txt').read())\"", "toolu_a.txt"),
                               ("jq . /x/tool-results/toolu_b.json", "toolu_b.json"),
-                              ("cat</x/tool-results/a.txt", "a.txt"), ("jq . < /x/tool-results/b.json", "b.json")):
+                              ("cat</x/tool-results/a.txt", "a.txt"), ("jq . < /x/tool-results/b.json", "b.json"),
+                              ("cat /x/tool-results/toolu_d.txt", "toolu_d.txt"),
+                              ("awk '{print}' /x/tool-results/toolu_e.txt", "toolu_e.txt"),
+                              ("cp /x/tool-results/toolu_f.txt /tmp/tollgate-copia.txt", "toolu_f.txt")):
             with self.subTest(command):
                 stream = self.write_stream(self.saved_stream(command, stdout="TERZI-BASH riga"))
                 self.assertEqual(len(flowreg.third_party_blocks(stream)), 1)
@@ -1901,6 +2246,43 @@ class FlowScriptTest(unittest.TestCase):
                 marker = f"[pagina di terzi tolta dalle evidenze: copia salvata da Claude Code ({name}), 15 caratteri]"
                 self.assertEqual(out[1]["message"]["content"][0]["content"], marker)
                 self.assertEqual(out[1]["tool_use_result"]["stdout"], marker)
+
+    def test_togli_pagine_bash_folder_followed_by_punctuation(self):
+        flowreg = self.flowreg_module()
+        for command in ("ls {/x/tool-results,/y}", "echo ${D:-/x/tool-results}", "ls [/x/tool-results]",
+                        "ls /x/tool-results:/y", "ls /x/tool-results\\"):
+            with self.subTest(command):
+                stream = self.write_stream(self.saved_stream(command, stdout="TERZI-BASH riga"))
+                self.assertEqual(len(flowreg.third_party_blocks(stream)), 1)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(flowreg.togli_pagine([str(stream)]), 1)
+                self.assertNotIn("TERZI", stream.read_text())
+
+    def test_togli_pagine_bash_lookahead_negatives(self):
+        flowreg = self.flowreg_module()
+        for command in ("cat /x/tool-results.txt", "ls /x/tool-results-old/x"):
+            with self.subTest(command):
+                stream = self.write_stream(self.saved_stream(command, stdout="NORMALE riga"))
+                before = stream.read_text()
+                self.assertEqual(flowreg.third_party_blocks(stream), [])
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(flowreg.togli_pagine([str(stream)]), 0)
+                self.assertEqual(stream.read_text(), before)
+
+    def test_togli_pagine_bash_stdout_and_stderr(self):
+        flowreg = self.flowreg_module()
+        stream = self.write_stream(self.saved_stream("cat /x/tool-results/toolu_g.txt", stdout="TERZI-BASH riga",
+                                                     stderr="TERZI-ERR riga", content="TERZI-BASH riga"))
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(flowreg.togli_pagine([str(stream)]), 1)
+            self.assertEqual(flowreg.togli_pagine([str(stream)]), 0, "idempotente")
+        self.assertNotIn("TERZI", stream.read_text())
+        out = json.loads(stream.read_text().splitlines()[1])
+        marker = out["message"]["content"][0]["content"]
+        self.assertTrue(marker.startswith("[pagina di terzi tolta dalle evidenze: copia salvata da Claude Code (toolu_g.txt)"), marker)
+        self.assertEqual(out["tool_use_result"]["stdout"], marker)
+        self.assertEqual(out["tool_use_result"]["stderr"], marker)
+        self.assertEqual(flowreg.third_party_blocks(stream), [])
 
     def test_togli_pagine_bash_on_the_folder_alone(self):
         flowreg = self.flowreg_module()

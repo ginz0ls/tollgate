@@ -1,0 +1,23 @@
+--- "spikes/b7/input/spec-L2.md"	2026-11-17 14:13:27.532224812 +0100
++++ docs/superpowers/specs/2026-11-12-prova-b7.md	2026-11-17 16:39:17.928700787 +0100
+@@ -6,15 +6,18 @@
+ 
+ ## Fette previste
+ 
+-1. Tabella `tags` con la sua riga di sicurezza per le righe, e lettura dei tag nella edge function, con un test per ciascuno.
++1. Tabella `tags` con la sua riga di sicurezza per le righe e la sua policy di lettura, e lettura dei tag nella edge function, con un test per ciascuno. Prima la migrazione `supabase/migrations/20261112000100_tags.sql` con il test `tests/test_migrations.py`, poi la funzione con il test nel nuovo file `tests/test_function.py`. Una sola fetta è voluta: i due passi sono piccoli e si consegnano insieme.
+ 
+ ## Must-have
+ 
+-- M1. Esiste la tabella `tags`, collegata a `notes`, e ha la riga che attiva la sicurezza per le righe, come `notes` — test: tests.test_migrations.MigrationsTest::test_tags_table
++- M1. Esiste la tabella `tags`, collegata a `notes`, e ha la riga che attiva la sicurezza per le righe e la policy di lettura, come `notes` — test: tests.test_migrations.MigrationsTest::test_tags_table
+ - M2. La edge function `notes` legge la tabella `tags` — test: tests.test_function.FunctionTest::test_reads_tags
+ 
+ ## Tane di coniglio
+ 
++- Schema di `tags`: scelta fatta, `id bigint generated always as identity primary key`, `note_id bigint not null references public.notes (id) on delete cascade`, `text text not null`. Nessun indice su `note_id`: fuori scopo per una tabella di prova. La migrazione ha timestamp successivo a quello di `notes`. Il test M1 cerca nel testo `create table public.tags`, `references public.notes` e `alter table public.tags enable row level security`.
++- Policy di `tags`: scelta fatta, con la sicurezza per le righe attiva serve una policy `select` per `authenticated` che ammette il tag solo se la nota collegata appartiene a `auth.uid()` (`exists (select 1 from public.notes n where n.id = tags.note_id and n.user_id = auth.uid())`). Nessuna policy di scrittura (`insert`, `update`, `delete`): la scrittura dei tag è fuori scopo, l'issue chiede solo la lettura. Senza la policy `select` la funzione leggerebbe sempre zero righe. Il test M1 cerca nel blocco `create policy … on public.tags` anche `for select`, `to authenticated`, `auth.uid()` e `public.notes`; la semantica completa della policy resta verificata solo in revisione. Come per M2, il test legge il solo testo: non distingue il codice dai commenti e non prova il comportamento reale.
++- Forma della lettura: scelta fatta, select annidata `select("id, title, body, tags(id, text)")` e ogni nota ha `tags` come lista di oggetti `{id, text}`. Il test M2 cerca nel testo di `index.ts` un `select(` che contiene `tags(` (espressione `select\([^)]*tags\(`); essendo un test sul solo testo, non prova la lettura effettiva.
+ - Ordine dei tag di una nota: scelta fatta, nessun ordine garantito.
+ - Più tag con lo stesso testo sulla stessa nota: scelta fatta, ammessi; nessun vincolo di unicità.
+ - Un tag senza nota: scelta fatta, non esiste; ogni tag appartiene a una nota.

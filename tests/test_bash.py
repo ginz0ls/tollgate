@@ -199,9 +199,235 @@ class EffectsTest(unittest.TestCase):
         self.check_effects(["npx supabase status", "npx supabase migration list"], False)
 
     def test_launcher_local_service_commands_ask(self):
-        self.check_effects(["npx supabase migration new x", "npx supabase functions serve",
-                            "npx vercel dev", "npx vercel --version",
+        self.check_effects(["npx vercel dev", "npx vercel --version",
                             "npx vitest run vercel"], True)
+
+    def test_launcher_supabase_local_commands_pass(self):
+        self.check_effects(["npx supabase migration new x", "npx supabase functions serve",
+                            "pnpm exec supabase start", "bunx supabase db reset"], False)
+
+    def test_launcher_double_dash_before_service_args(self):
+        # Il `--` dopo il programma separa gli argomenti del lanciatore: non conta per il programma.
+        self.check_effects([
+            "npm exec prisma -- migrate deploy", "npx prisma -- migrate deploy",
+            "pnpm exec prisma -- migrate deploy", "npm run prisma -- migrate deploy",
+            "npm exec drizzle-kit -- push", "npx drizzle-kit -- push",
+            "npm exec wrangler -- deploy", "npm exec wrangler -- d1 execute DB --remote"], True)
+        self.check_effects(["npm exec supabase -- start"], False)
+        self.check_effects(["supabase -- db push"], True)
+        self.assertEqual(bash.launcher_candidates(["npm", "exec", "prisma", "--", "migrate"]),
+                         [["prisma", "migrate"]])
+
+    def test_launcher_word_supabase_as_argument(self):
+        # Costo noto (decisione 6): un'opzione dopo `supabase` e' sconosciuta e chiede.
+        self.check_effects(["npx eslint supabase --fix"], True)
+        self.check_effects(["npx eslint supabase", "npx tsc -p supabase"], False)
+
+    SUPA_LOCAL = ["supabase init", "supabase start", "supabase migration new x",
+                  "supabase functions new f", "supabase functions serve", "supabase db reset",
+                  "supabase db lint", "supabase db diff -f x", "supabase gen types typescript",
+                  "supabase test db", "supabase inspect db bloat", "supabase db push --help",
+                  "supabase stop", "supabase status", "supabase db start", "supabase services",
+                  "supabase help", "supabase completion bash", "supabase test new x",
+                  "supabase gen signing-key", "supabase gen bearer-jwt", "supabase --version",
+                  "supabase db query 'select 1'", "supabase db advisors", "supabase db dump",
+                  "supabase migration list", "supabase migration squash", "supabase seed buckets",
+                  "supabase inspect report", "supabase", "supabase --debug"]
+
+    def test_supabase_local_commands_pass(self):
+        for prefix in ("", "npx ", "pnpm exec ", "bunx "):
+            self.check_effects([prefix + t for t in self.SUPA_LOCAL], False)
+
+    def test_supabase_remote_flag_asks(self):
+        base = ["db reset", "db lint", "db query 'select 1'", "db advisors", "db diff",
+                "db dump", "migration list", "migration squash", "gen types typescript",
+                "test db", "inspect db bloat", "inspect report", "seed buckets"]
+        flags = ["--remote", "--remote=abc", "--linked", "--db-url postgres://x",
+                 "--project-ref x", "--project-id x"]
+        self.check_effects([f"supabase {b} {f}" for b in base for f in flags], True)
+        self.check_effects(["supabase gen types typescript --project-id x",
+                            "supabase inspect db bloat --remote",
+                            "npx supabase db diff --linked"], True)
+        # pflag non conosce il `false` di yargs: l'opzione c'e', il comando va sul servizio.
+        self.check_effects(["supabase db reset --linked false", "supabase db reset --remote false",
+                            "supabase db reset --remote=false", "supabase db dump --linked false",
+                            "supabase db reset --linked=false"], True)
+
+    def test_supabase_unknown_group_asks(self):
+        self.check_effects([
+            "supabase postgres-config update", "supabase network-restrictions update",
+            "supabase ssl-enforcement update", "supabase domains activate", "supabase sso add",
+            "supabase pull", "npx supabase postgres-config update", "npx supabase sso add",
+            "pnpm exec supabase pull", "supabase network-bans remove", "supabase encryption x",
+            "supabase vanity-subdomains activate", "supabase nuovo-gruppo x"], True)
+
+    def test_supabase_unless_local(self):
+        base = ["db push", "db pull", "migration up", "migration down",
+                "migration repair --status applied 1", "migration fetch"]
+        self.check_effects([f"supabase {b}" for b in base], True)
+        self.check_effects([f"npx supabase {b}" for b in base], True)
+        self.check_effects([f"supabase {b} --local" for b in base], False)
+        self.check_effects([f"supabase {b} --local=true" for b in base], False)
+        self.check_effects([f"supabase {b} --local --remote" for b in base], True)
+        self.check_effects([f"supabase {b} --local --linked" for b in base], True)
+        self.check_effects([f"supabase {b} --local=false" for b in base], True)
+        self.check_effects([f"supabase {b} --local --db-url postgres://x" for b in base], True)
+        self.check_effects(["supabase db push --local --project-ref x"], True)
+
+    def test_supabase_always_asks(self):
+        self.check_effects([
+            "supabase functions deploy f", "supabase functions delete f",
+            "supabase secrets set A=b", "supabase secrets unset A", "supabase link",
+            "supabase config push", "supabase branches create", "supabase storage cp a b",
+            "supabase functions deploy f --local", "supabase config push --local",
+            "supabase unlink", "supabase bootstrap", "supabase storage ls", "supabase login",
+            "supabase logout", "supabase branches get", "supabase projects create x",
+            "supabase projects delete x", "supabase projects api-keys", "supabase orgs create",
+            "supabase backups restore", "supabase snippets download x", "supabase config pull",
+            "supabase config diff", "supabase whoami", "npx supabase functions deploy f"], True)
+
+    def test_supabase_reads_pass(self):
+        self.check_effects([
+            "supabase functions download f", "supabase functions list", "supabase secrets list",
+            "supabase migration list", "supabase projects list", "supabase branches list",
+            "supabase orgs list", "supabase snippets list", "npx supabase functions list",
+            "supabase secrets list --workdir x"], False)
+        self.check_effects(["supabase branches get"], True)
+
+    def test_supabase_global_option_before_subcommand(self):
+        self.check_effects(["supabase --debug db push", "supabase --workdir x db push",
+                            "supabase --workdir=x db push", "supabase --sconosciuta db reset",
+                            "supabase -o json db push", "npx supabase --debug db push",
+                            "supabase --yes db push", "supabase --experimental functions deploy f",
+                            "supabase --agent no db pull", "supabase --profile p db push",
+                            "supabase --dns-resolver native db push",
+                            "supabase --network-id n db push",
+                            "supabase --output-format x db push",
+                            "supabase --workdir x --debug db push", "supabase -x db reset"], True)
+        self.check_effects(["supabase --debug migration new x", "supabase -o json migration list",
+                            "supabase --workdir x db reset", "supabase --output=json status",
+                            "supabase --workdir=x --debug functions serve",
+                            "npx supabase --debug start"], False)
+
+    def test_supabase_help_only_outside_option_values(self):
+        self.check_effects(["supabase --workdir --help db push --db-url postgres://x",
+                            "supabase --profile -h db push --linked",
+                            "supabase db push -- --help",
+                            "supabase db push --linked -- --help"], True)
+        self.check_effects(["supabase db push --help", "supabase -h", "supabase --help",
+                            "supabase functions deploy -h", "supabase --debug db push --help",
+                            "supabase db push --linked --help"], False)
+
+    def test_supabase_reason_names_command(self):
+        self.assertIn("supabase db push", self.eff("supabase db push"))
+        self.assertIn("supabase functions deploy", self.eff("supabase functions deploy f"))
+        self.assertIn("supabase", self.eff("supabase postgres-config update"))
+        self.assertIn("--linked", self.eff("supabase db reset --linked"))
+        self.assertIn("supabase", self.eff("supabase --sconosciuta db reset"))
+
+    def test_supabase_tables(self):
+        self.assertNotIn(("login",), bash.SUPABASE_LOCAL)
+        self.assertNotIn(("logout",), bash.SUPABASE_LOCAL)
+        self.assertNotIn(("snippets", "download"), bash.SUPABASE_READS)
+        self.assertNotIn(("branches", "get"), bash.SUPABASE_READS)
+        self.assertEqual(bash.REMOTE_FLAGS["wrangler"], ("--remote", "--preview"))
+
+    def test_supabase_local_flag_hidden_as_option_value_asks(self):
+        base = ["db push", "db pull", "migration up", "migration down",
+                "migration repair --status applied 1", "migration fetch"]
+        for opt in ("--network-id", "--profile", "--output-format", "-o", "--output",
+                    "--agent", "--dns-resolver", "--workdir"):
+            self.check_effects([f"supabase {b} {opt} --local" for b in base], True)
+        self.check_effects(["supabase db push --network-id=x --local",
+                            "supabase db push --network-id n --local",
+                            "supabase db push --local --profile p",
+                            "supabase db pull -o json --local",
+                            "supabase --workdir x db push --local"], False)
+
+    def test_supabase_local_value_only_when_true(self):
+        for value in ("true", "1", "t", "T", "TRUE", "True"):
+            self.check_effects([f"supabase db push --local={value}"], False)
+        for value in ("0", "false", "f", "False", "FALSE", "F", "x", ""):
+            self.check_effects([f"supabase db push --local={value}",
+                                f"supabase db pull --local={value}"], True)
+
+    def test_wrangler_flag_semantics_unchanged(self):
+        self.check_effects(["wrangler kv key put K V --local --remote"], True)
+        self.check_effects(["wrangler kv key put K V --local=0",
+                            "wrangler d1 execute DB --remote=false --file x",
+                            "wrangler d1 execute DB --remote false --file x",
+                            "wrangler kv key put K V --local=true"], False)
+
+    PRISMA_DRIZZLE_ASK = [
+        "prisma migrate dev", "prisma migrate deploy", "prisma migrate reset",
+        "prisma migrate resolve --applied x", "prisma db push", "prisma db execute --file x",
+        "prisma db seed", "prisma studio", "prisma db init", "prisma db update",
+        "prisma db migrate", "prisma db sign", "drizzle-kit push", "drizzle-kit migrate",
+        "drizzle-kit studio", "drizzle-kit push:pg", "drizzle-kit push:mysql",
+        "drizzle-kit push:sqlite", "drizzle-kit push --config x.ts"]
+    PRISMA_DRIZZLE_PASS = [
+        "prisma generate", "prisma format", "prisma validate", "prisma init", "prisma version",
+        "prisma debug", "prisma db pull", "prisma migrate status", "prisma migrate diff",
+        "prisma db verify", "drizzle-kit generate", "drizzle-kit check", "drizzle-kit pull",
+        "drizzle-kit introspect", "drizzle-kit up", "drizzle-kit export"]
+
+    def test_prisma_drizzle_writes_ask(self):
+        self.check_effects(self.PRISMA_DRIZZLE_ASK, True)
+        self.check_effects(["npx " + t for t in self.PRISMA_DRIZZLE_ASK], True)
+        self.check_effects(["pnpm exec prisma migrate dev", "bunx drizzle-kit push",
+                            "npx prisma@5 migrate dev", "yarn prisma db push",
+                            "pnpm dlx drizzle-kit migrate"], True)
+
+    def test_prisma_drizzle_no_db_pass(self):
+        self.check_effects(self.PRISMA_DRIZZLE_PASS, False)
+        self.check_effects(["npx " + t for t in self.PRISMA_DRIZZLE_PASS], False)
+        self.check_effects(["pnpm add prisma", "npm install drizzle-kit"], False)
+
+    def test_text_effect_supabase_lists(self):
+        for text in ("x; supabase migration new x", "x; supabase functions list",
+                     "x; supabase status", "x; supabase db reset", "x; supabase gen types ts",
+                     "x; supabase snippets list", "x; supabase inspect db bloat"):
+            with self.subTest(text=text):
+                self.assertIsNone(bash.text_effect(text))
+        for text in ("echo 'a; supabase db push", "echo 'a; supabase --debug migration new x",
+                     "echo 'a; supabase nuovo-gruppo x", "echo 'a; supabase db reset --linked",
+                     "echo 'a; supabase gen types --db-url x", "echo 'a; supabase login",
+                     "echo 'a; supabase functions deploy f", "echo 'a; supabase db pull --local",
+                     "echo 'a; supabase migration list --remote", "echo 'a; supabase pull",
+                     "echo 'a; npx supabase db push", "echo 'a; supabase branches get",
+                     "echo 'a; supabase test db --project-ref x"):
+            with self.subTest(text=text):
+                self.assertIsNotNone(bash.text_effect(text))
+
+    def test_text_effect_prisma_drizzle(self):
+        self.assertIsNotNone(bash.text_effect("echo 'a; prisma migrate dev"))
+        self.assertIsNotNone(bash.text_effect("echo 'a; npx drizzle-kit push:pg"))
+        self.assertIsNone(bash.text_effect("echo 'a; prisma generate"))
+
+    def test_wrangler_new_entries_in_config(self):
+        cfg = bash.EffectsCfg(allow=["wrangler kv key put K V --local"],
+                              commands=["wrangler r2 bucket *", "wrangler d1 create *",
+                                        "wrangler kv key put *"])
+
+        def reason(text):
+            return bash.effect_reason(one(text), cfg)
+
+        self.assertIn("[external_effects] commands", reason("wrangler r2 bucket list"))
+        self.assertIn("[external_effects] commands", reason("wrangler d1 create DB"))
+        self.assertIn("[external_effects] commands", reason("wrangler kv key put K2 V --local"))
+        allow = bash.EffectsCfg(allow=["wrangler kv namespace create *",
+                                       "wrangler r2 object put *", "wrangler d1 execute *"])
+        for text in ("wrangler kv namespace create NS", "wrangler r2 object put b/k",
+                     "wrangler d1 execute DB --remote"):
+            with self.subTest(text=text):
+                self.assertIsNone(bash.effect_reason(one(text), allow))
+        self.assertIsNotNone(bash.effect_reason(one("wrangler kv key delete K"), allow))
+
+    def test_text_effect_kv_namespace_and_remote_false(self):
+        # Il ripiego testuale non legge i valori ne' distingue le letture: chiede (parte sicura).
+        self.assertIsNotNone(bash.text_effect("x; wrangler kv:namespace create NS"))
+        self.assertIsNotNone(bash.text_effect("x; wrangler kv:namespace list"))
+        self.assertIsNotNone(bash.text_effect("x; wrangler d1 execute DB --remote=false --file y"))
 
     def test_launcher_without_effect_passes(self):
         self.check_effects([

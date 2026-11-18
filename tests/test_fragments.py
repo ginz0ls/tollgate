@@ -209,6 +209,14 @@ class FragmentsTest(unittest.TestCase):
                 self.assertIn("ai.toml", str(cm.exception))
                 self.assertIn("**/*.<estensione>", str(cm.exception))
 
+    def test_parse_error_message(self):
+        self.put("ai.toml", '[profile]\npaths = ["src/**/x"]\n')
+        with self.assertRaises(fragments.FragmentError) as cm:
+            fragments.load(self.root)
+        self.assertEqual(str(cm.exception),
+                         "ai.toml: i pattern di paths devono avere la forma **/<cartella>/**, "
+                         "<cartella>/**, **/<nome-file> o **/*.<estensione>")
+
     def test_load_accepts_three_forms(self):
         self.put("infra.toml", '[profile]\npaths = ["**/ai/**", "infra/**", "**/vercel.json"]\n')
         (f,) = fragments.load(self.root)
@@ -262,6 +270,12 @@ class RealFragmentsTest(unittest.TestCase):
         self.assertEqual(found["frontend"].profile["agent"], "tollgate:implementer-frontend")
         self.assertTrue(found["frontend"].detect)
         self.assertEqual(found["frontend"].patterns[2], fragments.Pattern("ext", "tsx"))
+        self.assertIn("database", found)
+        self.assertEqual(found["database"].profile["agent"], "tollgate:implementer-database")
+        self.assertEqual(found["database"].profile["final_specialist"], "tollgate:final-database")
+        self.assertTrue(found["database"].detect)
+        self.assertEqual(found["database"].exclude, ())
+        self.assertEqual(found["database"].patterns[3], fragments.Pattern("ext", "sql"))
 
     def test_real_ai_fragment_approved(self):
         found = {f.area: f for f in fragments.load(ROOT)}
@@ -278,6 +292,10 @@ class RealFragmentsTest(unittest.TestCase):
     def test_real_frontend_fragment_approved(self):
         found = {f.area: f for f in fragments.load(ROOT)}
         self.assertTrue(fragments.approved(found["frontend"]))
+
+    def test_real_database_fragment_approved(self):
+        found = {f.area: f for f in fragments.load(ROOT)}
+        self.assertTrue(fragments.approved(found["database"]))
 
 
 if __name__ == "__main__":

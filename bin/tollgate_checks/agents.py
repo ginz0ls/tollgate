@@ -33,6 +33,15 @@ def live_writers(ctx, work_id, exclude=()):
     return live, [record("subagent_interrupt", agent_id=r["id"]) for r in stale]
 
 
+def _relaunchable(ctx, work_id, task, session) -> bool:
+    """Task in `resume`: un `Agent` nuovo vale solo se l'ultimo subagente del task è di un'altra
+    sessione (SendMessage non lo raggiunge più) oppure non ce n'è nessuno."""
+    last = ctx.db.execute("SELECT session FROM subagents WHERE work = ? AND task = ? "
+                          "AND started IS NOT NULL ORDER BY started DESC, rowid DESC LIMIT 1",
+                          (work_id, task["number"])).fetchone()
+    return last is None or last["session"] != session
+
+
 def decide(event, ctx):
     work = governing_work(ctx, event.cwd)
     if work is None:
@@ -60,17 +69,25 @@ def decide(event, ctx):
                            f"/tollgate:resolve writer", rule="single_writer")]
     if work["phase"] != "execution" or work["level"] not in ("L1", "L2"):
         return out
-    pending = ctx.db.execute("SELECT * FROM tasks WHERE work = ? AND pending = 'launch' "
-                             "ORDER BY number", (work["id"],)).fetchall()
-    cand = [t for t in pending if t["agent_type"] == atype]
+    pending = ctx.db.execute("SELECT * FROM tasks WHERE work = ? AND pending IN "
+                             "('launch', 'resume') ORDER BY number", (work["id"],)).fetchall()
+    same = [t for t in pending if t["agent_type"] == atype]
+    cand = [t for t in same if t["pending"] == "launch"
+            or _relaunchable(ctx, work["id"], t, event.session)]
     if not cand:
+        waiting = [t for t in same if t["pending"] == "resume"]
+        if waiting:
+            return out + [deny(f"il task {waiting[0]['number']} è in ripresa: riprendi "
+                               f"l'implementatore «{waiting[0]['implementer']}» con SendMessage "
+                               f"(un Agent nuovo è ammesso solo se la sessione che lo lanciò è "
+                               f"finita)", rule="writer")]
         hint = (f"; il task {pending[0]['number']} aspetta {pending[0]['agent_type']}"
                 if pending else "")
         return out + [deny(f"in execution l'unico subagente che scrive è l'implementatore scelto "
                            f"da {program_command(ctx.plugin_bin)} task start: {atype} non ha "
                            f"un task start in sospeso"
                            f"{hint}. Usa /tollgate:execute (6.3)", rule="writer")]
-    t = cand[0]
+    t = next((c for c in cand if c["implementer"] == ti.get("name")), cand[0])
     if ti.get("name") != t["implementer"]:
         return out + [deny(f"l'implementatore va lanciato con name «{t['implementer']}» "
                            f"(scritto nel brief): serve per riprenderlo con SendMessage",

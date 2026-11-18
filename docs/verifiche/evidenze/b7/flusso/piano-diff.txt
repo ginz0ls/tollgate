@@ -1,0 +1,61 @@
+--- spikes/b7/input/piano-L2.md	2026-11-17 05:05:03.649913011 +0100
++++ docs/superpowers/plans/2026-11-12-prova-b7.md	2026-11-17 16:43:00.714208198 +0100
+@@ -2,25 +2,27 @@
+ 
+ ## Fatti verificati
+ 
+-- Il progetto ha `supabase/migrations/20261112000000_notes.sql` (la tabella `notes`), `supabase/functions/notes/index.ts` (la edge function, file di testo mai eseguito) e `tests/test_migrations.py`.
++- Il progetto ha `supabase/migrations/20261112000000_notes.sql` (la tabella `notes`), `supabase/functions/notes/index.ts` (la edge function, file di testo mai eseguito, oggi con `.select("id, title, body")`) e `tests/test_migrations.py`.
+ - Il progetto non è collegato a nessun servizio e non ha credenziali.
+ - La suite si lancia con `python3 -m unittest discover -s tests -t .`.
+ 
+ ## Decisioni
+ 
+-- La tabella `tags` ha un identificativo, il testo del tag e il riferimento alla nota a cui appartiene (tana «un tag senza nota» della spec).
++- La migrazione è `supabase/migrations/20261112000100_tags.sql`: il timestamp è successivo a quello di `notes`, così `migrations_text()` (che ordina per nome) vede `notes` prima di `tags`.
++- La tabella `tags` ha `id bigint generated always as identity primary key`, `note_id bigint not null references public.notes (id) on delete cascade` (tana «un tag senza nota» della spec) e `text text not null`. Nessun indice su `note_id`.
++- La sicurezza per le righe è attiva su `tags` e c'è una sola policy `select` per `authenticated`, con `exists (select 1 from public.notes n where n.id = tags.note_id and n.user_id = auth.uid())`. Nessuna policy di scrittura. Senza la policy la funzione leggerebbe sempre zero righe.
+ - Nessun ordine dei tag e nessun vincolo di unicità (tane della spec).
+-- La funzione aggiunge i tag a ciò che già restituisce (tana «tag nelle risposte già esistenti» della spec).
++- La funzione usa la select annidata `select("id, title, body, tags(id, text)")`: aggiunge i tag a ciò che già restituisce e non toglie `id`, `title` e `body` (tana «tag nelle risposte già esistenti» della spec). Niente seconda query separata.
+ - Ogni test legge solo il testo dei file con la libreria standard: nessun programma di database o di servizi.
+ 
+ ## Interfacce
+ 
+-- Una tabella `tags` in un file sotto `supabase/migrations/`.
+-- `supabase/functions/notes/index.ts`: la lettura della tabella `tags`.
++- Una tabella `tags` in `supabase/migrations/20261112000100_tags.sql`, con la sua riga di sicurezza per le righe e la sua policy `select`.
++- `supabase/functions/notes/index.ts`: la lettura annidata della tabella `tags`, con `tags` come lista di oggetti `{id, text}` per ogni nota.
+ 
+ ## Must-have
+ 
+-- M1. Esiste la tabella `tags`, collegata a `notes`, con la riga che attiva la sicurezza per le righe — test: tests.test_migrations.MigrationsTest::test_tags_table
++- M1. Esiste la tabella `tags`, collegata a `notes`, e ha la riga che attiva la sicurezza per le righe e la policy di lettura, come `notes` — test: tests.test_migrations.MigrationsTest::test_tags_table
+ - M2. La edge function `notes` legge la tabella `tags` — test: tests.test_function.FunctionTest::test_reads_tags
+ 
+ ## Scope
+@@ -33,15 +35,15 @@
+ 
+ ## Rischi
+ 
+-- Il test di testo non prova che la migrazione giri su un database: è un limite dichiarato della prova.
++- I test di testo non provano che la migrazione giri su un database né che la funzione legga davvero i tag, e non distinguono il codice dai commenti: è un limite dichiarato della prova. La semantica completa della policy resta verificata solo in revisione.
+ 
+ ### Task 1: Tabella tags
+ 
+-- Create: un file sotto `supabase/migrations/` per la tabella `tags`
++- Create: `supabase/migrations/20261112000100_tags.sql`
+ - Test: `tests/test_migrations.py`
+ - Must-have: M1
+ 
+-In TDD: aggiungi in `tests/test_migrations.py` un `MigrationsTest.test_tags_table` che legge il testo delle migrazioni e controlla che ci sia la tabella `tags`, collegata a `notes`, con la sua riga che attiva la sicurezza per le righe; poi scrivi la tabella. Esegui `python3 -m unittest discover -s tests -t .` e committa.
++In TDD: aggiungi in `tests/test_migrations.py` un `MigrationsTest.test_tags_table` che legge il testo delle migrazioni (`migrations_text()`) e controlla, con regex senza distinzione di maiuscole, `create table public.tags`, `references public.notes`, `alter table public.tags enable row level security` e, nel blocco `create policy … on public.tags`, `for select`, `to authenticated`, `auth.uid()` e `public.notes`. Il blocco della policy si isola con la sola forma ancorata `create\s+policy\s+[^;]*?\bon\s+public\.tags\b[^;]*;` (niente `re.DOTALL` con `.*?`, che potrebbe partire dalla policy di `notes` e attraversare il `;`) e i quattro controlli si fanno solo su quel blocco: `notes` ha già `for select`, `to authenticated` e `auth.uid()`, quindi una regex sull'intero testo passerebbe senza provare nulla su `tags`. Allo stesso modo `references public.notes` si cerca solo dentro il blocco `create\s+table\s+public\.tags\b[^;]*;`, non sulla riga di `notes`. Esegui la suite e verifica che il nuovo test fallisca (rosso). Poi scrivi la migrazione con lo schema e la policy descritti in «Decisioni». Non toccare `test_every_table_has_row_level_security`. Esegui `python3 -m unittest discover -s tests -t .` e committa.
+ 
+ ### Task 2: Lettura dei tag nella funzione
+ 
+@@ -49,4 +51,4 @@
+ - Create: `tests/test_function.py`
+ - Must-have: M2
+ 
+-In TDD: crea `tests/test_function.py` con un `FunctionTest.test_reads_tags` che legge il testo di `supabase/functions/notes/index.ts` e controlla che legga la tabella `tags`; poi aggiungi la lettura dei tag alla funzione. Esegui `python3 -m unittest discover -s tests -t .` e committa.
++In TDD: crea `tests/test_function.py` con un `FunctionTest.test_reads_tags` che legge il testo di `supabase/functions/notes/index.ts` e controlla con la regex `select\([^)]*tags\(` che un `select(` contenga `tags(`; esegui la suite e verifica che il nuovo test fallisca (rosso); poi cambia la select in `select("id, title, body, tags(id, text)")`, senza togliere `id`, `title` e `body`. Esegui `python3 -m unittest discover -s tests -t .` e committa.

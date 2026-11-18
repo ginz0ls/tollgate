@@ -1,13 +1,16 @@
 import json
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
 from datetime import timedelta
 from unittest import mock
 
 from tests.flowkit import PLAN, FlowLab, plan_text
-from tests.helpers import git
+from tests.helpers import ROOT, git
 from tests.hookkit import DEFAULT_TOML
 from tollgate_core import git as core_git, phases, reviews
-from tollgate_flow import finalreview
+from tollgate_flow import finalreview, init
 
 REVIEWER = "tollgate:final-reviewer"
 SPEC = "probe:final-security"
@@ -20,7 +23,7 @@ checklist = "nessun segreto nel codice"
 
 
 class FinalCase(unittest.TestCase):
-    def lab(self, toml=DEFAULT_TOML, level="L1"):
+    def lab(self, toml=DEFAULT_TOML, level="L1", extra=None):
         """Lavoro in fase review: piano registrato, un commit, finish_sha = HEAD."""
         fl = FlowLab(issue=7, phase="plan", toml=toml)
         self.addCleanup(fl.close)
@@ -28,6 +31,8 @@ class FinalCase(unittest.TestCase):
         fl.register_plan(tasks=1)
         fl.commit(PLAN, plan_text(tasks=1), "piano")
         fl.commit("src/app.py", "def somma(a, b):\n    return b + a\n", "somma")
+        for path, text in (extra or {}).items():
+            fl.commit(path, text, f"aggiunge {path}")
         fl.close_tasks()
         self.advance("review")
         if level == "L0":       # un lavoro L0 non ha piano né task: solo il livello conta qui
@@ -87,6 +92,45 @@ class PrepareNewCycleTest(FinalCase):
         self.assertIn(SPEC, text)
         self.assertIn("nessun segreto nel codice", text)
         self.assertIn(self.cycle()["code"], text)
+
+    MIGRATION = {"supabase/migrations/20260101000000_init.sql": "create table t (id int);\n"}
+
+    def real_database_toml(self):
+        """Il frammento vero di `database`, come lo propone `init` in un repo temporaneo con una
+        migrazione e gli agenti veri del plugin (decisione 10 di B7)."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        (root / "templates" / "profiles").mkdir(parents=True)
+        shutil.copy(ROOT / "templates" / "profiles" / "database.toml",
+                    root / "templates" / "profiles" / "database.toml")
+        (root / "skills" / "rules-database").mkdir(parents=True)
+        shutil.copy(ROOT / "skills" / "rules-database" / "SKILL.md",
+                    root / "skills" / "rules-database" / "SKILL.md")
+        (root / "agents").mkdir()
+        for name in ("implementer-database", "reviewer-database", "final-database"):
+            shutil.copy(ROOT / "agents" / f"{name}.md", root / "agents" / f"{name}.md")
+        got = init.profile_blocks({"supabase/migrations/20260101000000_init.sql": 10},
+                                  DEFAULT_TOML, root)
+        self.assertIn("[profiles.database]", got.text)
+        return DEFAULT_TOML + got.text
+
+    def test_real_database_specialist_in_l2(self):
+        self.lab(toml=self.real_database_toml(), level="L2", extra=self.MIGRATION)
+        r = self.prepare()
+        specialist = "tollgate:final-database"
+        self.assertEqual([x.agent_type for x in r.launches], [REVIEWER, specialist])
+        self.assertEqual(json.loads(self.cycle()["reviewers"]), [REVIEWER, specialist])
+        brief = self.run_dir() / "final-1-database.md"
+        self.assertEqual(r.launches[1].brief, brief)
+        text = brief.read_text()
+        self.assertIn("Lista di controllo dell'area", text)
+        self.assertIn("migrazioni reversibili e dati esistenti", text)
+        self.assertIn(specialist, text)
+
+    def test_real_database_specialist_not_in_l1(self):
+        self.lab(toml=self.real_database_toml(), extra=self.MIGRATION)
+        self.assertEqual([x.agent_type for x in self.prepare().launches], [REVIEWER])
 
     def test_l1_has_no_specialists(self):
         self.lab(toml=SEC_TOML)
