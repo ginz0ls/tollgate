@@ -218,6 +218,7 @@ Il resto si decide con una `Ruling:`. Miglioramenti utili, compatibili e a basso
      - i comandi dietro `dotenv`, `cross-env`, `doppler run`, `infisical run`, `op run` chiedono il permesso come quelli diretti;
      - `supabase db push -p --local` chiede;
      - `init --update` propone `min_level` e `checklist` a un blocco scritto a mano;
+     - chiedono anche alcuni comandi innocui il cui argomento ha il nome di un servizio (`cross-env NODE_ENV=test jest aws`, `doppler run --project supabase -- npm run dev`), dalla parte sicura;
    - «Pagine approvate che invecchiano»: l'elenco unico del blocco «Dopo B» del piano principale, una pagina per riga con la frase che non è più vera;
    - per ultima, la riga «Posso unire su `main`?».
 
