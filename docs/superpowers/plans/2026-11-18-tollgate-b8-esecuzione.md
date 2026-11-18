@@ -146,7 +146,7 @@ Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincol
      - Che nell'ambiente **non** ci sia `ANTHROPIC_API_KEY` (solo se è impostata, mai il valore): con la chiave Claude Code userebbe la chiave al posto dell'abbonamento. Se c'è, ti fermi e chiedi.
      - `df -h /tmp` (il bersaglio sta in `/tmp/tollgate-eval-target`).
      - `git status` vuoto: le evidenze di ogni caso si committano dopo il loro controllo, e il lock del registro è ignorato da `.gitignore`.
-   - **Uscite.** 3, 4 o 5: ti fermi e controlli; se la pulizia non è riuscita, le evidenze di quel caso si spostano nel workspace finché non sono pulite. Al tetto: fermata.
+   - **Uscite.** 3, 4 o 5: ti fermi e controlli; le evidenze di quel caso si spostano nel workspace finché non sono pulite, e `budget.tsv` si committa da solo prima del caso dopo (con l'uscita 3 la riga «?» si corregge a mano dal `result.json`, come in P5). Al tetto: fermata.
    - **Rete della shell.** Con `WebFetch(domain:…)` anche la shell raggiunge quei domini: `run.sh` toglie i risultati dei `Bash` verso di loro (`strip_bash_web`), e il controllo a mano li cerca comunque.
    - **Divieti.** Mai `--max-cost-usd` a mano, mai la campagna `p5`, mai `--concurrency` sopra 1.
 3. **Push di `main` su `https://github.com/ginz0ls/tollgate.git`.**
