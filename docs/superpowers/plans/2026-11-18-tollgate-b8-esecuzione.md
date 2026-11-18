@@ -55,7 +55,7 @@ Prima del Task 1, un analista sonnet in sola lettura scrive `W/preflight-scan.md
 - i conflitti con il progetto di B, con la spec rev 34 e con il codice reale di `main`.
 
 Lo giudichi tu: una `Ruling:` nel ledger e una voce in `carry.md` per ogni conflitto, **prima** di lanciare i task che ne dipendono. Punti da far guardare apposta:
-- **la decisione 1 contro ogni chiamante di `launcher_candidates` e di `_unwrap`**: `effect_reason`, `text_effect`, i controlli di `git` e di `rm`, `script_name`, i test di `test_bash.py` e `test_effects.py`. Con una sonda su `bash.effect_reason` (nel workspace, mai nel repo), le forme del Review Focus 1 oggi e come le vuole il piano;
+- **la decisione 1 contro ogni chiamante di `launcher_candidates` e di `_unwrap`**: `effect_reason`, `text_effect`, i controlli di `git` e di `rm`, `script_name`, i test di `test_bash.py`, `test_effects.py` e `test_check_effects.py` (`_script_reason`). Con una sonda su `bash.effect_reason` (nel workspace, mai nel repo), le forme del Review Focus 1 oggi e come le vuole il piano;
 - **i tre scorrimenti di Supabase** (decisione 2) e i test che li fissano (`test_supabase_local_flag_hidden_as_option_value_asks`, `test_supabase_help_only_outside_option_values`, `test_text_effect_supabase_lists`);
 - **`take_pending`** (decisione 5) contro ogni chiamante (`apply._subagent_start`, `taskcmd`, i test di `test_tasks.py`, `test_check_agents.py`, `test_taskcmd.py`): che nessun chiamante dipenda dall'ordine per numero con un task prenotato;
 - **`_drift`** (decisione 4) contro i test di `init --update` e i blocchi dichiarati dei test della tabella delle precedenze (P39, Q-casi): una riga in più non deve rompere un confronto esatto;
