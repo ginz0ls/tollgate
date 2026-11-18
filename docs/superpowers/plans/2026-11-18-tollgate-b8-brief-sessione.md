@@ -75,7 +75,7 @@ Le altre scelte del piano sono «mia scelta», e la revisione finale le può con
 - **Le pagine vive.** s10 e s11 aprono `ai.google.dev` e `vercel.com` dal vivo: il nome del modello non si controlla, la varianza non si corregge ritoccando il prompt.
 - **Il registro di P5 non cambia mai**: la campagna predefinita è `b8`, e `p5` resta solo per leggere la storia.
 - **Le trace degli eval contengono testo di pagine, la casa dell'utente e l'host**: `run.sh` le ripulisce e le anonimizza subito; il controller rilegge a mano tutti i file copiati e fa `grep -raF` di nome utente e host prima di ogni commit.
-- **Gli eval girano con il worktree pulito** (salvo le evidenze di `eval-b8/` già prodotte), uno per invocazione e senza implementatori al lavoro: `run.sh` copia il plugin dal worktree.
+- **Gli eval girano con il worktree pulito**, uno per invocazione e senza implementatori al lavoro: `run.sh` copia il plugin dal worktree. Dopo ogni caso, le sue evidenze si controllano e si committano.
 - **s9** riceve l'indicatore della nota (scelta dell'utente: s9 ridisegnato), ed e4 ed e5 contano la nota solo nei conteggi: un grader with-only nei casi `extra` rompe `ExtraCasesTest`.
 - **`ANTHROPIC_API_KEY` non deve essere impostata** prima di un eval (si guarda solo se c'è).
 - **Il rapporto prima del merge** ha l'elenco unico delle pagine approvate che invecchiano: è l'ultima occasione di B per dirlo all'utente.

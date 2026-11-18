@@ -45,7 +45,7 @@ Una corsa di `tests/run` dura da 25 a 90 minuti (due interpreti).
   - Paralleli possibili:
     - revisione del Task 1 con il Task 2 (`bash.py` e `test_bash.py` contro `init.py`, `tasks.py` e i loro test);
     - revisione del Task 2 con il Task 3.
-  - **Gli eval (Task 6, 7) girano da soli**: nessun implementatore lavora nel worktree mentre `run.sh` copia il plugin, perché il bersaglio è la copia del worktree in quel momento. Nessuna suite gira mentre ci sono evidenze non ancora controllate nel worktree.
+  - **Gli eval (Task 6, 7) girano da soli**: nessun implementatore lavora nel worktree mentre `run.sh` copia il plugin, perché il bersaglio è la copia del worktree in quel momento. Nessuna suite gira mentre ci sono evidenze non ancora controllate nel worktree: dopo ogni eval si controllano e si committano le evidenze di quel caso (Task 7, Step 1), e nella sonda il commit delle evidenze viene prima delle correzioni (Task 6).
 
 ## Scan pre-flight
 
@@ -145,8 +145,9 @@ Copiale **nel brief di ogni subagente, al lancio** (l'utente lo considera vincol
    - **Prima di ogni invocazione.**
      - Che nell'ambiente **non** ci sia `ANTHROPIC_API_KEY` (solo se è impostata, mai il valore): con la chiave Claude Code userebbe la chiave al posto dell'abbonamento. Se c'è, ti fermi e chiedi.
      - `df -h /tmp` (il bersaglio sta in `/tmp/tollgate-eval-target`).
-     - `git status` senza modifiche fuori da `docs/verifiche/evidenze/eval-b8/`: le evidenze degli eval già girati restano fino al commit del Task 7, e il lock del registro è ignorato da `.gitignore`.
-   - **Uscite.** 3, 4 o 5: ti fermi e controlli. Al tetto: fermata.
+     - `git status` vuoto: le evidenze di ogni caso si committano dopo il loro controllo, e il lock del registro è ignorato da `.gitignore`.
+   - **Uscite.** 3, 4 o 5: ti fermi e controlli; se la pulizia non è riuscita, le evidenze di quel caso si spostano nel workspace finché non sono pulite. Al tetto: fermata.
+   - **Rete della shell.** Con `WebFetch(domain:…)` anche la shell raggiunge quei domini: `run.sh` toglie i risultati dei `Bash` verso di loro (`strip_bash_web`), e il controllo a mano li cerca comunque.
    - **Divieti.** Mai `--max-cost-usd` a mano, mai la campagna `p5`, mai `--concurrency` sopra 1.
 3. **Push di `main` su `https://github.com/ginz0ls/tollgate.git`.**
    - Solo dopo il merge con l'OK dell'utente e solo dopo `spikes/gh-p4/ghguard.py gitcheck -- push https://github.com/ginz0ls/tollgate.git main` con `P4_PROFILE=p5` uscito con 0; mai forzato.
