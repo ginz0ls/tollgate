@@ -1,0 +1,35 @@
+7dfee80 tollgate B8: correzioni documentali della revisione finale
+0705d6a tollgate B8: correzioni di codice della revisione finale
+6cbd3e2 tollgate B8: spec 14, i dodici casi spec
+8606917 tollgate B8: prove, spec rev 35, catalogo e piano principale: chiusura di B
+08cd53a tollgate B8: rapporto degli eval
+f589e6c tollgate B8: eval e5-rientro-gate
+37ed1df tollgate B8: eval e4-chiusura-l2
+21d444e tollgate B8: eval e3-start-spec
+f261a07 tollgate B8: eval e1-audit-a-lenti
+3db657f tollgate B8: eval s8-cambio-ramo
+ac4c77d tollgate B8: eval s7-spec-contraddittoria
+e85c959 tollgate B8: eval s5-l0-cresce
+806b516 tollgate B8: eval s4-deploy
+6fd908c tollgate B8: eval s9-implementatore-generico
+3397238 tollgate B8: eval s6-fine-execute
+4491d12 tollgate B8: eval s3-fuori-scope
+d8299c8 tollgate B8: eval s2-conflitto-test-spec
+3d084a4 tollgate B8: eval s1-done-senza-ricevuta
+5e44cef tollgate B8: eval s12-non-esiste
+dd6c408 tollgate B8: eval s11-deploy-dedotto
+4dfa785 tollgate B8: eval s10-modello-a-memoria
+ed7665a tollgate B8: seconda sonda dal vivo (lettura su aistudio.google.com, redirect non contati)
+20eee79 tollgate B8: anonimizzazione del nome utente come parola intera
+3edb16d tollgate B8: registro di b8 dopo la seconda sonda (evidenze tenute fuori finché non anonimizzate)
+95c4fad tollgate B8: sonda dal vivo di WebFetch negli eval
+c1108aa tollgate B8: anonimizzazione dei percorsi di progetto e conteggi con una cartella relativa
+2bb649c tollgate B8: lettura web, pulizia e dominio della pagina dei modelli dopo la sonda
+d2d2a7b tollgate B8: registro di b8 dopo la sonda uscita con 5 (evidenze non ripulite, tenute fuori)
+a5def61 tollgate B8: i casi di P5 con un implementatore misurano la nota
+8e80a90 tollgate B8: tre casi d'eval sugli schemi del progetto (modello a memoria, deploy dedotto, non esiste)
+a1906b8 tollgate B8: pulizia delle trace: ogni Bash che nomina un dominio concesso
+7618110 tollgate B8: campagne degli eval, WebFetch per dominio, trace ripulite e conteggi della nota
+6988775 tollgate B8: involucri dell'ambiente: comando interno in una sola parola
+53dcef1 tollgate B8: init --update propone min_level e checklist; take_pending preferisce il task prenotato
+f48919b tollgate B8: involucri dell'ambiente, opzioni con valore di Supabase e doppio -- negli effetti esterni

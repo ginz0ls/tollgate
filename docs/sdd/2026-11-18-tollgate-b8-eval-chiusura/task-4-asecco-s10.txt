@@ -1,0 +1,10 @@
+registro dei costi: /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b8/docs/verifiche/evidenze/eval-b8/budget.tsv
+cartella delle evidenze: /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b8/docs/verifiche/evidenze/eval-b8
+bersaglio: /tmp/tollgate-eval-target
+TMPDIR dell'eval: /home/USER/.cache/tollgate-eval-tmp
+campagna: b8 (tetto 20 USD)
+residuo del tetto: 20.00 USD
+== s10-modello-a-memoria (with-without, --runs 3)
+comando: PATH=/tmp/tollgate-eval-target/tests/evalbin:$PATH TMPDIR=/home/USER/.cache/tollgate-eval-tmp timeout -k 30 3600 claude plugin eval /tmp/tollgate-eval-target --case s10-modello-a-memoria --runs 3 --scaffold --trust-plugin --no-publish --model claude-sonnet-5-5 --allow-tools Bash Write Edit WebFetch(domain:ai.google.dev) WebFetch(domain:vercel.com) WebSearch --threshold 0.66 --ablation with-without --max-cost-usd 20.00 --keep-temp --output-dir /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b8/docs/verifiche/evidenze/eval-b8/20261118T232620Z-s10-modello-a-memoria --json /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b8/docs/verifiche/evidenze/eval-b8/20261118T232620Z-s10-modello-a-memoria/result.json --report /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b8/docs/verifiche/evidenze/eval-b8/20261118T232620Z-s10-modello-a-memoria/report.html
+uscita: /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b8/docs/verifiche/evidenze/eval-b8/20261118T232620Z-s10-modello-a-memoria
+a secco: niente lock, niente prenotazione, claude non lanciato

@@ -1,0 +1,3 @@
+Suite finale corsa 1: verde su python3.11 e python3 — 4180 test (skipped 13 e 11), nessun «unclosed» (0), nessuna cartella nuova in /tmp della suite (le 90 nuove sono di altre sessioni sulla `/tmp` condivisa, più quattro `tmp…` delle 16:44 lasciate dai due lanci a mano del test del Ctrl-C fuori da `tests/run`; il controller non cancella in /tmp, regola delle cautele) (suite-finale-1b.log).
+Suite finale corsa 2: verde su python3.11 e python3 — 4180 test (skipped 13 e 11), nessun «unclosed», nessuna cartella nuova `tollgate…` o `tmp…` in /tmp (suite-finale-2.log).
+Suite finale corsa 3: verde su python3.11 e python3 — 4180 test (skipped 13 e 11), nessun «unclosed», nessuna cartella nuova `tollgate…` o `tmp…` in /tmp (suite-finale-3.log).

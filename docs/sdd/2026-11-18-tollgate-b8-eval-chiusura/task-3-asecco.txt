@@ -1,0 +1,12 @@
+### b8
+registro dei costi: /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b8/docs/verifiche/evidenze/eval-b8/budget.tsv
+cartella delle evidenze: /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b8/docs/verifiche/evidenze/eval-b8
+campagna: b8 (tetto 20 USD)
+residuo del tetto: 20.00 USD
+comando: PATH=/tmp/tollgate-eval-target/tests/evalbin:$PATH TMPDIR=/home/USER/.cache/tollgate-eval-tmp timeout -k 30 3600 claude plugin eval /tmp/tollgate-eval-target --case s1-done-senza-ricevuta --runs 3 --scaffold --trust-plugin --no-publish --model claude-sonnet-5-5 --allow-tools Bash Write Edit WebFetch(domain:ai.google.dev) WebFetch(domain:vercel.com) WebSearch --threshold 0.66 --ablation with-without --max-cost-usd 20.00 --keep-temp
+### p5
+registro dei costi: /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b8/docs/verifiche/evidenze/eval-p5/budget.tsv
+cartella delle evidenze: /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/b8/docs/verifiche/evidenze/eval-p5
+campagna: p5 (tetto 80 USD)
+residuo del tetto: 70.93 USD
+comando: PATH=/tmp/tollgate-eval-target/tests/evalbin:$PATH TMPDIR=/home/USER/.cache/tollgate-eval-tmp timeout -k 30 3600 claude plugin eval /tmp/tollgate-eval-target --case s1-done-senza-ricevuta --runs 3 --scaffold --trust-plugin --no-publish --model claude-sonnet-5-5 --allow-tools Bash Write Edit --threshold 0.66 --ablation with-without --max-cost-usd 70.93 --keep-temp
