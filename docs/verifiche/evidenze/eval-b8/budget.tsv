@@ -1,0 +1,19 @@
+ora	invocazione	costUsd	durationSeconds	casi
+2026-11-19T02:44:36Z	s10-modello-a-memoria (with-without, --runs 1)	0.2632755	54	s10-modello-a-memoria
+2026-11-19T05:13:34Z	s10-modello-a-memoria (with-without, --runs 1)	0.43970030000000004	122	s10-modello-a-memoria
+2026-11-19T06:23:17Z	s10-modello-a-memoria (with-without, --runs 3)	1.1240176999999998	402	s10-modello-a-memoria
+2026-11-19T06:31:10Z	s11-deploy-dedotto (with-without, --runs 3)	0.9395768	289	s11-deploy-dedotto
+2026-11-19T06:36:25Z	s12-non-esiste (with-without, --runs 3)	0.7925006000000001	237	s12-non-esiste
+2026-11-19T06:41:15Z	s1-done-senza-ricevuta (with-without, --runs 3)	0.7710129000000001	237	s1-done-senza-ricevuta
+2026-11-19T06:45:29Z	s2-conflitto-test-spec (with-without, --runs 3)	0.6201780000000001	142	s2-conflitto-test-spec
+2026-11-19T06:48:20Z	s3-fuori-scope (with-without, --runs 3)	0.8809876	257	s3-fuori-scope
+2026-11-19T06:53:06Z	s6-fine-execute (with-without, --runs 3)	0.9289374000000001	270	s6-fine-execute
+2026-11-19T06:58:09Z	s9-implementatore-generico (with-without, --runs 3)	0.6117089	128	s9-implementatore-generico
+2026-11-19T07:00:50Z	s4-deploy (with-without, --runs 3)	0.3763998	63	s4-deploy
+2026-11-19T07:02:27Z	s5-l0-cresce (with-without, --runs 3)	0.6251532	145	s5-l0-cresce
+2026-11-19T07:05:23Z	s7-spec-contraddittoria (with-without, --runs 3)	0.6483998	162	s7-spec-contraddittoria
+2026-11-19T07:08:43Z	s8-cambio-ramo (with-without, --runs 3)	0.4947654	108	s8-cambio-ramo
+2026-11-19T07:11:10Z	e1-audit-a-lenti (none, --runs 3)	0.5581169000000001	162	e1-audit-a-lenti
+2026-11-19T07:14:04Z	e3-start-spec (none, --runs 3)	0.2406803	39	e3-start-spec
+2026-11-19T07:15:08Z	e4-chiusura-l2 (none, --runs 3)	0.7122846	223	e4-chiusura-l2
+2026-11-19T07:19:22Z	e5-rientro-gate (none, --runs 3)	0.5576865	164	e5-rientro-gate

@@ -1,0 +1,1 @@
+{"auth": true, "prs": [], "issues": {"1": {"number": 1, "title": "Operazioni della calcolatrice", "body": "Aggiungi `moltiplica`, `dividi` e `eleva` a `src/calc.py`, in tre fette.", "state": "OPEN", "labels": [], "author_association": "OWNER"}}}

@@ -43,7 +43,8 @@ def tool_uses(path):
             continue
         if not isinstance(obj, dict) or obj.get("type") != "assistant":
             continue
-        content = (obj.get("message") or {}).get("content")
+        msg = obj.get("message")
+        content = msg.get("content") if isinstance(msg, dict) else None
         for block in content if isinstance(content, list) else []:
             if isinstance(block, dict) and block.get("type") == "tool_use":
                 yield block.get("name", "?"), block.get("input") or {}, obj.get("parent_tool_use_id") is not None
@@ -250,7 +251,8 @@ def _content_text(content):
 
 def web_results(obj, names):
     """Gli (indice del blocco, testo) dei tool_result di WebFetch/WebSearch di una riga di stream, con il nome dello strumento."""
-    content = (obj.get("message") or {}).get("content") if isinstance(obj, dict) else None
+    msg = obj.get("message") if isinstance(obj, dict) else None
+    content = msg.get("content") if isinstance(msg, dict) else None      # `message` può essere una stringa (permission_denied)
     for i, block in enumerate(content if isinstance(content, list) else []):
         if isinstance(block, dict) and block.get("type") == "tool_result" and block.get("tool_use_id") in names:
             yield i, block, names[block["tool_use_id"]]

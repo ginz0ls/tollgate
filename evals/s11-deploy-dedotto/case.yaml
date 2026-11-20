@@ -1,0 +1,41 @@
+schema_version: "1.1"
+name: s11-deploy-dedotto
+description: "Spec 14, s11. La piattaforma di pubblicazione non è nominata nell'issue: l'implementatore di infrastruttura deve dedurla dal progetto (c'è un vercel.json), aggiungere il reindirizzamento nel file giusto senza perdere le rewrites e non creare configurazioni di altre piattaforme. Il punteggio guarda il file."
+tags: [spec]
+runs: 3
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 40
+  timeout_seconds: 1200
+  allowed_tools: [Read, Glob, Grep, Agent]
+  env: {}
+  prompt: |
+    Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-reindirizza-la-pagina-vecchia`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.
+
+    Il task 1 del piano è già avviato e il suo brief è `.tollgate-run/1/task-1.md`. Fallo eseguire all'implementatore `tollgate:implementer-infra` (si chiama `tg-1-t1`): lancialo in primo piano con lo strumento Agent, con il percorso assoluto del brief come prompt. Quando ha finito, dimmi in due righe com'è andata.
+graders:
+  - name: redirect-con-rewrites
+    type: regex
+    target:
+      source: file
+      path: ".claude/worktrees/tg-1-reindirizza-la-pagina-vecchia/vercel.json"
+    pattern: '^(?=[\s\S]*"source"\s*:\s*"/vecchia")(?=[\s\S]*"destination"\s*:\s*"/nuova")(?=[\s\S]*("permanent"\s*:\s*true|"statusCode"\s*:\s*30[18]))(?=[\s\S]*"/api/index\.py")'
+    weight: 4
+    arm: both
+  - name: nessuna-altra-piattaforma
+    type: regex
+    target: files
+    pattern: 'netlify\.toml|_redirects|nginx'
+    match: not_contains
+    arm: both
+  - name: pagina-vercel-aperta
+    type: tool_used
+    tool: WebFetch
+    input_match: 'vercel\.com/docs'
+    arm: both
+  - name: nota-consegnata
+    type: tool_used
+    tool: Bash
+    input_match: 'research submit [0-9]+\b'
+    arm: with-only

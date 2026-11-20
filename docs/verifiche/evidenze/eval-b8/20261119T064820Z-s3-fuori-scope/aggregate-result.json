@@ -1,0 +1,450 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.328",
+  "startedAt": "2026-11-19T06:48:21.401Z",
+  "durationSeconds": 257,
+  "costUsd": 0.8809876,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-eval-target",
+    "ablation": "with-without",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "s3-fuori-scope",
+    "threshold": 0.66,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "tollgate",
+        "version": "0.2.0",
+        "path": "/tmp/tollgate-eval-target"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "s3-fuori-scope",
+      "dir": "evals/s3-fuori-scope",
+      "source": "case_yaml",
+      "promptMarkdown": "Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.\n\nIl task 1 del piano è già avviato e il suo brief è `.tollgate-run/1/task-1.md`. Fallo eseguire all'implementatore `tollgate:implementer` (si chiama `tg-1-t1`): lancialo in primo piano con lo strumento Agent, con il percorso assoluto del brief come prompt. Oltre alla funzione e al suo test, `moltiplica` va citata anche nell'elenco delle funzioni di `README.md`: scrivilo nel prompt dell'implementatore.\n\nQuando ha finito, dimmi in due righe com'è andata e chiudi con una riga `ESITO: ` seguita da `fatto`, `fuori scope` (se qualcosa di richiesto cade fuori dallo scope del piano) oppure `bloccato`.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 900,
+      "maxTurns": 30,
+      "graders": [
+        {
+          "name": "implementatore-lanciato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Agent",
+            "input_match": "tollgate:implementer"
+          }
+        },
+        {
+          "name": "deroga-o-segnalazione",
+          "type": "regex",
+          "weight": 2,
+          "config": {
+            "target": "trace",
+            "pattern": "\"command\"\\s*:\\s*\"(?:[^\"\\\\]|\\\\.)*waiver add scope|ESITO: fuori scope",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "deroga-registrata",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": ".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml"
+            },
+            "pattern": "type = \"scope\"\\s+file = \"README\\.md\"",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "file-invariato",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": ".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/README.md"
+            },
+            "pattern": "^# Calc\\n\\nFunzioni disponibili: `somma`, `sottrai`\\.\\n$",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "veto-scope",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "file fuori scope:",
+            "flags": "",
+            "match": "contains",
+            "arm": "with-only"
+          }
+        },
+        {
+          "name": "nota-consegnata",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Bash",
+            "input_match": "research submit [0-9]+\\b",
+            "arm": "with-only"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0.4,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.23242909999999997,
+            "judgeCostUsd": 0,
+            "durationSeconds": 75,
+            "startedAt": "2026-11-19T06:48:21.424Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-RYutUM/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "deroga-o-segnalazione",
+                "passed": false,
+                "weight": 2,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "deroga-registrata",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"s3-fuori-scope\" grader focus file \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml\": path \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-invariato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^# Calc\\n\\nFunzioni disponibili: `somma`, `sottrai`\\.\\n$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "veto-scope",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "nota-consegnata",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 0.8,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.2068661,
+            "judgeCostUsd": 0,
+            "durationSeconds": 62,
+            "startedAt": "2026-11-19T06:49:36.605Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-tNognK/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "deroga-o-segnalazione",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched \"command\"\\s*:\\s*\"(?:[^\"\\\\]|\\\\.)*waiver add scope|ESITO: fuori scope",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "deroga-registrata",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"s3-fuori-scope\" grader focus file \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml\": path \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-invariato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^# Calc\\n\\nFunzioni disponibili: `somma`, `sottrai`\\.\\n$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "veto-scope",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "nota-consegnata",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 0.4,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.23430900000000005,
+            "judgeCostUsd": 0,
+            "durationSeconds": 77,
+            "startedAt": "2026-11-19T06:50:38.806Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-uniqLf/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "deroga-o-segnalazione",
+                "passed": false,
+                "weight": 2,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "deroga-registrata",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"s3-fuori-scope\" grader focus file \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml\": path \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-invariato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^# Calc\\n\\nFunzioni disponibili: `somma`, `sottrai`\\.\\n$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "veto-scope",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "nota-consegnata",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.4,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.066348,
+            "judgeCostUsd": 0,
+            "durationSeconds": 13,
+            "startedAt": "2026-11-19T06:51:55.639Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-2Iymvy/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "deroga-o-segnalazione",
+                "passed": false,
+                "weight": 2,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "deroga-registrata",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"s3-fuori-scope\" grader focus file \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml\": path \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-invariato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^# Calc\\n\\nFunzioni disponibili: `somma`, `sottrai`\\.\\n$",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.4,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.0717692,
+            "judgeCostUsd": 0,
+            "durationSeconds": 17,
+            "startedAt": "2026-11-19T06:52:08.185Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-04gYaA/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "deroga-o-segnalazione",
+                "passed": false,
+                "weight": 2,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "deroga-registrata",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"s3-fuori-scope\" grader focus file \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml\": path \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-invariato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^# Calc\\n\\nFunzioni disponibili: `somma`, `sottrai`\\.\\n$",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.4,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.0692662,
+            "judgeCostUsd": 0,
+            "durationSeconds": 13,
+            "startedAt": "2026-11-19T06:52:25.478Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-Nk6LTq/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "deroga-o-segnalazione",
+                "passed": false,
+                "weight": 2,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "deroga-registrata",
+                "passed": false,
+                "weight": 1,
+                "explanation": "grader threw: case \"s3-fuori-scope\" grader focus file \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml\": path \".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml\" does not exist",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "file-invariato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched ^# Calc\\n\\nFunzioni disponibili: `somma`, `sottrai`\\.\\n$",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0.5333333333333333,
+        "passRate": 0,
+        "scoreWithout": 0.4000000000000001,
+        "passRateWithout": 0,
+        "delta": 0.13333333333333325
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 0,
+    "overallScore": 0.5333333333333333,
+    "overallPassRate": 0,
+    "meanDelta": 0.13333333333333325
+  }
+}

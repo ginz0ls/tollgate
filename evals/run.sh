@@ -1,24 +1,31 @@
 #!/usr/bin/env bash
 # Esegue gli eval veri di tollgate con `claude plugin eval` (decisioni 8, 9 e 23). Solo il controller, in locale.
 #
-#   evals/run.sh [--a-secco] <spec|extra|nome-del-caso> [--runs N]
+#   evals/run.sh [--a-secco] [--campagna <nome>] <spec|extra|nome-del-caso> [--runs N]
+#
+# --campagna: registro e tetto di una campagna di `evals/cost.py` (`b8`, predefinita: 20 USD; `p5`: 80 USD, la storia). Per ogni
+# campagna diversa da `p5` gli eval ricevono anche WebFetch per i domini di `evals/scrub.py` (WEB_DOMAINS) e WebSearch.
 #
 # --a-secco: fa tutto fino alla stampa del comando (rifiuti, preambolo, residuo, bersaglio) ed esce 0 senza lock,
 # senza prenotare e senza lanciare claude (1 se il tetto è esaurito, come la corsa vera).
 #
-# Controlla il residuo del tetto (80 USD in budget.tsv), costruisce il bersaglio fuori dal repo, mette
+# Controlla il residuo del tetto della campagna (budget.tsv), costruisce il bersaglio fuori dal repo, mette
 # tests/evalbin (shim di gh e python3) in testa al PATH di chi lancia l'eval, lancia claude con --no-publish
 # e una cartella d'uscita fissa, scrive il costo in budget.tsv qualunque sia l'uscita, copia le corse tenute
-# in <uscita>/runs/ e controlla che il plugin tollgate sia caricato nel braccio con plugin.
+# in <uscita>/runs/, le ripulisce (pagine di terzi, nome utente e host: evals/scrub.py), conta le note di ricerca
+# (evals/research_counts.py, <uscita>/nota.md) e controlla che il plugin tollgate sia caricato nel braccio con plugin.
 #
 # Uscite: 0, 1, 2 sono quelle di claude (1 = sotto soglia, 2 = tetto raggiunto) tranne il rifiuto per
-# residuo esaurito (1, claude non parte); 3 = costo ignoto; 4 = plugin non caricato; 64 = uso errato.
+# residuo esaurito (1, claude non parte); 3 = costo ignoto; 4 = plugin non caricato; 5 = evidenze non ripulite
+# (non committare); 64 = uso errato.
 #
 # Variabili. BUDGET, EVIDENCE e TARGET valgono SOLO con TOLLGATE_EVAL_TEST_MODE=1 (i test le puntano a cartelle
 # temporanee); senza, se una è impostata, l'uscita è 64 prima di tutto:
-#   TOLLGATE_EVAL_BUDGET    registro dei costi (predefinito docs/verifiche/evidenze/eval-p5/budget.tsv)
-#   TOLLGATE_EVAL_EVIDENCE  radice delle cartelle d'uscita (predefinita docs/verifiche/evidenze/eval-p5)
+#   TOLLGATE_EVAL_BUDGET    registro dei costi (predefinito docs/verifiche/evidenze/<cartella della campagna>/budget.tsv)
+#   TOLLGATE_EVAL_EVIDENCE  radice delle cartelle d'uscita (predefinita docs/verifiche/evidenze/<cartella della campagna>)
 #   TOLLGATE_EVAL_TARGET    bersaglio (predefinito /tmp/tollgate-eval-target, decisione 9 (c))
+#   TOLLGATE_EVAL_FAKE_USER, TOLLGATE_EVAL_FAKE_HOST  nome utente e host finti per l'anonimizzazione (predefiniti utente-prova e
+#                           macchina-prova): così i test non leggono mai quelli veri
 # Valgono sempre:
 #   TOLLGATE_EVAL_TMPDIR    TMPDIR dell'eval (predefinito $HOME/.cache/tollgate-eval-tmp), mai sotto /tmp, /var/tmp, /dev/shm
 #   TOLLGATE_EVAL_TIMEOUT   secondi per invocazione, intero positivo (predefinito 3600; dopo 30 s di grazia, SIGKILL)
@@ -30,26 +37,21 @@
 set -u
 die() { echo "$1" >&2; exit "${2:-64}"; }
 if [ "${TOLLGATE_EVAL_TEST_MODE:-}" != 1 ]; then
-  for v in TOLLGATE_EVAL_BUDGET TOLLGATE_EVAL_EVIDENCE TOLLGATE_EVAL_TARGET; do
+  for v in TOLLGATE_EVAL_BUDGET TOLLGATE_EVAL_EVIDENCE TOLLGATE_EVAL_TARGET TOLLGATE_EVAL_FAKE_USER TOLLGATE_EVAL_FAKE_HOST; do
     [ -z "${!v:-}" ] || die "$v è impostata ma vale solo con TOLLGATE_EVAL_TEST_MODE=1: la tolgo dall'ambiente e rilancio"
   done
 fi
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/.." && pwd)"
-EVIDENCE="${TOLLGATE_EVAL_EVIDENCE:-$root/docs/verifiche/evidenze/eval-p5}"
-# Il registro: fuori dai test non si esporta niente e cost.py usa il suo predefinito (lo stesso percorso).
-if [ "${TOLLGATE_EVAL_TEST_MODE:-}" = 1 ] && [ -n "${TOLLGATE_EVAL_BUDGET:-}" ]; then
-  budget_file="$TOLLGATE_EVAL_BUDGET"; export TOLLGATE_EVAL_BUDGET
-else
-  budget_file="$root/docs/verifiche/evidenze/eval-p5/budget.tsv"; unset TOLLGATE_EVAL_BUDGET
-fi
 TARGET="${TOLLGATE_EVAL_TARGET:-/tmp/tollgate-eval-target}"
 MODEL=claude-sonnet-5-5
 THRESHOLD=0.66
 DEFAULT_RUNS=3         # decisione 8: tre corse per caso
 TOKEN_PATTERN='gh[pos]_[A-Za-z0-9_]{8,}|github_pat_[A-Za-z0-9_]{8,}|sk-ant-[A-Za-z0-9_-]{8,}|AKIA[0-9A-Z]{16}'
 
-cost() { python3 -B "$here/cost.py" "$@"; }
+campaign=b8
+# cost <sottocomando> ...: sempre con la campagna scelta
+cost() { local sub="$1"; shift; python3 -B "$here/cost.py" "$sub" --campagna "$campaign" "$@"; }
 
 # ---------------------------------------------------------------- argomenti
 
@@ -59,17 +61,33 @@ while [ "$#" -gt 0 ]; do
     --output-dir|--output-dir=*|--json|--json=*|--report|--report=*|--publish|--publish=*|--publish-report|--publish-report=*)
       die "argomento rifiutato ($1): cartella d'uscita, JSON e rapporto sono fissi e il rapporto non si pubblica mai" ;;
     --a-secco) dry=1; shift ;;
+    --campagna)
+      [ "$#" -ge 2 ] || die "--campagna vuole un nome"
+      campaign="$2"; shift 2 ;;
+    --campagna=*) campaign="${1#--campagna=}"; shift ;;
     --runs)
       [ "$#" -ge 2 ] || die "--runs vuole un numero"
       runs="$2"; shift 2 ;;
     --runs=*) runs="${1#--runs=}"; shift ;;
-    -*) die "argomento sconosciuto: $1 (uso: run.sh [--a-secco] <spec|extra|caso> [--runs N])" ;;
+    -*) die "argomento sconosciuto: $1 (uso: run.sh [--a-secco] [--campagna NOME] <spec|extra|caso> [--runs N])" ;;
     *)
       [ -z "$selector" ] || die "un solo selettore: spec, extra o il nome di un caso"
       selector="$1"; shift ;;
   esac
 done
-[ -n "$selector" ] || die "uso: run.sh <spec|extra|caso> [--runs N]"
+[ -n "$selector" ] || die "uso: run.sh [--a-secco] [--campagna NOME] <spec|extra|caso> [--runs N]"
+# cartella delle evidenze e tetto della campagna (da cost.py, che li ha in CAMPAIGNS), domini del web (da scrub.py, WEB_DOMAINS)
+campaign_info="$(python3 -B "$here/cost.py" info --campagna "$campaign")" || die "campagna sconosciuta: $campaign"
+{ IFS= read -r campaign_folder; IFS= read -r campaign_total; } <<< "$campaign_info"
+mapfile -t web_domains < <(python3 -B "$here/scrub.py" domains) || die "domini del web non leggibili" 1
+[ "${#web_domains[@]}" -gt 0 ] || die "nessun dominio del web in evals/scrub.py" 1
+EVIDENCE="${TOLLGATE_EVAL_EVIDENCE:-$root/docs/verifiche/evidenze/$campaign_folder}"
+# Il registro: fuori dai test non si esporta niente e cost.py usa il suo predefinito (lo stesso percorso).
+if [ "${TOLLGATE_EVAL_TEST_MODE:-}" = 1 ] && [ -n "${TOLLGATE_EVAL_BUDGET:-}" ]; then
+  budget_file="$TOLLGATE_EVAL_BUDGET"; export TOLLGATE_EVAL_BUDGET
+else
+  budget_file="$root/docs/verifiche/evidenze/$campaign_folder/budget.tsv"; unset TOLLGATE_EVAL_BUDGET
+fi
 eval_timeout="${TOLLGATE_EVAL_TIMEOUT:-3600}"
 case "$eval_timeout" in ''|*[!0-9]*|0|0[0-9]*) die "TOLLGATE_EVAL_TIMEOUT vuole un intero positivo di secondi: $eval_timeout" ;; esac
 [ "${#eval_timeout}" -le 6 ] || die "TOLLGATE_EVAL_TIMEOUT troppo grande: $eval_timeout"
@@ -105,7 +123,7 @@ fi
 
 cap="$(cost remaining)" || die "budget.tsv illeggibile: non lancio niente" 1
 if ! awk -v c="$cap" 'BEGIN { exit !(c >= 0.01) }'; then
-  die "tetto di 80 USD esaurito (residuo $cap): non lancio niente. Chiedi all'utente." 1
+  die "tetto di $campaign_total USD della campagna $campaign esaurito (residuo $cap): non lancio niente. Chiedi all'utente." 1
 fi
 
 # ---------------------------------------------------------------- cartella temporanea dell'eval
@@ -131,6 +149,7 @@ echo "registro dei costi: $budget_file"
 echo "cartella delle evidenze: $EVIDENCE"
 echo "bersaglio: $TARGET"
 echo "TMPDIR dell'eval: $evtmp"
+echo "campagna: $campaign (tetto $campaign_total USD)"
 echo "residuo del tetto: $cap USD"
 [ "${TOLLGATE_EVAL_TEST_MODE:-}" != 1 ] || echo "!! TEST_MODE attivo: percorsi di prova, non è una corsa vera"
 
@@ -148,8 +167,14 @@ if [ "$dry" = 0 ]; then
 fi
 
 label="$selector ($ablation, --runs $runs)"
+# i permessi: la campagna di P5 ha solo la shell e la scrittura; le altre anche WebFetch per dominio e WebSearch
+allow_tools=(Bash Write Edit)
+if [ "$campaign" != p5 ]; then
+  for d in "${web_domains[@]}"; do allow_tools+=("WebFetch(domain:$d)"); done
+  allow_tools+=(WebSearch)
+fi
 cmd=(claude plugin eval "$TARGET" "${select_args[@]}" --runs "$runs" --scaffold --trust-plugin --no-publish
-     --model "$MODEL" --allow-tools Bash Write Edit --threshold "$THRESHOLD" --ablation "$ablation"
+     --model "$MODEL" --allow-tools "${allow_tools[@]}" --threshold "$THRESHOLD" --ablation "$ablation"
      --max-cost-usd "$cap" --keep-temp --output-dir "$dir" --json "$dir/result.json" --report "$dir/report.html")
 
 echo "== $label"
@@ -168,14 +193,42 @@ reserved="$(cost reserve --label "$label")" || die "prenotazione del costo in bu
 rc=$?
 echo "$rc" > "$dir/claude.rc"
 
+# ---------------------------------------------------------------- pulizia delle evidenze (decisioni 9 e 10 di B8)
+
+# scrub_evidence <cartella d'uscita>: nell'ordine, `togli-pagine` (pagine lunghe, copie salvate, skill e hook di terzi), ogni
+# risultato di WebFetch e WebSearch, i risultati dei Bash che leggono un dominio concesso, poi nome utente e host (mai stampati).
+# In TEST_MODE i valori sono finti, per non leggere mai quelli veri. Ritorna 1 se un passo fallisce.
+scrub_evidence() {
+  local out="$1" user host trace
+  local -a traces=()
+  while IFS= read -r -d '' trace; do traces+=("$trace"); done < <(find "$out/runs" -type f -name trace.jsonl -print0 2>/dev/null)
+  if [ "${#traces[@]}" -gt 0 ]; then
+    python3 -B "$root/spikes/b1/flowreg.py" togli-pagine "${traces[@]}" || return 1
+    python3 -B "$here/scrub.py" strip-web "${traces[@]}" || return 1
+    python3 -B "$here/scrub.py" strip-bash "${traces[@]}" || return 1
+  fi
+  if [ "${TOLLGATE_EVAL_TEST_MODE:-}" = 1 ]; then
+    user="${TOLLGATE_EVAL_FAKE_USER:-utente-prova}"; host="${TOLLGATE_EVAL_FAKE_HOST:-macchina-prova}"
+  else
+    user="$(id -un)"; host="$(hostname)"
+  fi
+  python3 -B "$here/scrub.py" anonymize "$out" "$user" "$host" || return 1
+}
+not_scrubbed() { die "evidenze non ripulite: non committare ($dir)" 5; }
+
 # ---------------------------------------------------------------- costo: qualunque sia l'uscita
 
+# con il costo ignoto la riga «?» resta in budget.tsv; le evidenze (stdout, stderr) si anonimizzano comunque prima di uscire
+unknown_cost() {
+  scrub_evidence "$dir" || { echo "costo ignoto: la riga «?» resta in budget.tsv" >&2; not_scrubbed; }
+  die "costo ignoto: controlla a mano prima di continuare ($dir): la riga «?» resta in budget.tsv" 3
+}
 if [ ! -s "$dir/result.json" ]; then
   echo "uscita di claude: $rc" >&2
-  die "costo ignoto: controlla a mano prima di continuare ($dir): la riga «?» resta in budget.tsv" 3
+  unknown_cost
 fi
 if ! cost add "$dir/result.json" --label "$label" --reserved "$reserved"; then
-  die "costo ignoto: controlla a mano prima di continuare ($dir): la riga «?» resta in budget.tsv" 3
+  unknown_cost
 fi
 after="$(cost remaining)"
 run_cost="$(grep -F "$reserved" "$budget_file" | tail -n 1 | cut -f3)"
@@ -257,10 +310,15 @@ while IFS= read -r run; do
   copy_one_run "$run" "$dir" || echo "cartella tenuta ignorata: $run"
 done < "$dir/cartelle-tenute.txt"
 
+# ---------------------------------------------------------------- pulizia, tabella e conteggi della nota
+
+scrub_evidence "$dir" || not_scrubbed
+
 # ---------------------------------------------------------------- il plugin è caricato?
 
 status=0
 cost table "$dir/result.json" > "$dir/tabella.md" || true
+python3 -B "$here/research_counts.py" "$dir" > "$dir/nota.md" || echo "conteggi della nota non fatti ($dir)" >&2
 if ! problems="$(cost plugin-check "$dir/result.json")"; then
   printf '%s\n' "$problems" >&2
   echo "plugin tollgate non caricato: controlla prima di continuare ($dir)" >&2

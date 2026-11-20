@@ -138,6 +138,67 @@ class EffectsTest(unittest.TestCase):
                     (self.lab.wt / "scripts/nuovo.sh").write_text("echo x\n")
                 self.assertEqual(self.lab.bash(cmd, agent_id="a1").exit, 2)
 
+    def test_untracked_script_behind_env_loader_asks(self):
+        wt = self.lab.wt
+        (wt / "scripts/migrate.js").write_text("x\n")
+        (wt / "deploy.py").write_text("x\n")
+        for cmd in ("dotenv -- ./deploy.sh", "cross-env A=1 ./deploy.sh",
+                    "npx dotenv -- ./deploy.sh", "dotenv -- node scripts/migrate.js",
+                    "cross-env A=1 python3 deploy.py", "npx dotenv -- node scripts/migrate.js",
+                    "dotenv -e .env -e .env.local node scripts/migrate.js",
+                    "dotenv --debug node scripts/migrate.js",
+                    "dotenv -- doppler run -- ./deploy.sh",
+                    "dotenv -e .env ./scripts/deploy.sh"):
+            with self.subTest(cmd=cmd):
+                r = self.lab.bash(cmd, agent_id="a1")
+                self.assertEqual(r.exit, 2, r.stderr)
+                self.assertIn("script nel repo non tracciato", r.stderr)
+        # `./deploy` e' un file da guardare solo se e' eseguibile (giro 6, m4).
+        (wt / "deploy").write_text("#!/bin/sh\n")
+        (wt / "deploy").chmod(0o644)
+        self.assertEqual(self.lab.bash("cross-env A=1 ./deploy", agent_id="a1").exit, 0)
+        (wt / "deploy").chmod(0o755)
+        r = self.lab.bash("cross-env A=1 ./deploy", agent_id="a1")
+        self.assertEqual(r.exit, 2, r.stderr)
+
+    def test_untracked_script_behind_shell_text_asks(self):
+        (self.lab.wt / "deploy.sh").write_text("x\n")
+        r = self.lab.bash('cross-env-shell "./deploy.sh && echo ok"', agent_id="a1")
+        self.assertEqual(r.exit, 2, r.stderr)
+        self.assertIn("script nel repo non tracciato", r.stderr)
+
+    def test_untracked_env_file_behind_env_loader_passes(self):
+        wt = self.lab.wt
+        (wt / "test").mkdir()
+        (wt / "test/.env").write_text("A=PROVA-123\n")
+        (wt / "src").mkdir(exist_ok=True)
+        (wt / "src/new.test.ts").write_text("x\n")
+        (wt / "test/new.test.ts").write_text("x\n")
+        (wt / "test/new.js").write_text("x\n")
+        (wt / "scripts/new.sh").write_text("x\n")
+        for cmd in ("env-cmd -f ./test/.env mocha -R spec",
+                    "cross-env NODE_ENV=test mocha 'test/**/*.spec.js'",
+                    "env-cmd -f .env.test jest src/new.test.ts",
+                    "cross-env NODE_ENV=test c8 node --test 'test/**/*.test.js'",
+                    "cross-env NODE_ENV=test node --import tsx --test 'test/**/*.test.ts'",
+                    "cross-env NODE_ENV=test mocha --require tsx test/new.test.ts",
+                    "cross-env CI=1 python3 -m pytest ./tests/vercel",
+                    "cross-env NODE_ENV=test c8 -r text node --test 'test/**/*.test.js'",
+                    "cross-env NODE_ENV=test nyc --reporter lcov node test/new.js",
+                    "cross-env CI=1 shellcheck scripts/new.sh",
+                    "dotenv -e ./.env.test -- jest", "dotenv -- python3 -m unittest"):
+            with self.subTest(cmd=cmd):
+                r = self.lab.bash(cmd, agent_id="a1")
+                self.assertEqual(r.exit, 0, r.stderr)
+
+    def test_relative_script_without_dot_slash_is_a_limit(self):
+        # Costo noto (decisione 1): prima del `--` un percorso relativo senza `./` e senza
+        # `bin/` e' un dato; la forma diretta invece chiede.
+        wt = self.lab.wt
+        (wt / "scripts/deploy").write_text("#!/bin/sh\n")
+        (wt / "scripts/deploy").chmod(0o755)
+        self.assertEqual(self.lab.bash("cross-env A=1 scripts/deploy", agent_id="a1").exit, 0)
+
     def test_allowed(self):
         for cmd in ("npm publish --dry-run", "bash scripts/ok.sh", "gh pr view 3",
                     f"'{ROOT}/bin/tollgate' verify", "ls -la", "git status"):

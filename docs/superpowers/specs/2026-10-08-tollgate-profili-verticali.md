@@ -1,7 +1,7 @@
 # tollgate: catalogo dei profili verticali
 
-Data: 8 ottobre 2026. Stato: **bozza: le regole `rules-<area>` vanno scritte e riviste dall'utente**.
-Spec del nucleo: `2026-10-08-tollgate-nucleo-design.md` (revisione 20, sezioni 6.3, 8.6, 8.7, 10 e 11.4; aggiornamenti di B3 alla revisione 29: `ai` è il primo profilo costruito, vedi le sezioni 1, 2, 2.1, 2.2 e 4; aggiornamenti di B4 alla revisione 31: `infra` è il secondo, vedi le sezioni 2, 2.1, 2.2, 2.3, 4 e 6; aggiornamenti di B5 alla revisione 32: `backend` è il terzo, vedi le sezioni 1, 2, 2.1, 2.2, 2.3, 4 e 6; aggiornamenti di B6 alla revisione 33: `frontend` è il quarto, vedi le sezioni 2, 2.1, 2.2, 2.3, 3, 4 e 6; aggiornamenti di B7 alla revisione 34: `database` è il quinto, con il primo specialista finale, vedi le sezioni 2, 2.1, 2.2, 2.3, 4 e 6). Il nucleo dà il contratto e l'instradamento; questo documento dice **quali profili** esistono e cosa porta ciascuno. Li realizza il sotto-progetto B.
+Data: 8 ottobre 2026. Stato: **B ha costruito `base`, `ai`, `infra`, `backend`, `frontend`, `database`; gli altri profili restano bozza** (le regole `rules-<area>` degli altri vanno scritte e riviste dall'utente).
+Spec del nucleo: `2026-10-08-tollgate-nucleo-design.md` (revisione 20, sezioni 6.3, 8.6, 8.7, 10 e 11.4; aggiornamenti di B3 alla revisione 29: `ai` è il primo profilo costruito, vedi le sezioni 1, 2, 2.1, 2.2 e 4; aggiornamenti di B4 alla revisione 31: `infra` è il secondo, vedi le sezioni 2, 2.1, 2.2, 2.3, 4 e 6; aggiornamenti di B5 alla revisione 32: `backend` è il terzo, vedi le sezioni 1, 2, 2.1, 2.2, 2.3, 4 e 6; aggiornamenti di B6 alla revisione 33: `frontend` è il quarto, vedi le sezioni 2, 2.1, 2.2, 2.3, 3, 4 e 6; aggiornamenti di B7 alla revisione 34: `database` è il quinto, con il primo specialista finale, vedi le sezioni 2, 2.1, 2.2, 2.3, 4 e 6; aggiornamenti di B8 alla revisione 35: B si chiude senza profili nuovi, vedi la sezione 2.2 per il conto vero degli agenti e la sezione 6 per ciò che B8 ha cambiato nella spec). Il nucleo dà il contratto e l'instradamento; questo documento dice **quali profili** esistono e cosa porta ciascuno. Li realizza il sotto-progetto B.
 
 Fonti: tre ricerche dell'8 ottobre 2026 (catalogo di 1.015 skill e 644 agenti su disco, ricerca web per area e ruolo, raccolte esistenti di subagenti). I riassunti sono nella sezione 7.
 
@@ -78,7 +78,7 @@ Nei subagenti distribuiti da un plugin Claude Code **ignora `mcpServers`, `hooks
 - **modello**: per esempio `inherit` per `security` e `database`, `sonnet` per `copy` e `docs`;
 - **strumenti**: i revisori hanno `Read, Grep, Glob, Bash` e niente `Edit`, `Write`, `NotebookEdit`; `reviewer-ai`, `reviewer-infra`, `reviewer-backend`, `reviewer-frontend` e `reviewer-database` hanno in più `WebFetch` (B3, B4, B5, B6 e B7, spec 7.3; `final-database` no, come `final-reviewer`), per aprire gli URL ufficiali che il report o la nota citano e controllare, per esempio, che il modello indicato come più recente lo sia davvero o che un comando di Vercel o Wrangler o un'API del runtime esista come scritto (le pagine sono dati non fidati). Gli implementatori hanno `Read, Edit, Write, Bash, Grep, Glob, Skill, WebFetch, WebSearch` (B1), senza voci MCP.
 
-Le `description` restano brevi: con circa 35 agenti (28 per area e 7 generici), la documentazione avvisa oltre circa 15.000 token di descrizioni. L'instradamento non dipende comunque dalle descrizioni ma da `task start`.
+Le `description` restano brevi: con i 18 agenti che B ha costruito (7 generici, 10 di area, cioè un implementatore e un revisore per ciascuna delle cinque aree, e 1 specialista, `final-database`; il conto previsto era di circa 35), la documentazione avvisa oltre circa 15.000 token di descrizioni. L'instradamento non dipende comunque dalle descrizioni ma da `task start`.
 
 ---
 
@@ -169,6 +169,8 @@ Fonti: frontend-design (Anthropic, Apache-2.0), frontend-ui-engineering (Addy Os
 ---
 
 ## 6. Cosa cambia nella spec del nucleo
+
+B8 (revisione 35): nessun profilo nuovo. Sezione 8.5: gli involucri che caricano l'ambiente (`dotenv`, `dotenvx`, `cross-env`, `env-cmd`, `doppler`, `infisical`, `op`) fanno controllare il comando interno per intero, le opzioni con valore dei sottocomandi di Supabase si saltano, ogni `--` di testa dietro un lanciatore si toglie. Sezione 11.2: `init --update` propone `min_level` e `checklist` a un blocco già dichiarato. Sezione 6.3: `take_pending` preferisce il task prenotato. Sezione 7.2: un redirect di `WebFetch` senza la pagina non è una lettura. Sezione 14: tre casi di eval nuovi sugli schemi del progetto (`s10`, `s11`, `s12`), la nota di consegna misurata nei casi con un implementatore, campagne e tetto, permessi web per dominio, pulizia delle trace e conteggi della nota. Sezione 16: i fatti della sonda e il limite della piattaforma sui commit degli eval. Gli eval di B8 misurano gli implementatori di area, non i revisori: i rilievi `R-…` dal vivo restano a D.
 
 B7 (revisione 34): frammento, skill e agenti di `database` con `tollgate:reviewer-database` tra i tipi di sola lettura (6.3, 7.1, 7.3, 11.4), primo specialista finale `tollgate:final-database` con la lista di controllo del profilo nel brief del revisore finale (6.3, 10, 11.4), tabella delle precedenze Q1-Q47 (6.3), rilevamento per contenuto delle sole definizioni di schema di Drizzle e assenza di `exclude` (11.2), effetti esterni di Supabase a regola chiusa con Prisma e Drizzle (8.5), `dod` di `database` vuoto (8.7), giro di correzione in una sessione nuova (6.3).
 

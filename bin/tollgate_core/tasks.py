@@ -145,12 +145,14 @@ def assign(conn, work: int, number: int, *, implementer: str, agent_type: str, p
 def take_pending(conn, work: int, *, agent_type: str, resume: bool,
                  number: int | None = None) -> int | None:
     """Associa un subagente che parte (o riprende) al task in sospeso del suo tipo. Con `number`
-    guarda solo quel task (la ripresa sa già di chi è). Azzera anche la prenotazione del lancio."""
+    guarda solo quel task (la ripresa sa già di chi è). Tra più task dello stesso tipo preferisce
+    quello prenotato dal lancio (il più recente), poi il numero più basso.
+    Azzera anche la prenotazione del lancio."""
     want = "resume" if resume else "launch"
     with db.tx(conn):
         row = conn.execute("SELECT number FROM tasks WHERE work = ? AND pending = ? "
                            "AND agent_type = ? AND (? IS NULL OR number = ?) "
-                           "ORDER BY number LIMIT 1",
+                           "ORDER BY (reserved_at IS NULL), reserved_at DESC, number LIMIT 1",
                            (work, want, agent_type, number, number)).fetchone()
         if row is None:
             return None

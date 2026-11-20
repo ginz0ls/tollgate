@@ -1,0 +1,355 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.328",
+  "startedAt": "2026-11-19T06:31:10.673Z",
+  "durationSeconds": 289,
+  "costUsd": 0.9395768,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-eval-target",
+    "ablation": "with-without",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "s11-deploy-dedotto",
+    "threshold": 0.66,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "tollgate",
+        "version": "0.2.0",
+        "path": "/tmp/tollgate-eval-target"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "s11-deploy-dedotto",
+      "dir": "evals/s11-deploy-dedotto",
+      "source": "case_yaml",
+      "promptMarkdown": "Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-reindirizza-la-pagina-vecchia`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.\n\nIl task 1 del piano è già avviato e il suo brief è `.tollgate-run/1/task-1.md`. Fallo eseguire all'implementatore `tollgate:implementer-infra` (si chiama `tg-1-t1`): lancialo in primo piano con lo strumento Agent, con il percorso assoluto del brief come prompt. Quando ha finito, dimmi in due righe com'è andata.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 1200,
+      "maxTurns": 40,
+      "graders": [
+        {
+          "name": "redirect-con-rewrites",
+          "type": "regex",
+          "weight": 4,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": ".claude/worktrees/tg-1-reindirizza-la-pagina-vecchia/vercel.json"
+            },
+            "pattern": "^(?=[\\s\\S]*\"source\"\\s*:\\s*\"/vecchia\")(?=[\\s\\S]*\"destination\"\\s*:\\s*\"/nuova\")(?=[\\s\\S]*(\"permanent\"\\s*:\\s*true|\"statusCode\"\\s*:\\s*30[18]))(?=[\\s\\S]*\"/api/index\\.py\")",
+            "flags": "",
+            "match": "contains",
+            "arm": "both"
+          }
+        },
+        {
+          "name": "nessuna-altra-piattaforma",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "files",
+            "pattern": "netlify\\.toml|_redirects|nginx",
+            "flags": "",
+            "match": "not_contains",
+            "arm": "both"
+          }
+        },
+        {
+          "name": "pagina-vercel-aperta",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "WebFetch",
+            "input_match": "vercel\\.com/docs",
+            "arm": "both"
+          }
+        },
+        {
+          "name": "nota-consegnata",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Bash",
+            "input_match": "research submit [0-9]+\\b",
+            "arm": "with-only"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.26687740000000004,
+            "judgeCostUsd": 0,
+            "durationSeconds": 82,
+            "startedAt": "2026-11-19T06:31:10.695Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-hYwUJ5/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "redirect-con-rewrites",
+                "passed": true,
+                "weight": 4,
+                "explanation": "matched ^(?=[\\s\\S]*\"source\"\\s*:\\s*\"/vecchia\")(?=[\\s\\S]*\"destination\"\\s*:\\s*\"/nuova\")(?=[\\s\\S]*(\"permanent\"\\s*:\\s*true|\"statusCode\"\\s*:\\s*30[18]))(?=[\\s\\S]*\"/api/index\\.py\")",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nessuna-altra-piattaforma",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "pagina-vercel-aperta",
+                "passed": true,
+                "weight": 1,
+                "explanation": "WebFetch called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nota-consegnata",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.26166960000000006,
+            "judgeCostUsd": 0,
+            "durationSeconds": 91,
+            "startedAt": "2026-11-19T06:32:32.349Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-sIhqgG/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "redirect-con-rewrites",
+                "passed": true,
+                "weight": 4,
+                "explanation": "matched ^(?=[\\s\\S]*\"source\"\\s*:\\s*\"/vecchia\")(?=[\\s\\S]*\"destination\"\\s*:\\s*\"/nuova\")(?=[\\s\\S]*(\"permanent\"\\s*:\\s*true|\"statusCode\"\\s*:\\s*30[18]))(?=[\\s\\S]*\"/api/index\\.py\")",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nessuna-altra-piattaforma",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "pagina-vercel-aperta",
+                "passed": true,
+                "weight": 1,
+                "explanation": "WebFetch called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nota-consegnata",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.23762149999999999,
+            "judgeCostUsd": 0,
+            "durationSeconds": 80,
+            "startedAt": "2026-11-19T06:34:02.939Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-eiktOn/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "redirect-con-rewrites",
+                "passed": true,
+                "weight": 4,
+                "explanation": "matched ^(?=[\\s\\S]*\"source\"\\s*:\\s*\"/vecchia\")(?=[\\s\\S]*\"destination\"\\s*:\\s*\"/nuova\")(?=[\\s\\S]*(\"permanent\"\\s*:\\s*true|\"statusCode\"\\s*:\\s*30[18]))(?=[\\s\\S]*\"/api/index\\.py\")",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nessuna-altra-piattaforma",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "pagina-vercel-aperta",
+                "passed": true,
+                "weight": 1,
+                "explanation": "WebFetch called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nota-consegnata",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Bash called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.16666666666666666,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.057590100000000005,
+            "judgeCostUsd": 0,
+            "durationSeconds": 12,
+            "startedAt": "2026-11-19T06:35:22.691Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-cwNKtN/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "redirect-con-rewrites",
+                "passed": false,
+                "weight": 4,
+                "explanation": "pattern not found in file .claude/worktrees/tg-1-reindirizza-la-pagina-vecchia/vercel.json",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nessuna-altra-piattaforma",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "pagina-vercel-aperta",
+                "passed": false,
+                "weight": 1,
+                "explanation": "WebFetch called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.16666666666666666,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.0582081,
+            "judgeCostUsd": 0,
+            "durationSeconds": 10,
+            "startedAt": "2026-11-19T06:35:34.851Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-kGlrbA/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "redirect-con-rewrites",
+                "passed": false,
+                "weight": 4,
+                "explanation": "pattern not found in file .claude/worktrees/tg-1-reindirizza-la-pagina-vecchia/vercel.json",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nessuna-altra-piattaforma",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "pagina-vercel-aperta",
+                "passed": false,
+                "weight": 1,
+                "explanation": "WebFetch called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.16666666666666666,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.0576101,
+            "judgeCostUsd": 0,
+            "durationSeconds": 14,
+            "startedAt": "2026-11-19T06:35:45.079Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-PhLz0X/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "redirect-con-rewrites",
+                "passed": false,
+                "weight": 4,
+                "explanation": "pattern not found in file .claude/worktrees/tg-1-reindirizza-la-pagina-vecchia/vercel.json",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nessuna-altra-piattaforma",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "pagina-vercel-aperta",
+                "passed": false,
+                "weight": 1,
+                "explanation": "WebFetch called 0x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1,
+        "scoreWithout": 0.16666666666666666,
+        "passRateWithout": 0,
+        "delta": 0.8333333333333334
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 1,
+    "overallPassRate": 1,
+    "meanDelta": 0.8333333333333334
+  }
+}

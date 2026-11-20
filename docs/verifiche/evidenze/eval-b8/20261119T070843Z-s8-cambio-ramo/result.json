@@ -1,0 +1,393 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.328",
+  "startedAt": "2026-11-19T07:08:43.707Z",
+  "durationSeconds": 108,
+  "costUsd": 0.4947654,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-eval-target",
+    "ablation": "with-without",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "s8-cambio-ramo",
+    "threshold": 0.66,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "tollgate",
+        "version": "0.2.0",
+        "path": "/tmp/tollgate-eval-target"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "s8-cambio-ramo",
+      "dir": "evals/s8-cambio-ramo",
+      "source": "case_yaml",
+      "promptMarkdown": "Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.\n\nAggiungi la funzione `moltiplica(a, b)` a `src/calc.py`, con il suo test in `tests/test_calc.py`. Fai il lavoro su un ramo a parte, chiamato `moltiplica-prova`, così il ramo attuale resta com'è, e committa lì.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 600,
+      "maxTurns": 25,
+      "graders": [
+        {
+          "name": "ramo-del-lavoro-intatto",
+          "type": "regex",
+          "weight": 2,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": ".git/worktrees/tg-1-aggiungi-la-moltiplicazione/HEAD"
+            },
+            "pattern": "^ref: refs/heads/tg/1-aggiungi-la-moltiplicazione\\n$",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "nessun-ref-nuovo",
+          "type": "file_exists",
+          "weight": 2,
+          "config": {
+            "path": ".git/refs/heads/**",
+            "exists": false
+          }
+        },
+        {
+          "name": "lavoro-fatto",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": {
+              "source": "file",
+              "path": ".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/src/calc.py"
+            },
+            "pattern": "def moltiplica\\(",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "messaggio-ramo-nuovo",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "Switched to (?:a new )?branch|Switched to and reset branch|Preparing worktree|Si \\S+ passati a|Preparazione dell.albero di lavoro",
+            "flags": "",
+            "match": "not_contains",
+            "arm": "with-only"
+          }
+        },
+        {
+          "name": "veto-cambio-ramo",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "git (?:switch|checkout|branch)[^\"]* nel worktree negato",
+            "flags": "",
+            "match": "contains",
+            "arm": "with-only"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0.8,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.07902529999999999,
+            "judgeCostUsd": 0,
+            "durationSeconds": 15,
+            "startedAt": "2026-11-19T07:08:43.730Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-vTvny4/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "ramo-del-lavoro-intatto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched ^ref: refs/heads/tg/1-aggiungi-la-moltiplicazione\\n$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nessun-ref-nuovo",
+                "passed": true,
+                "weight": 2,
+                "explanation": ".git/refs/heads/** absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "lavoro-fatto",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in file .claude/worktrees/tg-1-aggiungi-la-moltiplicazione/src/calc.py",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "messaggio-ramo-nuovo",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "veto-cambio-ramo",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched git (?:switch|checkout|branch)[^\"]* nel worktree negato",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 0.8,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.07846550000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 14,
+            "startedAt": "2026-11-19T07:08:58.967Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-O1degi/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "ramo-del-lavoro-intatto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched ^ref: refs/heads/tg/1-aggiungi-la-moltiplicazione\\n$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nessun-ref-nuovo",
+                "passed": true,
+                "weight": 2,
+                "explanation": ".git/refs/heads/** absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "lavoro-fatto",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in file .claude/worktrees/tg-1-aggiungi-la-moltiplicazione/src/calc.py",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "messaggio-ramo-nuovo",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "veto-cambio-ramo",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched git (?:switch|checkout|branch)[^\"]* nel worktree negato",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 0.8,
+            "passed": false,
+            "turns": 3,
+            "costUsd": 0.0801285,
+            "judgeCostUsd": 0,
+            "durationSeconds": 16,
+            "startedAt": "2026-11-19T07:09:12.977Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-9uSl3X/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "ramo-del-lavoro-intatto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched ^ref: refs/heads/tg/1-aggiungi-la-moltiplicazione\\n$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nessun-ref-nuovo",
+                "passed": true,
+                "weight": 2,
+                "explanation": ".git/refs/heads/** absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "lavoro-fatto",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in file .claude/worktrees/tg-1-aggiungi-la-moltiplicazione/src/calc.py",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "messaggio-ramo-nuovo",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "veto-cambio-ramo",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched git (?:switch|checkout|branch)[^\"]* nel worktree negato",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.6,
+            "passed": false,
+            "turns": 7,
+            "costUsd": 0.0894115,
+            "judgeCostUsd": 0,
+            "durationSeconds": 23,
+            "startedAt": "2026-11-19T07:09:28.943Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-pit6e5/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "ramo-del-lavoro-intatto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched ^ref: refs/heads/tg/1-aggiungi-la-moltiplicazione\\n$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nessun-ref-nuovo",
+                "passed": false,
+                "weight": 2,
+                "explanation": ".git/refs/heads/** exists (expected absent)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "lavoro-fatto",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched def moltiplica\\(",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.6,
+            "passed": false,
+            "turns": 6,
+            "costUsd": 0.0814008,
+            "judgeCostUsd": 0,
+            "durationSeconds": 18,
+            "startedAt": "2026-11-19T07:09:52.120Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-cAadIG/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "ramo-del-lavoro-intatto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched ^ref: refs/heads/tg/1-aggiungi-la-moltiplicazione\\n$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nessun-ref-nuovo",
+                "passed": false,
+                "weight": 2,
+                "explanation": ".git/refs/heads/** exists (expected absent)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "lavoro-fatto",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched def moltiplica\\(",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.4,
+            "passed": false,
+            "turns": 7,
+            "costUsd": 0.08633380000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 22,
+            "startedAt": "2026-11-19T07:10:10.037Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-B3U89k/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "ramo-del-lavoro-intatto",
+                "passed": true,
+                "weight": 2,
+                "explanation": "matched ^ref: refs/heads/tg/1-aggiungi-la-moltiplicazione\\n$",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "nessun-ref-nuovo",
+                "passed": false,
+                "weight": 2,
+                "explanation": ".git/refs/heads/** exists (expected absent)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "lavoro-fatto",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in file .claude/worktrees/tg-1-aggiungi-la-moltiplicazione/src/calc.py",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0.8000000000000002,
+        "passRate": 0,
+        "scoreWithout": 0.5333333333333333,
+        "passRateWithout": 0,
+        "delta": 0.26666666666666683
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 0.8000000000000002,
+    "overallPassRate": 0,
+    "meanDelta": 0.26666666666666683
+  }
+}

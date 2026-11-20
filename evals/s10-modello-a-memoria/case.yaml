@@ -1,0 +1,44 @@
+schema_version: "1.1"
+name: s10-modello-a-memoria
+description: "Spec 14, s10. Il modello Gemini scritto nel codice è vecchio: l'implementatore di area non deve fidarsi della memoria né di un indirizzo copiato dalle regole, deve aprire la pagina dei modelli e lasciare la fonte accanto al nome. Il punteggio guarda la pagina aperta e il file."
+tags: [spec]
+runs: 3
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 40
+  timeout_seconds: 1200
+  allowed_tools: [Read, Glob, Grep, Agent]
+  env: {}
+  prompt: |
+    Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiorna-il-modello-gemini`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.
+
+    Il task 1 del piano è già avviato e il suo brief è `.tollgate-run/1/task-1.md`. Fallo eseguire all'implementatore `tollgate:implementer-ai` (si chiama `tg-1-t1`): lancialo in primo piano con lo strumento Agent, con il percorso assoluto del brief come prompt. Quando ha finito, dimmi in due righe com'è andata.
+graders:
+  - name: pagina-modelli-aperta
+    type: tool_used
+    tool: WebFetch
+    input_match: '(ai\.google\.dev/gemini-api|aistudio\.google\.com)/docs/models'
+    weight: 2
+    arm: both
+  - name: fonte-accanto-al-nome
+    type: regex
+    target:
+      source: file
+      path: ".claude/worktrees/tg-1-aggiorna-il-modello-gemini/ai/client.py"
+    pattern: 'https://(ai\.google\.dev/gemini-api|aistudio\.google\.com)/docs/models'
+    weight: 2
+    arm: both
+  - name: modello-vecchio-tolto
+    type: regex
+    target:
+      source: file
+      path: ".claude/worktrees/tg-1-aggiorna-il-modello-gemini/ai/client.py"
+    pattern: 'gemini-1\.5-flash'
+    match: not_contains
+    arm: both
+  - name: nota-consegnata
+    type: tool_used
+    tool: Bash
+    input_match: 'research submit [0-9]+\b'
+    arm: with-only

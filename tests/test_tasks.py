@@ -1,6 +1,7 @@
 import itertools
 import json
 import unittest
+from datetime import timedelta
 from unittest import mock
 
 from tests.helpers import TempState
@@ -173,6 +174,48 @@ class TaskCmdSupportTest(unittest.TestCase):
                                              resume=True, number=2))
         self.assertEqual(tasks.take_pending(self.conn, self.w, agent_type="tollgate:implementer",
                                             resume=True), 1)
+
+    def test_take_pending_by_number_beats_a_newer_reservation_elsewhere(self):
+        self._two_pending("launch")
+        tasks.reserve(self.conn, self.w, 1, now=T0 + timedelta(seconds=10))
+        self.assertEqual(tasks.take_pending(self.conn, self.w, agent_type="tollgate:implementer",
+                                            resume=False, number=2), 2)
+        self.assertEqual(self.row(1)["pending"], "launch")
+
+    def _two_pending(self, pending):
+        for n in (1, 2):
+            tasks.assign(self.conn, self.w, n, implementer=f"tg-1-t{n}",
+                         agent_type="tollgate:implementer", pending=pending, now=T0)
+
+    def _take(self, resume):
+        return tasks.take_pending(self.conn, self.w, agent_type="tollgate:implementer",
+                                  resume=resume)
+
+    def test_take_pending_prefers_reserved_launch(self):
+        self._two_pending("launch")
+        tasks.reserve(self.conn, self.w, 2, now=T0)
+        self.assertEqual(self._take(False), 2)
+        self.assertEqual(self.row(1)["pending"], "launch")
+        self.assertIsNone(self.row(2)["pending"])
+        self.assertEqual(self._take(False), 1)
+
+    def test_take_pending_prefers_reserved_resume(self):
+        self._two_pending("resume")
+        tasks.reserve(self.conn, self.w, 2, now=T0)
+        self.assertEqual(self._take(True), 2)
+        self.assertEqual(self.row(1)["pending"], "resume")
+        self.assertEqual(self._take(True), 1)
+
+    def test_take_pending_without_reservation_takes_lowest_number(self):
+        self._two_pending("launch")
+        self.assertEqual(self._take(False), 1)
+
+    def test_take_pending_most_recent_reservation_wins(self):
+        self._two_pending("launch")
+        tasks.reserve(self.conn, self.w, 1, now=T0 + timedelta(seconds=10))
+        tasks.reserve(self.conn, self.w, 2, now=T0)
+        self.assertEqual(self._take(False), 1)
+        self.assertEqual(self.row(2)["pending"], "launch")
 
     def test_set_verdict_keeps_state(self):
         for e in ("start", "report_done"):

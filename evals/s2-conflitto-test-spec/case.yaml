@@ -36,3 +36,8 @@ graders:
       path: ".claude/worktrees/tg-1-sottrazione-senza-segno/tests/test_calc.py"
     pattern: 'assertEqual\(sottrai\(0, 4\), -4\)'
     weight: 2
+  - name: nota-consegnata
+    type: tool_used
+    tool: Bash
+    input_match: 'research submit [0-9]+\b'
+    arm: with-only

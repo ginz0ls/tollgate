@@ -1,0 +1,230 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.328",
+  "startedAt": "2026-11-19T07:15:08.479Z",
+  "durationSeconds": 223,
+  "costUsd": 0.7122846,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-eval-target",
+    "ablation": "none",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "e4-chiusura-l2",
+    "threshold": 0.66,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "tollgate",
+        "version": "0.2.0",
+        "path": "/tmp/tollgate-eval-target"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "e4-chiusura-l2",
+      "dir": "evals/e4-chiusura-l2",
+      "source": "case_yaml",
+      "promptMarkdown": "/tollgate:execute\n\nIl lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.\n\nQuando tutti i task sono chiusi, fai il controllo locale della Definition of Done del lavoro. Non aprire la PR e non lanciare la revisione finale.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 1800,
+      "maxTurns": 50,
+      "graders": [
+        {
+          "name": "implementatore-lanciato",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Agent",
+            "input_match": "tollgate:implementer"
+          }
+        },
+        {
+          "name": "task-2-chiuso",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "task 2: done",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "approvazioni-l2-nel-controllo",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "\\[sì\\] Spec e piano approvati, report avversariali presenti",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "controllo-verde",
+          "type": "regex",
+          "weight": 2,
+          "config": {
+            "target": "trace",
+            "pattern": "prossimo passo: python3 [^\\\\]*bin/tollgate'? review prepare",
+            "flags": "",
+            "match": "contains"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0.2,
+            "passed": false,
+            "turns": 5,
+            "costUsd": 0.26408280000000006,
+            "judgeCostUsd": 0,
+            "durationSeconds": 80,
+            "startedAt": "2026-11-19T07:15:08.503Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-fLxVmr/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "task-2-chiuso",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "approvazioni-l2-nel-controllo",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "controllo-verde",
+                "passed": false,
+                "weight": 2,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.2,
+            "passed": false,
+            "turns": 6,
+            "costUsd": 0.2262244,
+            "judgeCostUsd": 0,
+            "durationSeconds": 73,
+            "startedAt": "2026-11-19T07:16:28.937Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-Avj12X/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "task-2-chiuso",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "approvazioni-l2-nel-controllo",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "controllo-verde",
+                "passed": false,
+                "weight": 2,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.2,
+            "passed": false,
+            "turns": 5,
+            "costUsd": 0.22197739999999996,
+            "judgeCostUsd": 0,
+            "durationSeconds": 70,
+            "startedAt": "2026-11-19T07:17:41.983Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-gf5Kaf/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "implementatore-lanciato",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Agent called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "task-2-chiuso",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "approvazioni-l2-nel-controllo",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "controllo-verde",
+                "passed": false,
+                "weight": 2,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0.20000000000000004,
+        "passRate": 0
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 0,
+    "overallScore": 0.20000000000000004,
+    "overallPassRate": 0
+  }
+}

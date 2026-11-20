@@ -1,0 +1,1 @@
+{"auth": true, "prs": [], "issues": {"1": {"number": 1, "title": "Aggiungi la divisione", "body": "Aggiungi a `src/calc.py` la divisione, se nel progetto non c'\u00e8 gi\u00e0.", "state": "OPEN", "labels": [], "author_association": "OWNER"}}}

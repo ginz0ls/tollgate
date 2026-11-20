@@ -184,6 +184,39 @@ class BuildTest(KitCase):
         self.assertFalse(list(self.ws.rglob("DEPLOYED")))
         self.assertWorkspaceClean()
 
+    def test_build_l1_ai_model(self):
+        """s10: un client con il modello scritto a mano e il blocco `[profiles.ai]`; il task va all'agente di area."""
+        built = self.build("l1-ai-model")
+        self.assertEqual(built.work_branch, "tg/1-aggiorna-il-modello-gemini")
+        self.assertEqual(self.status()["tasks"], {"running": 1})
+        self.assertIn('MODEL = "gemini-1.5-flash"', (built.worktree / "ai" / "client.py").read_text())
+        self.assertIn("[profiles.ai]", (built.worktree / "tollgate.toml").read_text())
+        brief = (built.worktree / ".tollgate-run" / "1" / "task-1.md").read_text()
+        self.assertIn("(agente `tollgate:implementer-ai`)", brief)
+        self.assertWorkspaceClean()
+
+    def test_build_l1_infra_redirect(self):
+        """s11: un `vercel.json` con una rewrite e il blocco `[profiles.infra]`; il task va all'agente di area."""
+        built = self.build("l1-infra-redirect")
+        self.assertEqual(built.work_branch, "tg/1-reindirizza-la-pagina-vecchia")
+        self.assertEqual(self.status()["tasks"], {"running": 1})
+        self.assertIn('"/api/index.py"', (built.worktree / "vercel.json").read_text())
+        self.assertIn("[profiles.infra]", (built.worktree / "tollgate.toml").read_text())
+        brief = (built.worktree / ".tollgate-run" / "1" / "task-1.md").read_text()
+        self.assertIn("(agente `tollgate:implementer-infra`)", brief)
+        self.assertWorkspaceClean()
+
+    def test_build_l1_dividi(self):
+        """s12: `dividi` esiste già in `src/operazioni/divisione.py` e non in `src/calc.py`; agente generico."""
+        built = self.build("l1-dividi")
+        self.assertEqual(built.work_branch, "tg/1-aggiungi-la-divisione")
+        self.assertEqual(self.status()["tasks"], {"running": 1})
+        self.assertIn("def dividi", (built.worktree / "src" / "operazioni" / "divisione.py").read_text())
+        self.assertNotIn("dividi", (built.worktree / "src" / "calc.py").read_text())
+        brief = (built.worktree / ".tollgate-run" / "1" / "task-1.md").read_text()
+        self.assertIn("(agente `tollgate:implementer`)", brief)
+        self.assertWorkspaceClean()
+
     def test_build_l1_task_done(self):
         built = self.build("l1-task-done")
         self.assertEqual(self.status()["tasks"], {"done": 1, "pending": 1})

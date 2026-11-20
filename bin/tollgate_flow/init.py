@@ -355,6 +355,10 @@ def _drift(area: str, decl: dict, fragment, rules: tuple[list[str], list[str]],
         value = fragment.profile.get(key)
         if value and key not in decl and _agent_exists(plugin_root, value):
             out.append(f"{head} {key}: aggiungi {key} = {_toml_item(value)}")
+    for key in ("min_level", "checklist"):
+        value = fragment.profile.get(key)
+        if value and value != config.PROFILE_DEFAULTS[key] and key not in decl:
+            out.append(f"{head} {key}: aggiungi {key} = {_toml_item(value)}")
     return out
 
 

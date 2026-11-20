@@ -672,8 +672,8 @@ reviewer = "tollgate:reviewer-x"
 SKILL_X = "---\nname: rules-x\napproved: 2026-11-01\n---\n# Regole x\n\n" \
           "R-X-01 [blocca] uno\n\nR-X-02 due\n"
 BASE_TOML = 'schema_version = 1\n[gate]\nmode = "protected"\n'
-DECLARED_X = ('[profiles.x]\npaths = ["src/x/**"]\nrules = ["R-X-01", "R-X-02"]\n'
-              'blocking_rules = ["R-X-01"]\nagent = "tollgate:implementer-x"\n'
+DECLARED_X = ('[profiles.x]\npaths = ["src/x/**"]\nmin_level = "L1"\n'
+              'rules = ["R-X-01", "R-X-02"]\nblocking_rules = ["R-X-01"]\nagent = "tollgate:implementer-x"\n'
               'reviewer = "tollgate:reviewer-x"\n')
 
 
@@ -1477,6 +1477,33 @@ class FrontendPrecedenceTest(unittest.TestCase):
                          "init non deve proporre di togliere la cartella a backend")
         self.assertEqual({f: profiles.vertical_for(f, declared) for f in files},
                          {f: "backend" for f in files}, "Runtime")
+
+    def test_real_update_proposes_min_level_and_checklist_for_database(self):
+        """Un blocco `[profiles.database]` con i soli `paths` (senza `min_level` né `checklist`)
+        riceve le due righe `aggiungi`, con i valori del frammento (decisione 4)."""
+        files = ["supabase/migrations/001.sql"]
+        root = _real_fragments_root(self, areas={"database"})
+        current = DEFAULT_TOML + '[profiles.database]\npaths = ["supabase/**"]\n'
+        got = init.profile_blocks({f: 10 for f in files}, current, root)
+        fragment = next(f for f in fragments.load(root) if f.area == "database")
+        head = "profilo database: [profiles.database]"
+        self.assertIn(f"{head} min_level: aggiungi min_level = "
+                      f"{init._toml_item(fragment.profile['min_level'])}", got.lines)
+        self.assertEqual(fragment.profile["min_level"], "L2")
+        self.assertIn(f"{head} checklist: aggiungi checklist = "
+                      f"{init._toml_item(fragment.profile['checklist'])}", got.lines)
+
+    def test_update_does_not_repeat_declared_min_level(self):
+        """Con `min_level` e `checklist` già scritti nel blocco, nessuna delle due righe."""
+        files = ["supabase/migrations/001.sql"]
+        root = _real_fragments_root(self, areas={"database"})
+        fragment = next(f for f in fragments.load(root) if f.area == "database")
+        current = (DEFAULT_TOML + '[profiles.database]\npaths = ["supabase/**"]\n'
+                   'min_level = "L0"\nchecklist = ""\n')
+        got = init.profile_blocks({f: 10 for f in files}, current, root)
+        self.assertFalse([line for line in got.lines
+                          if "min_level:" in line or "checklist:" in line], got.lines)
+        self.assertTrue(fragment.profile["checklist"])
 
     def test_real_frontend_exclude_several_prefixes(self):
         """Sei prefissi di `exclude` (quelli di `backend`, di `infra` e `supabase/`) tengono fuori

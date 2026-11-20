@@ -1,0 +1,25 @@
+schema_version = 1
+
+[project]
+allow_no_tests = false
+
+[gate]
+mode = "protected"
+
+[commands]
+verify = "python3 tools/unittest_junit.py"
+gate = ["verify"]
+report = "junit:reports/junit.xml"
+
+[profiles.infra]
+paths = ["/vercel.json"]
+kind = "vertical"
+min_level = "L1"
+skills = []
+reviewer_skills = []
+commands = {}
+dod = []
+agent = "tollgate:implementer-infra"
+reviewer = "tollgate:reviewer-infra"
+rules = ["R-INFRA-01", "R-INFRA-02", "R-INFRA-03", "R-INFRA-04", "R-INFRA-05", "R-INFRA-06", "R-INFRA-07", "R-INFRA-08", "R-INFRA-09", "R-INFRA-10", "R-INFRA-11", "R-INFRA-12"]
+blocking_rules = ["R-INFRA-01", "R-INFRA-02", "R-INFRA-03", "R-INFRA-04", "R-INFRA-05", "R-INFRA-06", "R-INFRA-12"]

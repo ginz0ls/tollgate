@@ -38,3 +38,8 @@ graders:
     tool: Skill
     input_match: 'tollgate:finish'
     arm: with-only
+  - name: nota-consegnata
+    type: tool_used
+    tool: Bash
+    input_match: 'research submit [0-9]+\b'
+    arm: with-only

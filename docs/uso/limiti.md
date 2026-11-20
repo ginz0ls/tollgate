@@ -18,6 +18,12 @@ I comandi `!` scritti nel prompt di Claude Code non passano da nessun hook. Poss
 
 Hanno un solo livello di controllo: quando arriva la PR sono già avvenuti. L'atto `approve effect` serve proprio a decidere prima.
 
+Il comando dietro un involucro che carica l'ambiente (`dotenv`, `dotenvx`, `cross-env`, `env-cmd`, `doppler run`, `infisical run`, `op run`) si controlla come se fosse scritto da solo, anche dietro `npx`; il terzo involucro annidato chiede sempre. Il prezzo: un valore con il nome di un servizio (`dotenv -e vercel -- echo x`) chiede senza motivo, e un percorso relativo senza `./` prima del `--` (`cross-env A=1 scripts/deploy`) non si guarda. Gli altri controlli sul comando (`git push`, `rm`) non vedono dietro l'involucro.
+
+Le scritture dei gestori di segreti (`doppler secrets set`, `infisical secrets set`, `op item create` e simili) non sono nell'elenco degli effetti esterni e passano senza chiedere, anche se tollgate riconosce questi programmi come involucri. Se il tuo progetto li usa per cambiare segreti veri, dichiarali in `[external_effects] commands`.
+
+Le opzioni con valore dei sottocomandi di Supabase (`db push -p x --local`) si saltano insieme al valore, così `-p --local` e `--schema --help` non nascondono `--local` né `--help`. Un sottocomando nuovo della CLI con un'opzione a valore che non è in tabella resta com'è oggi.
+
 ### Il codice scritto nel lavoro ed eseguito in locale
 
 I test e `verify` eseguono il codice del lavoro sulla tua macchina, con l'ambiente ripulito. Se quel codice è ostile, gira.
@@ -120,9 +126,9 @@ Sono hook e regole sui comandi Bash: fermano gli errori onesti, non un agente ch
 
 ## Gli eval
 
-### Gli eval girano in una sandbox senza rete, su casi costruiti
+### Gli eval girano in una sandbox con la rete limitata ai domini concessi, su casi costruiti
 
-Gli eval di comportamento ([eval e CI](eval-e-ci.md)) usano una sandbox di `claude plugin eval`: senza rete, con `gh` finto, su casi offline. Misurano se l'agente rispetta gli obblighi nei casi scelti. Non provano il gate su GitHub vero, che si prova su repo di prova. La sandbox protegge anche `.git/config` del workspace: tollgate non lo riscrive se il valore c'è già, ma un caso che lo cambiasse davvero non potrebbe girare lì.
+Gli eval di comportamento ([eval e CI](eval-e-ci.md)) usano una sandbox di `claude plugin eval`: con `gh` finto, su casi offline. La rete è chiusa, salvo i domini che `evals/run.sh` concede alla shell e a `WebFetch` (oggi tre: le pagine ufficiali che le regole `ai` e `infra` indicano e il dominio a cui la pagina dei modelli di Gemini rimanda) e `WebSearch`, che è concessa. Misurano se l'agente rispetta gli obblighi nei casi scelti. Non provano il gate su GitHub vero, che si prova su repo di prova. La sandbox protegge anche `.git/config` del workspace: tollgate non lo riscrive se il valore c'è già, ma un caso che lo cambiasse davvero non potrebbe girare lì. In Claude Code 2.1.328 rende di sola lettura anche `.git/worktrees/`: chi lavora in un worktree del progetto non può fare il commit e non si può creare un worktree nuovo. I casi che misurano il commit o ciò che viene dopo escono quindi sotto soglia per la piattaforma e non per un difetto di tollgate, come dice il [rapporto degli eval di B8](../verifiche/2026-11-18-b8-eval.md).
 
 ### Gli eval misurano un modello, in tre corse per caso
 

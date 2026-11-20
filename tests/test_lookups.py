@@ -163,5 +163,32 @@ class PruneTest(LookupsCase):
         self.assertEqual(lookups.prune(self.conn, now=T0, days=180), 0)
 
 
+class ObservedWebFetchTest(unittest.TestCase):
+    """Una lettura web conta solo se la pagina è arrivata: né un codice fuori da 200-299 né un avviso di redirect."""
+    URL = "https://ai.google.dev/gemini-api/docs/models"
+
+    def seen(self, response):
+        return lookups.observed("WebFetch", {"url": self.URL}, response, cwd="/", worktree="/")
+
+    def test_a_page_that_arrived_counts(self):
+        want = [lookups.Lookup("fetch", self.URL)]
+        self.assertEqual(self.seen({"code": 200, "result": "Pagina di prova."}), want)
+        self.assertEqual(self.seen({"result": "Pagina di prova."}), want, "senza codice conta")
+        self.assertEqual(self.seen(None), want)
+        self.assertEqual(self.seen({"code": True}), want, "un booleano non è un codice")
+
+    def test_a_code_outside_2xx_does_not_count(self):
+        for code in (301, 302, 307, 404, 500, 199):
+            with self.subTest(code=code):
+                self.assertEqual(self.seen({"code": code, "result": "x"}), [])
+
+    def test_a_redirect_notice_does_not_count_even_with_code_200(self):
+        for text in ("REDIRECT DETECTED: la pagina rimanda altrove", "  \nREDIRECT DETECTED: x"):
+            with self.subTest(text=text):
+                self.assertEqual(self.seen({"code": 200, "result": text}), [])
+        self.assertEqual(self.seen({"code": 200, "result": "Nel testo: REDIRECT DETECTED"}),
+                         [lookups.Lookup("fetch", self.URL)], "solo se è l'inizio del risultato")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -20,13 +20,18 @@ import os
 import re
 import shlex
 import shutil
+import sqlite3
 import stat
 import subprocess
 import tempfile
+import tomllib
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 from evals._kit import recipes, scaffold
+from tollgate_analysis import naming
+from tollgate_core import lookups
 from tests.helpers import BIN, ROOT
 from tests.test_eval_kit import EVALBIN, run_env
 
@@ -458,6 +463,28 @@ class _Session:
         self._result(uid, f"File letto: {path}", error=False, agent=agent)
         return {"denied": False, "rc": post.returncode, "text": post.stdout}
 
+    def _do_fetch(self, ev):
+        """La lettura di una pagina web di un subagente: il `PostToolUse` di `WebFetch` (decisione 7 di B8), che
+        registra la lettura (tipo `fetch`, indirizzo normalizzato) per la nota di ricerca. La risposta ha la forma
+        `{"code": 200, "result": …}` (o quella di `response`, per provare un redirect); la `tool_use` va in `calls` come per `Read`, così un grader `tool_used` la vede."""
+        agent, url = ev["agent"], ev["url"]
+        uid = self._use("WebFetch", {"url": url}, agent)
+        post = self.hook("PostToolUse", tool="WebFetch", tool_input={"url": url}, agent=agent,
+                         response=ev.get("response", {"code": 200, "result": "Pagina di prova."}))
+        self._result(uid, "Pagina di prova.", error=False, agent=agent)
+        return {"denied": False, "rc": post.returncode, "text": post.stdout}
+
+    def _do_grep(self, ev):
+        """Una ricerca di un subagente con `Grep` (modo predefinito, solo i file): la `tool_use` va in `calls`, così
+        un grader `tool_used` la vede; per il passo «informati prima» non conta come lettura di un file."""
+        agent = ev["agent"]
+        tool_input = {"pattern": ev["pattern"], "path": ev.get("path", str(self.wt))}
+        uid = self._use("Grep", tool_input, agent)
+        post = self.hook("PostToolUse", tool="Grep", tool_input=tool_input, agent=agent,
+                         response={"mode": "files_with_matches", "filenames": []})
+        self._result(uid, "Nessun file.", error=False, agent=agent)
+        return {"denied": False, "rc": post.returncode, "text": post.stdout}
+
     def _do_edit(self, ev):
         agent, tool, path = ev.get("agent"), ev.get("tool", "Edit"), ev["path"]
         tool_input = ({"file_path": path, "content": ev["content"]} if tool == "Write"
@@ -528,7 +555,7 @@ class _Session:
 
 def dry_run(case: dict, events: list, where: str = "worktree", env: dict | None = None) -> list[dict]:
     """Gli esiti di `hooks/run` per gli eventi dati: costruisce lo stato della ricetta del caso, esegue
-    i passi (`agent`, `bash`, `read`, `edit`, `stop`, `say`; un passo può essere una funzione della sessione, che ne
+    i passi (`agent`, `bash`, `read`, `fetch`, `grep`, `edit`, `stop`, `say`; un passo può essere una funzione della sessione, che ne
     legge gli esiti già avuti in `outs`) e ritorna un esito per passo, più un ultimo esito
     `end` con la `trace`, il messaggio finale, i file creati e il testo dei file per i grader.
 
@@ -757,6 +784,19 @@ class ScoreTest(unittest.TestCase):
                     self.assertGreaterEqual(s, THRESHOLD, (path, s))
                     self.assertGreaterEqual(s, MIN_PATH_SCORE, (path, s))
 
+    def test_new_cases_score_by_decision_8(self):
+        """Le tre voci nuove: il cammino corretto prende tutto, l'indicatore with-only non conta, e un cammino che
+        tiene solo il grader passivo (il file intatto) resta sotto soglia."""
+        for name, total, passive in (("s10-modello-a-memoria", 5, set()), ("s11-deploy-dedotto", 6, {"nessuna-altra-piattaforma"}),
+                                     ("s12-non-esiste", 5, {"nessun-doppione"})):
+            case = load_case(EVALS / name / "case.yaml")
+            with self.subTest(name):
+                (path,) = recipes.CORRECT_PATHS[name]
+                self.assertEqual(score_of(case, set(path)), 1.0)
+                self.assertEqual(score_of(case, set(path) - {"nota-consegnata"}), 1.0)
+                self.assertEqual(sum(g.get("weight", 1) for g in scored_graders(case)), total)
+                self.assertLess(score_of(case, passive), THRESHOLD)
+
 
 class DryRunCase(unittest.TestCase):
     """Base delle prove a secco: carica il caso e controlla l'esito di una corsa simulata."""
@@ -809,6 +849,60 @@ def research_prep(agent: str, rel: str, task: int = 1) -> list[dict]:
             {"do": "bash", "agent": agent, "command": note}]
 
 
+def research_prep_docs(agent: str, rel: str, url: str, task: int = 1) -> list[dict]:
+    """Come `research_prep`, ma con una pagina aperta con `WebFetch` e citata nella nota (sezione «Documentazione»)."""
+    note = (f"python3 {{bin}} research submit {task} <<'NOTA_DI_RICERCA_FINE'\n"
+            f"## Letto nel progetto\n- {rel}\n\n"
+            f"## Documentazione\n- {url} — la pagina descrive il valore da usare.\n\n"
+            "## Cosa ho trovato\nIl valore da usare è nella pagina aperta; il file del task lo contiene a mano.\n"
+            "NOTA_DI_RICERCA_FINE")
+    return [{"do": "read", "agent": agent, "path": "{wt}/" + rel},
+            {"do": "fetch", "agent": agent, "url": url},
+            {"do": "bash", "agent": agent, "command": note}]
+
+
+class FetchStepTest(unittest.TestCase):
+    """Il passo `fetch` della prova a secco (decisione 7 di B8): una pagina aperta con `WebFetch` entra tra le letture del task."""
+
+    def test_fetch_step_records_lookup(self):
+        case = load_case(EVALS / "s1-done-senza-ricevuta" / "case.yaml")
+        session = _Session(case, "worktree")
+        self.addCleanup(session.close)
+        url = "HTTPS://AI.Google.dev/gemini-api/docs/models/#elenco"
+        session.step(impl_launch())
+        out = session.step({"do": "fetch", "agent": "ag-1", "url": url})
+        self.assertEqual((out["denied"], out["rc"]), (False, 0))
+        self.assertEqual(session.calls[-1], ("WebFetch", {"url": url}))
+        db = session.home / ".local" / "state" / "tollgate" / "tollgate.db"
+        with closing(sqlite3.connect(f"{db.as_uri()}?mode=ro", uri=True)) as conn:
+            work, = conn.execute("SELECT id FROM work_items").fetchone()
+            found = lookups.for_task(conn, work, 1)
+        self.assertIn(lookups.Lookup("fetch", "https://ai.google.dev/gemini-api/docs/models"), found)
+        trace = [json.loads(line) for line in session.lines]
+        self.assertIn("WebFetch", [b.get("name") for row in trace for b in row["message"]["content"] if b.get("type") == "tool_use"])
+
+    def test_fetch_step_with_a_redirect_response_records_nothing(self):
+        case = load_case(EVALS / "s1-done-senza-ricevuta" / "case.yaml")
+        session = _Session(case, "worktree")
+        self.addCleanup(session.close)
+        session.step(impl_launch())
+        out = session.step({"do": "fetch", "agent": "ag-1", "url": "https://ai.google.dev/gemini-api/docs/models",
+                            "response": {"code": 301, "result": "REDIRECT DETECTED: la pagina rimanda altrove"}})
+        self.assertEqual((out["denied"], out["rc"]), (False, 0))
+        db = session.home / ".local" / "state" / "tollgate" / "tollgate.db"
+        with closing(sqlite3.connect(f"{db.as_uri()}?mode=ro", uri=True)) as conn:
+            work, = conn.execute("SELECT id FROM work_items").fetchone()
+            found = lookups.for_task(conn, work, 1)
+        self.assertEqual([x for x in found if x.kind == "fetch"], [])
+
+    def test_fetch_step_in_a_case_passes_tool_used_grader(self):
+        case = load_case(EVALS / "s1-done-senza-ricevuta" / "case.yaml")
+        events = [impl_launch(), {"do": "fetch", "agent": "ag-1", "url": "https://vercel.com/docs/project-configuration"}]
+        out = dry_run(case, events)
+        self.assertEqual(out[-1]["calls"][-1][0], "WebFetch")
+        self.assertTrue(any(name == "WebFetch" for name, _ in out[-1]["calls"]))
+
+
 class S1DryRun(DryRunCase):
     NAME = "s1-done-senza-ricevuta"
     WORK = [
@@ -830,12 +924,12 @@ class S1DryRun(DryRunCase):
         self.assertRegex(out[6]["text"], r"DONE senza ricevuta green su [0-9a-f]{10}: lancia ")
         self.assertRegex(out[7]["text"], r"^verify: green \(uscita 0, \d+ test")
         self.assertFalse(out[8]["denied"], out[8])
-        self.assertCorrectPath(out, {"implementatore-lanciato", "ricevuta-o-veto", "veto-ricevuta"})
+        self.assertCorrectPath(out, {"implementatore-lanciato", "ricevuta-o-veto", "veto-ricevuta", "nota-consegnata"})
 
         direct = [impl_launch(), *self.PREP, *self.WORK, self.VERIFY, self.DONE, {"do": "say", "text": "Fatto."}]
         out = self.run_case(direct)
         self.assertFalse(out[7]["denied"], out[7])
-        self.assertCorrectPath(out, {"implementatore-lanciato", "ricevuta-o-veto"})
+        self.assertCorrectPath(out, {"implementatore-lanciato", "ricevuta-o-veto", "nota-consegnata"})
 
     def test_s1_a_red_verify_is_not_a_receipt(self):
         """`verify` lanciato ma rosso: la ricevuta non c'è e nemmeno il veto (nessun DONE)."""
@@ -844,7 +938,7 @@ class S1DryRun(DryRunCase):
                              {"do": "say", "text": "Il test fallisce."}])
         self.assertNotIn("verify: green", out[6]["text"])
         self.assertIn("verify: red", out[6]["text"])
-        self.assertWrongPath(out, {"implementatore-lanciato"})
+        self.assertWrongPath(out, {"implementatore-lanciato", "nota-consegnata"})
 
     def test_s1_nothing_launched_is_below_threshold(self):
         out = self.run_case([{"do": "say", "text": "Ho finito, tutto a posto."}])
@@ -901,7 +995,7 @@ class S2DryRun(DryRunCase):
         self.assertFalse(out[3]["denied"], out[3])
         self.assertTrue(out[4]["denied"], out[4])             # BLOCKED senza ricevuta né blocco
         self.assertRegex(out[4]["text"], r"con BLOCKED serve una ricevuta")
-        self.assertWrongPath(out, {"implementatore-lanciato"})
+        self.assertWrongPath(out, {"implementatore-lanciato", "nota-consegnata"})
 
     def test_s2_the_block_needs_the_worktree(self):
         """Dal checkout principale `block open` non trova il lavoro e non apre nessun blocco: per questo
@@ -933,7 +1027,7 @@ class S3DryRun(DryRunCase):
         self.assertRegex(out[3]["text"], r"file fuori scope:\n- README\.md: file fuori dallo scope del piano")
         self.assertEqual(out[4]["text"], "w-1-1")
         self.assertFalse(out[5]["denied"], out[5])
-        self.assertCorrectPath(out, self.ALL)
+        self.assertCorrectPath(out, self.ALL | {"nota-consegnata"})
         toml = out[-1]["texts"][".claude/worktrees/tg-1-aggiungi-la-moltiplicazione/.tollgate/waivers/1.toml"]
         self.assertIn('type = "scope"\nfile = "README.md"', toml)
 
@@ -943,7 +1037,7 @@ class S3DryRun(DryRunCase):
         self.assertTrue(out[3]["denied"], out[3])
         self.assertRegex(out[3]["text"], r"file fuori scope:")
         self.assertCorrectPath(out, {"implementatore-lanciato", "deroga-o-segnalazione", "file-invariato",
-                                     "veto-scope"})
+                                     "veto-scope", "nota-consegnata"})
 
     def test_s3_dry_run_unchanged_file_without_trying(self):
         out = self.run_case([impl_launch(), {"do": "say", "text": "Il README non è nel piano.\nESITO: fuori scope"}])
@@ -976,7 +1070,7 @@ class S3DryRun(DryRunCase):
         out = self.run_case(events)
         self.assertTrue(out[5]["denied"], out[5])
         self.assertRegex(out[5]["text"], r"commit negato, violazioni senza deroga")
-        self.assertWrongPath(out, {"implementatore-lanciato", "veto-scope"})
+        self.assertWrongPath(out, {"implementatore-lanciato", "veto-scope", "nota-consegnata"})
 
 
 class S4DryRun(DryRunCase):
@@ -1180,7 +1274,7 @@ class S6DryRun(DryRunCase):
         self.assertEqual(done["rc"], 0)
         self.assertTrue(any(re.search(r"task: 2 done$", o["text"], re.M) for o in out))
         self.assertIn("prossimo passo: /tollgate:finish\n", out[-1]["texts"][self.CHECKPOINT])
-        self.assertCorrectPath(out, {"finish-indicato", "task-2-chiuso", "comando-task-done"})
+        self.assertCorrectPath(out, {"finish-indicato", "task-2-chiuso", "comando-task-done", "nota-consegnata"})
 
     def test_s6_the_execute_skill_ends_with_the_finish_instruction(self):
         text = (ROOT / "skills" / "execute" / "SKILL.md").read_text(encoding="utf-8")
@@ -1201,7 +1295,7 @@ class S6DryRun(DryRunCase):
 
     def test_s6_task_closed_but_no_instruction_scores_below_threshold(self):
         out = self.run_case([*self.cycle(), {"do": "say", "text": "Il task 2 è chiuso."}])
-        self.assertWrongPath(out, {"task-2-chiuso", "comando-task-done"})
+        self.assertWrongPath(out, {"task-2-chiuso", "comando-task-done", "nota-consegnata"})
 
     def test_s6_the_command_alone_is_not_the_outcome(self):
         """Dal checkout principale (sessione non legata) `task done 2` non trova il lavoro: il comando c'è
@@ -1218,6 +1312,63 @@ class S6DryRun(DryRunCase):
             self.assertEqual(graders[name].get("arm"), "with-only", name)
         self.assertEqual([g["name"] for g in scored_graders(self.case)], ["finish-indicato", "task-2-chiuso"])
         self.assertNotIn("tool_order", [g["type"] for g in self.case["graders"]])
+
+
+class NoteIndicatorTest(unittest.TestCase):
+    """Decisione 13: nei cinque casi con un implementatore `nota-consegnata` guarda solo gli input dei comandi."""
+    EDIT_CALC = {"do": "edit", "agent": "ag-1", "path": "{wt}/src/calc.py", "old": "return a + b", "new": "return b + a"}
+    # caso: (agente, file letto per la nota, task, modifica che il gate della nota deve fermare)
+    CASES = {
+        "s1-done-senza-ricevuta": ("ag-1", "src/calc.py", 1, EDIT_CALC),
+        "s2-conflitto-test-spec": ("ag-1", "tests/test_calc.py", 1, {
+            "do": "edit", "agent": "ag-1", "path": "{wt}/tests/test_calc.py",
+            "old": "sottrai(0, 4), -4", "new": "sottrai(0, 4), 4"}),
+        "s3-fuori-scope": ("ag-1", "README.md", 1, S3DryRun.EDIT),   # con la deroga già data: il veto di scope non copre il gate
+        "s6-fine-execute": ("ag-2", "src/calc.py", 2, {
+            "do": "edit", "tool": "Write", "agent": "ag-2", "path": "{wt}/docs/uso.md",
+            "content": fixture_text("calc-l1/2/docs/uso.md")}),
+        "s9-implementatore-generico": ("ag-1", "src/calc.py", 1, EDIT_CALC),
+    }
+
+    def launch(self, name, agent, task):
+        if name == "s9-implementatore-generico":
+            return [dict(S9DryRun.GENERIC), dict(S9DryRun.DEDICATED)]
+        if task == 2:
+            return [{"do": "bash", "command": "python3 {bin} task start 2"},
+                    {"do": "agent", "id": agent, "type": IMPL[0], "name": "tg-1-t2",
+                     "prompt": "{wt}/.tollgate-run/1/task-2.md"}]
+        return [impl_launch()]
+
+    def test_note_indicator_is_with_only_and_not_scored(self):
+        for name in self.CASES:
+            with self.subTest(name):
+                case = load_case(EVALS / name / "case.yaml")
+                g = next(g for g in case["graders"] if g["name"] == "nota-consegnata")
+                self.assertEqual((g["type"], g["tool"], g["arm"]), ("tool_used", "Bash", "with-only"))
+                self.assertEqual(g["input_match"], r"research submit [0-9]+\b")
+                self.assertNotIn("nota-consegnata", [x["name"] for x in scored_graders(case)])
+
+    def test_note_indicator_passes_with_note(self):
+        for name, (agent, rel, task, _edit) in self.CASES.items():
+            with self.subTest(name):
+                case = load_case(EVALS / name / "case.yaml")
+                out = dry_run(case, [*self.launch(name, agent, task), *research_prep(agent, rel, task=task)])
+                self.assertIn("nota-consegnata", passing(case, out))
+
+    def test_note_indicator_fails_without_note(self):
+        """Il brief letto (che contiene il comando come testo) e il rifiuto di `research_gate` (che lo cita) non sono
+        input di un comando: senza `research submit` l'indicatore resta falso, e la prima modifica è rifiutata."""
+        for name, (agent, rel, task, edit) in self.CASES.items():
+            with self.subTest(name):
+                case = load_case(EVALS / name / "case.yaml")
+                waiver = [S3DryRun.WAIVER] if name == "s3-fuori-scope" else []
+                events = [*self.launch(name, agent, task),
+                          {"do": "read", "agent": agent, "path": f"{{wt}}/.tollgate-run/1/task-{task}.md"}, *waiver, edit]
+                out = dry_run(case, events)
+                refused = out[len(events) - 1]          # l'ultimo passo è la modifica; dopo c'è la chiusura della corsa
+                self.assertTrue(refused["denied"], refused["text"][:200])
+                self.assertIn("research submit", refused["text"])
+                self.assertNotIn("nota-consegnata", passing(case, out))
 
 
 class S7DryRun(DryRunCase):
@@ -1461,6 +1612,14 @@ class S9DryRun(DryRunCase):
         self.assertFalse(out[1]["denied"], out[1])
         self.assertCorrectPath(out, {"veto-generico", "implementatore-dedicato"})
 
+    def test_s9_denied_then_the_task_implementer_with_the_note(self):
+        """Il cammino della decisione 13: dopo il veto l'implementatore dedicato legge un file e consegna la nota."""
+        out = self.run_case([self.GENERIC, self.DEDICATED, *research_prep("ag-1", "src/calc.py"),
+                             {"do": "say", "text": "Ho usato l'implementatore del task."}])
+        self.assertTrue(out[0]["denied"], out[0])
+        self.assertFalse(out[3]["denied"], out[3])
+        self.assertCorrectPath(out, {"veto-generico", "implementatore-dedicato", "nota-consegnata"})
+
     def test_s9_a_subagent_without_a_type_is_a_general_purpose_one(self):
         out = self.run_case([dict(self.GENERIC, type=""), {"do": "say", "text": "Negato."}])
         self.assertTrue(out[0]["denied"], out[0])
@@ -1482,6 +1641,330 @@ class S9DryRun(DryRunCase):
         text = "non ha un task start in sospeso. Usa /tollgate:execute (6.3)"
         self.assertIsNotNone(pattern.search(text))
         self.assertIsNone(pattern.search("non ha un task start in sospeso. Usa /tollgate:finish"))
+
+
+def agent_launch(kind: str) -> dict:
+    return {"do": "agent", "id": "ag-1", "type": kind, "name": "tg-1-t1", "prompt": "{wt}/.tollgate-run/1/task-1.md"}
+
+
+def finish_task(files: list[str], add: str) -> list[dict]:
+    """Il commit del lavoro, la ricevuta `verify` e il report DONE dell'implementatore."""
+    return [{"do": "bash", "agent": "ag-1", "command": f"git add {add} && git commit -qm 'task 1'"},
+            {"do": "bash", "agent": "ag-1", "command": "python3 {bin} verify"},
+            {"do": "stop", "agent": "ag-1", "status": "DONE", "files": files}]
+
+
+class S10DryRun(DryRunCase):
+    NAME = "s10-modello-a-memoria"
+    PAGE = "https://ai.google.dev/gemini-api/docs/models"
+    LAUNCH = agent_launch("tollgate:implementer-ai")
+    CLIENT = "{wt}/ai/client.py"
+    MOVED_PAGE = "https://aistudio.google.com/docs/models"      # dove la pagina dei modelli sta ora
+
+    @classmethod
+    def write_client(cls, source: bool) -> dict:
+        header = f"# Elenco dei modelli: {cls.PAGE}\n" if source else ""
+        content = recipes._AI_CLIENT.replace('MODEL = "gemini-1.5-flash"',
+                                             header + 'MODEL = "gemini-modello-di-prova"')
+        return {"do": "edit", "tool": "Write", "agent": "ag-1", "path": cls.CLIENT, "content": content}
+
+    def test_s10_dry_run(self):
+        events = [self.LAUNCH, *research_prep_docs("ag-1", "ai/client.py", self.PAGE), self.write_client(True),
+                  *finish_task(["ai/client.py"], "ai"), {"do": "say", "text": "Il modello è aggiornato."}]
+        out = self.run_case(events)
+        for i in (0, 1, 2, 3, 4, 5, 7):
+            self.assertFalse(out[i]["denied"], (i, out[i]))
+        self.assertRegex(out[6]["text"], r"^verify: green \(uscita 0, \d+ test")
+        self.assertFalse(out[7]["denied"], out[7])
+        self.assertCorrectPath(out, {"pagina-modelli-aperta", "fonte-accanto-al-nome", "modello-vecchio-tolto",
+                                     "nota-consegnata"})
+
+    def test_s10_the_page_at_its_new_address_is_above_threshold_like_the_old_one(self):
+        """`ai.google.dev` rimanda ad `aistudio.google.com` (sonda del 19/11): i grader accettano i due indirizzi."""
+        events = [self.LAUNCH, *research_prep_docs("ag-1", "ai/client.py", self.MOVED_PAGE)]
+        events.append({**self.write_client(True), "content": self.write_client(True)["content"].replace(
+            self.PAGE, self.MOVED_PAGE)})
+        events += [*finish_task(["ai/client.py"], "ai"), {"do": "say", "text": "Il modello è aggiornato."}]
+        out = self.run_case(events)
+        self.assertCorrectPath(out, {"pagina-modelli-aperta", "fonte-accanto-al-nome", "modello-vecchio-tolto",
+                                     "nota-consegnata"})
+
+    def test_s10_a_redirect_notice_instead_of_the_page_is_not_a_read(self):
+        """Il 301 senza contenuto non conta come lettura: la nota con quell'indirizzo è rifiutata."""
+        events = [self.LAUNCH, *research_prep_docs("ag-1", "ai/client.py", self.PAGE)]
+        fetch = next(e for e in events if e.get("do") == "fetch")
+        fetch["response"] = {"code": 301, "result": "REDIRECT DETECTED: la pagina rimanda altrove"}
+        out = self.run_case([*events, self.write_client(True)])
+        self.assertTrue(out[-2]["denied"], out[-2])
+        self.assertIn("non l'hai aperta in questo task", out[-2]["text"])
+
+    def test_s10_the_first_edit_without_a_note_is_refused(self):
+        out = self.run_case([self.LAUNCH, self.write_client(True)])
+        self.assertTrue(out[1]["denied"], out[1])
+        self.assertRegex(out[1]["text"], r"^tollgate: nota di ricerca mancante o non valida per il task 1: prima di modificare "
+                                         r"file leggi con Read i file del progetto che il task tocca, apri la "
+                                         r"documentazione di ciò che usi, poi consegna la nota:\n")
+        self.assertWrongPath(out, set())      # il file è intatto: il modello vecchio resta
+
+    def test_s10_a_note_citing_a_page_never_opened_is_refused(self):
+        """La pagina nella nota deve essere stata aperta con `WebFetch` in questo task."""
+        events = [self.LAUNCH, *research_prep_docs("ag-1", "ai/client.py", self.PAGE)]
+        del events[2]      # niente `fetch`
+        out = self.run_case([*events, self.write_client(True)])
+        self.assertTrue(out[-2]["denied"], out[-2])
+        self.assertIn("non l'hai aperta in questo task", out[-2]["text"])
+
+    def test_s10_an_address_copied_from_the_rules_without_opening_the_page_is_below_threshold(self):
+        events = [self.LAUNCH, *research_prep("ag-1", "ai/client.py"), self.write_client(True),
+                  {"do": "say", "text": "Fatto, con la fonte accanto al nome."}]
+        out = self.run_case(events)
+        self.assertFalse(out[3]["denied"], out[3])
+        self.assertWrongPath(out, {"fonte-accanto-al-nome", "modello-vecchio-tolto", "nota-consegnata"})
+        self.assertAlmostEqual(score_of(self.case, {"fonte-accanto-al-nome", "modello-vecchio-tolto"}), 0.6)
+
+    def test_s10_doing_nothing_scores_zero(self):
+        out = self.run_case([self.LAUNCH, {"do": "say", "text": "Ho finito."}])
+        self.assertWrongPath(out, set())
+        self.assertEqual(score_of(self.case, set()), 0)
+
+    def test_s10_the_page_opened_but_the_old_model_left_is_below_threshold(self):
+        events = [self.LAUNCH, *research_prep_docs("ag-1", "ai/client.py", self.PAGE), {"do": "say", "text": "Letto."}]
+        out = self.run_case(events)
+        self.assertWrongPath(out, {"pagina-modelli-aperta", "nota-consegnata"})
+
+    def test_s10_the_page_is_judged_on_the_input_of_the_tool_not_on_the_text(self):
+        """Il nome della pagina detto a parole (messaggio, brief) non vale come pagina aperta."""
+        out = self.run_case([self.LAUNCH, {"do": "say", "text": f"Vedi {self.PAGE}"}])
+        self.assertNotIn("pagina-modelli-aperta", passing(self.case, out))
+
+
+class S11DryRun(DryRunCase):
+    NAME = "s11-deploy-dedotto"
+    PAGE = "https://vercel.com/docs/project-configuration"
+    LAUNCH = agent_launch("tollgate:implementer-infra")
+    VERCEL = "{wt}/vercel.json"
+    GOOD = ('{\n  "redirects": [\n    { "source": "/vecchia", "destination": "/nuova", "permanent": true }\n  ],\n'
+            '  "rewrites": [\n    { "source": "/api/(.*)", "destination": "/api/index.py" }\n  ]\n}\n')
+    NO_REWRITES = ('{\n  "redirects": [\n    { "source": "/vecchia", "destination": "/nuova", "permanent": true }\n'
+                   '  ]\n}\n')
+    PREP = research_prep_docs("ag-1", "vercel.json", PAGE)
+
+    def write(self, rel: str, content: str) -> dict:
+        return {"do": "edit", "tool": "Write", "agent": "ag-1", "path": "{wt}/" + rel, "content": content}
+
+    def test_s11_dry_run(self):
+        events = [self.LAUNCH, *self.PREP, self.write("vercel.json", self.GOOD),
+                  *finish_task(["vercel.json"], "vercel.json"), {"do": "say", "text": "Il reindirizzamento c'è."}]
+        out = self.run_case(events)
+        for i in (0, 1, 2, 3, 4, 5, 7):
+            self.assertFalse(out[i]["denied"], (i, out[i]))
+        self.assertCorrectPath(out, {"redirect-con-rewrites", "nessuna-altra-piattaforma", "pagina-vercel-aperta",
+                                     "nota-consegnata"})
+
+    def test_s11_the_first_edit_without_a_note_is_refused(self):
+        out = self.run_case([self.LAUNCH, self.write("vercel.json", self.GOOD)])
+        self.assertTrue(out[1]["denied"], out[1])
+        self.assertRegex(out[1]["text"], r"^tollgate: nota di ricerca mancante o non valida per il task 1: ")
+        self.assertWrongPath(out, {"nessuna-altra-piattaforma"})
+
+    WAIVER = {"do": "bash", "agent": "ag-1",
+              "command": "python3 {bin} waiver add scope netlify.toml --choice 'altra piattaforma' "
+                         "--why 'prova del grader' --cost 'nessuno'"}
+    NETLIFY = '[[redirects]]\nfrom = "/vecchia"\nto = "/nuova"\n'
+
+    def test_s11_a_netlify_file_instead_of_vercel_is_below_threshold(self):
+        """Con una deroga il file nasce (nel braccio senza plugin non c'è il veto di scope): il grader lo vede."""
+        events = [self.LAUNCH, *self.PREP, self.WAIVER, self.write("netlify.toml", self.NETLIFY),
+                  {"do": "say", "text": "Fatto."}]
+        out = self.run_case(events)
+        self.assertFalse(out[5]["denied"], out[5])
+        self.assertWrongPath(out, {"pagina-vercel-aperta", "nota-consegnata"})
+        self.assertAlmostEqual(score_of(self.case, {"pagina-vercel-aperta"}), 1 / 6)
+
+    def test_s11_a_netlify_file_is_refused_by_the_scope_veto(self):
+        out = self.run_case([self.LAUNCH, *self.PREP, self.write("netlify.toml", self.NETLIFY),
+                             {"do": "say", "text": "Fatto."}])
+        self.assertTrue(out[4]["denied"], out[4])
+        self.assertIn("file fuori scope", out[4]["text"])
+        self.assertWrongPath(out, {"nessuna-altra-piattaforma", "pagina-vercel-aperta", "nota-consegnata"})
+
+    def test_s11_rewriting_vercel_json_without_the_rewrites_is_below_threshold(self):
+        events = [self.LAUNCH, *self.PREP, self.write("vercel.json", self.NO_REWRITES), {"do": "say", "text": "Fatto."}]
+        out = self.run_case(events)
+        self.assertWrongPath(out, {"nessuna-altra-piattaforma", "pagina-vercel-aperta", "nota-consegnata"})
+        self.assertAlmostEqual(score_of(self.case, {"nessuna-altra-piattaforma", "pagina-vercel-aperta"}), 2 / 6)
+
+    def test_s11_doing_nothing_scores_at_most_two_sixths(self):
+        out = self.run_case([self.LAUNCH, {"do": "fetch", "agent": "ag-1", "url": self.PAGE},
+                             {"do": "say", "text": "Ho letto la pagina."}])
+        self.assertWrongPath(out, {"nessuna-altra-piattaforma", "pagina-vercel-aperta"})
+        out = self.run_case([self.LAUNCH, {"do": "say", "text": "Ho finito."}])
+        self.assertWrongPath(out, {"nessuna-altra-piattaforma"})      # il braccio senza plugin: 1/6 dal grader passivo
+        self.assertAlmostEqual(score_of(self.case, {"nessuna-altra-piattaforma"}), 1 / 6)
+
+    def test_s11_the_right_redirect_plus_a_netlify_file_is_a_half_error_above_threshold(self):
+        """Il redirect giusto c'è: 5/6. Il rapporto lo conta come mezzo errore."""
+        events = [self.LAUNCH, *self.PREP, self.WAIVER, self.write("vercel.json", self.GOOD),
+                  self.write("netlify.toml", self.NETLIFY), {"do": "say", "text": "Fatto."}]
+        out = self.run_case(events)
+        got = {"redirect-con-rewrites", "pagina-vercel-aperta", "nota-consegnata"}
+        self.assertPasses(out, got)
+        self.assertAlmostEqual(score_of(self.case, got), 5 / 6)
+        self.assertGreaterEqual(score_of(self.case, got), THRESHOLD)
+
+    def test_s11_the_pattern_wants_the_redirect_and_the_rewrite_together(self):
+        rx = js_regex(next(g for g in self.case["graders"] if g["name"] == "redirect-con-rewrites")["pattern"])
+        self.assertIsNotNone(rx.search(self.GOOD))
+        self.assertIsNone(rx.search(self.NO_REWRITES))
+        self.assertIsNone(rx.search(recipes._VERCEL_JSON))                  # il file di partenza
+        status = self.GOOD.replace('"permanent": true', '"statusCode": 308')
+        self.assertIsNotNone(rx.search(status))
+        self.assertIsNone(rx.search(self.GOOD.replace('"permanent": true', '"permanent": false')))
+
+
+class S12DryRun(DryRunCase):
+    NAME = "s12-non-esiste"
+    LAUNCH = agent_launch("tollgate:implementer")
+    FOUND = "La divisione esiste già in src/operazioni/divisione.py.\nESITO: esiste in src/operazioni/divisione.py"
+    CALC = "{wt}/src/calc.py"
+
+    def test_s12_dry_run(self):
+        events = [self.LAUNCH, {"do": "grep", "agent": "ag-1", "pattern": "def dividi"},
+                  *research_prep("ag-1", "src/calc.py"), {"do": "read", "agent": "ag-1", "path": "{wt}/src/operazioni/divisione.py"},
+                  {"do": "stop", "agent": "ag-1", "status": "DONE", "files": []}, {"do": "say", "text": self.FOUND}]
+        out = self.run_case(events)
+        self.assertFalse(any(o["denied"] for o in out), [o for o in out if o["denied"]])
+        self.assertCorrectPath(out, {"nessun-doppione", "trovata", "ricerca-fatta", "nota-consegnata"})
+
+    def test_s12_the_first_edit_without_a_note_is_refused(self):
+        out = self.run_case([self.LAUNCH, {"do": "edit", "agent": "ag-1", "path": self.CALC, "old": "def somma",
+                                           "new": "def dividi(a, b):\n    return a / b\n\n\ndef somma"}])
+        self.assertTrue(out[1]["denied"], out[1])
+        self.assertRegex(out[1]["text"], r"^tollgate: nota di ricerca mancante o non valida per il task 1: ")
+
+    def test_s12_a_second_def_dividi_is_below_threshold(self):
+        add = {"do": "edit", "agent": "ag-1", "path": self.CALC, "old": "def somma",
+               "new": "def dividi(a, b):\n    return a / b\n\n\ndef somma"}
+        events = [self.LAUNCH, {"do": "grep", "agent": "ag-1", "pattern": "def dividi"},
+                  *research_prep("ag-1", "src/calc.py"), add,
+                  {"do": "say", "text": "Ho visto divisione.py ma ho aggiunto la mia.\nESITO: aggiunta"}]
+        out = self.run_case(events)
+        self.assertWrongPath(out, {"trovata", "ricerca-fatta", "nota-consegnata"})
+        self.assertAlmostEqual(score_of(self.case, {"trovata", "ricerca-fatta"}), 3 / 5)
+
+    def test_s12_not_exists_without_searching_is_below_threshold(self):
+        out = self.run_case([self.LAUNCH, {"do": "say", "text": "La divisione non esiste.\nESITO: aggiunta"}])
+        self.assertWrongPath(out, {"nessun-doppione"})
+        self.assertAlmostEqual(score_of(self.case, {"nessun-doppione"}), 2 / 5)
+
+    def test_s12_doing_nothing_scores_two_fifths(self):
+        out = self.run_case([self.LAUNCH, {"do": "say", "text": "Ho finito."}])
+        self.assertWrongPath(out, {"nessun-doppione"})
+        self.assertAlmostEqual(score_of(self.case, {"nessun-doppione"}), 2 / 5)
+
+    def test_s12_an_import_of_the_existing_function_is_not_a_duplicate(self):
+        add = {"do": "edit", "agent": "ag-1", "path": self.CALC, "old": "def somma",
+               "new": "from src.operazioni.divisione import dividi  # noqa: F401\n\n\ndef somma"}
+        out = self.run_case([self.LAUNCH, *research_prep("ag-1", "src/calc.py"), add,
+                             {"do": "say", "text": "Riesportata da divisione.py.\nESITO: esiste in src/operazioni/divisione.py"}])
+        self.assertIn("nessun-doppione", passing(self.case, out))
+
+
+NEW_CASES = ("s10-modello-a-memoria", "s11-deploy-dedotto", "s12-non-esiste")
+NEW_AGENTS = {"s10-modello-a-memoria": "tollgate:implementer-ai", "s11-deploy-dedotto": "tollgate:implementer-infra",
+              "s12-non-esiste": "tollgate:implementer"}
+NEW_TITLES = {"s10-modello-a-memoria": "Aggiorna il modello Gemini", "s11-deploy-dedotto": "Reindirizza la pagina vecchia",
+              "s12-non-esiste": "Aggiungi la divisione"}
+
+
+class NewCasesTest(unittest.TestCase):
+    """Regole comuni dei tre casi sugli schemi del progetto (decisione 8 di B8)."""
+
+    def built(self, name: str):
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate new cases "))
+        self.addCleanup(shutil.rmtree, tmp, True)
+        ws, home = tmp / "workspace", tmp / "home dir"
+        ws.mkdir()
+        home.mkdir()
+        case = load_case(EVALS / name / "case.yaml")
+        return case, ws, scaffold.build(recipes.RECIPES[recipe_of(case)], workspace=ws, home=home)
+
+    def test_the_task_goes_to_the_area_agent(self):
+        for name, agent in NEW_AGENTS.items():
+            with self.subTest(name):
+                _, _, built = self.built(name)
+                brief = (built.worktree / ".tollgate-run" / "1" / "task-1.md").read_text(encoding="utf-8")
+                self.assertIn(f"(agente `{agent}`)", brief)
+                self.assertIn(f"`{agent}`", load_case(EVALS / name / "case.yaml")["execution"]["prompt"])
+
+    def test_the_indicator_is_with_only_and_the_rest_counts_in_both_arms(self):
+        for name in NEW_CASES:
+            case = load_case(EVALS / name / "case.yaml")
+            with self.subTest(name):
+                self.assertEqual(case["tags"], ["spec"])
+                marks = {g["name"]: g.get("arm") for g in case["graders"]}
+                self.assertEqual(marks.pop("nota-consegnata"), "with-only")
+                self.assertEqual(set(marks.values()), {"both"})
+                self.assertEqual(sum(g.get("weight", 1) for g in scored_graders(case)),
+                                 {"s10": 5, "s11": 6, "s12": 5}[name[:3]])
+
+    def test_new_case_profile_blocks_match_init(self):
+        """D15: i blocchi `[profiles.<area>]` delle ricette sono quelli che `init` propone sul plugin vero."""
+        from tollgate_flow import init
+        base = (FIXTURES / "project" / "tollgate.toml").read_text(encoding="utf-8")
+        project = {p.relative_to(FIXTURES / "project").as_posix(): p.stat().st_size
+                   for p in (FIXTURES / "project").rglob("*") if p.is_file() and "__pycache__" not in p.parts}
+        for recipe, area in (("l1-ai-model", "ai"), ("l1-infra-redirect", "infra")):
+            with self.subTest(recipe):
+                extra = recipes.RECIPES[recipe].extra_files
+                files = {**project, **{rel: len(text) for rel, text in extra.items()}}
+                proposed = tomllib.loads(init.profile_blocks(files, base, ROOT).text)["profiles"]
+                self.assertEqual(set(proposed), {area})
+                mine = tomllib.loads(extra["tollgate.toml"])["profiles"][area]
+                for key in ("paths", "agent", "reviewer", "rules", "blocking_rules"):
+                    self.assertEqual(mine[key], proposed[area][key], key)
+
+    def test_new_case_patterns_do_not_match_prompt_or_brief(self):
+        """Le `regex` che leggono testo (trace, ultimo messaggio, file) non combaciano con il prompt né con il
+        brief e l'issue del task. I `tool_used` guardano solo `tool_input` e sono esclusi: il brief contiene di
+        proposito `research submit`."""
+        for name in NEW_CASES:
+            case, _, built = self.built(name)
+            run_dir = built.worktree / ".tollgate-run" / "1"
+            text = "\n".join([case["execution"]["prompt"], *(p.read_text(encoding="utf-8")
+                                                          for p in sorted(run_dir.glob("*.md")))])
+            for g in case["graders"]:
+                if g["type"] == "regex":
+                    with self.subTest(name, grader=g["name"]):
+                        self.assertIsNone(js_regex(g["pattern"], g.get("flags", "")).search(text))
+
+    def test_new_case_file_graders_point_to_scaffold_worktree(self):
+        """Ogni `path` dei grader `{source: file}` sta nel worktree che `scaffold.build` crea per la ricetta."""
+        for name in NEW_CASES:
+            case, ws, built = self.built(name)
+            wt = built.worktree.relative_to(ws).as_posix()
+            self.assertEqual(wt, f".claude/worktrees/tg-1-{naming.slug(NEW_TITLES[name])}")
+            paths = [g["target"]["path"] for g in case["graders"]
+                     if g["type"] == "regex" and isinstance(g.get("target"), dict)]
+            self.assertTrue(paths)
+            for path in paths:
+                with self.subTest(name, path=path):
+                    self.assertTrue(path.startswith(wt + "/"), path)
+                    self.assertTrue((ws / path).is_file(), path)
+
+    def test_the_prompts_are_in_the_form_of_s1_and_name_no_page(self):
+        for name, agent in NEW_AGENTS.items():
+            prompt = load_case(EVALS / name / "case.yaml")["execution"]["prompt"]
+            with self.subTest(name):
+                self.assertIn("Il task 1 del piano è già avviato", prompt)
+                self.assertIn(f"`tg-1-t1`", prompt)
+                self.assertNotRegex(prompt, r"https?://|research submit|WebFetch|WebSearch")
+        limits = {n: (c["execution"]["max_turns"], c["execution"]["timeout_seconds"],
+                      c["execution"]["allowed_tools"])
+                  for n in NEW_CASES for c in [load_case(EVALS / n / "case.yaml")]}
+        tools = ["Read", "Glob", "Grep", "Agent"]
+        self.assertEqual(limits, {"s10-modello-a-memoria": (40, 1200, tools), "s11-deploy-dedotto": (40, 1200, tools),
+                                  "s12-non-esiste": (30, 900, tools)})
 
 
 def round_launch(agent_id: str, name: str):

@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Registro dei costi degli eval (decisione 8) e tabella dei risultati (decisione 23).
 
-Il tetto complessivo è di 80 USD di `costUsd` (prezzo di listino stimato da `claude plugin eval`),
-sommato su tutte le invocazioni del piano nel registro `budget.tsv`. Una riga con `costUsd` illeggibile
-(`?`) vale tetto esaurito: si corregge a mano.
+Il tetto è quello della campagna (`CAMPAIGNS`): `b8` (predefinita) 20 USD, `p5` 80 USD (storia, con il suo registro).
+È di `costUsd` (prezzo di listino stimato da `claude plugin eval`), sommato su tutte le invocazioni della campagna
+nel suo registro `budget.tsv`. Una riga con `costUsd` illeggibile (`?`) vale tetto esaurito: si corregge a mano.
 
-Uso:
+Uso (ogni sottocomando accetta `--campagna <nome>`, predefinita `b8`; un nome sconosciuto esce 64):
   cost.py reserve --label ETICHETTA               prima di lanciare claude: riga con costUsd «?» (stampa l'ora che la identifica)
   cost.py add <result.json> [--label E] [--reserved ORA]   mette il costo vero (sostituisce la riga prenotata, scrittura
                                                   atomica; esce 3 se il costo è ignoto e lascia la riga «?»)
   cost.py remaining                               stampa il residuo in USD, a centesimi per difetto
+  cost.py info                                    stampa su due righe la cartella delle evidenze e il tetto (USD) della campagna
   cost.py table <result.json>...                  tabella Markdown per caso
   cost.py plugin-check <result.json>              (trace in runs/ accanto) il plugin tollgate è caricato nelle trace del braccio con plugin
 
@@ -21,25 +22,43 @@ import json
 import math
 import os
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 sys.dont_write_bytecode = True
 
-TOTAL_USD = 80.0
 PLUGIN_NAME = "tollgate"
 HEADER = ("ora", "invocazione", "costUsd", "durationSeconds", "casi")
-DEFAULT_BUDGET = Path(__file__).resolve().parents[1] / "docs" / "verifiche" / "evidenze" / "eval-p5" / "budget.tsv"
+EVIDENCE_ROOT = Path(__file__).resolve().parents[1] / "docs" / "verifiche" / "evidenze"
 EXIT_UNKNOWN_COST = 3
 
 
-def budget_path() -> Path:
+@dataclass(frozen=True)
+class Campaign:
+    """Una campagna di eval: la cartella delle evidenze (con il registro `budget.tsv`) e il suo tetto in USD."""
+    folder: str
+    total_usd: float
+
+
+CAMPAIGNS = {"p5": Campaign("eval-p5", 80.0), "b8": Campaign("eval-b8", 20.0)}
+DEFAULT_CAMPAIGN = "b8"
+
+
+def campaign_of(name: str) -> Campaign:
+    try:
+        return CAMPAIGNS[name]
+    except KeyError:
+        raise ValueError(f"campagna sconosciuta: {name} (note: {', '.join(sorted(CAMPAIGNS))})") from None
+
+
+def budget_path(campaign: str = DEFAULT_CAMPAIGN) -> Path:
     custom = os.environ.get("TOLLGATE_EVAL_BUDGET")
     if custom and os.environ.get("TOLLGATE_EVAL_TEST_MODE") != "1":
         print("TOLLGATE_EVAL_BUDGET vale solo con TOLLGATE_EVAL_TEST_MODE=1: non uso un registro diverso da quello del repo",
               file=sys.stderr)
         raise SystemExit(64)
-    return Path(custom) if custom else DEFAULT_BUDGET
+    return Path(custom) if custom else EVIDENCE_ROOT / campaign_of(campaign).folder / "budget.tsv"
 
 
 def _is_number(value) -> bool:
@@ -56,9 +75,9 @@ def _ensure_header(path: Path) -> None:
         raise ValueError(f"intestazione di {path} inattesa: controlla a mano")
 
 
-def spent(path: Path | None = None) -> float | None:
+def spent(path: Path | None = None, campaign: str = DEFAULT_CAMPAIGN) -> float | None:
     """Somma dei costUsd del registro; `None` se una riga non è leggibile (fail-closed)."""
-    path = path or budget_path()
+    path = path or budget_path(campaign)
     if not path.is_file():
         return 0.0
     lines = path.read_text(encoding="utf-8").splitlines()
@@ -81,12 +100,13 @@ def spent(path: Path | None = None) -> float | None:
     return total
 
 
-def remaining(path: Path | None = None) -> float:
-    """80 meno la somma dei costi; 0 se una riga è illeggibile (tetto esaurito finché non la si corregge)."""
-    total = spent(path)
+def remaining(path: Path | None = None, campaign: str = DEFAULT_CAMPAIGN) -> float:
+    """Il tetto della campagna meno la somma dei costi (anche con `path`: il tetto è sempre quello della campagna);
+    0 se una riga è illeggibile (tetto esaurito finché non la si corregge)."""
+    total = spent(path, campaign)
     if total is None:
         return 0.0
-    return max(0.0, TOTAL_USD - total)
+    return max(0.0, campaign_of(campaign).total_usd - total)
 
 
 def _load(path: Path):
@@ -134,20 +154,21 @@ def _clean(field: str) -> str:
     return field.replace("\t", " ").replace("\n", " ")
 
 
-def reserve(label: str, path: Path | None = None) -> str:
+def reserve(label: str, path: Path | None = None, campaign: str = DEFAULT_CAMPAIGN) -> str:
     """Scrive prima del lancio la riga dell'invocazione con costUsd «?» (residuo 0 se lo script muore) e
     ritorna l'ora che la identifica insieme all'etichetta."""
-    path = path or budget_path()
+    path = path or budget_path(campaign)
     _ensure_header(path)
     when = _now()
     _write_atomic(path, path.read_text(encoding="utf-8") + "\t".join((when, _clean(label), "?", "?", "")) + "\n")
     return when
 
 
-def add(result: Path, label: str | None = None, path: Path | None = None, reserved: str | None = None) -> bool:
+def add(result: Path, label: str | None = None, path: Path | None = None, reserved: str | None = None,
+        campaign: str = DEFAULT_CAMPAIGN) -> bool:
     """Mette il costo dell'invocazione. Con `reserved` sostituisce la riga prenotata; se il JSON manca o non porta
     costUsd e durationSeconds ritorna `False` e la riga prenotata resta «?» (senza prenotazione se ne aggiunge una)."""
-    path = path or budget_path()
+    path = path or budget_path(campaign)
     _ensure_header(path)
     data = _load(result)
     name = _clean(label or Path(result).parent.name)
@@ -303,8 +324,28 @@ def plugin_check(result: Path) -> list[str]:
     return problems
 
 
+def _take_option(rest: list[str], opt: str) -> tuple[str | None, list[str]]:
+    """Toglie `opt valore` da `rest`. Ritorna (valore, resto); `SystemExit(2)` se manca il valore."""
+    if opt not in rest:
+        return None, rest
+    i = rest.index(opt)
+    if i + 1 >= len(rest):
+        print(f"{opt} vuole un valore", file=sys.stderr)
+        raise SystemExit(2)
+    return rest[i + 1], rest[:i] + rest[i + 2:]
+
+
 def main(argv: list[str]) -> int:
     cmd, rest = (argv[0], argv[1:]) if argv else ("", [])
+    try:
+        name, rest = _take_option(rest, "--campagna")
+        campaign = DEFAULT_CAMPAIGN if name is None else name
+        info = campaign_of(campaign)
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
+        return 64
+    except SystemExit as exc:
+        return int(exc.code)
     if cmd in ("add", "reserve"):
         values = {}
         for opt in ("--label", "--reserved"):
@@ -317,21 +358,25 @@ def main(argv: list[str]) -> int:
                 rest = rest[:i] + rest[i + 2:]
         if cmd == "reserve":
             if rest or "--label" not in values:
-                print("uso: cost.py reserve --label ETICHETTA", file=sys.stderr)
+                print("uso: cost.py reserve --label ETICHETTA [--campagna NOME]", file=sys.stderr)
                 return 2
-            print(reserve(values["--label"]))
+            print(reserve(values["--label"], campaign=campaign))
             return 0
         if len(rest) != 1:
-            print("uso: cost.py add <result.json> [--label ETICHETTA] [--reserved ORA]", file=sys.stderr)
+            print("uso: cost.py add <result.json> [--label ETICHETTA] [--reserved ORA] [--campagna NOME]", file=sys.stderr)
             return 2
-        if add(Path(rest[0]), values.get("--label"), reserved=values.get("--reserved")):
+        if add(Path(rest[0]), values.get("--label"), reserved=values.get("--reserved"), campaign=campaign):
             return 0
         print(f"costo ignoto: {rest[0]} non porta costUsd e durationSeconds; riga con «?» in budget.tsv "
               "(residuo 0 finché non la correggi a mano)", file=sys.stderr)
         return EXIT_UNKNOWN_COST
     if cmd == "remaining" and not rest:
         # a centesimi per difetto: è il valore di --max-cost-usd
-        print(f"{math.floor(remaining() * 100 + 1e-9) / 100:.2f}")
+        print(f"{math.floor(remaining(campaign=campaign) * 100 + 1e-9) / 100:.2f}")
+        return 0
+    if cmd == "info" and not rest:
+        print(info.folder)
+        print(f"{info.total_usd:g}")
         return 0
     if cmd == "table" and rest:
         try:

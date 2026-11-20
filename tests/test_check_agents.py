@@ -267,6 +267,17 @@ class StartAndResumeTest(unittest.TestCase):
         row = subagents.get(self.lab.conn, "a1")
         self.assertEqual((row["agent_base_sha"], row["resumes"]), (self.lab.base, 1))
 
+    def test_second_task_of_same_type_bound_by_name(self):
+        tasks.add_task(self.lab.conn, self.lab.work, 2, source="plan", now=self.lab.now)
+        tasks.assign(self.lab.conn, self.lab.work, 2, implementer="tg-7-t2", agent_type=IMPL,
+                     pending="launch", now=self.lab.now)
+        self.assertEqual(self.lab.hook(agent_payload(self.lab, IMPL, "tg-7-t2")).exit, 0)
+        start(self.lab, "a2")
+        get = lambda n: tasks.get_task(self.lab.conn, self.lab.work, n)
+        self.assertIsNone(get(2)["pending"])
+        self.assertEqual(get(1)["pending"], "launch")
+        self.assertEqual(subagents.get(self.lab.conn, "a2")["task"], 2)
+
     def test_implementer_reminder_mentions_note(self):
         lab = Lab(research=True)
         self.addCleanup(lab.close)

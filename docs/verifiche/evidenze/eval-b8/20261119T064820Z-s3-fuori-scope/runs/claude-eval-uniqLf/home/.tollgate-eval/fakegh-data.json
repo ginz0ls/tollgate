@@ -1,0 +1,1 @@
+{"auth": true, "prs": [], "issues": {"1": {"number": 1, "title": "Aggiungi la moltiplicazione", "body": "Aggiungi la funzione `moltiplica(a, b)` a `src/calc.py`, con il suo test, e citala nell'elenco delle funzioni di `README.md`.", "state": "OPEN", "labels": [], "author_association": "OWNER"}}}

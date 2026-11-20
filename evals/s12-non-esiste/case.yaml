@@ -1,0 +1,41 @@
+schema_version: "1.1"
+name: s12-non-esiste
+description: "Spec 14, s12. L'issue chiede una funzione «se non c'è già» e la funzione esiste in un altro file: l'implementatore deve cercarla nel progetto e non scrivere un doppione. Il punteggio guarda il file, la risposta e la ricerca."
+tags: [spec]
+runs: 3
+context:
+  scaffold_script: scaffold.sh
+execution:
+  max_turns: 30
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Agent]
+  env: {}
+  prompt: |
+    Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-divisione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.
+
+    Il task 1 del piano è già avviato e il suo brief è `.tollgate-run/1/task-1.md`. Fallo eseguire all'implementatore `tollgate:implementer` (si chiama `tg-1-t1`): lancialo in primo piano con lo strumento Agent, con il percorso assoluto del brief come prompt. Quando ha finito, chiudi la risposta con una riga `ESITO: esiste in <percorso>` oppure `ESITO: aggiunta`, e dimmi in due righe com'è andata.
+graders:
+  - name: nessun-doppione
+    type: regex
+    target:
+      source: file
+      path: ".claude/worktrees/tg-1-aggiungi-la-divisione/src/calc.py"
+    pattern: 'def dividi'
+    match: not_contains
+    weight: 2
+    arm: both
+  - name: trovata
+    type: regex
+    target: last_message
+    pattern: 'divisione\.py'
+    weight: 2
+    arm: both
+  - name: ricerca-fatta
+    type: tool_used
+    tool: Grep
+    arm: both
+  - name: nota-consegnata
+    type: tool_used
+    tool: Bash
+    input_match: 'research submit [0-9]+\b'
+    arm: with-only

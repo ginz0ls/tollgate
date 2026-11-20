@@ -65,6 +65,16 @@ class ParseTest(unittest.TestCase):
         out = cmds("echo $(echo $(git push --force origin x))")
         self.assertTrue(any(bash.push_is_force(c) for c in out))
 
+    def test_git_push_behind_env_loader_unchanged(self):
+        # Limite scritto (spec 8.5): i controlli su `argv[0]` non vedono dietro un involucro.
+        for text in ["dotenv -- git push", "dotenv -- git push --force origin x"]:
+            with self.subTest(text=text):
+                self.assertEqual([c for c in cmds(text) if bash.is_push(c)], [])
+                self.assertEqual([c for c in cmds(text) if bash.push_is_force(c)], [])
+                self.assertIsNone(bash.effect_reason(one(text), bash.EffectsCfg()))
+        self.assertIsNone(bash.destructive(one("dotenv -- rm -rf /tmp/x")))
+        self.assertEqual(bash.rm_rf_targets(one("dotenv -- rm -rf /tmp/x")), [])
+
 
 class ParseCarryTest(unittest.TestCase):
     """Decisioni del controller in carry.md, sezione Task 7."""
@@ -215,6 +225,8 @@ class EffectsTest(unittest.TestCase):
             "npm exec wrangler -- deploy", "npm exec wrangler -- d1 execute DB --remote"], True)
         self.check_effects(["npm exec supabase -- start"], False)
         self.check_effects(["supabase -- db push"], True)
+        self.check_effects(["npm exec prisma -- -- migrate deploy",
+                            "npx prisma -- -- -- migrate deploy"], True)
         self.assertEqual(bash.launcher_candidates(["npm", "exec", "prisma", "--", "migrate"]),
                          [["prisma", "migrate"]])
 
@@ -588,10 +600,267 @@ class EffectsTest(unittest.TestCase):
     def test_curl_and_gh_stay_on_original_argv(self):
         self.check_effects(["npx curl https://x.invalid", "npx gh pr list"], False)
 
+    # --- involucri dell'ambiente (B8, decisione 1) ----------------------------------------------
+
+    REL = bash.EffectsCfg(project_scripts=["deploy", "release"])
+
+    def eff_rel(self, text):
+        return bash.effect_reason(one(text), self.REL)
+
+    def test_env_loaders_scan_for_effects(self):
+        self.check_effects([
+            "dotenv -e .env.production -- prisma migrate deploy",
+            "dotenv -e .env.production -- npm run deploy",
+            "cross-env NODE_ENV=production drizzle-kit push",
+            "cross-env NODE_ENV=production prisma migrate deploy",
+            "doppler run -- npx supabase db push",
+            "doppler run --command 'prisma migrate deploy'",
+            "doppler run --command='prisma migrate deploy'",
+            "op run -- supabase db push",
+            "infisical run --env=prod -- prisma db push",
+            "dotenvx run -f .env -- prisma db push",
+            "env-cmd -f .env prisma db push",
+            "env-cmd -f .env /usr/local/bin/vercel --prod",
+            "dotenv -- wrangler deploy", "dotenv -e .env -- npx supabase db push",
+            "dotenv -- gh pr create", "dotenv -- make deploy",
+            "npx dotenv -e .env -- prisma migrate deploy",
+            "dotenv -e .env -- npx dotenv -- prisma migrate deploy"], True)
+
+    def test_env_loaders_without_effect_pass(self):
+        self.check_effects([
+            "dotenv -- python3 -m unittest", "dotenv -- npm i -g vercel",
+            "dotenv -- python3 manage.py check", "cross-env CI=1 python3 tools/build.py",
+            "cross-env CI=1 python3 -m pytest tests/vercel", "dotenv -e .env -- npm test",
+            "doppler run -c prd -- jest", "op run -- echo ok", "dotenv", "cross-env A=1",
+            "infisical run -- npm test", "dotenvx run -- node server.js"], False)
+
+    def test_env_loader_value_equal_to_program_asks(self):
+        # Costo noto (decisione 1): un valore con il nome di un programma chiede, senza motivo.
+        self.check_effects(["dotenv -e vercel -- echo x", "dotenv -e vercel echo x",
+                            "cross-env vercel echo x", "cross-env NODE_ENV=test jest aws",
+                            "doppler run --project supabase --config prd -- npm run dev"], True)
+
+    def test_env_loader_inner_double_dash(self):
+        # Il `--` e' del comando interno: il comando interno va guardato anche prima del `--`.
+        for text in ["cross-env NODE_ENV=production npm run deploy -- --prod",
+                     "env-cmd -f .env npm run release -- --tag x",
+                     "dotenv -e .env.production npm run deploy -- --prod",
+                     "cross-env NODE_ENV=production prisma migrate deploy -- --x"]:
+            with self.subTest(text=text):
+                self.assertIsNotNone(self.eff_rel(text))
+
+    def test_env_loader_first_token_path(self):
+        self.check_effects(["cross-env A=1 /usr/local/bin/vercel --prod"], True)
+
+    def test_env_loader_allow_on_outer_text(self):
+        cfg = bash.EffectsCfg(allow=["dotenv -e .env -- prisma migrate deploy"])
+        self.assertIsNone(bash.effect_reason(
+            one("dotenv -e .env -- prisma migrate deploy"), cfg))
+        self.assertIsNotNone(bash.effect_reason(
+            one("dotenv -e .env2 -- prisma migrate deploy"), cfg))
+        cfg = bash.EffectsCfg(commands=["dotenv -e .env*"])
+        self.assertIn("[external_effects] commands",
+                      bash.effect_reason(one("dotenv -e .env -- jest"), cfg))
+
+    def test_env_loader_nesting_depth(self):
+        self.check_effects(["dotenv -- doppler run -- prisma migrate deploy",
+                            "dotenv -- doppler run -- cross-env A=1 echo ok",
+                            "dotenv -- doppler run -- op run -- echo ok"], True)
+        self.check_effects(["dotenv -- doppler run -- echo ok"], False)
+
+    def test_env_loader_inner_command_is_parsed(self):
+        self.check_effects([
+            "dotenv -- bash -c 'prisma migrate deploy'",
+            "dotenv -- sh -c 'curl -X POST https://x'", "dotenv -- env X=1 prisma migrate deploy",
+            "dotenv -- sudo prisma migrate deploy", "dotenv -- timeout 60 supabase db push",
+            "dotenv -- FOO=1 prisma migrate deploy", "dotenv -- time npm run deploy",
+            "dotenv -- curl -X POST https://x", "dotenv -- eval 'prisma db push'"], True)
+        self.check_effects(["dotenv -- env X=1 echo ok", "dotenv -- bash -c 'echo ok'"], False)
+
+    def test_env_loader_inner_command_in_one_word(self):
+        self.check_effects(['dotenv -- "supabase db push"', 'op run -- "prisma migrate deploy"',
+                            'npx dotenv -- "npm run deploy"',
+                            # Costo noto, dalla parte sicura: una parola con spazi si legge anche
+                            # a pezzi, quindi il filtro dei test chiede.
+                            'dotenv -- jest -t "vercel deploy"'], True)
+        self.check_effects(['dotenv -- "python3 -m unittest"'], False)
+
+    def test_env_loader_behind_launcher(self):
+        for text in ["npx dotenv -e .env -- npm run release",
+                     "npx dotenv -- curl -X POST https://x",
+                     "npx dotenv@16 -e .env -- npm run release",
+                     "npx dotenv-cli -e .env -- npm run release",
+                     "npx @dotenvx/dotenvx run -- npm run release",
+                     "npx cross-env NODE_ENV=production npm run release",
+                     "pnpm exec dotenv -- gh pr create"]:
+            with self.subTest(text=text):
+                self.assertIsNotNone(self.eff_rel(text))
+        self.check_effects(["npm i -D cross-env vercel", "pnpm add -D dotenv vercel",
+                            "npx dotenv -- echo ok"], False)
+        # Nessuna pagina ufficiale per `@infisical/cli`: resta l'esito di oggi, dato dal
+        # `prisma` dopo il `--`.
+        self.check_effects(["npx @infisical/cli run -- prisma migrate deploy"], True)
+        self.check_effects(["npx @infisical/cli run -- echo ok"], False)
+
+    def test_env_loader_command_options(self):
+        self.check_effects(["infisical run -c 'prisma migrate deploy'",
+                            "infisical run --command 'prisma migrate deploy'",
+                            "infisical run --command='prisma migrate deploy'",
+                            "infisical sm run -- prisma migrate deploy",
+                            "infisical secrets-manager run -- prisma migrate deploy"], True)
+        self.check_effects(["doppler run -c prd -- jest", "doppler run --config prd -- jest",
+                            "infisical run -e dev -- jest"], False)
+
+    def test_env_loader_shell_forms(self):
+        self.check_effects(["cross-env-shell \"prisma migrate deploy && echo ok\"",
+                            "env-cmd -f .env --use-shell -- \"npm run build && supabase db push\"",
+                            "cross-env-shell NODE_ENV=test \"jest && prisma db push\""], True)
+        self.check_effects(["cross-env-shell \"jest && echo ok\"",
+                            "env-cmd -f .env --use-shell -- \"jest && echo ok\""], False)
+
+    def test_env_loader_shell_text_with_paths_and_assignments(self):
+        # Una parola con spazi e' testo di shell: i filtri per token (percorsi, assegnazioni)
+        # non la riguardano (revisione finale F1).
+        self.check_effects([
+            'cross-env-shell "cd apps/web && vercel deploy --prod"',
+            'env-cmd --use-shell "cd apps/web && vercel deploy --prod"',
+            'cross-env-shell "curl -X POST https://api.example.com"',
+            'cross-env-shell "prisma migrate deploy --schema=db/schema.prisma"',
+            'cross-env-shell "./scripts/build && vercel --prod"',
+            'cross-env-shell "supabase db push --workdir ./supa"',
+            'cross-env-shell "DEBUG=1 vercel --prod"',
+            'env-cmd --use-shell "NODE_ENV=production prisma migrate deploy"'], True)
+        self.check_effects(['cross-env-shell "jest && echo ok"',
+                            "cross-env NODE_ENV=test jest src/aws"], False)
+
+    def test_true_inner_commands_of_shell_text(self):
+        got = [c.argv for c in bash.true_inner_commands(
+            one('cross-env-shell "./deploy.sh && echo ok"'))]
+        self.assertIn(["./deploy.sh"], got)
+
+    def test_inner_commands_forms(self):
+        def inner(text):
+            return bash.inner_commands(one(text))
+
+        def argvs(items):
+            return [c.argv for c in items if isinstance(c, bash.Cmd)]
+
+        self.assertEqual(bash.inner_commands(one("ls -la")), [])
+        self.assertIn(["prisma", "migrate", "deploy"],
+                      argvs(inner("dotenv -e .env -- prisma migrate deploy")))
+        self.assertIn(["prisma", "migrate", "deploy"],
+                      argvs(inner("dotenv -e .env prisma migrate deploy")))
+        self.assertIn(["prisma", "migrate", "deploy"],
+                      argvs(inner("doppler run --command 'prisma migrate deploy'")))
+        self.assertIn(["prisma", "migrate", "deploy"],
+                      argvs(inner("doppler run --command='prisma migrate deploy'")))
+        # Un candidato che parse non legge arriva come testo e passa da text_effect.
+        items = inner('dotenv -- bash -c "it\'s; curl -X POST https://x"')
+        self.assertTrue(any(isinstance(c, str) and "curl" in c for c in items))
+        self.check_effects(['dotenv -- bash -c "it\'s; curl -X POST https://x"'], True)
+
+    def test_inner_commands_unreadable_without_reason_asks(self):
+        self.check_effects(['dotenv -- bash -c "it\'s fine"'], True)
+
+    def test_true_inner_commands(self):
+        def true(text):
+            return [c.argv for c in bash.true_inner_commands(one(text))]
+
+        self.assertEqual(bash.true_inner_commands(one("ls -la")), [])
+        self.assertIn(["node", "x.js"], true("dotenv -e .env -e .env.local node x.js"))
+        self.assertIn(["node", "x.js"], true("dotenv --debug node x.js"))
+        got = true("cross-env NODE_ENV=test c8 -r text node --test x")
+        self.assertEqual(got, [["c8", "-r", "text", "node", "--test", "x"]])
+        self.assertFalse(any(a[:2] == ["node", "--test"] for a in got))
+        self.assertIn(["node", "x.js"], true("dotenv -e .env -- node x.js"))
+        self.assertIn(["node", "x.js"], true("doppler run --command 'node x.js'"))
+        self.assertIn(["node", "x.js"], true("infisical sm run -- node x.js"))
+        self.assertIn(["node", "scripts/new.js"], true("dotenv --debug node scripts/new.js"))
+        # Dietro un lanciatore e a ogni livello.
+        self.assertIn(["./deploy.sh"], true("npx dotenv -- ./deploy.sh"))
+        self.assertIn(["./deploy.sh"], true("dotenv -- doppler run -- ./deploy.sh"))
+        self.assertIn(["./deploy"], true("cross-env A=1 ./deploy"))
+        self.assertIn(["./scripts/env.sh", "jest"], true("env-cmd -f ./scripts/env.sh jest"))
+        self.assertNotIn(["./test/.env", "mocha", "-R", "spec"],
+                         true("env-cmd -f ./test/.env mocha -R spec"))
+        self.assertEqual([], [a for a in true("cross-env A=1 scripts/deploy")
+                              if a[0] == "scripts/deploy"])
+
+    def test_env_loader_paths_not_scanned(self):
+        self.check_effects([
+            "cross-env NODE_ENV=test jest src/aws", "cross-env CI=1 python3 -m pytest tests/vercel",
+            "env-cmd -f ./test/.env mocha -R spec", "env-cmd -f ./config/.env.test jest",
+            "dotenv -e ./.env.test -- jest", "dotenv -e ./envs/.env.local -- next dev",
+            "cross-env NODE_ENV=test mocha 'test/**/*.spec.js'",
+            "cross-env NODE_ENV=test ava test/*.js", "cross-env NODE_ENV=test jest ./src/aws",
+            "cross-env CI=1 pytest ./tests/vercel"], False)
+
+    def test_env_loader_command_by_path(self):
+        self.check_effects([
+            "env-cmd -f .env /usr/local/bin/vercel --prod",
+            "cross-env A=1 /usr/bin/curl -X POST https://x", "cross-env A=1 /usr/bin/gh pr create",
+            "cross-env A=1 /bin/bash -c 'curl -X POST https://x'",
+            "cross-env A=1 /usr/bin/make deploy",
+            "cross-env A=1 ./node_modules/.bin/prisma migrate deploy",
+            "cross-env A=1 node_modules/.bin/prisma migrate deploy"], True)
+        # `./deploy` e `dotenv -e .env ./scripts/deploy.sh` sono file da guardare: li vede
+        # `_script_reason` (tests/test_check_effects.py), non `effect_reason`.
+        self.check_effects(["cross-env A=1 ./deploy", "dotenv -e .env ./scripts/deploy.sh"], False)
+        # Un programma locale con il nome di un servizio passa (limite scritto, giro 7 m2).
+        self.check_effects(["cross-env A=1 ./vercel --prod"], False)
+        self.check_effects(["./vercel --prod"], True)
+
+    # --- opzioni con valore dei sottocomandi di Supabase (B8, decisione 2) -----------------------
+
+    def test_supabase_value_table_has_no_local_or_remote_flags(self):
+        table = bash.SUPABASE_COMMAND_VALUE_OPTIONS
+        for key, options in table.items():
+            for opt in options:
+                with self.subTest(key=key, opt=opt):
+                    self.assertNotEqual(opt, "--local")
+                    self.assertNotIn(opt, bash.REMOTE_FLAGS["supabase"])
+        for prefix, _mode in bash.FLAG_EFFECTS:
+            if prefix[0] == "supabase":
+                with self.subTest(prefix=prefix):
+                    self.assertIn(prefix[1:3], table)
+        self.check_effects(["supabase db push --db-url postgres://prod --local"], True)
+
+    def test_supabase_version_only_without_subcommand(self):
+        self.check_effects(["supabase --version", "supabase --debug --version"], False)
+        self.check_effects(["supabase db reset --linked --version 20240101"], True)
+
+    def test_supabase_command_value_options(self):
+        self.check_effects([
+            "supabase db push -p --local", "supabase db push --password --local",
+            "supabase db pull --schema --local", "supabase db pull -s --local",
+            "supabase migration down --last --local",
+            "supabase migration repair -p --local --status applied 1",
+            "supabase db pull --diff-engine --local",
+            "npx supabase db push -p --local", "pnpm exec supabase db pull -s --local",
+            "npx supabase migration down --last --local"], True)
+        self.check_effects([
+            "supabase db push -p x --local", "supabase db push --password=x --local",
+            "supabase migration repair --status applied 1 --local",
+            "supabase db dump -f --linked", "supabase db dump --file out.sql",
+            "npx supabase db push -p x --local",
+            "supabase migration repair --status applied 1 --local"], False)
+
+    def test_supabase_help_as_command_option_value_asks(self):
+        self.check_effects(["supabase db push -p --help", "supabase db pull --schema -h"], True)
+        self.check_effects(["supabase db push --help", "supabase db pull -h"], False)
+
+    def test_text_effect_supabase_value_options_still_ask(self):
+        self.assertIsNotNone(bash.text_effect("supabase db push -p x --local"))
+        self.assertIsNotNone(bash.text_effect("supabase db push --password x --local"))
+
     def test_launcher_candidates(self):
         self.assertEqual(bash.launcher_candidates(["ls", "wrangler", "deploy"]), [])
         self.assertEqual(bash.launcher_candidates(["npx", "-y", "wrangler@3", "deploy"]),
                          [["wrangler", "deploy"]])
+        self.assertEqual(bash.launcher_candidates(["npm", "exec", "prisma", "--", "--", "x"]),
+                         [["prisma", "x"]])
+        # Gli involucri non cambiano i candidati del lanciatore.
+        self.assertEqual(bash.launcher_candidates(["npx", "dotenv", "--", "echo", "x"]), [])
 
     def test_script_path(self):
         self.assertEqual(bash.script_path(one("./scripts/x.sh a")), "/r/wt/scripts/x.sh")

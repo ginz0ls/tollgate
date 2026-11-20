@@ -1,0 +1,313 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.328",
+  "startedAt": "2026-11-19T07:02:27.961Z",
+  "durationSeconds": 145,
+  "costUsd": 0.6251532,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/tollgate-eval-target",
+    "ablation": "with-without",
+    "modelOverride": "claude-sonnet-5-5",
+    "caseFilter": "s5-l0-cresce",
+    "threshold": 0.66,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "tollgate",
+        "version": "0.2.0",
+        "path": "/tmp/tollgate-eval-target"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "s5-l0-cresce",
+      "dir": "evals/s5-l0-cresce",
+      "source": "case_yaml",
+      "promptMarkdown": "Il lavoro dell'issue #1 è nel worktree `.claude/worktrees/tg-1-aggiungi-la-moltiplicazione`. Entra in quella cartella con `cd` e lavora da lì per tutto il resto.\n\nAggiungi al progetto le funzioni `divisione(a, b)`, `potenza(a, b)`, `radice(a)` e `modulo(a, b)`, ciascuna nel suo modulo `src/<nome>.py` con il suo test in `tests/test_<nome>.py`, e committa il lavoro. Crea ogni file con lo strumento Write, un file per chiamata, e committa alla fine.\n",
+      "runsPerCase": 3,
+      "timeoutSeconds": 900,
+      "maxTurns": 40,
+      "graders": [
+        {
+          "name": "crescita-vista",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "trace",
+            "pattern": "il diff ha superato le soglie di L0|il diff supera le soglie di L0|in fase plan si scrivono solo i \\.md sotto docs/superpowers|fase (?:plan|execution)\\s+livello L1",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "piano-scritto",
+          "type": "file_exists",
+          "weight": 1,
+          "config": {
+            "path": "**/docs/superpowers/plans/*.md",
+            "exists": true
+          }
+        },
+        {
+          "name": "oltre-soglia-evitato",
+          "type": "file_exists",
+          "weight": 2,
+          "config": {
+            "path": "**/src/modulo.py",
+            "exists": false
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0.75,
+            "passed": false,
+            "turns": 10,
+            "costUsd": 0.1048959,
+            "judgeCostUsd": 0,
+            "durationSeconds": 22,
+            "startedAt": "2026-11-19T07:02:27.986Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-e4h4dV/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "crescita-vista",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched il diff ha superato le soglie di L0|il diff supera le soglie di L0|in fase plan si scrivono solo i \\.md sotto docs/superpowers|fase (?:plan|execution)\\s+livello L1",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "piano-scritto",
+                "passed": false,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/plans/*.md missing (expected present)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "oltre-soglia-evitato",
+                "passed": true,
+                "weight": 2,
+                "explanation": "**/src/modulo.py absent as expected",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.75,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.10736500000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 27,
+            "startedAt": "2026-11-19T07:02:49.605Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-F4xHlm/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "crescita-vista",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched il diff ha superato le soglie di L0|il diff supera le soglie di L0|in fase plan si scrivono solo i \\.md sotto docs/superpowers|fase (?:plan|execution)\\s+livello L1",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "piano-scritto",
+                "passed": false,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/plans/*.md missing (expected present)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "oltre-soglia-evitato",
+                "passed": true,
+                "weight": 2,
+                "explanation": "**/src/modulo.py absent as expected",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.75,
+            "passed": false,
+            "turns": 10,
+            "costUsd": 0.10564409999999999,
+            "judgeCostUsd": 0,
+            "durationSeconds": 22,
+            "startedAt": "2026-11-19T07:03:16.402Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-GCtdjb/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "crescita-vista",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched il diff ha superato le soglie di L0|il diff supera le soglie di L0|in fase plan si scrivono solo i \\.md sotto docs/superpowers|fase (?:plan|execution)\\s+livello L1",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "piano-scritto",
+                "passed": false,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/plans/*.md missing (expected present)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "oltre-soglia-evitato",
+                "passed": true,
+                "weight": 2,
+                "explanation": "**/src/modulo.py absent as expected",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 13,
+            "costUsd": 0.1035377,
+            "judgeCostUsd": 0,
+            "durationSeconds": 24,
+            "startedAt": "2026-11-19T07:03:38.082Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-HYNbXd/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "crescita-vista",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "piano-scritto",
+                "passed": false,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/plans/*.md missing (expected present)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "oltre-soglia-evitato",
+                "passed": false,
+                "weight": 2,
+                "explanation": "**/src/modulo.py exists (expected absent)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 12,
+            "costUsd": 0.1014063,
+            "judgeCostUsd": 0,
+            "durationSeconds": 25,
+            "startedAt": "2026-11-19T07:04:01.723Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-pnLuft/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "crescita-vista",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "piano-scritto",
+                "passed": false,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/plans/*.md missing (expected present)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "oltre-soglia-evitato",
+                "passed": false,
+                "weight": 2,
+                "explanation": "**/src/modulo.py exists (expected absent)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 12,
+            "costUsd": 0.10230420000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 26,
+            "startedAt": "2026-11-19T07:04:26.682Z",
+            "error": null,
+            "tracePath": "/home/USER/.cache/tollgate-eval-tmp/claude-eval-8YPg7R/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "crescita-vista",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in trace",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "piano-scritto",
+                "passed": false,
+                "weight": 1,
+                "explanation": "**/docs/superpowers/plans/*.md missing (expected present)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "oltre-soglia-evitato",
+                "passed": false,
+                "weight": 2,
+                "explanation": "**/src/modulo.py exists (expected absent)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0.75,
+        "passRate": 0,
+        "scoreWithout": 0,
+        "passRateWithout": 0,
+        "delta": 0.75
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 0.75,
+    "overallPassRate": 0,
+    "meanDelta": 0.75
+  }
+}

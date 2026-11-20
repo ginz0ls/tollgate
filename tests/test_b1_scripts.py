@@ -1114,6 +1114,31 @@ class FlowScriptTest(unittest.TestCase):
         self.assertEqual(out[5]["message"]["content"][0]["content"], "NORMALE riga", "un Read normale non si tocca")
         self.assertEqual(out[5]["tool_use_result"]["file"]["content"], "NORMALE riga")
 
+    DENIED = {"type": "system", "subtype": "permission_denied", "tool_name": "WebFetch", "tool_use_id": "toolu_X",
+              "agent_id": "a1", "decision_reason_type": "mode", "message": "Permission to use WebFetch has been denied.",
+              "uuid": "u1", "session_id": "s1"}
+
+    def test_a_row_whose_message_is_a_string_is_a_row_without_blocks(self):
+        """La riga `system/permission_denied` ha `message` di tipo stringa (sonda del 19/11): non rompe nessuna lettura."""
+        flowreg = self.flowreg_module()
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-b8-flowreg-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        stream = tmp / "claude.jsonl"
+        rows = [self.DENIED,
+                {"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "w1", "name": "WebFetch",
+                                                               "input": {"url": "https://ai.google.dev/x"}}]}},
+                {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "w1",
+                                                          "content": "PAGINA " * 1500}]}}]
+        stream.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+        self.assertEqual(list(flowreg.web_results(self.DENIED, {"w1": "x"})), [])
+        self.assertEqual([name for name, _, _ in flowreg.tool_uses(stream)], ["WebFetch"])
+        self.assertEqual(len(flowreg.third_party_blocks(stream)), 1)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(flowreg.togli_pagine([str(stream)]), 1)
+        out = [json.loads(x) for x in stream.read_text().splitlines()]
+        self.assertEqual(out[0], self.DENIED, "la riga permission_denied resta com'è")
+        self.assertNotIn("PAGINA PAGINA", stream.read_text())
+
     def test_committed_evidence_has_no_long_web_results(self):
         """Nelle evidenze pubbliche non c'è testo di terzi: né risultati di WebFetch/WebSearch oltre MAX_WEB_RESULT, né Read/Grep di copie
         salvate in tool-results/, né skill che non sono di

@@ -1,0 +1,1 @@
+{"auth": true, "prs": [], "issues": {"1": {"number": 1, "title": "Aggiorna il modello Gemini", "body": "Porta `ai/client.py` all'ultimo modello Gemini stabile.", "state": "OPEN", "labels": [], "author_association": "OWNER"}}}

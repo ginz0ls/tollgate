@@ -1,0 +1,6 @@
+/home/USER/.cache/tollgate-eval-tmp/claude-eval-JJX6aS
+/home/USER/.cache/tollgate-eval-tmp/claude-eval-nosFCa
+/home/USER/.cache/tollgate-eval-tmp/claude-eval-rqS7Ka
+/home/USER/.cache/tollgate-eval-tmp/claude-eval-tDkVKp
+/home/USER/.cache/tollgate-eval-tmp/claude-eval-tQY9yD
+/home/USER/.cache/tollgate-eval-tmp/claude-eval-VJ7BAm

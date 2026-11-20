@@ -1,0 +1,1 @@
+{"auth": true, "prs": [], "issues": {"1": {"number": 1, "title": "Reindirizza la pagina vecchia", "body": "Aggiungi un reindirizzamento permanente da `/vecchia` a `/nuova` nella configurazione di pubblicazione.", "state": "OPEN", "labels": [], "author_association": "OWNER"}}}

@@ -1,0 +1,1 @@
+{"auth": true, "prs": [], "issues": {"1": {"number": 1, "title": "Sottrazione senza segno", "body": "`sottrai(a, b)` restituisce la distanza tra i due numeri, mai un risultato negativo: `sottrai(0, 4)` vale 4.", "state": "OPEN", "labels": [], "author_association": "OWNER"}}}

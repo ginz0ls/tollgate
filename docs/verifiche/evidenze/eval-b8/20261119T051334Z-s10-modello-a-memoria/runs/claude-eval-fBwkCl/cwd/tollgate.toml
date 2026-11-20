@@ -1,0 +1,24 @@
+schema_version = 1
+
+[project]
+allow_no_tests = false
+
+[gate]
+mode = "protected"
+
+[commands]
+verify = "python3 tools/unittest_junit.py"
+gate = ["verify"]
+report = "junit:reports/junit.xml"
+
+[profiles.ai]
+paths = ["/ai/**"]
+kind = "vertical"
+min_level = "L1"
+skills = []
+reviewer_skills = []
+agent = "tollgate:implementer-ai"
+reviewer = "tollgate:reviewer-ai"
+dod = []
+rules = ["R-AI-01", "R-AI-02", "R-AI-03", "R-AI-04", "R-AI-05", "R-AI-06", "R-AI-07", "R-AI-08", "R-AI-09", "R-AI-10", "R-AI-11"]
+blocking_rules = ["R-AI-01", "R-AI-02", "R-AI-03", "R-AI-04", "R-AI-05", "R-AI-06"]

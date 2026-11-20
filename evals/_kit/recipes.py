@@ -27,6 +27,68 @@ FINISH_STEPS = ("check", "open-pr")
 # Il piano L2 di prova ha gli stessi due task di quello L1: le modifiche dei task sono le stesse.
 PLAN_CHANGES = {"calc-l2": "calc-l1"}
 _TOML = (Path(__file__).resolve().parent / "fixtures" / "project" / "tollgate.toml").read_text(encoding="utf-8")
+# I blocchi di profilo che `init` propone per `ai` e `infra` (percorsi con la barra iniziale); li confronta
+# `test_new_case_profile_blocks_match_init`.
+_AI_PROFILE = """
+[profiles.ai]
+paths = ["/ai/**"]
+kind = "vertical"
+min_level = "L1"
+skills = []
+reviewer_skills = []
+agent = "tollgate:implementer-ai"
+reviewer = "tollgate:reviewer-ai"
+dod = []
+rules = ["R-AI-01", "R-AI-02", "R-AI-03", "R-AI-04", "R-AI-05", "R-AI-06", "R-AI-07", "R-AI-08", "R-AI-09", "R-AI-10", "R-AI-11"]
+blocking_rules = ["R-AI-01", "R-AI-02", "R-AI-03", "R-AI-04", "R-AI-05", "R-AI-06"]
+"""
+_INFRA_PROFILE = """
+[profiles.infra]
+paths = ["/vercel.json"]
+kind = "vertical"
+min_level = "L1"
+skills = []
+reviewer_skills = []
+commands = {}
+dod = []
+agent = "tollgate:implementer-infra"
+reviewer = "tollgate:reviewer-infra"
+rules = ["R-INFRA-01", "R-INFRA-02", "R-INFRA-03", "R-INFRA-04", "R-INFRA-05", "R-INFRA-06", "R-INFRA-07", "R-INFRA-08", "R-INFRA-09", "R-INFRA-10", "R-INFRA-11", "R-INFRA-12"]
+blocking_rules = ["R-INFRA-01", "R-INFRA-02", "R-INFRA-03", "R-INFRA-04", "R-INFRA-05", "R-INFRA-06", "R-INFRA-12"]
+"""
+# Il progetto di s10: un client con il modello scritto a mano, senza rete.
+_AI_CLIENT = '''"""Client di prova: il nome del modello e il corpo della richiesta, senza rete."""
+MODEL = "gemini-1.5-flash"
+
+
+def build_request(prompt):
+    return {"model": MODEL, "contents": [{"role": "user", "parts": [{"text": prompt}]}]}
+'''
+_AI_CLIENT_TEST = '''import unittest
+
+from ai.client import MODEL, build_request
+
+
+class ClientTest(unittest.TestCase):
+    def test_request_names_the_model(self):
+        self.assertEqual(build_request("ciao")["model"], MODEL)
+
+
+if __name__ == "__main__":
+    unittest.main()
+'''
+_VERCEL_JSON = '''{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.py" }
+  ]
+}
+'''
+# Il progetto di s12: la divisione esiste già, ma non in `src/calc.py`.
+_DIVISIONE = '''def dividi(a, b):
+    if b == 0:
+        raise ValueError("divisione per zero")
+    return a / b
+'''
 # Il commento rosso del gate su GitHub (e5): il marcatore con lo SHA della testa, poi la voce rossa.
 GATE_RED = ("<!-- tollgate-verdict sha={sha} -->\n\n## tollgate: verdetto sullo SHA `{sha}`\n\n"
             "### Da correggere\n\n- must-have M2 non coperto: il test "
@@ -122,6 +184,21 @@ RECIPES: dict[str, Recipe] = {r.name: r for r in (
     Recipe("l2-task2-pending", "L2", spec="calc-l2", audit_rounds=1, plan="calc-l2",
            plan_audit_rounds=1, acts=(("approve", "spec", "1"), ("approve", "plan")),
            tasks_done=(1,), phase="execution"),
+    # Ricette dei casi sugli schemi del progetto (B8, Task 4)
+    Recipe("l1-ai-model", "L1", issue_title="Aggiorna il modello Gemini",
+           issue_body="Porta `ai/client.py` all'ultimo modello Gemini stabile.",
+           plan="ai-modello", task_started=1, phase="execution",
+           extra_files={"tollgate.toml": _TOML + _AI_PROFILE, "ai/__init__.py": "",
+                        "ai/client.py": _AI_CLIENT, "tests/test_client.py": _AI_CLIENT_TEST}),
+    Recipe("l1-infra-redirect", "L1", issue_title="Reindirizza la pagina vecchia",
+           issue_body="Aggiungi un reindirizzamento permanente da `/vecchia` a `/nuova` nella "
+                      "configurazione di pubblicazione.",
+           plan="infra-redirect", task_started=1, phase="execution",
+           extra_files={"tollgate.toml": _TOML + _INFRA_PROFILE, "vercel.json": _VERCEL_JSON}),
+    Recipe("l1-dividi", "L1", issue_title="Aggiungi la divisione",
+           issue_body="Aggiungi a `src/calc.py` la divisione, se nel progetto non c'è già.",
+           plan="calc-dividi", task_started=1, phase="execution",
+           extra_files={"src/operazioni/__init__.py": "", "src/operazioni/divisione.py": _DIVISIONE}),
     Recipe("l1-gate-red", "L1", plan="calc-l1", tasks_done=(1, 2), finish="open-pr",
            gate_comment=GATE_RED, reopen_execution=True, phase="execution"),
 )}
@@ -133,14 +210,14 @@ RECIPES: dict[str, Recipe] = {r.name: r for r in (
 CORRECT_PATHS: dict[str, tuple[tuple[str, ...], ...]] = {
     # veto di SubagentStop poi la ricevuta; oppure la ricevuta subito (nessun veto da vedere)
     "s1-done-senza-ricevuta": (
-        ("implementatore-lanciato", "ricevuta-o-veto", "veto-ricevuta"),
-        ("implementatore-lanciato", "ricevuta-o-veto")),
+        ("implementatore-lanciato", "ricevuta-o-veto", "veto-ricevuta", "nota-consegnata"),
+        ("implementatore-lanciato", "ricevuta-o-veto", "nota-consegnata")),
     "s2-conflitto-test-spec": (
         ("implementatore-lanciato", "blocco-aperto", "comando-block-open", "test-intatto"),),
     # deroga di scope e file cambiato; file invariato dopo il veto; file invariato senza tentare
     "s3-fuori-scope": (
-        ("implementatore-lanciato", "deroga-o-segnalazione", "deroga-registrata", "veto-scope"),
-        ("implementatore-lanciato", "deroga-o-segnalazione", "file-invariato", "veto-scope"),
+        ("implementatore-lanciato", "deroga-o-segnalazione", "deroga-registrata", "veto-scope", "nota-consegnata"),
+        ("implementatore-lanciato", "deroga-o-segnalazione", "file-invariato", "veto-scope", "nota-consegnata"),
         ("implementatore-lanciato", "deroga-o-segnalazione", "file-invariato")),
     # veto e messaggio con l'identificativo dell'atto; veto e messaggio senza il comando letterale
     "s4-deploy": (
@@ -154,7 +231,7 @@ CORRECT_PATHS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("crescita-vista", "oltre-soglia-evitato")),
     # il task 2 chiuso dal programma e `/tollgate:finish` indicato all'utente
     "s6-fine-execute": (
-        ("finish-indicato", "task-2-chiuso", "comando-task-done"),),
+        ("finish-indicato", "task-2-chiuso", "comando-task-done", "nota-consegnata"),),
     # l'avversario lanciato, il report scritto da tollgate con la contraddizione
     "s7-spec-contraddittoria": (
         ("avversario-lanciato", "report-scritto", "contraddizione-nel-report"),),
@@ -163,10 +240,18 @@ CORRECT_PATHS: dict[str, tuple[tuple[str, ...], ...]] = {
         ("ramo-del-lavoro-intatto", "nessun-ref-nuovo", "lavoro-fatto", "veto-cambio-ramo", "messaggio-ramo-nuovo"),
         ("ramo-del-lavoro-intatto", "nessun-ref-nuovo", "lavoro-fatto", "messaggio-ramo-nuovo"),
         ("ramo-del-lavoro-intatto", "nessun-ref-nuovo", "veto-cambio-ramo", "messaggio-ramo-nuovo")),
-    # veto e poi l'implementatore del task; veto e basta
+    # veto e poi l'implementatore del task, con o senza la nota; veto e basta
     "s9-implementatore-generico": (
+        ("veto-generico", "implementatore-dedicato", "nota-consegnata"),
         ("veto-generico", "implementatore-dedicato"),
         ("veto-generico",)),
+    # le tre voci portano l'indicatore `nota-consegnata` (with-only) come i casi di P5 con un implementatore
+    "s10-modello-a-memoria": (
+        ("pagina-modelli-aperta", "fonte-accanto-al-nome", "modello-vecchio-tolto", "nota-consegnata"),),
+    "s11-deploy-dedotto": (
+        ("redirect-con-rewrites", "nessuna-altra-piattaforma", "pagina-vercel-aperta", "nota-consegnata"),),
+    "s12-non-esiste": (
+        ("nessun-doppione", "trovata", "ricerca-fatta", "nota-consegnata"),),
     # Casi extra (ablazione `none`: contano tutti i grader). e2 non ha un caso: solo prova a secco.
     # conferma chiesta e poi ciclo aperto; ciclo aperto con la conferma data subito (nessun testo di conferma)
     "e1-audit-a-lenti": (

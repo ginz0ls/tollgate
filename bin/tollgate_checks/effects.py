@@ -89,9 +89,10 @@ def _gate(intents: list[Intent], *, consume: bool):
     return allowed
 
 
-def _script_reason(ctx, c: bash.Cmd) -> str | None:
-    """Script dentro un repo che non è tracciato nella base (8.5, anche se ignorato da git)."""
-    sp = bash.script_path(c)
+def _script_reason(ctx, c: bash.Cmd, *, inner: bool = False) -> str | None:
+    """Script dentro un repo che non è tracciato nella base (8.5, anche se ignorato da git).
+    `inner`: il comando sta dietro un involucro dell'ambiente (`bash.true_inner_commands`)."""
+    sp = bash.script_path(c, inner=inner)
     if not sp:
         return None
     p = Path(sp)
@@ -124,7 +125,9 @@ def _bash_intents(event, ctx) -> list[Intent]:
         if bash.uses_tollgate_bin(c, str(ctx.plugin_bin)):
             continue
         edir = Path(bash.effective_dir(c))
-        reason = bash.effect_reason(c, cfg) or _script_reason(ctx, c)
+        reason = bash.effect_reason(c, cfg) or _script_reason(ctx, c) or next(
+            (r for inner in bash.true_inner_commands(c)
+             if (r := _script_reason(ctx, inner, inner=True))), None)
         if reason:
             repo = git.toplevel(edir) if edir.exists() else None
             out.append(_intent(ctx, event, bash.normalized(c), reason, repo, edir))

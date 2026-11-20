@@ -1066,9 +1066,43 @@ SUPABASE_READS: tuple[tuple[str, ...], ...] = (
 SUPABASE_VALUE_OPTIONS = ("--agent", "--dns-resolver", "--network-id", "-o", "--output",
                           "--output-format", "--profile", "--workdir")
 SUPABASE_GLOBAL_OPTIONS = ("--debug", "--experimental", "--yes")
-_SUPABASE_HELP = ("--help", "-h", "--version")
+# Opzioni a valore dei sottocomandi di `FLAG_EFFECTS` (CLI 3), per (gruppo, sottocomando): il
+# valore non e' un'opzione, quindi `-p --local` non nasconde `--local` ne' `--help`. Mai
+# `--local` ne' le opzioni di `REMOTE_FLAGS`: togliendole `db push --db-url x --local`
+# passerebbe. `--remote` prende un valore solo nella forma `--remote=...`.
+SUPABASE_COMMAND_VALUE_OPTIONS: dict[tuple[str, str], tuple[str, ...]] = {
+    ("db", "push"): ("-p", "--password"),
+    ("db", "pull"): ("-p", "--password", "-s", "--schema", "--diff-engine"),
+    ("db", "reset"): ("--last", "--version", "--sql-paths"),
+    ("db", "lint"): ("--fail-on", "--level", "-s", "--schema"),
+    ("db", "query"): ("-f", "--file", "-o", "--output"),
+    ("db", "advisors"): ("--fail-on", "--level", "--type"),
+    ("db", "diff"): ("-f", "--file", "--from", "-o", "--output", "-s", "--schema", "--to"),
+    ("db", "dump"): ("-f", "--file", "-x", "--exclude", "-p", "--password", "-s", "--schema"),
+    ("migration", "up"): (),
+    ("migration", "down"): ("--last",),
+    ("migration", "repair"): ("-p", "--password", "--status"),
+    ("migration", "fetch"): (),
+    ("migration", "list"): ("-p", "--password"),
+    ("migration", "squash"): ("-p", "--password", "--version"),
+    ("gen", "types"): ("--lang", "--query-timeout", "-s", "--schema", "--swift-access-control"),
+    ("test", "db"): (),
+    ("inspect", "db"): (),
+    ("inspect", "report"): ("--output-dir",),
+    ("seed", "buckets"): ()}
+_SUPABASE_HELP_FLAGS = ("--help", "-h")
 _READ_WORDS = ("list", "get", "info")
 _WRITE_WORDS = ("create", "delete", "rename", "update")
+# Involucri che caricano l'ambiente e poi eseguono un comando (B8, decisione 1): il comando
+# interno si controlla come uno diretto.
+ENV_LOADERS = ("dotenv", "dotenvx", "cross-env", "cross-env-shell", "env-cmd", "doppler",
+               "infisical", "op")
+LOADER_PACKAGES = {"dotenv-cli": "dotenv", "@dotenvx/dotenvx": "dotenvx"}
+# Opzioni che passano il comando da eseguire come testo (`-c` e' `--config` per doppler).
+_LOADER_COMMAND_OPTIONS = {"doppler": ("--command",), "infisical": ("--command", "-c")}
+# Involucri con un sottocomando `run`: le opzioni e il comando stanno dopo `run`.
+_LOADER_WITH_RUN = ("dotenvx", "doppler", "infisical", "op")
+MAX_LOADER_DEPTH = 2
 # Lanciatori di pacchetti (decisione 17): i comandi di servizio dietro di loro sono effetti.
 LAUNCHERS = ("npx", "bunx", "pnpx", "npm", "pnpm", "yarn", "bun")
 _PACKAGE_MANAGERS = ("npm", "pnpm", "yarn", "bun")
@@ -1092,24 +1126,165 @@ def _launcher_token(tok: str) -> str:
     return PACKAGE_PROGRAMS.get(tok, tok)
 
 
-def launcher_candidates(argv: list[str]) -> list[list[str]]:
-    """Comandi di servizio dietro un lanciatore: `[programma] + resto` per ogni posizione."""
+def _launcher_hits(argv: list[str], names) -> list[tuple[str, list[str]]]:
+    """`(programma, resto)` per ogni posizione di un lanciatore il cui token normalizzato e'
+    in `names`. Il resto e' quello che segue il token, senza toccare i `--`. Dopo un comando
+    di gestione dei pacchetti (`npm i -D x`) i token sono nomi di pacchetti: non si guardano."""
     if not argv or os.path.basename(argv[0]) not in LAUNCHERS:
         return []
-    programs = {p[0] for p in _DEFAULT_EFFECTS} | {"supabase"}
-    out: list[list[str]] = []
+    out: list[tuple[str, list[str]]] = []
     manager_seen = package_command_seen = False
     for i, tok in enumerate(argv):
         norm = _launcher_token(os.path.basename(tok) if i == 0 else tok)
-        if i >= 1 and not package_command_seen and norm in programs:
-            rest = argv[i + 1:]
-            if rest[:1] == ["--"]:  # il separatore dei lanciatori non è un argomento del programma
-                rest = rest[1:]
-            out.append([norm] + rest)
+        norm = LOADER_PACKAGES.get(norm, norm)
+        if i >= 1 and not package_command_seen and norm in names:
+            out.append((norm, argv[i + 1:]))
         if manager_seen and tok in PACKAGE_COMMANDS:
             package_command_seen = True
         if norm in _PACKAGE_MANAGERS:
             manager_seen = True
+    return out
+
+
+def launcher_candidates(argv: list[str]) -> list[list[str]]:
+    """Comandi di servizio dietro un lanciatore: `[programma] + resto` per ogni posizione."""
+    programs = {p[0] for p in _DEFAULT_EFFECTS} | {"supabase"}
+    out: list[list[str]] = []
+    for norm, rest in _launcher_hits(argv, programs):
+        while rest[:1] == ["--"]:  # il separatore dei lanciatori non e' un argomento del programma
+            rest = rest[1:]
+        out.append([norm] + rest)
+    return out
+
+
+def _command_path_ok(tok: str, *, for_effect: bool) -> bool:
+    """Un token con `/` e' un comando solo se e' un comando per percorso: assoluto o dentro una
+    cartella `bin/` o `.bin/`, uno script `.sh`/`.bash`, o `./x` e `../x` senza punto (questi
+    ultimi solo per il controllo dei file, mai per `effect_reason`). Gli altri sono dati o file
+    di test (`tests/vercel`, `./test/.env`, `test/**/*.spec.js`) e si saltano."""
+    if "/" not in tok:
+        return True
+    if tok.startswith(("/", "bin/", ".bin/")) or "/bin/" in tok or "/.bin/" in tok:
+        return True
+    if tok.endswith((".sh", ".bash")):
+        return True
+    if tok.startswith(("./", "../")) and "." not in os.path.basename(tok):
+        return not for_effect
+    return False
+
+
+def _loader_split(cmd: Cmd) -> tuple[list[str], list[str], list[str]]:
+    """`(parole, prefisso, dopo)` di un involucro: il prefisso e' prima del primo `--`."""
+    words = cmd.argv[1:]
+    if "--" not in words:
+        return words, words, []
+    at = words.index("--")
+    return words, words[:at], words[at + 1:]
+
+
+def _loader_command_values(base: str, prefix: list[str]) -> list[str]:
+    """I valori delle opzioni che passano il comando da eseguire come testo."""
+    options = _LOADER_COMMAND_OPTIONS.get(base, ())
+    out = []
+    for j, tok in enumerate(prefix):
+        if tok in options and j + 1 < len(prefix):
+            out.append(prefix[j + 1])
+        elif "=" in tok and tok.split("=", 1)[0] in options:
+            out.append(tok.split("=", 1)[1])
+    return out
+
+
+def _loader_word_lists(cmd: Cmd, *, true: bool) -> list[list[str]]:
+    """Le liste di parole che possono essere il comando interno di un involucro. Con `true=False`
+    (la scansione di `effect_reason`) e' ogni posizione del prefisso che non e' un'opzione ne'
+    un'assegnazione; con `true=True` (i file di `_script_reason`) solo il comando vero: lo
+    scorrimento si ferma al primo token che non segue un'opzione."""
+    base = os.path.basename(cmd.argv[0])
+    words, prefix, after = _loader_split(cmd)
+    out = [after] if after else []
+    start = 0
+    if true and base in _LOADER_WITH_RUN:
+        start = next((j + 1 for j, tok in enumerate(prefix[:3]) if tok == "run"), 0)
+    after_option = False
+    for j in range(start, len(prefix)):
+        tok = prefix[j]
+        if tok.startswith("-"):
+            after_option = "=" not in tok
+            continue
+        follows_option, after_option = after_option, False
+        # Una parola con spazi e' testo di shell (`cross-env-shell "cd a/b && x"`): niente
+        # filtro per assegnazioni o percorsi, che valgono per i token singoli.
+        if not re.search(r"\s", tok) and (
+                _ASSIGN.match(tok) or not _command_path_ok(tok, for_effect=not true)):
+            continue
+        out.append(words[j:])
+        if true and not follows_option:
+            break
+    return out
+
+
+def _is_shell_loader(base: str, prefix: list[str]) -> bool:
+    return base == "cross-env-shell" or (base == "env-cmd" and "--use-shell" in prefix)
+
+
+def _loader_candidates(cmd: Cmd, *, true: bool) -> list[Cmd | str]:
+    """Candidati interni di un involucro: `Cmd` letti da `parse`, o il testo di quelli che
+    `parse` non sa leggere (solo con `true=False`)."""
+    base = os.path.basename(cmd.argv[0])
+    if base not in ENV_LOADERS:
+        return []
+    _, prefix, _ = _loader_split(cmd)
+    texts = []
+    for words in _loader_word_lists(cmd, true=true):
+        texts.append(shlex.join(words))
+        # Una parola con spazi e' un comando intero tra virgolette (`dotenv -- "npm run x"`):
+        # `shlex.join` la quota e `parse` la leggerebbe come un programma dal nome strano.
+        spaced = any(re.search(r"\s", w) for w in words)
+        if _is_shell_loader(base, prefix) or spaced:
+            texts.append(" ".join(words))
+        if spaced and not true:
+            # Come per un comando scritto da solo, ogni posizione puo' essere il programma:
+            # costo (dalla parte sicura) `dotenv -- jest -t "vercel deploy"`.
+            try:
+                parts = shlex.split(" ".join(words))
+            except ValueError:
+                parts = " ".join(words).split()
+            texts += [shlex.join(parts[j:]) for j, tok in enumerate(parts)
+                      if not tok.startswith("-") and not _ASSIGN.match(tok)
+                      and _command_path_ok(tok, for_effect=True)]
+    texts += _loader_command_values(base, prefix)
+    out: list[Cmd | str] = []
+    for text in texts:
+        try:
+            out.extend(parse(text, cmd.cwd))
+        except BashParseError:
+            if not true:
+                out.append(text)
+    return out
+
+
+def inner_commands(cmd: Cmd) -> list[Cmd | str]:
+    """Per `effect_reason`: i comandi che un involucro dell'ambiente (`ENV_LOADERS`) puo'
+    eseguire, letti come comandi diretti. E' una scansione larga, non una grammatica: ogni
+    posizione del prefisso puo' essere il comando, e il testo che `parse` non legge arriva
+    come `str`. Vuota per un comando che non e' un involucro."""
+    return _loader_candidates(cmd, true=False)
+
+
+def true_inner_commands(cmd: Cmd, _depth: int = 0) -> list[Cmd]:
+    """Per `_script_reason`: i comandi interni veri di ogni livello, anche dietro un
+    lanciatore (`npx dotenv -- ./deploy.sh`)."""
+    if _depth > MAX_LOADER_DEPTH:
+        return []
+    base = os.path.basename(cmd.argv[0]) if cmd.argv else ""
+    loaders = [cmd] if base in ENV_LOADERS else [
+        Cmd([norm] + rest, cmd.cwd, cmd.env, cmd.redirects)
+        for norm, rest in _launcher_hits(cmd.argv, ENV_LOADERS)]
+    out: list[Cmd] = []
+    for loader in loaders:
+        for c in _loader_candidates(loader, true=True):
+            out.append(c)
+            out.extend(true_inner_commands(c, _depth + 1))
     return out
 
 
@@ -1232,10 +1407,33 @@ def _account_group_read(rest: list[str]) -> bool:
 _SUPABASE_TRUE = ("true", "1", "t", "T", "TRUE", "True")
 
 
-def _supabase_flag_present(rest: list[str], name: str) -> bool:
+def _supabase_option_tokens(prefix: tuple[str, ...], rest: list[str]) -> list[str]:
+    """I token di `rest` senza le opzioni a valore, con il loro valore (anche `--x=v`): le
+    globali di `SUPABASE_VALUE_OPTIONS` e quelle del sottocomando `prefix` (`("supabase", "db",
+    "push")`) in `SUPABASE_COMMAND_VALUE_OPTIONS`. Si ferma al primo `--`, che resta."""
+    own = SUPABASE_COMMAND_VALUE_OPTIONS.get(tuple(prefix[1:3]), ())
+    valued = SUPABASE_VALUE_OPTIONS + own
+    out: list[str] = []
+    i = 0
+    while i < len(rest):
+        tok = rest[i]
+        if tok == "--":
+            return out + rest[i:]
+        if tok in valued:
+            i += 2
+        elif "=" in tok and tok.split("=", 1)[0] in valued:
+            i += 1
+        else:
+            out.append(tok)
+            i += 1
+    return out
+
+
+def _supabase_flag_present(rest: list[str], name: str, prefix: tuple[str, ...] = ()) -> bool:
     """pflag: l'opzione c'e' se compare (`--x` o `--x=<v>`), qualunque sia il valore.
-    `--local` conta solo con un valore vero. Si ferma al primo `--`."""
-    for tok in rest:
+    `--local` conta solo con un valore vero. Si ferma al primo `--`. Con `prefix` i valori
+    delle opzioni del sottocomando non contano (`db push -p --local`: `--local` e' la password)."""
+    for tok in _supabase_option_tokens(prefix, rest):
         if tok == "--":
             return False
         if tok == name:
@@ -1251,12 +1449,16 @@ def _flag_data_reason(argv: list[str]) -> str | None:
         if argv[:len(prefix)] == list(prefix) and not _account_group_read(argv[len(prefix):]):
             return f"effetto esterno: {' '.join(prefix)}"
     remote_flags = REMOTE_FLAGS.get(argv[0], ())
-    present = _supabase_flag_present if argv[0] == "supabase" else _flag_present
     for prefix, mode in FLAG_EFFECTS:
         if argv[:len(prefix)] != list(prefix):
             continue
         rest = argv[len(prefix):]
         label = " ".join(prefix)
+        if argv[0] == "supabase":
+            def present(tokens, name, prefix=prefix):
+                return _supabase_flag_present(tokens, name, prefix)
+        else:
+            present = _flag_present
         if mode == "unless_local":
             local = present(rest, "--local") and not any(present(rest, f) for f in remote_flags)
             if not local:
@@ -1285,29 +1487,31 @@ def _supabase_args(argv: list[str]) -> list[str] | None:
 
 def _strip_value_options(tokens: list[str]) -> list[str]:
     """Toglie le opzioni globali a valore con il loro valore (anche `--x=v`), fino al primo `--`."""
-    out: list[str] = []
+    return _supabase_option_tokens(("supabase",), tokens)
+
+
+def _supabase_asks_help(argv: list[str]) -> bool:
+    """`--help`, `-h`, `--version` fuori dai valori delle opzioni e prima del primo `--`.
+    Il valore di un'opzione del sottocomando (`db push -p --help`) non e' un aiuto, e
+    `--version` vale come aiuto solo prima di ogni sottocomando (`supabase --version`)."""
+    tokens = _strip_value_options(argv[1:])
+    words: list[str] = []
+    entry = None
     i = 0
     while i < len(tokens):
         tok = tokens[i]
         if tok == "--":
-            return out + tokens[i:]
-        if tok in SUPABASE_VALUE_OPTIONS:
-            i += 2
-        elif "=" in tok and tok.split("=", 1)[0] in SUPABASE_VALUE_OPTIONS:
-            i += 1
-        else:
-            out.append(tok)
-            i += 1
-    return out
-
-
-def _supabase_asks_help(argv: list[str]) -> bool:
-    """`--help`, `-h`, `--version` fuori dai valori delle opzioni e prima del primo `--`."""
-    for tok in _strip_value_options(argv[1:]):
-        if tok == "--":
             return False
-        if tok in _SUPABASE_HELP:
+        if tok in _SUPABASE_HELP_FLAGS or (tok == "--version" and not words):
             return True
+        if not tok.startswith("-"):
+            words.append(tok)
+            if entry is None:
+                entry = next((p for p, _ in FLAG_EFFECTS
+                              if p[0] == "supabase" and words == list(p[1:])), None)
+                if entry is not None:
+                    tokens = tokens[:i + 1] + _supabase_option_tokens(entry, tokens[i + 1:])
+        i += 1
     return False
 
 
@@ -1364,7 +1568,25 @@ def script_name(argv: list[str]) -> str | None:
     return argv[i]
 
 
-def effect_reason(cmd: Cmd, cfg: EffectsCfg) -> str | None:
+def _loader_reason(cmd: Cmd, cfg: EffectsCfg, depth: int) -> str | None:
+    """Il comando dietro un involucro dell'ambiente, controllato per intero. Il terzo livello
+    di involucri annidati chiede senza guardare; un candidato che `parse` non legge passa da
+    `text_effect`, e senza un motivo chiede comunque (dalla parte sicura)."""
+    base = os.path.basename(cmd.argv[0])
+    if depth >= MAX_LOADER_DEPTH:
+        return f"effetto esterno: {base} annidato in altri involucri dell'ambiente"
+    for inner in inner_commands(cmd):
+        if isinstance(inner, Cmd):
+            reason = effect_reason(inner, cfg, depth + 1)
+        else:
+            reason = text_effect(inner) or f"effetto esterno: comando di {base} non leggibile"
+        if reason:
+            return reason
+    return None
+
+
+def effect_reason(cmd: Cmd, cfg: EffectsCfg, _depth: int = 0) -> str | None:
+    """`_depth`: gli involucri dell'ambiente gia' aperti sopra questo comando."""
     a = cmd.argv
     if not a:
         return None
@@ -1374,6 +1596,14 @@ def effect_reason(cmd: Cmd, cfg: EffectsCfg) -> str | None:
     if _matches(cfg.commands, text):
         return "comando dichiarato in [external_effects] commands"
     base = os.path.basename(a[0])
+    if base in ENV_LOADERS:
+        reason = _loader_reason(cmd, cfg, _depth)
+        if reason:
+            return reason
+    for norm, rest in _launcher_hits(a, ENV_LOADERS):
+        reason = effect_reason(Cmd([norm] + rest, cmd.cwd, cmd.env, cmd.redirects), cfg, _depth)
+        if reason:
+            return reason
     for argv in [[base] + a[1:]] + launcher_candidates(a):
         for prefix in _DEFAULT_EFFECTS:
             if argv[:len(prefix)] == list(prefix):
@@ -1390,7 +1620,7 @@ def effect_reason(cmd: Cmd, cfg: EffectsCfg) -> str | None:
                 return reason
             continue
         for c in inner:
-            reason = effect_reason(c, cfg)
+            reason = effect_reason(c, cfg, _depth)
             if reason:
                 return reason
     if base in ("npm", "pnpm", "yarn", "bun") and len(a) > 1:
@@ -1412,12 +1642,19 @@ _INTERPRETERS = {"bash", "sh", "zsh", "python", "python3", "node", "ruby", "perl
                  "bun", "tsx", "ts-node", "php"}
 
 
-def script_path(cmd: Cmd) -> str | None:
+def script_path(cmd: Cmd, *, inner: bool = False) -> str | None:
+    """Il file che il comando esegue. Con `inner` (un comando dietro un involucro) un comando
+    per percorso conta solo se e' uno script `.sh`/`.bash` o un file eseguibile: i token dei
+    comandi interni sono anche valori di opzioni e dati."""
     a = cmd.argv
     if not a:
         return None
     if "/" in a[0] and os.path.basename(a[0]) not in _INTERPRETERS:
-        return _norm(cmd.cwd, a[0])
+        path = _norm(cmd.cwd, a[0])
+        if inner and not path.endswith((".sh", ".bash")) and not (
+                os.path.isfile(path) and os.access(path, os.X_OK)):
+            return None
+        return path
     if os.path.basename(a[0]) in _INTERPRETERS:
         rest = a[1:]
         if any(x in ("-c", "-m", "-e") for x in rest[:1]):

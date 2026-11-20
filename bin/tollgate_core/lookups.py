@@ -53,11 +53,15 @@ def _file_target(path: str, *, cwd: str, worktree: str, must_exist: bool) -> str
     return research.normalize_path(full, cwd=cwd, worktree=_resolved(".", base=worktree))
 
 
+REDIRECT_NOTICE = "REDIRECT DETECTED"   # l'avviso di `WebFetch` quando la pagina rimanda a un altro dominio
+
+
 def observed(tool: str, tool_input: dict, tool_response: dict | None, *, cwd: str,
              worktree: str) -> list[Lookup]:
     """Cosa registrare per una lettura (decisione 4): una sola regola, per la via breve del
     runner e per il modulo `lookup_rec`. `Grep` conta solo in modo `content` esplicito su un
-    file; `WebFetch` con codice di errore, e ogni forma non riconosciuta, non contano."""
+    file; `WebFetch` con un codice fuori da 200-299 o con un avviso di redirect al posto della pagina,
+    e ogni forma non riconosciuta, non contano."""
     ti = tool_input if isinstance(tool_input, dict) else {}
     if tool == "Read":
         raw = ti.get("file_path")
@@ -71,8 +75,12 @@ def observed(tool: str, tool_input: dict, tool_response: dict | None, *, cwd: st
         rel = _file_target(raw, cwd=cwd, worktree=worktree, must_exist=True)
         return [Lookup("grep", rel)] if rel else []
     if tool == "WebFetch":
-        code = (tool_response or {}).get("code")
-        if isinstance(code, int) and not isinstance(code, bool) and code >= 400:
+        resp = tool_response if isinstance(tool_response, dict) else {}
+        code = resp.get("code")
+        if isinstance(code, int) and not isinstance(code, bool) and not 200 <= code <= 299:
+            return []
+        body = resp.get("result")
+        if isinstance(body, str) and body.lstrip().startswith(REDIRECT_NOTICE):
             return []
         raw = ti.get("url")
         url = research.normalize_url(raw) if isinstance(raw, str) else None
