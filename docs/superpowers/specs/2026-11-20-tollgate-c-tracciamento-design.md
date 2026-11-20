@@ -166,7 +166,24 @@ Un comando porta sulle bacheche i lavori già fatti, a partire da ciò che il re
 - C aggiunge un comando che dà la **fotografia di oggi** in JSON: lavori, taglie, fette con dipendenze, fase, a chi tocca, cosa aspetta l'utente, avanzamento, costo, stato della coda verso GitHub. Ha un numero di versione, come la busta: un campo nuovo non cambia la versione, un campo tolto o cambiato sì.
 - I due comandi sono **in sola lettura** e sono documentati in `docs/uso/`: sono ciò su cui il gestionale si appoggerà.
 
-## 11. Lasciato a chi costruisce
+## 11. Il profilo `security` (utente, 20/11/2026)
+
+**Scelta dell'utente:** il profilo `security`, rimasto fuori da B, entra nel piano di C come **una fetta a sé**, costruita con il modello **Fable** (`claude-fable-5-2`), il più capace.
+
+- **Cos'è.** Il profilo già progettato nel catalogo (`docs/superpowers/specs/2026-10-08-tollgate-profili-verticali.md`, righe `security` e `rules-security`): si accende su `**/auth/**`, `**/middleware.*`, `**/*session*`, `**/security/**`, `**/rls/**`, porta il lavoro a L2, ha un implementatore e un revisore di area e lo specialista finale `final-security`, che il catalogo usa anche per `ci`. Le regole (`rules-security`) vengono dalle fonti elencate nel catalogo (`security-and-hardening` e `security-auditor` di agent-skills, MIT; le altre da leggere prima, licenza compresa).
+- **Come si fa.** Come i profili di B (B3-B7):
+  - fonti verificate e copiate con la licenza;
+  - regole scritte con parole nostre, ognuna con la sua fonte;
+  - pagina del profilo;
+  - approvazione dell'utente prima di accendere il blocco;
+  - agenti di area;
+  - tabella delle precedenze con gli altri profili, con un test ciascuna;
+  - prova reale.
+- **Fable dove serve giudizio** (utente: «usando Fable»; mia scelta su dove): la verifica delle fonti, la scrittura delle regole, la revisione del piano, la revisione finale e, se il catalogo lo conferma, il modello di `final-security` e del revisore `security`. Gli implementatori meccanici possono restare sonnet. Il modello di ogni agente si scrive nel suo frontmatter, come per gli altri profili.
+- **Cosa non cambia.** I profili approvati di B (`base`, `ai`, `infra`, `backend`, `frontend`, `database`) non si toccano. Dove una regola di `security` si sovrappone a una già approvata (i segreti di `backend` e `database`, RLS di `database`), la pagina del profilo lo dice e l'utente decide all'approvazione.
+- **Ordine.** È una fetta indipendente dal tracciamento: il piano principale di C decide dove metterla, e la può far girare anche prima delle bacheche.
+
+## 12. Lasciato a chi costruisce
 
 - Nomi dei comandi, degli atti, dei campi e dei tipi di evento nuovi, e le loro firme.
 - Le soglie esatte delle taglie, con un test per ognuna.
@@ -176,15 +193,15 @@ Un comando porta sulle bacheche i lavori già fatti, a partire da ciò che il re
 - Da dove viene la stima dei costi fuori dagli eval.
 - La divisione in fette di C stesso (come B1-B8 per B), con il piano principale di C.
 
-## 12. Come si prova che funziona
+## 13. Come si prova che funziona
 
 - **Test senza rete**, come nel resto del progetto: il `gh` dei test è `tests/fakegh.py`, da estendere con i Projects e le sotto-issue. Nessun test parla con GitHub vero.
 - **Una prova vera su un repo di prova** dell'utente (privato, creato apposta), sul modello delle prove di P4: un lavoro piccolo, uno medio, uno grande con tre fette, una caduta simulata di GitHub (coda), un'issue chiusa a mano (allineamento), il recupero della storia. Rapporto in `docs/verifiche/`.
 - **Controllo di ciò che va su GitHub**: un test che scorre ogni scrittura verso GitHub e fallisce se contiene un campo della lista «non va mai» della sezione 7.
 
-## 13. Vincoli
+## 14. Vincoli
 
 - Come il resto di tollgate: Python ≥ 3.11 e solo libreria standard in `bin/` e nei test; strati del nucleo rispettati (`tests/test_layers.py`); suite verde su Python 3.11 e 3.13 con `PYTHONWARNINGS=error::ResourceWarning`.
-- Nessun modello di linguaggio nel codice di C (la presa di 3.3 resta vuota di modelli).
+- Nessun modello di linguaggio nel codice di C (la presa di 3.3 resta vuota di modelli). Fable si usa per costruire la fetta `security` (sezione 11), non dentro tollgate.
 - Profili e regole approvati di B non si toccano.
 - Il repo `ginz0ls/tollgate` è pubblico: nei test e nei documenti niente nomi di progetti privati, nome utente, host o token.
