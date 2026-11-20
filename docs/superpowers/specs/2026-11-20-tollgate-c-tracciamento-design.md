@@ -166,9 +166,9 @@ Un comando porta sulle bacheche i lavori già fatti, a partire da ciò che il re
 - C aggiunge un comando che dà la **fotografia di oggi** in JSON: lavori, taglie, fette con dipendenze, fase, a chi tocca, cosa aspetta l'utente, avanzamento, costo, stato della coda verso GitHub. Ha un numero di versione, come la busta: un campo nuovo non cambia la versione, un campo tolto o cambiato sì.
 - I due comandi sono **in sola lettura** e sono documentati in `docs/uso/`: sono ciò su cui il gestionale si appoggerà.
 
-## 11. Il profilo `security` (utente, 20/11/2026)
+## 11. I profili `security` e `ci` (utente, 20/11/2026)
 
-**Scelta dell'utente:** il profilo `security`, rimasto fuori da B, entra nel piano di C come **una fetta a sé**, costruita con il modello **Fable** (`claude-fable-5-2`), il più capace.
+**Scelta dell'utente:** il profilo `security`, rimasto fuori da B (che aveva scelto di aggiungere gli altri profili «quando un progetto reale ne ha bisogno»), entra nel piano di C come **una fetta a sé**, costruita con il modello **Fable** (`claude-fable-5-2`), il più capace. Con lo stesso «va bene come dici tu» entra anche il profilo **`ci`**, nella stessa fetta o in quella subito dopo (lo decide il piano principale): condivide con `security` lo specialista finale `final-security`, e i workflow sono un punto delicato per la sicurezza (permessi dei token, azioni fissate per SHA, segreti).
 
 - **Cos'è.** Il profilo già progettato nel catalogo (`docs/superpowers/specs/2026-10-08-tollgate-profili-verticali.md`, righe `security` e `rules-security`): si accende su `**/auth/**`, `**/middleware.*`, `**/*session*`, `**/security/**`, `**/rls/**`, porta il lavoro a L2, ha un implementatore e un revisore di area e lo specialista finale `final-security`, che il catalogo usa anche per `ci`. Le regole (`rules-security`) vengono dalle fonti elencate nel catalogo (`security-and-hardening` e `security-auditor` di agent-skills, MIT; le altre da leggere prima, licenza compresa).
 - **Come si fa.** Come i profili di B (B3-B7):
@@ -181,7 +181,9 @@ Un comando porta sulle bacheche i lavori già fatti, a partire da ciò che il re
   - prova reale.
 - **Fable dove serve giudizio** (utente: «usando Fable»; mia scelta su dove): la verifica delle fonti, la scrittura delle regole, la revisione del piano, la revisione finale e, se il catalogo lo conferma, il modello di `final-security` e del revisore `security`. Gli implementatori meccanici possono restare sonnet. Il modello di ogni agente si scrive nel suo frontmatter, come per gli altri profili.
 - **Cosa non cambia.** I profili approvati di B (`base`, `ai`, `infra`, `backend`, `frontend`, `database`) non si toccano. Dove una regola di `security` si sovrappone a una già approvata (i segreti di `backend` e `database`, RLS di `database`), la pagina del profilo lo dice e l'utente decide all'approvazione.
+- **`ci`.** Percorsi del catalogo: `.github/workflows/**` (esclusi i `tollgate-*`, che sono del gate), `.gitlab-ci.yml`, `scripts/ci/**`; livello minimo L2; regole `rules-ci` dalle fonti del catalogo (`ci-cd-and-automation` di agent-skills, MIT; `gha-security-review` di getsentry, Apache-2.0, da leggere prima). Si costruisce come `security`, con Fable negli stessi punti, e con la stessa approvazione dell'utente.
 - **Ordine.** È una fetta indipendente dal tracciamento: il piano principale di C decide dove metterla, e la può far girare anche prima delle bacheche.
+- **Gli altri profili del catalogo restano dopo C** (mia scelta, accettata dall'utente), uno alla volta quando un progetto reale ne ha bisogno: prima `3d` (l'utente lavora con Three.js), `a11y` e `performance` (rinforzano `frontend`) e `analytics`; poi `e2e`, `copy`, `docs`, `mobile`. Sono scritti nella lista delle cose da fare dopo: il blocco «Dopo B» della sezione 9 del piano principale di B (voce 6), che il piano principale di C riprenderà.
 
 ## 12. Lasciato a chi costruisce
 

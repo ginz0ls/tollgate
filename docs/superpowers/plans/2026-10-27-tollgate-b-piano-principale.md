@@ -321,6 +321,7 @@ Cose che B1 lascia alle fette successive, da leggere prima di scrivere il piano 
      - **F2, le scritture dei gestori di segreti passano** (`doppler secrets set`, `infisical secrets set`, `op item create` e simili): l'elenco degli effetti esterni è chiuso per scelta (spec 8.5) e non nomina questi comandi; il limite è scritto in `docs/uso/limiti.md`, e l'utente può dichiararli in `[external_effects] commands`. Aggiungerli all'elenco è una scelta da fare con l'utente.
      - **F4, una colonna «braccio» in `nota.md`** (`evals/research_counts.py`): lo scaffold crea lo stato anche nel braccio senza plugin, quindi la tabella ha righe a zero che non si distinguono da quelle del braccio con il plugin; la colonna si prende da `result.json` (`tracePath` per braccio).
      - **Un argomento tra virgolette con un percorso davanti al nome di un servizio fa chiedere senza motivo** (ri-revisione finale di B8): dopo la correzione F1 `cross-env NODE_ENV=test jest -t "src/aws parse"` chiede, dalla parte sicura; la stessa classe senza percorso chiedeva già. Da stringere con i filtri dei test, se pesa.
+  6. **Gli altri profili del catalogo** (utente, 20/11/2026). `security` e `ci` entrano nel piano di C, costruiti con Fable (progetto di C, `docs/superpowers/specs/2026-11-20-tollgate-c-tracciamento-design.md`, sezione 11). Gli altri si fanno dopo C, uno alla volta, quando un progetto reale ne ha bisogno, in quest'ordine: `3d` (Three.js), `a11y` e `performance` (rinforzano `frontend`), `analytics`; poi `e2e`, `copy`, `docs`, `mobile`.
 
 ---
 
