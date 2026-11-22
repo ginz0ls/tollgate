@@ -39,6 +39,7 @@ Documenti da tenere presenti:
 | Revisore di ogni task, ri-revisioni mirate, revisione del rapporto della prova | Fable |
 | Revisione finale dell'intero ramo e sua ri-revisione | Fable |
 | Sessione di `claude -p` della prova reale (dentro lo script) | opus (`MODEL=opus` dal Task 1) |
+| Eval di `evals/` (non si lanciano in C2) | `claude-opus-5-5` dal Task 1 |
 
 Un task con due mani (Task 4 e 5) ha un solo scrittore per volta: il controller lancia l'implementatore del passo, aspetta il suo report, poi lancia quello del passo dopo con il report precedente nel brief; il commit lo fa l'ultimo.
 
@@ -71,7 +72,7 @@ Prima del Task 1, un analista **Fable** in sola lettura scrive `W/preflight-scan
 
 Lo giudichi tu: una `Ruling:` nel ledger e una voce in `carry.md` per ogni conflitto, **prima** di lanciare i task che ne dipendono. Punti da far guardare apposta:
 - **la tabella delle precedenze della decisione 5, caso per caso, prima del codice**: la sonda (nel workspace, mai nel repo) con `keep_folders` simulato su una copia `git archive`, i frammenti veri e il frammento `security` delle decisioni 2-4 e 10; «Proposta» e «Runtime» come scritti, e almeno tre casi che la tabella non ha; e `FrontendPrecedenceTest` e `DatabasePrecedenceTest` interi sulla copia con il frammento aggiunto (attesi: nessun caso cambia);
-- **ogni test, testo o script che fissa un modello**: le righe dei «Fatti verificati» del piano, più ogni altro che lo scan trova con `/usr/bin/grep -rn "sonnet\|inherit" tests/ skills/ spikes/*.sh spikes/b1/*.sh docs/uso/`; una riga del Task 1 per ognuno, o una `Ruling:` che lo lascia con il motivo;
+- **ogni test, testo o script che fissa un modello**: le righe dei «Fatti verificati» del piano, più ogni altro che lo scan trova con `/usr/bin/grep -rn "sonnet\|inherit" tests/ skills/ spikes/*.sh spikes/b1/*.sh evals/*.sh evals/*.py docs/uso/`; una riga del Task 1 per ognuno, o una `Ruling:` che lo lascia con il motivo;
 - **i paragrafi degli agenti generici** che il Task 2 aggiunge, contro `test_area_agents_derive_from_generic` e le frasi esatte che gli altri test di `tests/test_manifest.py` cercano;
 - `profile_blocks` con `keep_folders` (Task 3) contro ogni test di `tests/test_init.py` che prova la regola di I-1;
 - i sei pattern e i marcatori del frammento contro gli alberi dei test che lanciano `init` dalla CLI con la radice vera, `test_real_trees_light_no_profile` (decisione 18), `install.files(ROOT)`, `bin/` (`test_real_markers_not_in_tollgate_bin`) e i progetti di prova `spikes/b1`…`b7/flow`, `evals/`;
