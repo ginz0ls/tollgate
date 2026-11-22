@@ -84,12 +84,13 @@ def open_stops(text: str) -> list[str]:
     """I casi delle fermate aperte e non ancora chiuse, in ordine."""
     state: dict[str, bool] = {}
     for kind, case, _ in FERMATA.findall(text):
-        state[case.strip()] = kind == "aperta"
+        state[case.strip().lower()] = kind == "aperta"
     return [c for c, is_open in state.items() if is_open]
 
 
 def stop_answer(text: str, case: str) -> str | None:
-    answers = [a for kind, c, a in FERMATA.findall(text) if kind == "chiusa" and c.strip() == case]
+    answers = [a for kind, c, a in FERMATA.findall(text)
+               if kind == "chiusa" and c.strip().lower() == case]
     return answers[-1] if answers else None
 
 
@@ -118,10 +119,13 @@ def bullets(body: str) -> int:
 
 
 def deferred_rows(review: str) -> int:
-    """Le righe della tabella di triage con una cella che comincia con «rinviato»."""
-    return sum(1 for line in review.splitlines()
-               if line.startswith("|")
-               and any(c.strip().lower().startswith("rinviato") for c in line.split("|")))
+    """Le righe della tabella di triage la cui ultima cella (l'esito) comincia con «rinviato»."""
+    count = 0
+    for line in review.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if line.startswith("|") and cells and cells[-1].lower().startswith("rinviato"):
+            count += 1
+    return count
 
 
 def file_text(repo: Path, rel: str) -> str | None:
@@ -200,7 +204,7 @@ def check_after_merge(c: Check, repo: Path, home: Path, led: str, *, subject: st
     elif pending:
         c(True, "domanda sul worktree fatta, l'utente non ha ancora risposto")
     elif answer is not None:
-        removed = "rimuov" in answer.lower() and "tieni" not in answer.lower()
+        removed = answer.strip().lower().startswith("rimuovi")
         c(not removed or not listed,
           f"risposta sul worktree «{answer}»: {'rimosso' if not listed else 'ancora presente'}")
     else:
@@ -256,7 +260,7 @@ def situation_b(c: Check, repo: Path, home: Path, led: str, ws: Path | None,
     for subject in ("tollgate C2: revisori su Fable, implementatori su opus, mai sonnet",
                     "tollgate C2: sicurezza fin dal progetto per chi pianifica, implementa e "
                     "rivede",
-                    "tollgate C2: keep_folders, un frammento che accende le sue cartelle anche "
+                    "tollgate C2: keep_paths, un frammento che accende i suoi percorsi anche "
                     "per i file trovati da un altro"):
         c(any(subject in l for l in commits), f"ledger: «c2-parziale: …» con «{subject}»")
     shas = branch_commits(repo, BRANCH_PARZIALE)

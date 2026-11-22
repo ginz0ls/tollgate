@@ -10,7 +10,7 @@ Leggi questo file per intero, poi `docs/superpowers/plans/2026-11-22-tollgate-c2
 
 ## Cosa fare
 
-Esegui il piano `docs/superpowers/plans/2026-11-22-tollgate-c2-profilo-security.md` (10 task: modelli degli agenti, sicurezza fin dal progetto, `keep_folders`, bozza delle regole con frammento e precedenze, verifica delle fonti e pagina, approvazione dell'utente, agenti di sicurezza con lo specialista `final-security`, script della prova, prova reale, revisione della spec) con `superpowers:subagent-driven-development`, seguendo alla lettera `docs/superpowers/plans/2026-11-22-tollgate-c2-esecuzione.md`:
+Esegui il piano `docs/superpowers/plans/2026-11-22-tollgate-c2-profilo-security.md` (10 task: modelli degli agenti, sicurezza fin dal progetto, `keep_paths`, bozza delle regole con frammento e precedenze, verifica delle fonti e pagina, approvazione dell'utente, agenti di sicurezza con lo specialista `final-security`, script della prova, prova reale, revisione della spec) con `superpowers:subagent-driven-development`, seguendo alla lettera `docs/superpowers/plans/2026-11-22-tollgate-c2-esecuzione.md`:
 - ramo `c2-profilo-security`, worktree `.claude/worktrees/c2`;
 - sessione avviata dalla radice del repo;
 - revisori, scan e verificatori su **Fable**; chi scrive codice e test e ogni correzione del codice su **opus**; il testo delle regole, della pagina e del rapporto delle fonti su **Fable**; **mai sonnet né haiku**;
@@ -34,7 +34,7 @@ A ogni fermata la sessione scrive nel ledger `Fermata aperta: <caso>`, manda il 
 
 ## Finito quando
 
-**Ogni condizione si controlla leggendo un file su `main` o nel worktree, mai solo il transcript.** Lo script `docs/superpowers/plans/2026-11-22-tollgate-c2-verifica-fine.py` (provato a secco su 18 situazioni) le controlla tutte e stampa la situazione e l'esito di ognuna: **nell'ultimo messaggio della sessione lancialo dalla radice del repo e incollane l'uscita**. Esce con 0 quando il lavoro è finito, anche «finito per ora» in attesa dell'utente.
+**Ogni condizione si controlla leggendo un file su `main` o nel worktree, mai solo il transcript.** Lo script `docs/superpowers/plans/2026-11-22-tollgate-c2-verifica-fine.py` (provato a secco su 21 situazioni) le controlla tutte e stampa la situazione e l'esito di ognuna: **nell'ultimo messaggio della sessione lancialo dalla radice del repo e incollane l'uscita**. Esce con 0 quando il lavoro è finito, anche «finito per ora» in attesa dell'utente.
 
 Le condizioni dipendono da **una sola** delle quattro situazioni, scelta da ciò che è scritto. **Si controllano prima C e D** (una fermata aperta nel ledger, diversa da `merge`, `worktree`, `merge c2-parziale`, `worktree c2-parziale`): se una delle due vale, prevale su A e B. Tra A e B: se `skills/rules-security/SKILL.md` ha la riga `approved: `, vale A anche se il ledger ha la riga del rinvio (l'utente può approvare dopo aver rinviato; le righe della variante del rinvio sono distinte e non si confondono con quelle di A).
 
