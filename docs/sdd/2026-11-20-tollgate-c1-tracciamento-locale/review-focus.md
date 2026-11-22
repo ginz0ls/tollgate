@@ -1,0 +1,7 @@
+## Review Focus
+
+1. **Un hook su `AskUserQuestion` che solleva** o nega: deve registrare o tacere, mai fermare la domanda (un `pre_question` che nega spegnerebbe le fermate dell'utente), anche con Python assente, un errore del programma o la scadenza. Test nel Task 6: input senza `questions`, con `questions` non lista, con stringhe enormi, senza DB; `test_ask_user_question_never_denied_by_failure` sul wrapper.
+2. **La potatura che perde eventi**: un errore di scrittura dell'archivio, un disco pieno, due `start` insieme. Test nel Task 2: scrittura che fallisce → nessuna cancellazione; due chiamate di fila → secondo archivio vuoto e nessuna cancellazione doppia; lettura, scrittura e cancellazione nella stessa transazione `BEGIN IMMEDIATE` (`db.tx`), così un secondo processo aspetta e non riscrive gli stessi eventi.
+3. **Una taglia che scende da sola o diventa grande senza un sì**: piano riscritto dopo `reopen plan` con meno task; piano L1 con `## Fette previste` a tre voci. Test nel Task 3 e nel Task 4.
+4. **Un lavoro nato prima di C1** (taglia nulla) in `approve spec`, nella fotografia, in `reopen plan`: niente errori, nessun ricalcolo silenzioso. Test nei Task 3, 4 e 8.
+5. **La fotografia con testo libero o dati della macchina oltre `host`**: nessun motivo di blocco, nessun percorso del worktree. Test nel Task 8 che scorre il JSON e fallisce su `worktree`, `reason`, `what`, `question`.
