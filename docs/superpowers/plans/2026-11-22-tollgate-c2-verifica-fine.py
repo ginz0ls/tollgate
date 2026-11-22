@@ -182,7 +182,7 @@ def check_report(c: Check, led: str, ws: Path | None, name: str, review_name: st
 
 
 def check_after_merge(c: Check, repo: Path, home: Path, led: str, *, subject: str, memory: str,
-                      wt_rel: str, network: bool, parziale: bool) -> None:
+                      wt_rel: str, network: bool, parziale: bool, from_main: bool) -> None:
     log = git(repo, "log", "main", "--format=%s") or ""
     c(any(s.startswith(subject) for s in log.splitlines()),
       f"git log main ha un commit «{subject}…»")
@@ -199,7 +199,9 @@ def check_after_merge(c: Check, repo: Path, home: Path, led: str, *, subject: st
     pending = stop in open_stops(led)
     answer = stop_answer(led, stop)
     listed = worktree_listed(repo, wt_rel)
-    if pending and not listed:
+    if not listed and from_main and has_line(led, closing):
+        c(True, f"worktree {wt_rel} rimosso; la copia del registro su main ha «{closing}»")
+    elif pending and not listed:
         c(True, f"worktree {wt_rel} rimosso dopo la domanda")
     elif pending:
         c(True, "domanda sul worktree fatta, l'utente non ha ancora risposto")
@@ -294,21 +296,22 @@ def finish_merge(c: Check, repo: Path, home: Path, led: str, ws: Path | None, ne
         c(on_main(repo, f"{sdd}/{name}") is not None, f"{sdd}/{name} è su main")
     stop = "merge c2-parziale" if parziale else "merge"
     head = "Merge c2-parziale:" if parziale else "Merge:"
-    if stop in open_stops(led):
-        c(True, "rapporto consegnato, l'utente non ha ancora risposto sul merge: finito per ora")
-        return True
     if has_line(led, f"{head} no dell'utente"):
         c(True, "l'utente ha detto no al merge: il lavoro è finito qui")
         return True
-    if not c(has_line(led, f"{head} OK dell'utente"),
-             f"ledger: «{head} OK dell'utente» (o la fermata «{stop}» aperta, o il no)"):
+    if not has_line(led, f"{head} OK dell'utente"):
+        if stop in open_stops(led):
+            c(True, "rapporto consegnato, l'utente non ha ancora risposto sul merge: "
+                    "finito per ora")
+            return True
+        c(False, f"ledger: «{head} OK dell'utente» (o la fermata «{stop}» aperta, o il no)")
         return False
     check_after_merge(c, repo, home, led,
                       subject="tollgate C2 (parziale):" if parziale
                       else "tollgate C2: profilo security",
                       memory="- C2 parziale" if parziale else "- C2 eseguito",
                       wt_rel=WT_PARZIALE_REL if parziale else WT_REL, network=network,
-                      parziale=parziale)
+                      parziale=parziale, from_main=ws is None)
     return True
 
 

@@ -25,7 +25,7 @@ Esegui il piano `docs/superpowers/plans/2026-11-22-tollgate-c2-profilo-security.
 ## Da leggere, in quest'ordine
 
 1. `docs/superpowers/plans/2026-11-22-tollgate-c2-esecuzione.md`: le istruzioni.
-2. Il piano C2: per intero «Fatti verificati», «Global Constraints», «Modelli per ogni lavoro», «Decisioni di questo piano» (20 decisioni, con la tabella S1-S67), «Review Focus», «Mappa dei file» e «Copertura».
+2. Il piano C2: per intero «Fatti verificati», «Global Constraints», «Modelli per ogni lavoro», «Decisioni di questo piano» (20 decisioni, con la tabella S1-S71), «Review Focus», «Mappa dei file» e «Copertura».
 3. Il progetto di C, `docs/superpowers/specs/2026-11-20-tollgate-c-tracciamento-design.md`: sezione 11 per intero (con le scelte dell'utente del 22/11/2026), sezioni 2, 12 e 14.
 4. Il piano principale di C, `docs/superpowers/plans/2026-11-20-tollgate-c-piano-principale.md`: sezioni 1, 2 (riga C2), 3 (riga C2 → C3), 6, 7 e 8.
 5. Il catalogo `docs/superpowers/specs/2026-10-08-tollgate-profili-verticali.md`: righe `security` e `ci` di 2, 2.1, 2.3 e 4, nota sul prefisso.
@@ -63,7 +63,7 @@ Esegui il piano `docs/superpowers/plans/2026-11-22-tollgate-c2-profilo-security.
 
 ## Punti delicati del piano
 
-- **La tabella delle precedenze** (S1-S67): la sonda si rilancia a ogni cambio di pattern o di marcatore; i casi di `FrontendPrecedenceTest` e `DatabasePrecedenceTest` non devono cambiare.
+- **La tabella delle precedenze** (S1-S71): la sonda si rilancia a ogni cambio di pattern o di marcatore; i casi di `FrontendPrecedenceTest` e `DatabasePrecedenceTest` non devono cambiare.
 - **`keep_paths` cambia solo il frammento che la dichiara**: la proposta degli altri cinque deve restare identica (Task 3).
 - **`exclude = ["supabase/"]` vale anche a runtime** solo perché `security` non ha forme `ext` e a runtime ha solo i percorsi proposti. Per spostare a mano una edge function di login a `security` serve un percorso più lungo di `/supabase/**` (`supabase/functions/auth/**`): un `**/auth/**` aggiunto a mano pareggia e vince `database` (S67).
 - **Le fonti CC BY-SA** (OWASP, Trail of Bits, `security-review`) danno solo idee: nessuna frase copiata, e ogni regola lo dice («idea di …»).
@@ -75,7 +75,7 @@ Esegui il piano `docs/superpowers/plans/2026-11-22-tollgate-c2-profilo-security.
 
 ## Stato al momento di questo brief
 
-- **`main`** contiene il nucleo, B e C1 completi (merge di C1 in `e0929a8`), il progetto di C con le scelte dell'utente del 22/11/2026 e i quattro file del piano di C2 con lo script di verifica (provato a secco su 21 situazioni).
+- **`main`** contiene il nucleo, B e C1 completi (merge di C1 in `e0929a8`), il progetto di C con le scelte dell'utente del 22/11/2026 e i quattro file del piano di C2 con lo script di verifica (provato a secco su 23 situazioni).
 - **Suite:** 4349 test verdi su Python 3.11 e 3.13 con `PYTHONWARNINGS=error::ResourceWarning`.
 - **Sulla macchina:** Claude Code 2.1.329, `gh` 2.46.0 (`gh pr edit` rotto: memoria `github-500-transitorio`), Superpowers 7.0.0. Nessun worktree aperto.
 - **Il repo locale non ha un remoto configurato**: il push di `main` si fa verso `https://github.com/ginz0ls/tollgate.git`, dopo `spikes/gh-p4/ghguard.py gitcheck` con `P4_PROFILE=p5`.

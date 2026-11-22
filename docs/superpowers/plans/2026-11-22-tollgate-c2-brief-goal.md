@@ -29,12 +29,12 @@ A ogni fermata la sessione scrive nel ledger `Fermata aperta: <caso>`, manda il 
 - **Task 6, Step 1** (`regole`): la pagina `docs/profili/security.md` in parole semplici, con la domanda se approvare, correggere, togliere o rinviare le regole.
 - **Una scelta della revisione finale** (`revisione finale`) che tocca una scelta dell'utente o un profilo approvato: il messaggio comincia con `Fermata: revisione finale`.
 - **Prima del merge** (`merge`, o `merge c2-parziale`): il rapporto salvato in `rapporto-merge.md` e mandato all'utente, la riga `Rapporto del merge: consegnato`, poi la domanda. Senza OK non si unisce niente.
-- **Dopo il merge** (`worktree`, o `worktree c2-parziale`): il rapporto «Chiusura di C2», la riga `Chiusura di C2: consegnata`, la copia del registro su `main` e, per ultima, la domanda sul worktree.
+- **Dopo il merge** (`worktree`, o `worktree c2-parziale`): il rapporto «Chiusura di C2»; nel ledger, in quest'ordine e **prima** della copia del registro, `Chiusura di C2: consegnata` e `Fermata aperta: worktree`; poi la copia del registro su `main` e il push; per ultima, la domanda sul worktree.
 - **Le altre fermate** sono solo quelle della sezione «Quando fermarsi e chiedere» delle istruzioni (`fonti`, `prova`, `precedenza diversa dal piano`, `revisione finale della prova`, `ambiente`, `perimetro`, `piano rotto`); il messaggio di ognuna comincia con la riga `Fermata: <caso>`.
 
 ## Finito quando
 
-**Ogni condizione si controlla leggendo un file su `main` o nel worktree, mai solo il transcript.** Lo script `docs/superpowers/plans/2026-11-22-tollgate-c2-verifica-fine.py` (provato a secco su 21 situazioni) le controlla tutte e stampa la situazione e l'esito di ognuna: **nell'ultimo messaggio della sessione lancialo dalla radice del repo e incollane l'uscita**. Esce con 0 quando il lavoro è finito, anche «finito per ora» in attesa dell'utente.
+**Ogni condizione si controlla leggendo un file su `main` o nel worktree, mai solo il transcript.** Lo script `docs/superpowers/plans/2026-11-22-tollgate-c2-verifica-fine.py` (provato a secco su 23 situazioni) le controlla tutte e stampa la situazione e l'esito di ognuna: **nell'ultimo messaggio della sessione lancialo dalla radice del repo e incollane l'uscita**. Esce con 0 quando il lavoro è finito, anche «finito per ora» in attesa dell'utente.
 
 Le condizioni dipendono da **una sola** delle quattro situazioni, scelta da ciò che è scritto. **Si controllano prima C e D** (una fermata aperta nel ledger, diversa da `merge`, `worktree`, `merge c2-parziale`, `worktree c2-parziale`): se una delle due vale, prevale su A e B. Tra A e B: se `skills/rules-security/SKILL.md` ha la riga `approved: `, vale A anche se il ledger ha la riga del rinvio (l'utente può approvare dopo aver rinviato; le righe della variante del rinvio sono distinte e non si confondono con quelle di A).
 
@@ -67,7 +67,7 @@ In C e in D il lavoro è finito per ora; quando l'utente risponde si riprende, e
      - `plugin-workflow-decisioni.md` della memoria ha una riga che comincia con `- C2 eseguito`;
      - il ledger ha `Chiusura di C2: consegnata`;
      - `git ls-remote https://github.com/ginz0ls/tollgate.git main` dà lo stesso SHA di `git rev-parse main`;
-     - sul worktree: il ledger ha `Fermata aperta: worktree` senza chiusura (domanda fatta e l'utente non ha risposto, oppure il worktree è già stato rimosso e lo script legge la copia su `main`), oppure `Fermata chiusa: worktree — <risposta>` e, se la risposta è di rimuoverlo, `git worktree list` non mostra più `.claude/worktrees/c2`.
+     - sul worktree: il ledger ha `Fermata aperta: worktree` senza chiusura (domanda fatta e l'utente non ha risposto, oppure il worktree è già stato rimosso: lo script legge la copia su `main`, e lì basta `Chiusura di C2: consegnata` con il worktree assente da `git worktree list`), oppure `Fermata chiusa: worktree — <risposta>` e, se la risposta è di rimuoverlo, `git worktree list` non mostra più `.claude/worktrees/c2`.
 
 **Situazione B** (rinvio delle regole, decisione 19 del piano). Valgono tutte:
 1. Il ledger ha una riga che comincia con `Task N: complete` per i Task 1-5, la riga `Task 6: rinviato dall'utente` e una riga che comincia con `Task 10 ridotto: complete`; i Task 7, 8 e 9 non si fanno e la prova reale non c'è.
