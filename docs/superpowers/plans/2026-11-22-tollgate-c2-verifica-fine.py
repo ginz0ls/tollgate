@@ -189,7 +189,8 @@ def check_after_merge(c: Check, repo: Path, home: Path, led: str, *, subject: st
     c(on_main(repo, f"{SDD_MAIN}/README.md") is not None, f"{SDD_MAIN}/README.md è su main")
     plan = on_main(repo, PIANO_PRINCIPALE) or ""
     row = next((l for l in plan.splitlines() if l.startswith("| **C2")), "")
-    c("unita" in row, "il piano principale su main ha «unita» nella riga C2")
+    word = "unita in parte" if parziale else "unita su"
+    c(word in row, f"il piano principale su main ha «{word}» nella riga C2")
     mem = memory_text(repo, home) or ""
     c(any(l.startswith(memory) for l in mem.splitlines()),
       f"plugin-workflow-decisioni.md ha una riga che comincia con «{memory}»")
@@ -296,10 +297,12 @@ def finish_merge(c: Check, repo: Path, home: Path, led: str, ws: Path | None, ne
         c(on_main(repo, f"{sdd}/{name}") is not None, f"{sdd}/{name} è su main")
     stop = "merge c2-parziale" if parziale else "merge"
     head = "Merge c2-parziale:" if parziale else "Merge:"
-    if has_line(led, f"{head} no dell'utente"):
-        c(True, "l'utente ha detto no al merge: il lavoro è finito qui")
+    answers = [l for l in led.splitlines()
+               if l.startswith((f"{head} no dell'utente", f"{head} OK dell'utente"))]
+    if answers and answers[-1].startswith(f"{head} no dell'utente"):
+        c(True, "l'utente ha detto no al merge (ultima risposta): il lavoro è finito qui")
         return True
-    if not has_line(led, f"{head} OK dell'utente"):
+    if not answers:
         if stop in open_stops(led):
             c(True, "rapporto consegnato, l'utente non ha ancora risposto sul merge: "
                     "finito per ora")

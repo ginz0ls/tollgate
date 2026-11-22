@@ -34,7 +34,7 @@ A ogni fermata la sessione scrive nel ledger `Fermata aperta: <caso>`, manda il 
 
 ## Finito quando
 
-**Ogni condizione si controlla leggendo un file su `main` o nel worktree, mai solo il transcript.** Lo script `docs/superpowers/plans/2026-11-22-tollgate-c2-verifica-fine.py` (provato a secco su 23 situazioni) le controlla tutte e stampa la situazione e l'esito di ognuna: **nell'ultimo messaggio della sessione lancialo dalla radice del repo e incollane l'uscita**. Esce con 0 quando il lavoro è finito, anche «finito per ora» in attesa dell'utente.
+**Ogni condizione si controlla leggendo un file su `main` o nel worktree, mai solo il transcript.** Lo script `docs/superpowers/plans/2026-11-22-tollgate-c2-verifica-fine.py` (provato a secco su 25 situazioni) le controlla tutte e stampa la situazione e l'esito di ognuna: **nell'ultimo messaggio della sessione lancialo dalla radice del repo e incollane l'uscita**. Esce con 0 quando il lavoro è finito, anche «finito per ora» in attesa dell'utente.
 
 Le condizioni dipendono da **una sola** delle quattro situazioni, scelta da ciò che è scritto. **Si controllano prima C e D** (una fermata aperta nel ledger, diversa da `merge`, `worktree`, `merge c2-parziale`, `worktree c2-parziale`): se una delle due vale, prevale su A e B. Tra A e B: se `skills/rules-security/SKILL.md` ha la riga `approved: `, vale A anche se il ledger ha la riga del rinvio (l'utente può approvare dopo aver rinviato; le righe della variante del rinvio sono distinte e non si confondono con quelle di A).
 
@@ -59,11 +59,11 @@ In C e in D il lavoro è finito per ora; quando l'utente risponde si riprende, e
    - e il ledger ha la riga `Rapporto del merge: consegnato`.
 7. Dopo il rapporto, una di queste tre:
    - il ledger ha `Fermata aperta: merge` senza la sua chiusura (l'utente non ha ancora risposto): il lavoro è finito per ora;
-   - il ledger ha `Merge: no dell'utente`: il lavoro è finito qui;
-   - il ledger ha `Merge: OK dell'utente`, e valgono tutte:
+   - l'ultima riga `Merge:` del ledger è `Merge: no dell'utente`: il lavoro è finito qui;
+   - l'ultima riga `Merge:` del ledger è `Merge: OK dell'utente`, e valgono tutte:
      - `git log main` ha un commit con l'oggetto che comincia con `tollgate C2: profilo security`;
      - `docs/sdd/2026-11-22-tollgate-c2-profilo-security/README.md` è su `main`;
-     - il piano principale di C su `main` ha la parola «unita» nella riga C2 della sezione 2;
+     - il piano principale di C su `main` ha le parole «unita su» nella riga C2 della sezione 2;
      - `plugin-workflow-decisioni.md` della memoria ha una riga che comincia con `- C2 eseguito`;
      - il ledger ha `Chiusura di C2: consegnata`;
      - `git ls-remote https://github.com/ginz0ls/tollgate.git main` dà lo stesso SHA di `git rev-parse main`;
@@ -74,4 +74,4 @@ In C e in D il lavoro è finito per ora; quando l'utente risponde si riprende, e
 2. Il ledger ha una riga che comincia con `c2-parziale: ` (uno sha e un oggetto) per ogni commit del ramo `c2-parziale` dopo il punto in cui si è staccato da `main` (finché il ramo esiste, lo script li confronta uno per uno), tra cui quelle con gli oggetti dei Task 1, 2 e 3 e «tollgate C2 (parziale): spec rev 37 ridotta».
 3. Il ledger ha `Revisione finale c2-parziale (Fable): …`, `Revisione finale c2-parziale chiusa: 0 critical, 0 important aperti` e le tre righe `Suite finale c2-parziale corsa <N>: verde su python3.11 e python3`.
 4. La condizione 6 della situazione A sul file `rapporto-merge-c2-parziale.md`, contro la riga `Rapporto del merge c2-parziale: consegnato`, con i rinviati presi da `final-review-c2-parziale.md`, «Regole approvate» che dice «rinviate dall'utente» (o «rifiutate dall'utente») e «Prova reale» che dice «non fatta: regole rinviate».
-5. La condizione 7 della situazione A con le righe della variante: la fermata `merge c2-parziale`, `Merge c2-parziale: no dell'utente` o `Merge c2-parziale: OK dell'utente`; il commit su `main` che comincia con `tollgate C2 (parziale):`; la riga della memoria che comincia con `- C2 parziale`; `Chiusura di C2 parziale: consegnata`; la fermata `worktree c2-parziale` e il worktree `.claude/worktrees/c2-parziale`.
+5. La condizione 7 della situazione A con le righe della variante: la fermata `merge c2-parziale`, `Merge c2-parziale: no dell'utente` o `Merge c2-parziale: OK dell'utente`; il commit su `main` che comincia con `tollgate C2 (parziale):`; le parole «unita in parte» nella riga C2 del piano principale; la riga della memoria che comincia con `- C2 parziale`; `Chiusura di C2 parziale: consegnata`; la fermata `worktree c2-parziale` e il worktree `.claude/worktrees/c2-parziale`.

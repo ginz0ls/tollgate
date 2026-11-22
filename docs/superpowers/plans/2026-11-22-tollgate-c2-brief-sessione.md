@@ -75,7 +75,7 @@ Esegui il piano `docs/superpowers/plans/2026-11-22-tollgate-c2-profilo-security.
 
 ## Stato al momento di questo brief
 
-- **`main`** contiene il nucleo, B e C1 completi (merge di C1 in `e0929a8`), il progetto di C con le scelte dell'utente del 22/11/2026 e i quattro file del piano di C2 con lo script di verifica (provato a secco su 23 situazioni).
+- **`main`** contiene il nucleo, B e C1 completi (merge di C1 in `e0929a8`), il progetto di C con le scelte dell'utente del 22/11/2026 e i quattro file del piano di C2 con lo script di verifica (provato a secco su 25 situazioni).
 - **Suite:** 4349 test verdi su Python 3.11 e 3.13 con `PYTHONWARNINGS=error::ResourceWarning`.
 - **Sulla macchina:** Claude Code 2.1.329, `gh` 2.46.0 (`gh pr edit` rotto: memoria `github-500-transitorio`), Superpowers 7.0.0. Nessun worktree aperto.
 - **Il repo locale non ha un remoto configurato**: il push di `main` si fa verso `https://github.com/ginz0ls/tollgate.git`, dopo `spikes/gh-p4/ghguard.py gitcheck` con `P4_PROFILE=p5`.

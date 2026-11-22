@@ -109,7 +109,7 @@ Scrivile in `W/progress.md` con queste parole esatte, all'inizio della riga. Il 
 - `Revisione finale (Fable): <verdetto>, <n> critical, <n> important, <n> minor` e poi `Revisione finale chiusa: 0 critical, 0 important aperti`.
 - `Suite finale corsa <N>: verde su python3.11 e python3 (<numero> test)` per N = 1, 2, 3; una corsa rossa `Suite finale corsa rossa: <motivo>`.
 - `Rapporto del merge: consegnato` subito dopo aver salvato `W/rapporto-merge.md` e mandato all'utente lo stesso testo.
-- `Merge: OK dell'utente` oppure `Merge: no dell'utente`.
+- `Merge: OK dell'utente` oppure `Merge: no dell'utente`; se l'utente cambia idea si scrive una riga nuova, e vale l'ultima.
 - `Chiusura di C2: consegnata` dopo il rapporto «Chiusura di C2».
 - **Variante del rinvio**, righe distinte (così un'approvazione che arriva dopo non si confonde con il merge parziale): `Task 6: rinviato dall'utente`; `Task 10 ridotto: complete (…)`; `c2-parziale: <sha> <oggetto>` per ogni commit del ramo `c2-parziale`; `Revisione finale c2-parziale (Fable): …` e `Revisione finale c2-parziale chiusa: 0 critical, 0 important aperti`; `Suite finale c2-parziale corsa <N>: verde su python3.11 e python3`; `Rapporto del merge c2-parziale: consegnato`; `Merge c2-parziale: OK dell'utente` o `Merge c2-parziale: no dell'utente`; `Chiusura di C2 parziale: consegnata`; le fermate `merge c2-parziale` e `worktree c2-parziale`.
 
