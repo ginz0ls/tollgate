@@ -109,6 +109,25 @@ class WrapperTest(unittest.TestCase):
                 self.assertIn(f"touch {self.ts.dir}/OFF", r.stderr)
                 self.assertIn(str(self.plugin / "bin" / "tollgate"), r.stderr)
 
+    def test_ask_user_question_never_denied_by_failure(self):
+        ask = {"hook_event_name": "PreToolUse", "session_id": "s1", "cwd": str(self.repo),
+               "tool_name": "AskUserQuestion", "tool_input": {"questions": []}}
+        bash = dict(ask, tool_name="Bash", tool_input={"command": "ls"})
+        for mode in ("1", "127", "raise", "sleep"):
+            with self.subTest(mode=mode):
+                r, elapsed = self.run_wrapper("PreToolUse", ask, mode=mode)
+                self.assertEqual(r.returncode, 0)
+                self.assertIn("avviso", r.stderr)
+                self.assertLess(elapsed, 10)
+                self.assertEqual(self.run_wrapper("PreToolUse", bash, mode=mode)[0].returncode, 2)
+        path = self._path_without_python()
+        r, _ = self.run_wrapper("PreToolUse", ask, path=path)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("Python", r.stderr)
+        self.assertEqual(self.run_wrapper("PreToolUse", bash, path=path)[0].returncode, 2)
+        # un'uscita 2 del programma passa com'è (la parte di runner la rende mai 2)
+        self.assertEqual(self.run_wrapper("PreToolUse", ask, mode="2")[0].returncode, 2)
+
     def test_timeout_becomes_2(self):
         r, elapsed = self.run_wrapper("PreToolUse", mode="sleep")
         self.assertEqual(r.returncode, 2)

@@ -12,8 +12,8 @@ import re
 from pathlib import Path
 
 from tollgate_analysis import (approvals, auditrules, brief as briefs, profiles as prof,
-                               specdoc)
-from tollgate_core import audits, clock, config, db, git, phases, scope, subagents
+                               specdoc, worksize)
+from tollgate_core import audits, clock, config, db, git, phases, scope, sizes, subagents
 from tollgate_core.paths import program_command
 
 from . import audit, l2tree
@@ -171,11 +171,21 @@ def approve_spec(conn, state, work, act, args, now, session) -> str:
     _write(wt, rel, {"kind": "spec-approval", "path": spec_path, "sha": blob, "slices": slices,
                      "adversarial": adversarial, "lens": lens, "act_id": act["act_id"],
                      "approved_at": clock.fmt(now)})
+    with db.tx(conn):           # prima di `set_phase`, che vuole stare fuori da una transazione
+        conn.execute("UPDATE work_items SET slices = ?, updated = ? WHERE id = ?",
+                     (slices, clock.fmt(now), work["id"]))
+        n_tasks = conn.execute("SELECT count(*) FROM tasks WHERE work = ?",
+                               (work["id"],)).fetchone()[0]
+        size_line = sizes.decide(conn, work["id"],
+                                 worksize.Signals(work["level"], n_tasks, 0, slices),
+                                 cause="approve_spec", confirmed=slices > 1, now=now,
+                                 session=session)
     phases.set_phase(conn, state, work["id"], "plan", "approve_spec", now=now, session=session)
     out = [f"spec approvata ({slices} fette): {rel} scritto, fase plan "
            f"(avversariale: {adversarial}, lenti: {lens})"]
     if slices > 1:
         out += _issue_proposal(spec_path, text, slices)
+    out.append(size_line)
     out.append(f"Committa {rel} con i report, poi scrivi il piano.")
     return "\n".join(out)
 
@@ -229,13 +239,22 @@ def approve_plan(conn, state, work, act, args, now, session) -> str:
     if not check.ok:
         raise Refused("il piano non passa plan-check:\n- " + "\n- ".join(check.problems))
     adversarial = _plan_adversarial(conn, work, cfg, plan_blob, spec_blob)
+    size_line = None
     if work["plan_sha"] != plan_blob:           # già registrato: ripetizione dopo interruzione
         plan_tasks = [(t.number, prof.task_skills(t.files, cfg.profiles)[:3])
                       for t in check.tasks]
         try:
-            scope.register_plan(conn, state, work["id"], plan_path=plan_path, plan_sha=plan_blob,
-                                scope_paths=check.scope, plan_tasks=plan_tasks, advance=False,
-                                now=now, session=session)
+            with db.tx(conn):       # il piano e la sua taglia si registrano insieme o per niente
+                scope.register_plan(conn, state, work["id"], plan_path=plan_path,
+                                    plan_sha=plan_blob, scope_paths=check.scope,
+                                    plan_tasks=plan_tasks, advance=False, now=now,
+                                    session=session)
+                size_line = sizes.decide(
+                    conn, work["id"],
+                    worksize.Signals(work["level"], len(check.tasks),
+                                     worksize.areas(check.scope, cfg.profiles),
+                                     work["slices"] or 1),
+                    cause="plan", now=now, session=session)
         except ValueError as e:
             raise Refused(str(e)) from e
     rel = approvals.approval_paths(work["issue"])[1]
@@ -244,9 +263,12 @@ def approve_plan(conn, state, work, act, args, now, session) -> str:
                      "act_id": act["act_id"], "approved_at": clock.fmt(now)})
     phases.set_phase(conn, state, work["id"], "execution", "approve_plan", now=now,
                      session=session)
-    return (f"piano approvato: scope di {len(set(check.scope))} file e {len(check.tasks)} task "
-            f"registrati, {rel} scritto, fase execution (avversario del piano: {adversarial}). "
-            f"Committa {rel} con i report, poi /tollgate:execute.")
+    out = [f"piano approvato: scope di {len(set(check.scope))} file e {len(check.tasks)} task "
+           f"registrati, {rel} scritto, fase execution (avversario del piano: {adversarial})."]
+    if size_line:       # come in `approve_spec`: la taglia prima dell'invito a committare
+        out.append(size_line)
+    out.append(f"Committa {rel} con i report, poi /tollgate:execute.")
+    return "\n".join(out)
 
 
 # --- reopen spec|plan ------------------------------------------------------------------------

@@ -14,8 +14,8 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
 from tollgate_analysis import (approvals, level as lv, plan as planmod, prblock, profiles as prof,
-                               waivers)
-from tollgate_core import (acts, active, clock, config, db, git, phases, scope, sessions)
+                               specdoc, waivers, worksize)
+from tollgate_core import (acts, active, clock, config, db, git, phases, scope, sessions, sizes)
 from tollgate_core.paths import State, repo_key
 
 from . import gh, gitw, l2tree, start as flow_start
@@ -46,6 +46,7 @@ class _Evidence:
     plan_header: dict | None
     pr: dict | None
     cap: tuple[str, str] | None
+    spec_own: bool = False      # `spec_header` è del `spec-approval.md` della stessa issue
     notes: list[str] = field(default_factory=list)
 
 
@@ -224,23 +225,25 @@ def _approved_elsewhere(main: Path, sha: str, spec_sha: str) -> dict | None:
     return None
 
 
-def _l2_proofs(main: Path, sha: str, issue: int, plan) -> tuple[dict | None, dict | None]:
+def _l2_proofs(main: Path, sha: str, issue: int, plan
+               ) -> tuple[dict | None, dict | None, bool]:
     """Le approvazioni di L2 valide nell'albero di `sha` (la punta del ramo): `(spec, piano)`.
     Senza `spec-approval.md` proprio, un `plan-approval.md` corrente il cui `spec_sha` è lo `sha`
     di un'approvazione trovata per una spec ancora con quel blob prova la spec approvata."""
     spec_rel, plan_rel = approvals.approval_paths(issue)
     spec_header = _approval(main, sha, spec_rel, "spec-approval")
+    own = spec_header is not None
     plan_header = None
     if plan is not None:
         plan_header = _approval(main, sha, plan_rel, "plan-approval", doc=plan[0])
         if spec_header is None and plan_header is not None and plan_header.get("spec_sha"):
             spec_header = _approved_elsewhere(main, sha, plan_header["spec_sha"])
     if spec_header is None:
-        return None, None
+        return None, None, False
     spec_sha = plan_header.get("spec_sha") if plan_header else None
     if spec_sha is not None and spec_sha != spec_header["sha"]:
         plan_header = None
-    return spec_header, plan_header
+    return spec_header, plan_header, own
 
 
 def _gather(state, main: Path, cfg, issue: int, branch: str, sha: str, base: str,
@@ -253,14 +256,15 @@ def _gather(state, main: Path, cfg, issue: int, branch: str, sha: str, base: str
     level = _level(state, main, cfg, issue, base, sha, changes, warnings)
     plan = find_plan(main, cfg, sha, changes, level) if level != "L0" else None
     spec_header = plan_header = None
+    spec_own = False
     if level == "L2":
-        spec_header, plan_header = _l2_proofs(main, sha, issue, plan)
+        spec_header, plan_header, spec_own = _l2_proofs(main, sha, issue, plan)
     adversary = bool(cfg.get("components").get("plan_adversary", True))
     phase = _phase(level, pr, plan, spec_header, plan_header, adversary)
     if level == "L2" and pr is not None and cap is None and not (spec_header and plan_header):
         warnings.append("L2 con la PR aperta ma senza spec-approval.md o plan-approval.md nel "
                         "ramo: la fase viene dalla PR")
-    return _Evidence(level, phase, plan, spec_header, plan_header, pr, cap)
+    return _Evidence(level, phase, plan, spec_header, plan_header, pr, cap, spec_own)
 
 
 def _worktree(main: Path, branch: str, sha: str, local: bool, lines: list[str]):
@@ -377,9 +381,15 @@ def _adopt(state, conn, main: Path, ref: str, cfg, key: str, issue: int, session
         if step("tetto di livello", lambda: _apply_cap(conn, main, cfg, work, wt, base, ev, now,
                                                        session)) is not FAILED:
             lines.append(f"tetto {ev.cap[0]} ripristinato dalla PR")
+    # Dopo il tetto: la taglia «start» legge il livello che il lavoro ha davvero (e non scende mai).
+    size_line = step("taglia", lambda: _decide_size(conn, work, ev, now, session))
     if ev.plan is not None:
-        step("piano", lambda: _register_plan(conn, state, main, cfg, work, sha, ev, now, session,
-                                             lines))
+        plan_line = step("piano", lambda: _register_plan(conn, state, main, cfg, work, sha, ev,
+                                                         now, session, lines))
+        if plan_line is not FAILED and plan_line:
+            size_line = plan_line
+    if size_line is not FAILED and size_line:
+        lines.append(size_line)
     step("deroghe", lambda: _waiver_line(main, sha, issue, lines))
     step("copia di sicurezza del database", lambda: db.backup(conn, state, "adopt"))
     step("radici attive", lambda: active.register(state, main, extra=[wt], force=True))
@@ -409,24 +419,51 @@ def _apply_cap(conn, main: Path, cfg, work: int, wt: Path, base: str, ev: _Evide
     phases.set_level_cap(conn, work, ev.cap[0], ev.cap[1], cap_paths, now=now, session=session)
 
 
+def _decide_size(conn, work: int, ev: _Evidence, now, session) -> str:
+    """La taglia all'avvio e, con l'approvazione della spec della stessa issue a più fette, anche
+    quella (il sì è già stato dato). Una fetta successiva (`_approved_elsewhere`) non la cambia.
+    Dà la riga dell'ultima decisione."""
+    level = phases.get_work(conn, work)["level"]
+    line = sizes.decide(conn, work, worksize.Signals(level, 0, 0, 1), cause="start", now=now,
+                        session=session)
+    n = ev.spec_header.get("slices") if ev.spec_header and ev.spec_own else None
+    if isinstance(n, int) and not isinstance(n, bool) and n > 1:
+        with db.tx(conn):
+            conn.execute("UPDATE work_items SET slices = ?, updated = ? WHERE id = ?",
+                         (n, clock.fmt(now), work))
+            line = sizes.decide(conn, work, worksize.Signals(level, 0, 0, n),
+                                cause="approve_spec", confirmed=True, now=now, session=session)
+    return line
+
+
 def _register_plan(conn, state, main: Path, cfg, work: int, sha: str, ev: _Evidence, now,
-                   session, lines: list[str]) -> None:
+                   session, lines: list[str]) -> str | None:
     """Scope e task `pending` dal piano. In L2 senza `plan-approval.md` il piano si registra solo
-    come percorso (come fa l'hook): scope e task arrivano con `approve plan`."""
+    come percorso (come fa l'hook): scope e task arrivano con `approve plan`. Dà la riga della
+    taglia, se il piano si è registrato."""
     path, check = ev.plan
     level = phases.get_work(conn, work)["level"]       # dopo l'eventuale tetto
     registered = level == "L1" or (level == "L2" and ev.plan_header is not None)
     if not registered:
         scope.set_plan_path(conn, work, path, now=now)
         lines.append(f"piano {path}: solo il percorso (manca plan-approval.md)")
-        return
+        return None
     plan_sha = git.run(main, "rev-parse", f"{sha}:{path}").strip()
     skills = [(t.number, prof.task_skills(t.files, cfg.profiles)[:3]) for t in check.tasks]
-    scope.register_plan(conn, state, work, plan_path=path, plan_sha=plan_sha,
-                        scope_paths=check.scope, plan_tasks=skills, advance=False, now=now,
-                        session=session)
+    # In L1 le fette sono quelle del testo del piano; in L2 le ha già fissate `approve spec`.
+    n_slices = (specdoc.slices(git.text_at(main, sha, path) or "") if level == "L1"
+                else phases.get_work(conn, work)["slices"] or 1)
+    with db.tx(conn):       # il piano e la sua taglia si registrano insieme o per niente
+        scope.register_plan(conn, state, work, plan_path=path, plan_sha=plan_sha,
+                            scope_paths=check.scope, plan_tasks=skills, advance=False, now=now,
+                            session=session)
+        size_line = sizes.decide(
+            conn, work, worksize.Signals(level, len(check.tasks),
+                                         worksize.areas(check.scope, cfg.profiles), n_slices),
+            cause="plan", now=now, session=session)
     lines.append(f"piano {path}: scope di {len(set(check.scope))} file, {len(check.tasks)} task "
                  "pending")
+    return size_line
 
 
 def _waiver_line(main: Path, sha: str, issue: int, lines: list[str]) -> None:

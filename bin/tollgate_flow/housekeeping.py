@@ -36,8 +36,10 @@ def run(conn, state, cfg, *, now) -> list[str]:
         except (sqlite3.Error, OSError, ValueError, TypeError) as e:
             warnings.append(f"pulizia non riuscita ({what}): {e}")
 
-    step("eventi", lambda: events.prune_events(conn, now, cfg.get("retention.events_days")))
-    step("letture", lambda: lookups.prune(conn, now=now, days=cfg.get("retention.events_days")))
+    events_days = cfg.get("retention.events_days")
+    if events_days > 0:  # 0 vuol dire «mai»: la storia non si cancella per difetto
+        step("eventi", lambda: events.archive_and_prune(conn, state, now, events_days))
+    step("letture", lambda: lookups.prune(conn, now=now, days=cfg.get("retention.lookups_days")))
     step("segnalini delle sessioni", lambda: sessions.prune_bound(
         conn, state, now=now, stale_minutes=cfg.get("review.stale_minutes")))
     step("copie temporanee", lambda: _remove_older(

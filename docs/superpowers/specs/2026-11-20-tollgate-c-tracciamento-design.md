@@ -1,5 +1,7 @@
 # tollgate C: tracciamento, piano a fette e bacheche su GitHub
 
+Avanzamento: **C1 eseguita** il 21/11/2026 sul ramo `c1-tracciamento-locale`, in attesa del merge su `main`. Prova reale corta riuscita (`docs/verifiche/2026-11-20-c1-prova-flusso.md`, un tentativo per passo, circa 0,93 USD equivalenti, nessun addebito); spec del nucleo alla revisione 36. C2-C6 non ancora cominciate.
+
 Progetto del sotto-progetto C (20 novembre 2026). È scritto dopo una conversazione con l'utente. Le scelte marcate **utente** non si discutono; quelle marcate **mia scelta** sono del progettista e chi costruisce le può correggere con un motivo scritto.
 
 Riferimenti: la spec del nucleo `docs/superpowers/specs/2026-10-08-tollgate-nucleo-design.md` (rev 35), in particolare 1.3 (cosa è di C), 5 («Spec con più fette»), 11.2 (token dell'agente), 12 (stato locale), 18.4 (eventi); il progetto di B `docs/superpowers/specs/2026-10-27-tollgate-b-profili-design.md` come modello di forma; il piano principale di B (`docs/superpowers/plans/2026-10-27-tollgate-b-piano-principale.md`) come esempio reale di piano a fette fatto a mano.

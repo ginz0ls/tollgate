@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.hookkit import DEFAULT_TOML, SESSION, Lab, sample
+from tests.hookkit import DEFAULT_TOML, MODEL, SESSION, USAGE, Lab, fake_transcript, sample
 from tests.helpers import ROOT, git
 from tests.test_check_writes import with_scope
 from tollgate_analysis import profiles as prof
@@ -179,6 +179,93 @@ class ReadonlyTest(Base):
         self.start("r2", "tollgate:task-reviewer")
         self.stop(aid="r2", atype="tollgate:task-reviewer", text="ok")
         self.assertEqual(subagents.get(self.lab.conn, "r2")["state"], "done")
+
+
+class CostTest(Base):
+    """Decisione 3 di C1: ogni chiusura con una trascrizione leggibile registra `cost`."""
+
+    def costs(self):
+        return self.lab.events("cost")
+
+    def assert_cost(self, agent, atype):
+        [c] = self.costs()
+        self.assertEqual((c["agent"], c["type"], c["tokens"], c["by_model"], c["usd"], c["source"]),
+                         (agent, atype, 20, USAGE, None, "transcript"))
+
+    def test_budget_branch(self):
+        self.green(self.commit())
+        tr = Path(fake_transcript(self))
+        big = {"type": "assistant", "message": {"id": "m2", "model": MODEL, "usage": {
+            "input_tokens": 500000, "output_tokens": 1}}}
+        tr.write_text(tr.read_text() + json.dumps(big) + "\n")
+        self.stop(text=report(), transcript=str(tr))
+        self.assertEqual(subagents.get(self.lab.conn, "a1")["state"], "budget")
+        [c] = self.costs()
+        self.assertEqual(c["tokens"], 500021)
+        self.assertEqual(c["by_model"][MODEL]["output"], 4)
+
+    def test_vetoes_exhausted_branch(self):
+        self.commit()
+        tr = fake_transcript(self)
+        self.assertEqual(self.stop(text=report(), transcript=tr).exit, 2)
+        self.assertEqual(self.stop(text=report(), transcript=tr).exit, 2)
+        self.assertEqual(self.costs(), [])          # i veti non chiudono: nessun costo
+        self.assertEqual(self.stop(text=report(), transcript=tr).exit, 0)
+        self.assertEqual(subagents.get(self.lab.conn, "a1")["state"], "done")
+        self.assert_cost("a1", IMPL)
+
+    def test_done_branch(self):
+        self.green(self.commit())
+        self.assertEqual(self.stop(text=report(), transcript=fake_transcript(self)).exit, 0)
+        self.assert_cost("a1", IMPL)
+
+    def test_implementer_without_work(self):
+        subagents.start(self.lab.conn, agent_id="a9", type_=IMPL, session=SESSION, work=None,
+                        task=None, base_sha=None, fingerprint=None, now=self.lab.now)
+        self.stop(aid="a9", text=report(), transcript=fake_transcript(self))
+        self.assertEqual(subagents.get(self.lab.conn, "a9")["state"], "done")
+        self.assert_cost("a9", IMPL)
+
+    def test_generic_readonly_branch(self):
+        self.start("r2", "tollgate:task-reviewer")
+        self.stop(aid="r2", atype="tollgate:task-reviewer", text="ok",
+                  transcript=fake_transcript(self))
+        self.assertEqual(subagents.get(self.lab.conn, "r2")["state"], "done")
+        self.assert_cost("r2", "tollgate:task-reviewer")
+
+    def test_tampered_readonly_branch(self):
+        self.start("r1", "tollgate:task-reviewer")
+        (self.lab.wt / "src/app.py").write_text("manomesso\n")
+        self.stop(aid="r1", atype="tollgate:task-reviewer", text="ok",
+                  transcript=fake_transcript(self))
+        self.assertEqual(subagents.get(self.lab.conn, "r1")["state"], "tampered")
+        self.assert_cost("r1", "tollgate:task-reviewer")
+
+    def test_no_transcript_no_cost_in_any_branch(self):
+        self.green(self.commit())
+        self.start("r2", "tollgate:task-reviewer")
+        self.stop(aid="r2", atype="tollgate:task-reviewer", text="ok")
+        self.start("r1", "tollgate:task-reviewer")
+        (self.lab.wt / "src/app.py").write_text("manomesso\n")
+        self.stop(aid="r1", atype="tollgate:task-reviewer", text="ok")
+        self.stop(text=report())
+        self.assertEqual({subagents.get(self.lab.conn, a)["state"] for a in ("a1", "r1", "r2")},
+                         {"done", "tampered"})
+        self.assertEqual(self.costs(), [])
+        stops = self.lab.events("subagent_stop")
+        self.assertTrue(stops)
+        self.assertTrue(all(not s["tokens"] for s in stops))
+
+    def test_no_transcript_means_unknown_tokens_not_zero(self):
+        """Riga 24: senza uso letto il ramo di sola lettura e quello senza lavoro dicono `None`."""
+        self.start("r2", "tollgate:task-reviewer")
+        self.stop(aid="r2", atype="tollgate:task-reviewer", text="ok")
+        subagents.start(self.lab.conn, agent_id="a9", type_=IMPL, session=SESSION, work=None,
+                        task=None, base_sha=None, fingerprint=None, now=self.lab.now)
+        self.stop(aid="a9", text=report())
+        by_id = {s["id"]: s["tokens"] for s in self.lab.events("subagent_stop")}
+        self.assertEqual(by_id, {"r2": None, "a9": None})
+        self.assertIsNone(subagents.get(self.lab.conn, "r2")["tokens"])
 
 
 class ExtraTest(Base):

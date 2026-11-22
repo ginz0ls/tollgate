@@ -38,8 +38,10 @@
 #   passo2     dal worktree: il modello scrive il piano con Write (il testo è nel prompt), lo committa, poi /tollgate:execute
 #   registra   versione di claude, righe di `lookups` e nota salvata, `.tollgate-run/1/research-*.md`, eventi research_note,
 #              research_reminder e veto, stato dei task (`status --json`), comandi Bash del modello, conto dei Grep
+#              (C1) in più `eventi-c1.jsonl` (gli eventi nuovi di C1, ridotti: `flowreg.py eventi-c1`) e `snapshot.json`
+#              (`snapshot` dello stato della prova); il modo `controlla` li nomina nella riga di `registra`
 #
-# Uscite in docs/verifiche/evidenze/b1/flusso/ (b2/flusso con B1_FLOW_RULES=vere): mai cancellate. Ogni tentativo di un passo è una sottocartella nuova
+# Uscite in docs/verifiche/evidenze/b1/flusso/ (b2/flusso con B1_FLOW_RULES=vere; <x>/flusso con B1_FLOW_EVIDENCE=<x>): mai cancellate. Ogni tentativo di un passo è una sottocartella nuova
 # (<passo>/tentativo-N) con argv, uscita JSONL, errori e l'esito; oltre 3 tentativi per passo lo script rifiuta. Ciò che esiste
 # già si rinomina in <nome>.prev-<tempo>.
 #
@@ -64,6 +66,10 @@ OUT="$root/docs/verifiche/evidenze/b1/flusso"
 [ "$CASE" = backend ] && OUT="$root/docs/verifiche/evidenze/b5/flusso"
 [ "$CASE" = frontend ] && OUT="$root/docs/verifiche/evidenze/b6/flusso"
 [ "$CASE" = database ] && OUT="$root/docs/verifiche/evidenze/b7/flusso"
+# C1: B1_FLOW_EVIDENCE=<x> sceglie docs/verifiche/evidenze/<x>/flusso e vince su B1_FLOW_RULES e B1_FLOW_CASE; B1_FLOW_OUT dei test vince ancora
+EVIDENCE="${B1_FLOW_EVIDENCE:-}"
+case "$EVIDENCE" in ""|*[!a-z0-9-]*) [ -z "$EVIDENCE" ] || { echo "ERRORE: B1_FLOW_EVIDENCE vale '$EVIDENCE': ammessi solo lettere minuscole, cifre e trattini" >&2; exit 1; } ;; esac
+[ -z "$EVIDENCE" ] || OUT="$root/docs/verifiche/evidenze/$EVIDENCE/flusso"
 PLUGIN="$TMP/plugin"
 [ "$CHECK" = 1 ] && { OUT="${B1_FLOW_OUT:-$OUT}"; PLUGIN="${B1_FLOW_PLUGIN-$PLUGIN}"; SRC="${B1_FLOW_SRC:-$SRC}"; }
 REPO="$TMP/flow"
@@ -266,7 +272,7 @@ modo_controlla() {
     echo "  passo1    claude plugin validate --strict sulla copia, poi claude -p \"/tollgate:start #$ISSUE L1\" dal checkout"
     echo "  passo2    dal worktree: Write del piano, commit, poi /tollgate:execute"
   fi
-  echo "  registra  lookups, nota, eventi research_note/research_reminder/veto, stato dei task, comandi Bash, conto dei Grep"
+  echo "  registra  lookups, nota, eventi research_note/research_reminder/veto, stato dei task, comandi Bash, conto dei Grep, eventi-c1.jsonl e snapshot.json (C1)"
   echo "--- i comandi claude (--plugin-dir, tetto di ${STEP_TIMEOUT} s)"
   PLUGIN="$DEFAULT_TMP/plugin"
   printf '  %s\n' "claude plugin validate --strict ."
@@ -605,6 +611,8 @@ modo_registra() {
   ( cd "$REPO" && "${TG[@]}" stats > "$d/stats.json" 2> "$d/stats.err" ); fallisce stats $?
   ( cd "$REPO" && "${TG[@]}" status --json > "$d/status.json" 2> "$d/status.err" ); fallisce status $?
   python3 -B "$here/b1/flowreg.py" eventi "$d/events.jsonl" > "$d/eventi-ricerca.jsonl" 2> "$d/eventi-ricerca.err"; fallisce eventi-ricerca $?
+  python3 -B "$here/b1/flowreg.py" eventi-c1 "$d/events.jsonl" > "$d/eventi-c1.jsonl" 2> "$d/eventi-c1.err"; fallisce eventi-c1 $?
+  ( cd "$REPO" && "${TG[@]}" snapshot > "$d/snapshot.json" 2> "$d/snapshot.err" ); fallisce snapshot $?
   python3 -B "$here/b1/flowreg.py" lookups "$STATE/tollgate.db" > "$d/lookups.txt" 2> "$d/lookups.err"; fallisce lookups $?
   # una sola chiamata con i flussi di tutti i tentativi e di tutti e due i passi: i conteggi sono somme
   # (con `database` anche passo3 ... passo6 e le cartelle libero-<n>, mai quelle spostate .prev-*)

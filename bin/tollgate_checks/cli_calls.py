@@ -59,6 +59,25 @@ def _research_submit(args: list[str]) -> bool:
     return [x for x in args if not x.startswith("-")][:2] == ["research", "submit"]
 
 
+def _ruling_by_user(args: list[str]) -> bool:
+    """`ruling add --by user` (anche `--by=user` e le abbreviazioni di `--by`): la scelta data
+    dall'utente in chat la registra il coordinatore."""
+    if [x for x in args if not x.startswith("-")][:2] != ["ruling", "add"]:
+        return False
+    for i, x in enumerate(args):
+        name, eq, value = x.partition("=")
+        if len(name) >= 3 and name.startswith("-") and "--by".startswith(name):
+            if (value if eq else (args[i + 1] if i + 1 < len(args) else "")) == "user":
+                return True
+    return False
+
+
+def _deny_subagent_ruling():
+    return deny("`ruling add --by user` registra una scelta data dall'utente in chat: la registra "
+                "solo il coordinatore. Un subagente registra le proprie decisioni con "
+                "`ruling add --by agent` (o senza --by).", rule="coordinator_only")
+
+
 def _deny_main_research():
     return deny("la nota la scrive l'implementatore del task: `research submit` non si lancia "
                 "dalla sessione principale. Il coordinatore la legge con `research show <k>`.",
@@ -129,6 +148,8 @@ def decide(event, ctx):
         if event.agent_id:
             if _coordinator_only(sub, args):
                 return [_deny_subagent(sub, certain)]
+            if sub == "ruling" and _ruling_by_user(args):
+                return [_deny_subagent_ruling()]
             continue
         if sub == "research" and _research_submit(args) and _tiered(ctx, bash.effective_dir(c)):
             return [_deny_main_research()]

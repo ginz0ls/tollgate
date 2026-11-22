@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tollgate_analysis import plan as planmod, profiles as prof
+from tollgate_analysis import plan as planmod, profiles as prof, specdoc, worksize
 from tollgate_core import git
 from tollgate_hooks.model import deny, inject, record
 
@@ -12,7 +12,7 @@ from ._common import edit_target, governing_work, level_records
 CHECK = {"api": 1, "events": ["post_edit"], "component": None, "order": 20}
 
 
-def _plan(ctx, work, wt: Path, rel: str):
+def _plan(ctx, work, wt: Path, rel: str, new_level: str):
     if not (rel.startswith("docs/superpowers/plans/") and rel.endswith(".md")):
         return []
     if work["phase"] != "plan" or not ctx.component("plan_check") or work["plan_sha"]:
@@ -35,10 +35,15 @@ def _plan(ctx, work, wt: Path, rel: str):
     if work["level"] == "L1":
         plan_tasks = [(t.number, prof.task_skills(t.files, ctx.config.profiles)[:3])
                       for t in r.tasks]
+        signals = worksize.Signals(new_level, len(plan_tasks),
+                                   worksize.areas(r.scope, ctx.config.profiles),
+                                   specdoc.slices(text))
+        size = worksize.preview(signals, work["size"], work["size_by"], cause="plan")
         out += [record("plan", work=work["id"], plan_path=rel, plan_sha=git.blob_sha(wt, rel),
-                       scope=r.scope, tasks=plan_tasks, advance=True),
+                       scope=r.scope, tasks=plan_tasks, advance=True, level=new_level,
+                       areas=signals.areas, slices=signals.slices),
                 inject(f"tollgate: piano registrato, scope di {len(r.scope)} file; fase "
-                       f"execution. Prossimo passo: /tollgate:execute.")]
+                       f"execution. {size.line}. Prossimo passo: /tollgate:execute.")]
     else:
         out += [record("plan_path", work=work["id"], plan_path=rel),
                 inject("tollgate: piano valido. Prossimo passo in L2: /tollgate:spec-audit "
@@ -57,10 +62,13 @@ def decide(event, ctx):
     rel = ctx.rel(p, wt)
     if rel is None:
         return []
-    plan = _plan(ctx, work, wt, rel)  # prima: un errore del livello non deve fermare il piano
     try:
-        level = level_records(ctx, work)
+        level_out = level_records(ctx, work)
     except Exception as e:  # noqa: BLE001 - il ricalcolo è informativo, il piano no
-        level = [inject(f"tollgate: ricalcolo del livello non riuscito ({e}); riprova alla "
-                        f"prossima modifica.")]
-    return level + plan
+        level_out = [inject(f"tollgate: ricalcolo del livello non riuscito ({e}); riprova alla "
+                            f"prossima modifica.")]
+    # Il livello nuovo (se sale nella stessa modifica) serve alla taglia del piano: riga iniettata
+    # ed evento coincidono. Il piano si registra comunque, anche se il livello non si ricalcola.
+    new_level = next((d.data["level"] for d in reversed(level_out)
+                      if d.kind == "record" and d.op == "level"), work["level"])
+    return level_out + _plan(ctx, work, wt, rel, new_level)

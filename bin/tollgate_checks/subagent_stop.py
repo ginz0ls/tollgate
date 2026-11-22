@@ -19,12 +19,15 @@ MAX_VETOES = 2
 MAX_SIZE_REASON = 500
 
 
-def _readonly(ctx, row, work):
+def _readonly(ctx, event, row, work):
     """7.3: un subagente di sola lettura che cambia l'impronta del worktree non vale."""
+    tokens, usage = _common.transcript_cost(event)
     if ctx.component("readonly_check") and work is not None and work["worktree"] \
             and _common.fingerprint_changed(ctx, row, Path(work["worktree"])):
-        return _common.tampered_records(row, work)
-    return [record("subagent_finish", agent_id=row["id"], state="done")]
+        return _common.tampered_records(row, work, tokens=tokens, usage=usage)
+    # Senza uso letto «non so» (None) resta distinto da «zero» nella storia.
+    return [record("subagent_finish", agent_id=row["id"], state="done",
+                   tokens=None if usage is None else tokens, usage=usage)]
 
 
 def _task_lines(ctx, wt: Path, base: str, head: str) -> int:
@@ -75,7 +78,7 @@ def decide(event, ctx):
         if _common.awaiting_review(ctx, row) or _common.awaiting_final(ctx, row) \
                 or _common.awaiting_audit(ctx, row):
             return []      # lo chiude task_verdict (decisione 11), final_review o audit_round
-        return _readonly(ctx, row, work)
+        return _readonly(ctx, event, row, work)
     msg = event.raw.get("last_assistant_message")
     # Il report resta nel DB anche in modalità manuale: `review-prepare` ne legge i dubbi.
     saved = [record("subagent_report", agent_id=row["id"], text=msg)] \
@@ -84,18 +87,19 @@ def decide(event, ctx):
 
 
 def _implementer(event, ctx, row, work):
+    tokens, usage = _common.transcript_cost(event)
     if work is None or not work["worktree"]:
-        return [record("subagent_finish", agent_id=row["id"], state="done")]
+        return [record("subagent_finish", agent_id=row["id"], state="done",
+                       tokens=None if usage is None else tokens, usage=usage)]
     wid, aid = work["id"], row["id"]
     task = None
     if row["task"] is not None:
         task = ctx.db.execute("SELECT * FROM tasks WHERE work = ? AND number = ?",
                               (wid, row["task"])).fetchone()
     running = task is not None and task["state"] == "running"
-    tokens = report.transcript_tokens(event.raw.get("agent_transcript_path") or "")
     cap = ctx.cfg("tasks.max_tokens").get(work["level"], 0)
     if ctx.component("task_budget") and cap and tokens > cap and running:
-        return [record("subagent_finish", agent_id=aid, state="budget", tokens=tokens),
+        return [record("subagent_finish", agent_id=aid, state="budget", tokens=tokens, usage=usage),
                 record("task", work=wid, number=task["number"], event="budget_exceeded"),
                 record("block", work=wid, type="needs_you",
                        reason=f"budget superato: {tokens} token oltre il tetto di {cap} sul task "
@@ -106,7 +110,7 @@ def _implementer(event, ctx, row, work):
         if row["vetoes"] >= MAX_VETOES:
             out = [record("subagent_finish", agent_id=aid, state="done",
                           declared_status=rep.status if rep.valid else None, tokens=tokens,
-                          size_reason=_size_reason(rep))]
+                          usage=usage, size_reason=_size_reason(rep))]
             if running:
                 out.append(record("task", work=wid, number=task["number"],
                                   event="report_blocked"))
@@ -151,7 +155,7 @@ def _implementer(event, ctx, row, work):
         if missing:
             return veto("skill dei profili non usate: " + ", ".join(missing))
     out = [record("subagent_finish", agent_id=aid, state="done", declared_status=rep.status,
-                  tokens=tokens, size_reason=_size_reason(rep))]
+                  tokens=tokens, usage=usage, size_reason=_size_reason(rep))]
     if running:
         if done:
             out.append(record("task", work=wid, number=task["number"], event="report_done"))

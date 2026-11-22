@@ -15,7 +15,7 @@ from tollgate_core import (clock, config, db, events, git, lookups, phases, revi
                            scope as scopes, sessions, tasks)
 from tollgate_core.paths import program_command
 
-from . import prereq
+from . import prereq, ruling_cmd
 from .research_cmd import note_path
 
 MAX_FIX_ROUNDS = tasks.BASE_FIX_ROUNDS
@@ -187,6 +187,7 @@ def _task_start(state, conn, cwd: Path, number: int, *, fix: bool, claude_dir: P
         if research_on else None,
         research_note_path=str(note_path(wt, work["issue"], number))
         if delivered is not None else None,
+        ruling_cmd=ruling_cmd.command(program_command(db.BIN_PATH), number),
         research_note_valid=delivered_ok,
         research_problems=lookups.last_problems(conn, work["id"], number)
         if delivered is not None and not delivered_ok else [])

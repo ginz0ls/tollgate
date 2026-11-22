@@ -4,6 +4,7 @@ import os
 import re
 import shlex
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -138,6 +139,39 @@ class StartNewTest(StartCase):
         self.assertIn(str(wt), active.splitlines())
         self.assertTrue(list((fl.ts.dir / "backup").glob("*-start.db")))
         self.assertEqual(fl.git("config", "--get", "tollgate.defaultBranch"), "main")
+
+    def test_start_new_work_has_size_line(self):
+        fl = self.make()
+        r = fl.cli("start", "7")
+        self.assertEqual(r.returncode, 0, out(r))
+        (row,) = self.rows(fl)
+        self.assertEqual((row["size"], row["size_by"]), ("small", "rules"))
+        lines = r.stdout.strip().splitlines()
+        self.assertTrue(lines[-2].startswith("taglia: piccolo — "), lines)
+        self.assertTrue(lines[-1].startswith("prossimo passo: "), lines)
+        (ev,) = fl.events("size_decided")
+        self.assertEqual((ev["cause"], ev["applied"], ev["previous"]), ("start", "small", None))
+        # la ripresa non decide una seconda volta
+        self.assertEqual(fl.cli("start", "7").returncode, 0)
+        self.assertEqual(len(fl.events("size_decided")), 1)
+
+    def test_start_l2_work_is_medium(self):
+        fl = self.make()
+        self.gh(fl, issues={"7": issue(7, labels=[{"name": "security"}])})
+        r = fl.cli("start", "7")
+        self.assertEqual(r.returncode, 0, out(r))
+        (row,) = self.rows(fl)
+        self.assertEqual((row["level"], row["size"]), ("L2", "medium"))
+        self.assertIn("taglia: medio — livello L2", r.stdout)
+
+    def test_size_failure_is_incomplete_registration(self):
+        fl = self.make()
+        with mock.patch.object(flow_start.sizes, "decide", side_effect=sqlite3.Error("rotto")):
+            r = self.start_direct(fl)
+        text = "\n".join(r.lines)
+        self.assertEqual(r.code, flow_start.INCOMPLETE, text)
+        self.assertIn("registrazione incompleta: taglia", text)
+        self.assertTrue(r.lines[-1].startswith("prossimo passo: EnterWorktree "), text)
 
     def test_new_work_has_research_on(self):
         fl = self.make()
@@ -1119,13 +1153,16 @@ class ResumeTest(StartCase):
         self.assertEqual(fl.conn.execute("SELECT state FROM intents").fetchone()[0], "requested")
 
 
+RETENTION_TOML = DEFAULT_TOML + "[retention]\nevents_days = 180\n"
+
+
 class HousekeepingTest(StartCase):
     def age(self, path, hours):
         t = (clock.now() - timedelta(hours=hours)).timestamp()
         os.utime(path, (t, t))
 
     def test_housekeeping(self):
-        fl = self.make(issue=9)
+        fl = self.make(issue=9, toml=RETENTION_TOML)
         state = fl.ts.state
         now = clock.now()
         sessions.mark_bound(state, SESSION)
@@ -1161,6 +1198,8 @@ class HousekeepingTest(StartCase):
         seqs = [r[0] for r in fl.conn.execute("SELECT seq FROM events")]
         self.assertNotIn(old_event, seqs)
         self.assertIn(new_event, seqs)
+        self.assertEqual([p.name for p in (d / events.ARCHIVE_DIR).iterdir()],
+                         [f"events-{old_event}-{old_event}.jsonl"])
 
     def test_prune_lookups_of_closed_works(self):
         fl = self.make(issue=9)
@@ -1188,7 +1227,7 @@ class HousekeepingTest(StartCase):
         return config.load_config(fl.ts.state, fl.main, "origin/main")
 
     def test_malformed_sessions_do_not_skip_other_cleanups(self):
-        fl = self.make(issue=9)
+        fl = self.make(issue=9, toml=RETENTION_TOML)
         state = fl.ts.state
         now = clock.now()
         old_event = events.record_event(fl.conn, "off", {}, now=now - timedelta(days=200))
@@ -1205,13 +1244,31 @@ class HousekeepingTest(StartCase):
         self.assertFalse(tmp.exists())
         seqs = [r[0] for r in fl.conn.execute("SELECT seq FROM events")]
         self.assertNotIn(old_event, seqs)
+        self.assertEqual(len(list((fl.ts.dir / events.ARCHIVE_DIR).iterdir())), 1)
+
+    def test_housekeeping_never_prunes_with_zero(self):
+        fl = self.make(issue=9)
+        now = clock.now()
+        old_event = events.record_event(fl.conn, "off", {}, now=now - timedelta(days=400))
+        cfg = self.cfg(fl)
+        self.assertEqual(cfg.get("retention.events_days"), 0)
+        self.assertEqual(housekeeping.run(fl.conn, fl.ts.state, cfg, now=now), [])
+        seqs = [r[0] for r in fl.conn.execute("SELECT seq FROM events")]
+        self.assertIn(old_event, seqs)
+        self.assertFalse((fl.ts.dir / events.ARCHIVE_DIR).exists())
+
+    def test_lookups_use_lookups_days(self):
+        fl = self.make(issue=9, toml=RETENTION_TOML + "lookups_days = 7\n")
+        now = clock.now()
+        with mock.patch.object(lookups, "prune", return_value=0) as prune:
+            housekeeping.run(fl.conn, fl.ts.state, self.cfg(fl), now=now)
+        self.assertEqual(prune.call_args.kwargs["days"], 7)
 
     def test_prune_events_error_does_not_skip_prune_bound(self):
-        from unittest import mock
-        fl = self.make(issue=9)
+        fl = self.make(issue=9, toml=RETENTION_TOML)
         state = fl.ts.state
         sessions.mark_bound(state, "morta")
-        with mock.patch.object(events, "prune_events", side_effect=OSError("disco")):
+        with mock.patch.object(events, "archive_and_prune", side_effect=OSError("disco")):
             warnings = housekeeping.run(fl.conn, state, self.cfg(fl), now=clock.now())
         self.assertEqual(len(warnings), 1, warnings)
         self.assertIn("eventi", warnings[0])

@@ -4,6 +4,7 @@
   comandi <stream.jsonl>...   i comandi Bash del modello e il conto degli strumenti (Grep compresi)
   lookups <tollgate.db>       le righe di `lookups` e la nota salvata di ogni task (sola lettura)
   eventi <events.jsonl>       gli eventi research_note, research_reminder e veto
+  eventi-c1 <events.jsonl>    (C1) gli eventi size_decided (data intero), cost (solo tokens e le chiavi di by_model) e ruling
   grep <comandi.txt> <lookups.txt>   quanti Grep del modello, quante letture registrate: i Grep non sono registrati (B1-V6)
   precarico <stream.jsonl>... il titolo della rules-base vera nelle trascrizioni dei subagenti (prova) o, senza percorsi, le righe con R-BASE- (indizio)
   trascrizioni <home> <stream.jsonl>...   (B3) i titoli delle regole nelle trascrizioni dei subagenti, cercate solo nelle cartelle
@@ -24,6 +25,7 @@ import sys
 from pathlib import Path, PurePosixPath
 
 WANTED = ("research_note", "research_reminder", "veto")
+C1_WANTED = ("size_decided", "cost", "ruling")
 RULES_TITLE = "# Regole di base (versione 1)"
 AREA_TITLES = ("# Regole ai (versione 1)", "# Regole infra (versione 1)", "# Regole backend (versione 1)", "# Regole frontend (versione 1)",
                "# Regole database (versione 1)", RULES_TITLE)
@@ -94,6 +96,21 @@ def eventi(path):
             continue
         if isinstance(obj, dict) and obj.get("type") in WANTED:
             print(json.dumps(obj, ensure_ascii=False, sort_keys=True))
+
+
+def eventi_c1(path):
+    for line in Path(path).read_text(errors="replace").splitlines():
+        try:
+            obj = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(obj, dict) or obj.get("type") not in C1_WANTED:
+            continue
+        if obj["type"] == "cost":
+            data = obj.get("data") if isinstance(obj.get("data"), dict) else {}
+            by_model = data.get("by_model")
+            obj = {**obj, "data": {"tokens": data.get("tokens"), "by_model": sorted(by_model) if isinstance(by_model, dict) else []}}
+        print(json.dumps(obj, ensure_ascii=False, sort_keys=True))
 
 
 def _count(path, prefix):
@@ -443,6 +460,8 @@ def main(argv):
         lookups(argv[1])
     elif len(argv) == 2 and argv[0] == "eventi":
         eventi(argv[1])
+    elif len(argv) == 2 and argv[0] == "eventi-c1":
+        eventi_c1(argv[1])
     elif len(argv) == 3 and argv[0] == "grep":
         grep(argv[1], argv[2])
     elif len(argv) >= 2 and argv[0] == "precarico":

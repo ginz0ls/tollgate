@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -81,6 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("stats", help="statistiche dagli eventi, in JSON")
     sp.add_argument("--since", type=_date, metavar="AAAA-MM-GG")
     sp.add_argument("--work", type=int, metavar="N", help="numero dell'issue nel repo corrente")
+    sub.add_parser("snapshot", help="fotografia JSON dei lavori aperti (sola lettura)")
     ep = sub.add_parser("events", help="eventi in JSONL dopo un seq")
     ep.add_argument("--after-seq", type=int, default=0, metavar="N")
     dp = sub.add_parser("db", help="manutenzione del DB")
@@ -134,6 +136,13 @@ def build_parser() -> argparse.ArgumentParser:
     rss.add_argument("number", type=int, metavar="K")
     rsh = rssub.add_parser("show", help="mostra la nota consegnata e l'esito")
     rsh.add_argument("number", type=int, metavar="K")
+    lp = sub.add_parser("ruling", help="decisioni prese al posto dell'utente (C1)")
+    lpsub = lp.add_subparsers(dest="ruling_cmd", required=True)
+    lpa = lpsub.add_parser("add", help="registra una decisione (testo da stdin: cosa, perché, "
+                                       "costo)")
+    lpa.add_argument("--task", type=int, metavar="K", help="il task a cui si riferisce")
+    lpa.add_argument("--by", choices=("agent", "user"), default="agent",
+                     help="user: scelta data dall'utente in chat (la registra il coordinatore)")
     ap = sub.add_parser("act", help="atti dell'utente (8.4)")
     asub = ap.add_subparsers(dest="act_cmd", required=True)
     aa = asub.add_parser("apply", help="applica un atto registrato (resolve, approve level)")
@@ -439,6 +448,15 @@ def main(argv: list[str]) -> int:
                                                     and res.code == research_cmd.INVALID)
             print("\n".join(res.lines), file=sys.stdout if shown else sys.stderr)
             return res.code
+        if args.cmd == "ruling":
+            from tollgate_flow import ruling_cmd
+            # al più qualche multiplo del limite (3 campi, byte UTF-8): oltre, è comunque «troppo lungo»
+            res = ruling_cmd.add(state, Path.cwd(),
+                                 sys.stdin.read(4 * 3 * ruling_cmd.RULING_TEXT_MAX + 1),
+                                 task=args.task, by=args.by)
+            print("\n".join(res.lines),
+                  file=sys.stdout if res.code == ruling_cmd.OK else sys.stderr)
+            return res.code
         if args.cmd == "act":
             from tollgate_flow import actapply
             try:
@@ -491,6 +509,12 @@ def main(argv: list[str]) -> int:
             print(waiver_cli.open_block_cmd(state, Path.cwd(), type_=args.type,
                                             reason=args.reason))
             return 0
+        if args.cmd == "snapshot" and not state.db_path.exists():
+            # sola lettura: senza DB si stampa una fotografia vuota e non si crea nulla
+            from . import snapshot
+            print(snapshot.dumps({"v": snapshot.SNAPSHOT_VERSION, "at": clock.fmt(clock.now()),
+                                  "host": socket.gethostname(), "works": []}))
+            return 0
         if args.cmd == "status":
             if not state.db_path.exists():
                 # sola lettura: senza DB non si crea nulla
@@ -521,6 +545,11 @@ def main(argv: list[str]) -> int:
                     print(json.dumps(items, ensure_ascii=False, indent=2))
                 else:
                     _print_status(items, _detect_active(conn, key))
+                return 0
+            if args.cmd == "snapshot":
+                from . import snapshot
+                print(snapshot.dumps(snapshot.build(conn, now=clock.now(),
+                                                    host=socket.gethostname())))
                 return 0
             if args.cmd == "stats":
                 return _stats(conn, args)

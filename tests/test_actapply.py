@@ -192,6 +192,57 @@ class ApproveLevelTest(ApplyCase):
         self.assertEqual(self.work()["level"], "L2")
 
 
+class ApproveSizeTest(ApplyCase):
+    def test_approve_size_act(self):
+        fl = self.make(level="L2", phase="execution")
+        a = self.act("tollgate:approve", "size medio piano più grande del previsto")
+        msg = self.apply()
+        self.assertIn("medio", msg)
+        w = self.work()
+        self.assertEqual((w["size"], w["size_by"]), ("medium", "user"))
+        self.assertEqual(self.state_of(a), "consumed")
+        ev = fl.events("size_decided")[-1]
+        self.assertEqual((ev["cause"], ev["by"], ev["reason"]),
+                         ("act", "user", "piano più grande del previsto"))
+
+    def test_approve_size_can_lower(self):
+        self.make(level="L2", phase="execution")
+        self.act("tollgate:approve", "size grande tre fette")
+        self.apply()
+        self.act("tollgate:approve", "size piccolo in realtà è poco")
+        self.apply()
+        self.assertEqual(self.work()["size"], "small")
+
+    def test_approve_size_large_leaves_slices_and_proposes_no_issues(self):
+        """Riga 13 (contratto di C5): solo `approve spec <n>` con `n > 1` autorizza le fette."""
+        self.make(level="L2", phase="execution")
+        self.act("tollgate:approve", "size grande tre fette")
+        msg = self.apply()
+        w = self.work()
+        self.assertEqual((w["size"], w["size_by"]), ("large", "user"))
+        self.assertIsNone(w["slices"])
+        self.assertNotIn("Fette successive", msg)
+        self.assertNotIn("--spec", msg)
+
+    def test_approve_size_refused_with_unknown_value(self):
+        self.make(level="L2", phase="execution")
+        a = self.act("tollgate:approve", "size enorme x")
+        with self.assertRaises(actapply.ActApplyError) as cm:
+            self.apply()
+        for word in ("piccolo", "medio", "grande"):
+            self.assertIn(word, str(cm.exception))
+        self.assertEqual(self.state_of(a), "consumed")
+        self.assertIsNone(self.work()["size"])
+
+    def test_approve_size_refused_without_reason(self):
+        self.make(level="L2", phase="execution")
+        a = self.act("tollgate:approve", "size medio")
+        with self.assertRaisesRegex(actapply.ActApplyError, "motivo"):
+            self.apply()
+        self.assertEqual(self.state_of(a), "consumed")
+        self.assertIsNone(self.work()["size"])
+
+
 class ReviewApplyCase(ApplyCase):
     """Cicli di revisione veri, costruiti con le funzioni di `reviews`."""
 
@@ -368,6 +419,20 @@ class ApproveFindingTest(ReviewApplyCase):
         self.assertEqual(reviews.counted(fl.conn, fl.work), 1)
         ev = [e for e in events.export_events(fl.conn, 0) if e["type"] == "review_cycle"]
         self.assertEqual(ev[-1]["data"]["outcome"], "ok")
+
+    def test_approve_finding_emits_finding_event(self):
+        """Decisione 6 di C1: l'evento `finding` della decisione porta confidenza, verifica,
+        decisione e motivo."""
+        fl = self.make(phase="review")
+        self.cycle()
+        self.act("tollgate:approve", "finding f-1-1 minor solo uno stile")
+        self.apply()
+        decided = [e["data"] for e in events.export_events(fl.conn, 0)
+                   if e["type"] == "finding" and e["data"]["user_decision"]]
+        [d] = decided
+        self.assertEqual((d["id"], d["confidence"], d["verification"], d["user_decision"],
+                          d["reason"]),
+                         ("f-1-1", 0.9, "confirmed", "downgraded:minor", "solo uno stile"))
 
     def test_approve_finding_downgrade_turns_cycle_ok(self):
         fl = self.make(phase="review")

@@ -1,4 +1,7 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
 from tests.flowkit import SESSION, SPEC as FLOW_SPEC, FlowLab
@@ -6,7 +9,7 @@ from tests.helpers import git
 from tests.hookkit import T0, Lab
 from tests.test_check_acts import expand
 from tollgate_analysis import approvals
-from tollgate_checks._common import locked_docs, orphan_tg
+from tollgate_checks._common import budget_cut_records, locked_docs, orphan_tg, transcript_cost
 from tollgate_core import phases, sessions
 from tollgate_flow import actapply
 from tollgate_hooks.context import ReadDb
@@ -116,6 +119,56 @@ class OrphanTgTest(unittest.TestCase):
             git(lab.wt, "remote", "remove", "origin")
             ctx = SimpleNamespace(db=ReadDb(lab.conn))
             self.assertIsNone(orphan_tg(ctx, lab.wt))
+        finally:
+            lab.close()
+
+
+class TranscriptCostTest(unittest.TestCase):
+    def event(self, lines=None, *, path=None):
+        """Un evento con una trascrizione finta (le righe date) o con il percorso dato."""
+        if lines is not None:
+            tmp = tempfile.TemporaryDirectory(prefix="tollgate-")
+            self.addCleanup(tmp.cleanup)
+            path = Path(tmp.name) / "t.jsonl"
+            path.write_text("\n".join(lines) + "\n")
+        return SimpleNamespace(raw={"agent_transcript_path": str(path)})
+
+    def test_missing_file_has_no_usage(self):
+        self.assertEqual(transcript_cost(self.event(path="/non/esiste.jsonl")), (0, None))
+        self.assertEqual(transcript_cost(SimpleNamespace(raw={})), (0, None))
+
+    def test_unreadable_path_has_no_usage(self):
+        tmp = tempfile.TemporaryDirectory(prefix="tollgate-")
+        self.addCleanup(tmp.cleanup)
+        self.assertEqual(transcript_cost(self.event(path=tmp.name)), (0, None))
+
+    def test_transcript_without_usage_rows_has_no_usage(self):
+        ev = self.event(["riga non json", json.dumps({"type": "user", "message": {"content": "x"}})])
+        self.assertEqual(transcript_cost(ev), (0, None))
+
+    def test_usage_and_tokens_from_one_reading(self):
+        row = {"type": "assistant", "message": {"id": "m1", "model": "claude-sonnet-5-5", "usage": {
+            "input_tokens": 10, "cache_creation_input_tokens": 5,
+            "cache_read_input_tokens": 1000, "output_tokens": 3}}}
+        tokens, usage = transcript_cost(self.event([json.dumps(row)]))
+        self.assertEqual(tokens, 18)
+        self.assertEqual(usage, {"claude-sonnet-5-5": {"input": 10, "cache_creation": 5,
+                                                        "cache_read": 1000, "output": 3}})
+
+
+class BudgetCutCostTest(unittest.TestCase):
+    def test_budget_cut_has_no_cost(self):
+        lab = Lab()
+        try:
+            from tollgate_core import subagents
+            subagents.start(lab.conn, agent_id="a1", type_="tollgate:implementer",
+                            session=SESSION, work=lab.work, task=None, base_sha="b0",
+                            fingerprint="f0", now=T0)
+            ctx = SimpleNamespace(db=ReadDb(lab.conn), component=lambda name: False)
+            out = budget_cut_records(ctx, "a1", 1234)
+            [fin] = [d for d in out if d.op == "subagent_finish"]
+            self.assertEqual((fin.data["state"], fin.data["tokens"]), ("cut", 1234))
+            self.assertIsNone(fin.data.get("usage"))
         finally:
             lab.close()
 

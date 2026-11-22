@@ -6,7 +6,7 @@ from unittest import mock
 
 import tests.test_audit_prepare as tap
 from tests.flowkit import SESSION, SPEC, round_message
-from tests.hookkit import DEFAULT_TOML, sample
+from tests.hookkit import DEFAULT_TOML, USAGE, fake_transcript, sample
 from tollgate_analysis import approvals, auditrules
 from tollgate_core import audits, clock, fsutil, subagents
 from tollgate_flow import audit
@@ -16,6 +16,7 @@ ADV, LENS, PLAN_ADV = "spec-adversarial", "spec-lens", "plan-adversarial"
 MAJOR = {"major": 1}
 CLEAN: dict = {}
 REPORT = f"docs/superpowers/reviews/7/{ADV}-1.md"
+
 
 
 class RoundCase(tap.AuditCase):
@@ -57,10 +58,11 @@ class RoundCase(tap.AuditCase):
                                    cwd=str(self.fl.wt), agent_id=self.agent_id(row),
                                    agent_type=audits.AGENTS[row["kind"]]))
 
-    def stop(self, row, text, atype=None):
+    def stop(self, row, text, atype=None, transcript=None):
         p = sample("SubagentStop-manual-normal", session_id=SESSION, cwd=str(self.fl.wt),
                    agent_id=self.agent_id(row), agent_type=atype or audits.AGENTS[row["kind"]],
-                   last_assistant_message=text, agent_transcript_path="/non/esiste.jsonl")
+                   last_assistant_message=text,
+                   agent_transcript_path=transcript or "/non/esiste.jsonl")
         if text is None:
             p.pop("last_assistant_message")
         return self.fl.hook(p)
@@ -178,6 +180,48 @@ class ReportTest(RoundCase):
         self.assertIn("messaggio troncato", body)
         self.assertLess(len(body), 61500)
         self.assertIn("````", body)
+
+
+class UsageTest(RoundCase):
+    def assert_cost(self, agent):
+        [c] = self.fl.events("cost")
+        self.assertEqual((c["agent"], c["tokens"], c["by_model"]),
+                         (agent, 20, USAGE))
+
+    def test_reviewers_pass_usage_valid_report(self):
+        self.open_adv()
+        row = self.open_row()
+        self.start(row)
+        self.stop(row, round_message(row, CLEAN), transcript=fake_transcript(self))
+        self.assertEqual(self.sub(row)["state"], "done")
+        self.assert_cost(self.agent_id(row))
+
+    def test_reviewers_pass_usage_vetoes_exhausted(self):
+        self.open_adv()
+        row = self.open_row()
+        self.start(row)
+        tr = fake_transcript(self)
+        for _ in range(2):
+            self.assertEqual(self.stop(row, "niente json", transcript=tr).exit, 2)
+        self.assertEqual(self.fl.events("cost"), [])
+        self.assertEqual(self.stop(row, "niente json", transcript=tr).exit, 0)
+        self.assert_cost(self.agent_id(row))
+
+    def test_reviewers_pass_usage_component_off(self):
+        self.open_off()
+        row = self.open_row()
+        self.start(row)
+        self.stop(row, round_message(row, MAJOR), transcript=fake_transcript(self))
+        self.assert_cost(self.agent_id(row))
+
+    def test_reviewers_pass_usage_tampered(self):
+        self.open_adv()
+        row = self.open_row()
+        self.start(row)
+        (self.fl.wt / "src" / "app.py").write_text("manomesso\n")
+        self.stop(row, round_message(row, CLEAN), transcript=fake_transcript(self))
+        self.assertEqual(self.sub(row)["state"], "tampered")
+        self.assert_cost(self.agent_id(row))
 
 
 class InvalidReportTest(RoundCase):

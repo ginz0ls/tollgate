@@ -10,6 +10,7 @@ from tests.hookkit import SESSION, Lab
 from tollgate_analysis import research
 from tollgate_core import scope, subagents, tasks
 from tollgate_core.paths import program_command
+from tollgate_flow import ruling_cmd
 
 PROGRAM = BIN / "tollgate"
 
@@ -301,6 +302,50 @@ class ResearchSubcommandTest(unittest.TestCase):
                              env=lab.ts.env(), cwd=str(lab.wt), timeout=60)
         self.assertIn("non valida", run.stdout + run.stderr)
         self.assertEqual(tasks.get_task(lab.conn, lab.work, 1)["research_note"], note)
+
+
+class RulingCallsTest(unittest.TestCase):
+    BODY = ("cosa: uso l'helper `task start` senza $HOME\nperché: l'utente non c'è, review "
+            "rinviata\ncosto: nessuno")
+
+    def setUp(self):
+        self.lab = Lab()
+        self.addCleanup(self.lab.close)
+
+    def command(self, body=None, head=None):
+        text = ruling_cmd.command(program_command(PROGRAM), 1).splitlines()
+        text = text[:1] + [self.BODY if body is None else body, ruling_cmd.HEREDOC_END]
+        if head:
+            text[0] = head
+        return "\n".join(text)
+
+    def test_subagent_may_add_ruling(self):
+        for agent in ("ag-1", None):
+            with self.subTest(agent=agent):
+                self.assertEqual(self.lab.bash(self.command(), agent_id=agent).exit, 0)
+
+    def test_same_body_with_task_start_is_denied_to_a_subagent(self):
+        """Controllo negativo (D11): lo stesso corpo con `task start 1` al posto di `ruling add`."""
+        head = f"{program_command(PROGRAM)} task start 1 <<'{ruling_cmd.HEREDOC_END}'"
+        r = self.lab.bash(self.command(head=head), agent_id="ag-1")
+        self.assertEqual(r.exit, 2)
+        self.assertEqual([e["rule"] for e in self.lab.events("veto")], ["coordinator_only"])
+        self.assertIn("comando del coordinatore", r.stderr)
+
+    def test_subagent_cannot_register_a_user_choice(self):
+        for by in ("--by user", "--by=user", "--b user", "--by 'user'"):
+            with self.subTest(by=by):
+                head = f"{program_command(PROGRAM)} ruling add --task 1 {by} <<'RULING_FINE'"
+                r = self.lab.bash(self.command(head=head), agent_id="ag-1")
+                self.assertEqual(r.exit, 2)
+                self.assertIn("solo il coordinatore", r.stderr)
+                self.assertEqual(self.lab.bash(self.command(head=head)).exit, 0)
+
+    def test_subagent_may_register_its_own_ruling(self):
+        for by in ("", "--by agent", "--by=agent"):
+            with self.subTest(by=by):
+                head = f"{program_command(PROGRAM)} ruling add {by} <<'RULING_FINE'"
+                self.assertEqual(self.lab.bash(self.command(head=head), agent_id="ag-1").exit, 0)
 
 
 if __name__ == "__main__":

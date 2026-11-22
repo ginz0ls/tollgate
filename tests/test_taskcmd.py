@@ -143,6 +143,12 @@ class TaskStartTest(TaskCase):
         self.assertIn("verify", brief)
         self.assertIn(f"{program_command(BIN / 'tollgate')} verify", brief)
 
+    def test_task_start_brief_has_ruling_cmd(self):
+        self.make()
+        brief = self.start()[0].read_text()
+        self.assertIn(f"{program_command(BIN / 'tollgate')} ruling add --task 1 <<'RULING_FINE'",
+                      brief)
+
     def test_task_start_brief_has_research_cmd(self):
         self.make()
         self.set_research()

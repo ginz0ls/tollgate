@@ -194,8 +194,19 @@ SCHEMA_V6 = [
     "ALTER TABLE work_items ADD COLUMN research INTEGER NOT NULL DEFAULT 0",
 ]
 
+# Migrazione 7 (piano C1, Task 1): taglia del lavoro (small|medium|large), chi l'ha decisa
+# (rules|user) e numero di fette. Nulli nei lavori nati prima di C1: nessuna regola li ricalcola.
+SCHEMA_V7 = [
+    "ALTER TABLE work_items ADD COLUMN size TEXT "
+    "CHECK (size IS NULL OR size IN ('small','medium','large'))",
+    "ALTER TABLE work_items ADD COLUMN size_by TEXT "
+    "CHECK (size_by IS NULL OR size_by IN ('rules','user'))",
+    "ALTER TABLE work_items ADD COLUMN slices INTEGER",
+]
+
 MIGRATIONS: list[tuple[int, list[str]]] = [(1, SCHEMA_V1), (2, SCHEMA_V2), (3, SCHEMA_V3),
-                                           (4, SCHEMA_V4), (5, SCHEMA_V5), (6, SCHEMA_V6)]
+                                           (4, SCHEMA_V4), (5, SCHEMA_V5), (6, SCHEMA_V6),
+                                           (7, SCHEMA_V7)]
 
 
 def latest_version() -> int:

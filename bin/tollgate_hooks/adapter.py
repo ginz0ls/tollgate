@@ -7,11 +7,12 @@ from pathlib import Path
 from .model import Event
 
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
-_PRE = {"Bash": "pre_bash", "Agent": "pre_agent", "SendMessage": "pre_send_message"}
+_PRE = {"Bash": "pre_bash", "Agent": "pre_agent", "SendMessage": "pre_send_message",
+        "AskUserQuestion": "pre_question"}
 # Letture di un subagente (B1): Read, Grep, WebFetch, WebSearch e ogni strumento MCP; Glob no.
 LOOKUP_TOOLS = frozenset({"Read", "Grep", "WebFetch", "WebSearch"})
 _POST = {"Bash": "post_bash", "Agent": "post_agent", "Skill": "post_skill",
-         "SubagentHandback": "subagent_handback"}
+         "SubagentHandback": "subagent_handback", "AskUserQuestion": "post_question"}
 _PLAIN = {"SessionStart": "session_start", "UserPromptExpansion": "prompt_expansion",
           "UserPromptSubmit": "prompt_submit", "SubagentStart": "subagent_start",
           "SubagentStop": "subagent_stop"}
@@ -46,6 +47,8 @@ def _kind(hook_event: str, tool: str | None) -> str | None:
         # PostToolUse (consumo dell'atto, commit visti, livello), solo per Bash e per le modifiche.
         if tool in EDIT_TOOLS:
             return "post_edit"
+        if tool == "AskUserQuestion":
+            return "post_question"   # domanda rifiutata o interrotta: la chiude (stops)
         return "post_bash" if tool == "Bash" else None
     return None
 

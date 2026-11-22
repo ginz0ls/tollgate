@@ -13,7 +13,7 @@ from tests.hookkit import DEFAULT_TOML, SESSION, Lab, sample
 from tests.helpers import ROOT, TempState
 from tollgate_core import db, paths
 from tollgate_hooks import adapter, apply as applier, registry, runner
-from tollgate_hooks.model import INPUT_EVENTS, Event, deny, inject, record
+from tollgate_hooks.model import CONTROL_EVENTS, INPUT_EVENTS, Event, deny, inject, record
 
 FAKE = {
     "rotto.py": '''
@@ -169,6 +169,21 @@ class AdapterTest(unittest.TestCase):
                 self.assertEqual(ev.kind if ev else None, kind)
         self.assertEqual(adapter.INJECT_MODE["PostToolUseFailure"], "context")
 
+    def test_adapter_maps_ask_user_question(self):
+        pre = sample("PreToolUse-Bash", tool_name="AskUserQuestion")
+        post = sample("PostToolUse-Bash", tool_name="AskUserQuestion")
+        fail = sample("PostToolUse-Bash", hook_event_name="PostToolUseFailure",
+                      tool_name="AskUserQuestion")
+        self.assertEqual(adapter.to_event("PreToolUse", pre).kind, "pre_question")
+        self.assertEqual(adapter.to_event("PostToolUse", post).kind, "post_question")
+        self.assertEqual(adapter.to_event("PostToolUseFailure", fail).kind, "post_question")
+        self.assertIn("pre_question", INPUT_EVENTS)
+        self.assertIn("post_question", INPUT_EVENTS)
+        self.assertNotIn("pre_question", CONTROL_EVENTS)
+        self.assertNotIn("post_question", CONTROL_EVENTS)
+        read = sample("PostToolUse-Bash", hook_event_name="PostToolUseFailure", tool_name="Read")
+        self.assertIsNone(adapter.to_event("PostToolUseFailure", read))
+
     def test_render(self):
         self.assertEqual(adapter.render("PreToolUse", "no", None)[:1], (2,))
         code, out, _ = adapter.render("SessionStart", None, "ciao")
@@ -298,6 +313,35 @@ class RunnerTest(unittest.TestCase):
         self.assertIn(str(db.BIN_PATH), r.stderr)
         r = runner.run_hook("PostToolUse", "{rotto", env=self.lab.ts.env(), plugin_root=ROOT)
         self.assertEqual(r.exit, 0)
+
+    def test_ask_user_question_never_denied_by_runner_failure(self):
+        from unittest import mock
+        ask = ('{"hook_event_name": "PreToolUse", "session_id": "s1", '
+               '"tool_name": "AskUserQuestion", "tool_input": {"questions": [')
+        bash = ask.replace("AskUserQuestion", "Bash")
+        env = self.lab.ts.env()
+        r = runner.run_hook("PreToolUse", ask, env=env, plugin_root=ROOT)   # JSON troncato
+        self.assertEqual(r.exit, 0)
+        self.assertIn("Avviso", r.stderr)
+        self.assertEqual(runner.run_hook("PreToolUse", bash, env=env, plugin_root=ROOT).exit, 2)
+        for exc in (runner._Timeout(), RuntimeError("guasto")):
+            for text, code in ((ask + "]}}", 0), (bash + "]}}", 2)):
+                with self.subTest(exc=type(exc).__name__, code=code):
+                    with mock.patch.object(runner, "_off_active", side_effect=exc):
+                        r = runner.run_hook("PreToolUse", text, env=env, plugin_root=ROOT)
+                    self.assertEqual(r.exit, code)
+        # una `PostToolUse` con la stessa chiave non cambia: informativa
+        self.assertEqual(runner.run_hook("PostToolUse", ask, env=env, plugin_root=ROOT).exit, 0)
+        # riga 19: un `tool_name` annidato in un `Bash` (e il comando che lo cita) resta un
+        # controllo, anche con l'input troncato
+        nested = ('{"hook_event_name": "PreToolUse", "session_id": "s1", "tool_name": "Bash", '
+                  '"tool_input": {"tool_name": "AskUserQuestion", "command": "echo ')
+        quoted = ('{"hook_event_name": "PreToolUse", "session_id": "s1", "tool_name": "Bash", '
+                  '"tool_input": {"command": "echo \\"tool_name\\": \\"AskUserQuestion\\"')
+        for text in (nested, quoted):
+            with self.subTest(text=text[-40:]):
+                self.assertEqual(runner.run_hook("PreToolUse", text, env=env,
+                                                 plugin_root=ROOT).exit, 2)
 
     def test_malformed_input_missing_fields(self):
         p = self.lab._base("PreToolUse-Write", None, None, tool_name="Write", tool_input={})

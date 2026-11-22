@@ -48,6 +48,7 @@ class ImplBrief:
     research_note_path: str | None = None  # la nota già consegnata, nei giri `--fix`
     research_note_valid: bool = True       # esito del controllo meccanico di quella nota
     research_problems: list[str] = field(default_factory=list)
+    ruling_cmd: str | None = None          # da `ruling_cmd.command`, composto da `taskcmd`
 
 
 def _effective_severity(f: dict):
@@ -153,6 +154,10 @@ def implementer_brief(b: ImplBrief) -> str:
             f"- Prima di dichiarare DONE esegui `{b.verify_cmd}`: serve una ricevuta green.",
             "- Se un test e la specifica sono in conflitto, non adattare il test: apri un blocco "
             "con `block open test_spec_conflict --reason …`.",
+            *([f"- Se decidi qualcosa che il piano non dice, al posto dell'utente, registralo "
+               f"con `ruling add` (testo da stdin con tre righe: cosa:, perché:, costo:; nel "
+               f"testo non scrivere un'assegnazione `TOLLGATE_…=`, che viene negata):",
+               "", _block(b.ruling_cmd), ""] if b.ruling_cmd else []),
             "- Chiudi con un solo blocco JSON con i campi di 18.5:",
             "", _block(_report_example(b.task)),
             "", "`size_reason` è obbligatorio se il task supera il limite di righe."]

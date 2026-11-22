@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tollgate_analysis import report, verdicts
+from tollgate_analysis import verdicts
 from tollgate_core import reviews, subagents
 from tollgate_hooks.model import record
 
@@ -19,8 +19,9 @@ from . import _common
 CHECK = {"api": 1, "events": ["subagent_stop"], "component": "final_review", "order": 15}
 
 
-def _invalid(row, work, tokens, what: str, problems: list[str]) -> list:
-    return [record("subagent_finish", agent_id=row["id"], state="done", tokens=tokens),
+def _invalid(row, work, tokens, usage, what: str, problems: list[str]) -> list:
+    return [record("subagent_finish", agent_id=row["id"], state="done", tokens=tokens,
+                   usage=usage),
             record("block", work=work["id"], type="needs_you",
                    reason=f"{what} non valido: {'; '.join(problems)}"[:500])]
 
@@ -35,23 +36,23 @@ def decide(event, ctx):
     if found is None:
         return []
     work, cycle, role = found
+    tokens, usage = _common.transcript_cost(event)
     if ctx.component("readonly_check") and work["worktree"] \
             and _common.fingerprint_changed(ctx, row, Path(work["worktree"])):
-        return _common.tampered_records(row, work)
+        return _common.tampered_records(row, work, tokens=tokens, usage=usage)
     aid, number = row["id"], cycle["number"]
-    tokens = report.transcript_tokens(event.raw.get("agent_transcript_path") or "")
     msg = event.raw.get("last_assistant_message") or row["report"]
     if role == "reviewer":
         v = verdicts.parse_final_verdict(msg, sha=cycle["sha"], code=cycle["code"])
         if not v.valid:
-            return _invalid(row, work, tokens, "verdetto del revisore finale", v.problems)
+            return _invalid(row, work, tokens, usage, "verdetto del revisore finale", v.problems)
         return [record("review_report", work=work["id"], cycle=number, source=row["type"],
                        outcome=v.outcome, findings=v.findings, rejected=v.rejected),
                 record("subagent_finish", agent_id=aid, state="done", declared_status=v.outcome,
-                       tokens=tokens)]
+                       tokens=tokens, usage=usage)]
     ids = set(reviews.unjudged_ids(ctx.db, work["id"], number))
     r = verdicts.parse_verifier_results(msg, sha=cycle["sha"], code=cycle["code"], ids=ids)
     if not r.valid:
-        return _invalid(row, work, tokens, "risultati del verificatore", r.problems)
+        return _invalid(row, work, tokens, usage, "risultati del verificatore", r.problems)
     return [record("finding_verify", work=work["id"], cycle=number, results=r.results),
-            record("subagent_finish", agent_id=aid, state="done", tokens=tokens)]
+            record("subagent_finish", agent_id=aid, state="done", tokens=tokens, usage=usage)]

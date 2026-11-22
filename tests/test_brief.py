@@ -1,6 +1,7 @@
 import unittest
 
 from tollgate_analysis import auditrules, brief, plan, report, research
+from tollgate_flow import ruling_cmd
 
 FENCE_TEXT = "usa ``` e ````` nel testo\n```python\nx = 1\n```"
 
@@ -68,6 +69,20 @@ class ImplementerBriefTest(unittest.TestCase):
         self.assertIn("````\n- [major]", out)
         self.assertIn("model: inherit", out)
         self.assertNotIn("giro di correzione", brief.implementer_brief(impl()))
+
+
+RULING_CMD = ruling_cmd.command("'/p/bin/tollgate'", 2)
+
+
+class ImplementerRulingTest(unittest.TestCase):
+    def test_implementer_brief_mentions_ruling(self):
+        out = brief.implementer_brief(impl(ruling_cmd=RULING_CMD))
+        for part in ("ruling add", "--task", ruling_cmd.HEREDOC_END, "TOLLGATE_"):
+            self.assertIn(part, out)
+        self.assertIn(RULING_CMD, out)
+
+    def test_implementer_brief_without_ruling_has_no_line(self):
+        self.assertNotIn("ruling add", brief.implementer_brief(impl()))
 
 
 class ImplementerResearchTest(unittest.TestCase):

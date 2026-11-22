@@ -9,7 +9,7 @@ from tollgate_core.paths import program_command
 from tollgate_hooks.model import inject, record
 
 CHECK = {"api": 1, "events": ["prompt_expansion"], "component": None, "order": 10}
-_TARGET_ARG = {"waiver", "effect", "finding", "level", "rounds", "spec"}
+_TARGET_ARG = {"waiver", "effect", "finding", "level", "rounds", "spec", "size"}
 
 
 def _refuse(why: str):

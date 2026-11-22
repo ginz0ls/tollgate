@@ -72,7 +72,8 @@ def heading_slugs(path):
 
 class DocsTest(unittest.TestCase):
     def test_docs_exist(self):
-        names = {"installazione", "comandi", "modalita", "limiti", "emergenze-e-aggiornamenti", "eval-e-ci"}
+        names = {"installazione", "comandi", "modalita", "limiti", "emergenze-e-aggiornamenti", "eval-e-ci",
+                 "gestionale"}
         self.assertEqual({p.stem for p in USO.glob("*.md")}, names)
         self.assertTrue((ROOT / "README.md").is_file())
 

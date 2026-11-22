@@ -60,6 +60,10 @@ class ReportTest(unittest.TestCase):
                                       "text": "NOTE: this agent stopped at its 2-turn limit"}])
         self.assertFalse(report.is_turn_cut(fake))
 
+    def test_new_tokens_leaves_cache_read_out(self):
+        use = {"input": 1, "cache_creation": 2, "cache_read": 1000, "output": 4}
+        self.assertEqual(report.new_tokens(use), 7)
+
     def test_transcript_tokens(self):
         lines = [
             {"type": "assistant", "message": {"id": "m1", "usage": {
@@ -81,6 +85,35 @@ class ReportTest(unittest.TestCase):
         finally:
             Path(f.name).unlink()
         self.assertEqual(report.transcript_tokens("/non/esiste.jsonl"), 0)
+
+    def test_transcript_usage_by_model(self):
+        def use(i, o, cc, cr):
+            return {"input_tokens": i, "output_tokens": o, "cache_creation_input_tokens": cc,
+                    "cache_read_input_tokens": cr}
+        lines = [
+            {"type": "assistant", "message": {"id": "m1", "model": "claude-sonnet-5-5",
+                                              "usage": use(10, 3, 5, 1000)}},
+            {"type": "assistant", "message": {"id": "m1", "model": "claude-sonnet-5-5",
+                                              "usage": use(10, 3, 5, 1000)}},
+            {"type": "assistant", "message": {"id": "m2", "model": "claude-sonnet-5-5",
+                                              "usage": use(1, 1, 0, 7)}},
+            {"type": "assistant", "message": {"id": "m3", "usage": use(2, 2, 2, 2)}},
+        ]
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+            for l in lines:
+                f.write(json.dumps(l) + "\n")
+        self.addCleanup(Path(f.name).unlink)
+        got = report.transcript_usage(f.name)
+        self.assertEqual(set(got), {"claude-sonnet-5-5", "sconosciuto"})
+        self.assertEqual(got["claude-sonnet-5-5"], {"input": 11, "cache_creation": 5,
+                                                     "cache_read": 1007, "output": 4})
+        self.assertEqual(got["sconosciuto"], {"input": 2, "cache_creation": 2, "cache_read": 2,
+                                              "output": 2})
+        total = sum(u["input"] + u["cache_creation"] + u["output"] for u in got.values())
+        self.assertEqual(total, report.transcript_tokens(f.name))
+
+    def test_transcript_usage_missing_file(self):
+        self.assertEqual(report.transcript_usage("/non/esiste.jsonl"), {})
 
     def test_transcript_tokens_skips_malformed_usage(self):
         raw = [

@@ -5,7 +5,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 from tests.helpers import ROOT, git
-from tests.hookkit import DEFAULT_TOML, SESSION, Lab, sample
+from tests.hookkit import DEFAULT_TOML, SESSION, USAGE, Lab, fake_transcript, sample
 from tests.test_check_task_verdict import CODE as TASK_CODE, make_base_root
 from tests.test_verdicts import GOOD
 from tollgate_core import config, git as tg_git, reviews, subagents, tasks
@@ -15,6 +15,7 @@ REVIEWER = "tollgate:final-reviewer"
 VERIFIER = "tollgate:finding-verifier"
 SPEC = "probe:final-security"
 CODE = "f1na1c0d"
+
 SEC_TOML = DEFAULT_TOML + """
 [profiles.security]
 paths = ["src/**"]
@@ -67,10 +68,10 @@ class Base(unittest.TestCase):
         data.update(over)
         return "Esiti.\n```json\n" + json.dumps(data) + "\n```"
 
-    def stop(self, aid="a0", atype=REVIEWER, text=None):
+    def stop(self, aid="a0", atype=REVIEWER, text=None, transcript=None):
         p = sample("SubagentStop-manual-normal", session_id=SESSION, cwd=str(self.lab.wt),
                    agent_id=aid, agent_type=atype, last_assistant_message=text,
-                   agent_transcript_path="/non/esiste.jsonl")
+                   agent_transcript_path=transcript or "/non/esiste.jsonl")
         if text is None:
             p.pop("last_assistant_message")
         return self.lab.hook(p)
@@ -371,6 +372,38 @@ class VerifierTest(Base):
         self.stop(aid="v2", atype=VERIFIER, text=self.results(("f-1-2", "rejected")))
         self.assertEqual((self.cycle()["stage"], self.cycle()["outcome"]), ("closed", "ok"))
         self.assertEqual(self.open_blocks(), [])
+
+
+class UsageTest(Base):
+    def costs(self):
+        return [c["agent"] for c in self.lab.events("cost")]
+
+    def test_reviewers_pass_usage(self):
+        tr = fake_transcript(self)
+        with self.subTest("revisore valido"):
+            self.stop(text=self.verdict(), transcript=tr)
+            [c] = self.lab.events("cost")
+            self.assertEqual((c["agent"], c["tokens"], c["by_model"]),
+                             ("a0", 20, USAGE))
+        with self.subTest("verificatore valido"):
+            self.start("v1", VERIFIER)
+            self.stop(aid="v1", atype=VERIFIER, text=self.results(("f-1-1", "confirmed")),
+                      transcript=tr)
+            self.assertEqual(self.costs(), ["a0", "v1"])
+        with self.subTest("verificatore non valido"):
+            self.start("v2", VERIFIER)
+            self.stop(aid="v2", atype=VERIFIER, text="niente json", transcript=tr)
+            self.assertEqual(self.costs(), ["a0", "v1", "v2"])
+
+    def test_invalid_reviewer_and_tampered_pass_usage(self):
+        tr = fake_transcript(self)
+        self.stop(text="niente json", transcript=tr)                  # _invalid
+        self.assertEqual(self.costs(), ["a0"])
+        self.start("a9", REVIEWER)
+        (self.lab.wt / "src/app.py").write_text("manomesso\n")
+        self.stop(aid="a9", text=self.verdict(), transcript=tr)       # tampered_records
+        self.assertEqual(self.sub("a9")["state"], "tampered")
+        self.assertEqual(self.costs(), ["a0", "a9"])
 
 
 class ComponentOffTest(Base):

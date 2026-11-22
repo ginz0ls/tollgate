@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tollgate_analysis import profiles as prof, report, research, verdicts
+from tollgate_analysis import profiles as prof, research, verdicts
 from tollgate_core import git, lookups, subagents
 from tollgate_hooks.model import deny, record
 
@@ -43,11 +43,12 @@ def decide(event, ctx):
     if found is None:
         return []
     work, task = found
+    tokens, usage = _common.transcript_cost(event)
     if ctx.component("readonly_check") and work["worktree"] \
             and _common.fingerprint_changed(ctx, row, Path(work["worktree"])):
-        return _common.tampered_records(row, work)
+        return _common.tampered_records(row, work, tokens=tokens, usage=usage,
+                                        cost_task=task["number"])
     aid = row["id"]
-    tokens = report.transcript_tokens(event.raw.get("agent_transcript_path") or "")
     msg = event.raw.get("last_assistant_message") or row["report"]
     profs = ctx.config.profiles
     active = prof.active_profiles(_task_files(work, task), profs, ctx.cfg("profiles.active"))
@@ -63,10 +64,11 @@ def decide(event, ctx):
         return [record("task_verdict", work=work["id"], number=task["number"],
                        outcome=v.outcome, findings=v.findings, dropped=v.dropped),
                 record("subagent_finish", agent_id=aid, state="done", declared_status=v.outcome,
-                       tokens=tokens)]
+                       tokens=tokens, usage=usage, cost_task=task["number"])]
     why = "; ".join(v.problems)
     if row["vetoes"] >= MAX_VETOES:
-        return [record("subagent_finish", agent_id=aid, state="done", tokens=tokens),
+        return [record("subagent_finish", agent_id=aid, state="done", tokens=tokens, usage=usage,
+                       cost_task=task["number"]),
                 record("block", work=work["id"], type="needs_you",
                        reason=f"verdetto del revisore non valido sul task {task['number']} "
                               f"dopo {MAX_VETOES} veti: {why}"[:500])]

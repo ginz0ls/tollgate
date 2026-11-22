@@ -30,6 +30,51 @@ class SessionStartTest(unittest.TestCase):
         finally:
             lab.close()
 
+    def test_session_start_recorded(self):
+        def started(lab):
+            return [(r["work"], json.loads(r["data"])) for r in lab.conn.execute(
+                "SELECT work, data FROM events WHERE type = 'session_start' ORDER BY seq")]
+        lab = Lab()
+        try:
+            lab.hook(start_payload(lab, SESSION, source="resume"))        # sessione legata
+            lab.hook(start_payload(lab, "s-nuova"))                       # nuova, nel worktree
+            self.assertEqual(started(lab), [(lab.work, {"source": "resume"}),
+                                            (lab.work, {"source": "startup"})])
+        finally:
+            lab.close()
+        lab = Lab(bind=False)
+        try:
+            lab.hook(start_payload(lab, "s-fuori", cwd=lab.main))
+            self.assertEqual(started(lab), [(None, {"source": "startup"})])
+        finally:
+            lab.close()
+
+    def test_session_start_source_is_a_trimmed_string_or_none(self):
+        """Riga 20: `source` non stringa diventa nullo, una stringa lunga si taglia."""
+        for given, saved in (("x" * 100, "x" * 32), (["resume"], None), (7, None)):
+            with self.subTest(given=str(given)[:10]):
+                lab = Lab()
+                try:
+                    payload = start_payload(lab, SESSION)
+                    payload["source"] = given
+                    lab.hook(payload)
+                    row = lab.conn.execute(
+                        "SELECT data FROM events WHERE type = 'session_start'").fetchone()
+                    self.assertEqual(json.loads(row["data"]), {"source": saved})
+                finally:
+                    lab.close()
+
+    def test_session_start_without_source(self):
+        lab = Lab()
+        try:
+            payload = start_payload(lab, SESSION)
+            payload.pop("source", None)
+            lab.hook(payload)
+            row = lab.conn.execute("SELECT data FROM events WHERE type = 'session_start'").fetchone()
+            self.assertEqual(json.loads(row["data"]), {"source": None})
+        finally:
+            lab.close()
+
     def test_main_checkout_does_not_bind(self):
         lab = Lab(bind=False)
         try:

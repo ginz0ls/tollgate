@@ -36,6 +36,56 @@ class SubagentsTest(unittest.TestCase):
             "SELECT data FROM events WHERE type = 'subagent_stop' ORDER BY seq")]
         self.assertEqual([d["size_reason"] for d in data], ["generato", None])
 
+    def costs(self):
+        return [json.loads(r["data"]) for r in self.conn.execute(
+            "SELECT data FROM events WHERE type = 'cost' ORDER BY seq")]
+
+    def test_cost_event_on_finish(self):
+        self._start()
+        by_model = {"claude-sonnet-5-5": {"input": 4, "cache_creation": 2, "cache_read": 90,
+                                          "output": 4}}
+        subagents.finish(self.conn, "a1", state="done", declared_status="DONE", tokens=10,
+                         usage=by_model, now=T0)
+        order = [r["type"] for r in self.conn.execute(
+            "SELECT type FROM events WHERE type IN ('subagent_stop', 'cost') ORDER BY seq")]
+        self.assertEqual(order, ["subagent_stop", "cost"])
+        self.assertEqual(self.costs(), [{"agent": "a1", "type": "tollgate:implementer", "task": 1,
+                                         "tokens": 10, "by_model": by_model, "usd": None,
+                                         "source": "transcript"}])
+
+    def test_cost_task_overrides_only_the_cost_event(self):
+        """F1: `cost_task` è il task rivisto del revisore; solo `cost` lo porta."""
+        subagents.start(self.conn, agent_id="r1", type_="tollgate:task-reviewer", session="s1",
+                        work=self.w, task=None, base_sha="b0", fingerprint="f0", now=T0)
+        by_model = {"claude-sonnet-5-5": {"input": 1, "cache_creation": 1, "cache_read": 0,
+                                          "output": 1}}
+        subagents.finish(self.conn, "r1", state="done", tokens=2, usage=by_model, cost_task=1,
+                         now=T0)
+        [cost] = self.costs()
+        self.assertEqual(cost["task"], 1)
+        [stop] = [json.loads(r["data"]) for r in self.conn.execute(
+            "SELECT data FROM events WHERE type = 'subagent_stop'")]
+        self.assertIsNone(stop["task"])
+        self.assertIsNone(subagents.get(self.conn, "r1")["task"])
+
+    def test_cost_task_defaults_to_the_row_task(self):
+        self._start()
+        subagents.finish(self.conn, "a1", state="done", tokens=2,
+                         usage={"m": {"input": 1, "cache_creation": 0, "cache_read": 0,
+                                      "output": 1}}, now=T0)
+        self.assertEqual(self.costs()[0]["task"], 1)
+
+    def test_no_cost_without_usage(self):
+        self._start()
+        subagents.finish(self.conn, "a1", state="done", tokens=10, usage=None, now=T0)
+        subagents.start(self.conn, agent_id="a2", type_="tollgate:implementer", session="s1",
+                        work=self.w, task=1, base_sha="b0", fingerprint="f0", now=T0)
+        subagents.finish(self.conn, "a2", state="done", tokens=10, usage={}, now=T0)
+        subagents.start(self.conn, agent_id="a3", type_="tollgate:implementer", session="s1",
+                        work=self.w, task=1, base_sha="b0", fingerprint="f0", now=T0)
+        subagents.interrupt(self.conn, "a3", now=T0)
+        self.assertEqual(self.costs(), [])
+
     def test_start_then_resume_keeps_base(self):
         self.assertFalse(self._start())
         subagents.finish(self.conn, "a1", state="done", declared_status="NEEDS_CONTEXT", now=T0)

@@ -45,6 +45,11 @@ json_str() {
     }'
 }
 
+# Una domanda diretta all'utente non si nega mai, nemmeno se l'hook fallisce (spec 7.1, decisione 4).
+if [ "$EVENT" = "PreToolUse" ] && [ "$(json_str tool_name)" = "AskUserQuestion" ]; then
+  CONTROL=no
+fi
+
 # Le letture (PostToolUse di Read, Grep, WebFetch, WebSearch, mcp__*) si registrano solo per i
 # subagenti (B1, decisione 5): senza agent_id Python non deve partire. UNNAMED_TOOLS rispecchia
 # research.ATTRIBUTE_UNNAMED_TOOLS (separati da spazio): quegli strumenti passano anche senza agent_id.

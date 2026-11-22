@@ -54,6 +54,14 @@ class ManifestTest(unittest.TestCase):
                 self.assertEqual(h["command"], f'"${{CLAUDE_PLUGIN_ROOT}}/hooks/run" {event}')
                 self.assertEqual(h["timeout"], 90)
 
+    def test_hooks_json_matches_ask_user_question(self):
+        from tollgate_hooks.model import CONTROL_EVENTS
+        hooks = json.loads((ROOT / "hooks" / "hooks.json").read_text())["hooks"]
+        for event in ("PreToolUse", "PostToolUse", "PostToolUseFailure"):
+            with self.subTest(event=event):
+                self.assertRegex("AskUserQuestion", f"^(?:{hooks[event][0]['matcher']})$")
+        self.assertNotIn("pre_question", CONTROL_EVENTS)
+
     def test_post_tool_use_matcher_has_lookups(self):
         post = json.loads((ROOT / "hooks" / "hooks.json").read_text())["hooks"][
             "PostToolUse"][0]["matcher"]

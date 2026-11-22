@@ -76,7 +76,10 @@ def add_veto(conn, agent_id: str) -> int:
 
 def finish(conn, agent_id: str, *, state: str, now, declared_status: str | None = None,
            tokens: int | None = None, session: str | None = None,
-           size_reason: str | None = None) -> None:
+           size_reason: str | None = None, usage: dict | None = None,
+           cost_task: int | None = None) -> None:
+    """`cost_task` è il task rivisto di un revisore (la sua riga non ha task): lo porta solo
+    `data.task` dell'evento `cost`, così `by_task` somma anche i revisori (F1)."""
     if state not in STATES or state == "running":
         raise ValueError(f"stato di chiusura non ammesso: {state}")
     with db.tx(conn):
@@ -93,6 +96,13 @@ def finish(conn, agent_id: str, *, state: str, now, declared_status: str | None 
                       "declared_status": declared_status, "tokens": tokens, "state": state,
                       "size_reason": size_reason},
                      now=now, session=session or row["session"], work=row["work"])
+        if usage:
+            record_event(conn, "cost",
+                         {"agent": agent_id, "type": row["type"],
+                          "task": row["task"] if cost_task is None else cost_task,
+                          "tokens": tokens, "by_model": usage, "usd": None,
+                          "source": "transcript"},
+                         now=now, session=session or row["session"], work=row["work"])
 
 
 def by_name(conn, name: str, *, work: int | None):

@@ -16,6 +16,9 @@ SAMPLES_B1 = json.loads((ROOT / "spikes/fixtures/hook-inputs/samples-b1.json").r
 SESSION = "sess-lab"
 T0 = datetime(2026, 10, 9, 10, 0, tzinfo=timezone.utc)
 DROP = object()
+MODEL = "claude-sonnet-5-5"
+# Uso della trascrizione finta di `fake_transcript`: 20 token nuovi, 700 di cache_read.
+USAGE = {MODEL: {"input": 12, "cache_creation": 5, "cache_read": 700, "output": 3}}
 DEFAULT_TOML = """schema_version = 1
 [gate]
 mode = "protected"
@@ -158,3 +161,16 @@ class Lab:
         self.conn.close()
         self.ts.cleanup()
         shutil.rmtree(self.tmp, ignore_errors=True)
+
+
+def fake_transcript(case) -> str:
+    """Una trascrizione finta con un solo messaggio (uso `USAGE`), in una cartella temporanea
+    che `case` toglie a fine test."""
+    tmp = tempfile.TemporaryDirectory(prefix="tollgate-")
+    case.addCleanup(tmp.cleanup)
+    path = Path(tmp.name) / "t.jsonl"
+    path.write_text(json.dumps({"type": "assistant", "message": {
+        "id": "m1", "model": MODEL, "usage": {
+            "input_tokens": 12, "cache_creation_input_tokens": 5,
+            "cache_read_input_tokens": 700, "output_tokens": 3}}}) + "\n")
+    return str(path)

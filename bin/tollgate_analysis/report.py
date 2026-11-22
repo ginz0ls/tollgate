@@ -84,14 +84,18 @@ def _count(v) -> int:
     return v if isinstance(v, int) and not isinstance(v, bool) else 0
 
 
-def transcript_tokens(path) -> int:
-    """Token nuovi del subagente: input + cache_creation + output, una volta per messaggio
-    (decisione 20). cache_read resta fuori perché riconta il contesto a ogni turno."""
-    seen: dict[str, int] = {}
+_USAGE_KEYS = (("input", "input_tokens"), ("cache_creation", "cache_creation_input_tokens"),
+               ("cache_read", "cache_read_input_tokens"), ("output", "output_tokens"))
+
+
+def _messages(path) -> dict[str, tuple[str, dict[str, int]]]:
+    """Per ogni messaggio della trascrizione (un id una volta, vale l'ultima riga): modello e uso.
+    Lettura tollerante: file assente o illeggibile, righe non JSON e usi malformati si saltano."""
+    seen: dict[str, tuple[str, dict[str, int]]] = {}
     try:
         fh = open(path, encoding="utf-8", errors="replace")
     except OSError:
-        return 0
+        return seen
     with fh:
         for n, line in enumerate(fh):
             try:
@@ -102,7 +106,31 @@ def transcript_tokens(path) -> int:
             usage = msg.get("usage") if isinstance(msg, dict) else None
             if not isinstance(usage, dict):
                 continue
-            total = sum(_count(usage.get(k)) for k in
-                        ("input_tokens", "cache_creation_input_tokens", "output_tokens"))
-            seen[str(msg.get("id") or f"riga-{n}")] = total
-    return sum(seen.values())
+            model = msg.get("model")
+            seen[str(msg.get("id") or f"riga-{n}")] = (
+                model if isinstance(model, str) and model else "sconosciuto",
+                {name: _count(usage.get(key)) for name, key in _USAGE_KEYS})
+    return seen
+
+
+def new_tokens(usage: dict[str, int]) -> int:
+    """Token nuovi di un uso: input + cache_creation + output (`cache_read` resta fuori)."""
+    return usage["input"] + usage["cache_creation"] + usage["output"]
+
+
+def transcript_usage(path) -> dict[str, dict[str, int]]:
+    """Uso del subagente per modello (decisione 3 di C1): `input`, `cache_creation`, `cache_read`,
+    `output`, un messaggio una volta (come `transcript_tokens`); modello assente: `sconosciuto`.
+    `{}` senza file o senza nessuna riga di uso."""
+    out: dict[str, dict[str, int]] = {}
+    for model, use in _messages(path).values():
+        total = out.setdefault(model, dict.fromkeys((n for n, _ in _USAGE_KEYS), 0))
+        for name, v in use.items():
+            total[name] += v
+    return out
+
+
+def transcript_tokens(path) -> int:
+    """Token nuovi del subagente: input + cache_creation + output, una volta per messaggio
+    (decisione 20). cache_read resta fuori perché riconta il contesto a ogni turno."""
+    return sum(new_tokens(u) for _, u in _messages(path).values())

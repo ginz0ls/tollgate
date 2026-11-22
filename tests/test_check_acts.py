@@ -84,8 +84,14 @@ class ActsTest(unittest.TestCase):
         self.assertEqual([(a["type"], a["object"], a["target"]) for a in self.acts()],
                          [expected for _, _, expected in cases])
 
+    def test_size_is_target_arg(self):
+        expand(self.lab, "tollgate:approve", "size medio x")
+        self.assertEqual([(a["type"], a["object"], a["target"]) for a in self.acts()],
+                         [("approve", "size", "medio")])
+
     def test_refused_forms_are_not_recorded(self):
-        for name, args in [("tollgate:approve", "spec"), ("tollgate:approve", "waiver"),
+        for name, args in [("tollgate:approve", "spec"), ("tollgate:approve", "size"),
+                           ("tollgate:approve", "waiver"),
                            ("tollgate:approve", "effect"), ("tollgate:reopen", ""),
                            ("tollgate:reopen", "foo motivo"), ("tollgate:resolve", ""),
                            ("tollgate:adopt", "abc"), ("tollgate:abandon", "x")]:

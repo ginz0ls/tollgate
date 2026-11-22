@@ -10,9 +10,9 @@ import re
 import sqlite3
 from pathlib import Path
 
-from tollgate_analysis import level as lv
+from tollgate_analysis import level as lv, worksize
 from tollgate_core import (acts, audits, clock, config, db, events, git, intents, phases,
-                           reviews, sessions, subagents, tasks)
+                           reviews, sessions, sizes, subagents, tasks)
 from tollgate_core.paths import program_command
 
 from . import audit, gitw, l2acts
@@ -235,9 +235,22 @@ def _approve_level(conn, state, work, act, args, now, session) -> str:
            f"percorso sensibile nuovo; percorsi sensibili attuali: {len(cap_paths)}"
 
 
+def _approve_size(conn, state, work, act, args, now, session) -> str:
+    by_label = {label: size for size, label in worksize.LABELS.items()}
+    size = by_label.get(act["target"])
+    if size is None:
+        raise ActApplyError(f"taglia sconosciuta: {act['target']} ({', '.join(by_label)})")
+    reason = " ".join(args[2:]).strip()
+    if not reason:
+        raise ActApplyError("approve size vuole un motivo: "
+                            "/tollgate:approve size <piccolo|medio|grande> <motivo>")
+    return sizes.set_by_user(conn, work["id"], size, reason, now=now, session=session)
+
+
 APPLIERS = {
     ("resolve", None): _resolve,
     ("approve", "level"): _approve_level,
+    ("approve", "size"): _approve_size,
     ("approve", "finding"): _approve_finding,
     ("approve", "rounds"): _approve_rounds,
     ("approve", "unverified-review"): _approve_unverified_review,
@@ -265,7 +278,7 @@ def _pick(conn, work, act_id, session, now):
         "ORDER BY n DESC LIMIT 1", [session, work["id"], clock.fmt(now), *keys]).fetchone()
     if row is None:
         raise ActApplyError("nessun atto da applicare per questa sessione: dai prima "
-                            "/tollgate:resolve, un /tollgate:approve (level, finding, rounds, "
+                            "/tollgate:resolve, un /tollgate:approve (level, size, finding, rounds, "
                             "unverified-review, rebase, spec, plan) o /tollgate:reopen")
     return row
 

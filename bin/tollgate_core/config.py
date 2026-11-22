@@ -89,7 +89,7 @@ DEFAULTS: dict = {
         "moderate": "debito o attrito che emergerà più avanti",
         "minor": "redazionale",
     },
-    "retention": {"retention_days": 30, "events_days": 180},
+    "retention": {"retention_days": 30, "events_days": 0, "lookups_days": 180},
     "profiles": {"active": []},
     "models": {"files": []},
     "components": {k: True for k in (
@@ -123,6 +123,10 @@ _ENUMS = {"gate.mode": ("protected", "detect"), "profiles.*.kind": ("vertical", 
           "profiles.*.min_level": ("L0", "L1", "L2")}
 # Sezioni che accettano chiavi nuove, con il tipo delle chiavi nuove.
 _OPEN = {"commands": str, "components": bool}
+# Giorni di conservazione: 0 è ammesso (per `events_days` vuol dire «mai»), non il negativo né
+# oltre un secolo.
+_DAYS_KEYS = ("retention.retention_days", "retention.events_days", "retention.lookups_days")
+MAX_RETENTION_DAYS = 36500
 
 
 @dataclass
@@ -180,6 +184,9 @@ def _set_key(table: dict, key: str, value, default, path: str, pattern: str) -> 
     allowed = _ENUMS.get(pattern)
     if allowed and value not in allowed:
         raise ConfigError(f"valore non ammesso per {path}: {value!r} (ammessi: {', '.join(allowed)})")
+    if pattern in _DAYS_KEYS and not 0 <= value <= MAX_RETENTION_DAYS:
+        raise ConfigError(f"valore non ammesso per {path}: {value} "
+                          f"(ammessi: da 0 a {MAX_RETENTION_DAYS} giorni)")
     table[key] = value
 
 

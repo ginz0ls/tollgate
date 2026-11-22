@@ -10,7 +10,7 @@ from .events import record_event
 ACT_TYPES = frozenset({"finish", "approve", "reopen", "resolve", "sync", "adopt", "abandon",
                        "cleanup", "off", "on"})
 APPROVE_OBJECTS = frozenset({"spec", "plan", "waiver", "level", "effect", "finding", "rounds",
-                             "unverified-review", "unverified-tests", "rebase", "pr"})
+                             "unverified-review", "unverified-tests", "rebase", "pr", "size"})
 _ONE_SHOT = frozenset({("finish", None), ("approve", "effect"), ("approve", "pr"),
                        ("approve", "rebase"), ("sync", None), ("adopt", None),
                        ("cleanup", None), ("abandon", None)})

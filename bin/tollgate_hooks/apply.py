@@ -5,9 +5,10 @@ import getpass
 
 from pathlib import Path
 
-from tollgate_analysis import approvals, auditrules, brief, profiles as prof, research
+from tollgate_analysis import (approvals, auditrules, brief, profiles as prof, research,
+                               worksize)
 from tollgate_core import (acts, audits, effects, events, git, lookups, phases, reviews, scope,
-                           sessions, subagents, tasks, violations)
+                           sessions, sizes, subagents, tasks, violations)
 from tollgate_core.fsutil import write_atomic
 
 REPORT_MAX_CHARS = 60000
@@ -30,6 +31,30 @@ def _act(conn, state, ctx, d):
                     args=d.get("args"), typed_text=d.get("typed_text", ""), actor=_actor(),
                     session=ctx.event.session, work=d.get("work"), head_sha=d.get("head_sha"),
                     now=ctx.now, ttl_minutes=ctx.cfg("acts.ttl_minutes"))
+
+
+def _level(conn, state, ctx, d):
+    before = phases.get_work(conn, d["work"])["level"]
+    phases.set_level(conn, d["work"], d["level"], now=ctx.now, session=ctx.event.session)
+    if phases.LEVELS.index(d["level"]) > phases.LEVELS.index(before):
+        row = phases.get_work(conn, d["work"])
+        n_tasks = conn.execute("SELECT count(*) FROM tasks WHERE work = ?",
+                               (d["work"],)).fetchone()[0]
+        sizes.decide(conn, d["work"], worksize.Signals(d["level"], n_tasks, 0, row["slices"] or 1),
+                     cause="level", now=ctx.now, session=ctx.event.session)
+
+
+def _plan(conn, state, ctx, d):
+    # Niente transazione attorno: con `advance` `register_plan` chiama `set_phase`, che vuole
+    # una connessione senza transazione aperta (copia del DB).
+    scope.register_plan(
+        conn, state, d["work"], plan_path=d["plan_path"], plan_sha=d["plan_sha"],
+        scope_paths=d["scope"], plan_tasks=[tuple(t) for t in d["tasks"]],
+        advance=d["advance"], now=ctx.now, session=ctx.event.session)
+    level = d.get("level") or phases.get_work(conn, d["work"])["level"]
+    sizes.decide(conn, d["work"], worksize.Signals(level, len(d["tasks"]), d.get("areas", 0),
+                                                   d.get("slices", 1)),
+                 cause="plan", now=ctx.now, session=ctx.event.session)
 
 
 def _subagent_start(conn, state, ctx, d):
@@ -224,14 +249,10 @@ _OPS = {
     "expire_acts": lambda c, s, x, d: acts.expire_stale(c, now=x.now, session=x.event.session),
     "block": lambda c, s, x, d: phases.open_block(c, s, d["work"], d["type"], d["reason"],
                                                   now=x.now, session=x.event.session),
-    "level": lambda c, s, x, d: phases.set_level(c, d["work"], d["level"], now=x.now,
-                                                 session=x.event.session),
+    "level": _level,
     "phase": lambda c, s, x, d: phases.set_phase(c, s, d["work"], d["to"], d["cause"],
                                                  now=x.now, session=x.event.session),
-    "plan": lambda c, s, x, d: scope.register_plan(
-        c, s, d["work"], plan_path=d["plan_path"], plan_sha=d["plan_sha"],
-        scope_paths=d["scope"], plan_tasks=[tuple(t) for t in d["tasks"]],
-        advance=d["advance"], now=x.now, session=x.event.session),
+    "plan": _plan,
     "plan_path": lambda c, s, x, d: scope.set_plan_path(c, d["work"], d["plan_path"], now=x.now),
     "subagent_start": _subagent_start,
     "subagent_name": lambda c, s, x, d: subagents.set_name(c, d["agent_id"], d["name"],
@@ -241,8 +262,8 @@ _OPS = {
     "subagent_veto": lambda c, s, x, d: subagents.add_veto(c, d["agent_id"]),
     "subagent_finish": lambda c, s, x, d: subagents.finish(
         c, d["agent_id"], state=d["state"], declared_status=d.get("declared_status"),
-        tokens=d.get("tokens"), size_reason=d.get("size_reason"), now=x.now,
-        session=x.event.session),
+        tokens=d.get("tokens"), size_reason=d.get("size_reason"), usage=d.get("usage"),
+        cost_task=d.get("cost_task"), now=x.now, session=x.event.session),
     "subagent_interrupt": lambda c, s, x, d: subagents.interrupt(c, d["agent_id"], now=x.now,
                                                                  session=x.event.session),
     "task": lambda c, s, x, d: tasks.task_event(c, d["work"], d["number"], d["event"],

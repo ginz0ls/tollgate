@@ -891,6 +891,60 @@ class FlowScriptTest(unittest.TestCase):
         self.assertTrue((self.b.out / "registro-2").is_dir())
         self.assertTrue((d / "research-1.md").is_file())
 
+    def test_registra_lists_c1_events(self):
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-c1ev-"))
+        self.addCleanup(shutil.rmtree, tmp, True)
+        events = tmp / "e.jsonl"
+        rows = [{"seq": 1, "type": "commit", "data": {}},
+                {"seq": 2, "type": "size_decided", "data": {"cause": "start", "size": "L1", "extra": {"a": 1}}},
+                {"seq": 3, "type": "cost", "data": {"agent": "a1", "tokens": 120, "usd": None,
+                                                      "by_model": {"m-one": {"input": 1, "output": 2}, "m-two": {"input": 3}}}},
+                {"seq": 4, "type": "ruling", "data": {"rule": "R-1", "decision": "add"}},
+                {"seq": 5, "type": "veto", "data": {}}]
+        events.write_text("".join(json.dumps(x) + "\n" for x in rows) + "non json\n")
+        out = subprocess.run([sys.executable, "-B", str(FLOW_REG), "eventi-c1", str(events)], capture_output=True, text=True, check=True).stdout
+        got = [json.loads(x) for x in out.splitlines()]
+        self.assertEqual([x["type"] for x in got], ["size_decided", "cost", "ruling"])
+        self.assertEqual(got[0]["data"], rows[1]["data"])
+        self.assertEqual(got[1]["data"], {"tokens": 120, "by_model": ["m-one", "m-two"]})
+        self.assertEqual(got[2]["data"], rows[3]["data"])
+        # `eventi` non cambia: continua a stampare solo gli eventi della ricerca
+        out = subprocess.run([sys.executable, "-B", str(FLOW_REG), "eventi", str(events)], capture_output=True, text=True, check=True).stdout
+        self.assertEqual([json.loads(x)["type"] for x in out.splitlines()], ["veto"])
+
+    def test_flow_registra_writes_c1_files(self):
+        self.b.prepara()
+        self.b.worktree()
+        self.assertEqual(self.b.run("passo1").returncode, 0)
+        r = self.b.run("registra")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = self.b.out / "registro-1"
+        self.assertTrue((d / "eventi-c1.jsonl").is_file())
+        snap = json.loads((d / "snapshot.json").read_text())
+        self.assertIsInstance(snap, dict)
+        self.assertEqual((d / "fallimenti.txt").read_text(), "")
+
+    def test_flow_evidence_out_dir(self):
+        r = self.b.run("controlla", B1_FLOW_EVIDENCE="c1", B1_FLOW_OUT="")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn(f"cartella delle uscite: {ROOT}/docs/verifiche/evidenze/c1/flusso", r.stdout)
+        # vince sulle scelte di B1_FLOW_RULES e B1_FLOW_CASE
+        r = self.b.run("controlla", B1_FLOW_EVIDENCE="c1", B1_FLOW_RULES="vere", B1_FLOW_CASE="ai", B1_FLOW_OUT="")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn(f"cartella delle uscite: {ROOT}/docs/verifiche/evidenze/c1/flusso", r.stdout)
+
+    def test_flow_evidence_rejects_bad_values(self):
+        for bad in ("../x", "A", "a/b", "x y"):
+            with self.subTest(bad=bad):
+                r = self.b.run("controlla", B1_FLOW_EVIDENCE=bad, B1_FLOW_OUT="")
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn("B1_FLOW_EVIDENCE", r.stderr)
+
+    def test_flow_evidence_test_out_still_wins(self):
+        r = self.b.run("controlla", B1_FLOW_EVIDENCE="c1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn(f"cartella delle uscite: {self.b.out}", r.stdout)
+
     def test_flow_registra_sums_greps_over_attempts_and_steps(self):
         self.b.prepara()
         wt = self.b.worktree()

@@ -76,7 +76,7 @@ Scelte che il progetto lascia a chi costruisce, o che il codice reale impone, co
    - `ALTER TABLE work_items ADD COLUMN size_by TEXT CHECK (size_by IS NULL OR size_by IN ('rules','user'))`;
    - `ALTER TABLE work_items ADD COLUMN slices INTEGER`.
 
-   I lavori nati prima di C1 restano con `size` nullo: la fotografia li mostra «non calcolata» e nessuna regola li ricalcola da sola (come `work_items.research` di B1). Tipi nuovi in `EVENT_TYPES`: `size_decided`, `ruling`, `stop_asked`, `stop_answered`, `cost`. Costo: nessuno, tre colonne nullabili.
+   I lavori nati prima di C1 restano con `size` nullo: la fotografia li mostra con `size` nullo e nessuna regola li ricalcola da sola (come `work_items.research` di B1). Tipi nuovi in `EVENT_TYPES`: `size_decided`, `ruling`, `stop_asked`, `stop_answered`, `cost`. Costo: nessuno, tre colonne nullabili.
 2. **La taglia** (progetto 3; mia scelta sulle soglie).
    - Nomi: `small`, `medium`, `large` nel codice e negli eventi; `piccolo`, `medio`, `grande` per l'utente (righe, atto).
    - **La presa** è una sola funzione pura: `tollgate_analysis.worksize.propose(signals: Signals) -> Proposal`, con `Signals(level: str, tasks: int, areas: int, slices: int)` e `Proposal(size: str, reason: str)`. Regole, nell'ordine: `slices > 1` → `large`; `level == "L2"` o `tasks >= MEDIUM_MIN_TASKS` (4) o `areas >= MEDIUM_MIN_AREAS` (2) → `medium`; altrimenti `small`. Il motivo è una frase per l'utente, per esempio «piano con 6 task su 2 aree».
@@ -399,16 +399,16 @@ Scelte che il progetto lascia a chi costruisce, o che il codice reale impone, co
 | 3.2 «Segnali» (fette, task, aree, L2; soglie con test) | 3 | `test_medium_thresholds`, `test_large_with_slices`, `test_areas_counts_verticals_only` |
 | 3.2 «Crescita» (il livello sale, il piano aggiunge fette; grande solo con un sì; mai giù da sola) | 3 | `test_never_goes_down`, `test_large_needs_a_yes`, `test_level_rise_raises_size`, `test_l1_plan_with_three_slices_stays_medium`, `test_plan_after_reopen_does_not_shrink` |
 | 3.2 «Scelta dell'utente» (l'atto fissa la taglia) | 3, 4 | `test_approve_size_act`, `test_user_size_is_fixed` |
-| 8 «La macchina che l'ha avviato o adottato» (un lavoro adottato ha taglia e fette) | 3 | `test_adopt_decides_size` |
+| 8 «La macchina che l'ha avviato o adottato» (un lavoro adottato ha taglia e fette) | 3 | `test_adopt_decides_size_at_start` (`tests/test_adopt.py`; fette: `test_own_spec_approval_with_three_slices_is_a_yes`, `test_later_slice_keeps_slices_null_and_medium`, `test_l1_plan_with_three_slices_adopts_medium`) |
 | 3.3 La presa: punto unico, segnali in ingresso, taglia e motivo in uscita, ogni proposta e correzione registrata | 3 | `test_reason_names_the_signals`, `test_decide_records_event_and_sets_size` |
 | 6 `size_decided` | 3, 4 | come sopra |
 | 6 `ruling` e «Come si registrano le ruling» (comando sul modello di `research submit`, quattro campi, la skill e il brief lo citano) | 5 | `test_parse_text`, `test_add_records_event`, `test_subagent_may_add_ruling`, `test_implementer_brief_mentions_ruling` |
 | 6 `stop_asked`, `stop_answered` (con la risposta, anche rifiutata) | 6, 8 | `test_stop_asked_recorded`, `test_stop_answered_from_tool_response`, `test_stop_answered_on_failure`, `test_unanswered_question_expires` |
 | 6 `cost` e «Dove sta il costo» (token per ogni subagente; dollari solo negli eval, nel loro registro) | 7 | `test_cost_event_on_finish`, `test_transcript_usage_by_model`, `test_reviewers_pass_usage` |
-| 6 Decisioni sui rilievi come evento (accettato, declassato, archiviato), con confidenza e verifica | 7 | `test_approve_finding_emits_finding_event`, `test_user_decision_written_only_by_set_decision`; «accettato» = evento `finding` confermato senza `user_decision` (decisione 6) |
+| 6 Decisioni sui rilievi come evento (accettato, declassato, archiviato), con confidenza e verifica | 7 | `test_approve_finding_emits_finding_event` (in `tests/test_actapply.py`, dove vive il flusso `approve finding`), `test_user_decision_written_only_by_set_decision` (`tests/test_reviews.py`); «accettato» = evento `finding` confermato senza `user_decision` (decisione 6) |
 | 6 `sync` | rinviato a C4 (decisione 10; piano principale, decisione 2) | — |
 | 6 «Tutto locale» | 5, 6, 8 | nessuna scrittura su GitHub nei task; `test_snapshot_has_no_free_text` |
-| 6 «La storia non si cancella» («mai» per difetto, archivio JSONL, spazio misurato) | 2, 8 | `test_events_days_default_is_never`, `test_archive_then_prune`, `test_archive_write_failure_deletes_nothing`; pagina d'uso |
+| 6 «La storia non si cancella» («mai» per difetto, archivio JSONL, spazio misurato) | 2, 8 | `test_minimal_gets_defaults` (`tests/test_config.py`) e `test_housekeeping_never_prunes_with_zero` (`tests/test_start.py`), `test_archive_then_prune`, `test_archive_write_failure_deletes_nothing`; pagina d'uso |
 | 10 Fotografia con versione, sola lettura, documentata in `docs/uso/` | 8 | `test_snapshot_shape`, `test_cli_snapshot_without_db`; `docs/uso/gestionale.md` |
 | 4.3 «A chi tocca» (il calcolo locale; la scheda è di C4) | 8 | `test_decision_wins`, `test_user_phases`, `test_agent_otherwise` |
 | 2 Anti-obiettivo «una cosa piccola con la cerimonia di una grande» | 3 | `test_small_by_default` (un lavoro piccolo non chiede niente all'utente) |
@@ -416,6 +416,8 @@ Scelte che il progetto lascia a chi costruisce, o che il codice reale impone, co
 | 14 Vincoli (stdlib, strati, suite, niente modelli, profili intatti, repo pubblico) | tutti | `tests/test_layers.py`; suite tre volte; revisione finale |
 | Piano principale, decisione 6: prova reale corta | 9 | rapporto `docs/verifiche/2026-11-20-c1-prova-flusso.md` |
 | Spec del nucleo: revisione 36 | 1 (riga `**Tipi:**`), 10 | `test_spec_event_types_match_registry` |
+
+Nomi corretti dal Task 10 (grep `def <nome>` in `tests/`): `test_adopt_decides_size` è `test_adopt_decides_size_at_start`; `test_events_days_default_is_never` è diviso tra `test_minimal_gets_defaults` (il predefinito 0 e `lookups_days` 180) e `test_housekeeping_never_prunes_with_zero` (con 0 la pulizia non cancella); `test_approve_finding_emits_finding_event` sta in `tests/test_actapply.py` e non in `tests/test_reviews.py` (ruling del Task 7). Gli altri nomi esistono come scritti.
 
 ## Revisione del piano
 

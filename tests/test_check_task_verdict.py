@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from tests.helpers import git
-from tests.hookkit import DEFAULT_TOML, SESSION, Lab, sample
+from tests.hookkit import DEFAULT_TOML, SESSION, USAGE, Lab, fake_transcript, sample
 from tests.test_check_writes import with_scope
 from tests.test_verdicts import GOOD
 from tollgate_core import git as tg_git, subagents, tasks
@@ -13,6 +13,7 @@ from tollgate_core import git as tg_git, subagents, tasks
 IMPL = "tollgate:implementer"
 REVIEWER = "tollgate:task-reviewer"
 CODE = "c0de1234"
+
 
 
 def make_base_root(approved: bool) -> Path:
@@ -58,10 +59,10 @@ class Base(unittest.TestCase):
         data.update(over)
         return "Verdetto.\n```json\n" + json.dumps(data) + "\n```"
 
-    def stop(self, aid="r1", atype=REVIEWER, text=None):
+    def stop(self, aid="r1", atype=REVIEWER, text=None, transcript=None):
         p = sample("SubagentStop-manual-normal", session_id=SESSION, cwd=str(self.lab.wt),
                    agent_id=aid, agent_type=atype, last_assistant_message=text,
-                   agent_transcript_path="/non/esiste.jsonl")
+                   agent_transcript_path=transcript or "/non/esiste.jsonl")
         if text is None:
             p.pop("last_assistant_message")
         return self.lab.hook(p)
@@ -456,6 +457,46 @@ class StandardOffTest(Base):
     def test_reviewer_standard_component_off(self):
         self.stop(text=self.minor())
         self.assertEqual(self.task()["verdict"], "changes")
+
+
+class UsageTest(Base):
+    def costs(self):
+        return self.lab.events("cost")
+
+    def test_reviewers_pass_usage(self):
+        tr = fake_transcript(self)
+        self.assertEqual(self.stop(text=self.verdict(), transcript=tr).exit, 0)       # valido
+        [c] = self.costs()
+        self.assertEqual((c["agent"], c["tokens"], c["by_model"]),
+                         ("r1", 20, USAGE))
+
+    def test_cost_carries_the_reviewed_task(self):
+        """F1: il revisore parte senza task, ma il suo `cost` porta quello rivisto; la riga del
+        subagente e `subagent_stop` restano senza task."""
+        tr = fake_transcript(self)
+        for _ in range(2):
+            self.stop(text="niente json", transcript=tr)
+        self.stop(text="niente json", transcript=tr)                      # veti esauriti
+        self.start("r2", REVIEWER)
+        self.stop(aid="r2", text=self.verdict(), transcript=tr)
+        self.assertEqual([c["task"] for c in self.costs()], [1, 1])
+        self.assertIsNone(subagents.get(self.lab.conn, "r2")["task"])
+        stops = [e for e in self.lab.events("subagent_stop")]
+        self.assertEqual([e["task"] for e in stops], [None, None])
+
+    def test_reviewers_pass_usage_vetoes_exhausted_and_tampered(self):
+        tr = fake_transcript(self)
+        for _ in range(2):
+            self.assertEqual(self.stop(text="niente json", transcript=tr).exit, 2)
+        self.assertEqual(self.costs(), [])
+        self.assertEqual(self.stop(text="niente json", transcript=tr).exit, 0)
+        self.assertEqual([c["agent"] for c in self.costs()], ["r1"])
+        self.start("r2", REVIEWER)
+        (self.lab.wt / "src/app.py").write_text("manomesso\n")
+        self.stop(aid="r2", text=self.verdict(), transcript=tr)
+        self.assertEqual(subagents.get(self.lab.conn, "r2")["state"], "tampered")
+        self.assertEqual([c["agent"] for c in self.costs()], ["r1", "r2"])
+        self.assertEqual([c["task"] for c in self.costs()], [1, 1])
 
 
 class ReadonlyOffTest(Base):

@@ -1,8 +1,14 @@
+import types
 import unittest
 from unittest import mock
 
 from tests.hookkit import DEFAULT_FILES, DEFAULT_TOML, Lab
-from tollgate_core import phases, scope, tasks
+import json
+
+from tollgate_analysis import worksize
+from tollgate_core import phases, scope, sizes, tasks
+from tollgate_hooks import apply
+from tollgate_hooks.model import record
 
 SECTIONS = ["Fatti verificati", "Decisioni", "Interfacce", "Must-have", "Scope",
             "Punti di arresto", "Rischi"]
@@ -16,6 +22,16 @@ def plan_text(must_have="M1. Somma — test: tests.test_app::test_somma",
         out += [f"## {s}", must_have if s == "Must-have" else "x", ""]
     out += ["### Task 1: Somma", *files, "", "### Task 2: Doc", "- Create: `docs/uso.md`"]
     return "\n".join(out) + "\n"
+
+
+def big_plan(tasks=5, slices=0):
+    """Un piano con `tasks` task e, se serve, una sezione «Fette previste» con `slices` voci."""
+    text = plan_text().rstrip("\n") + "\n"
+    for n in range(3, tasks + 1):
+        text += f"\n### Task {n}: Extra {n}\n- Create: `docs/extra{n}.md`\n"
+    if slices:
+        text += "\n## Fette previste\n" + "".join(f"{i}. Fetta {i}\n" for i in range(1, slices + 1))
+    return text
 
 
 class LevelTest(unittest.TestCase):
@@ -46,9 +62,15 @@ class LevelTest(unittest.TestCase):
         try:
             (lab.wt / "src/auth").mkdir()
             (lab.wt / "src/auth/x.py").write_text("x = 1\n")
-            lab.post_edit(lab.wt / "src/auth/x.py")
+            r = lab.post_edit(lab.wt / "src/auth/x.py")
             w = phases.get_work(lab.conn, lab.work)
             self.assertEqual((w["level"], w["phase"]), ("L2", "plan"))
+            ev = json.loads(lab.conn.execute(
+                "SELECT data FROM events WHERE type = 'size_decided' "
+                "ORDER BY seq DESC").fetchone()[0])
+            self.assertEqual(ev["cause"], "level")
+            line = f"taglia: {worksize.LABELS[ev['applied']]} — {ev['reason']}"
+            self.assertIn(line, json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"])
         finally:
             lab.close()
 
@@ -193,6 +215,158 @@ class PlanCheckHookTest(unittest.TestCase):
         other = self.lab.wt / "docs/superpowers/plans/altro.md"
         other.write_text("niente\n")
         self.assertEqual(self.lab.post_edit(other).exit, 0)
+
+
+class PlanSizeTest(unittest.TestCase):
+    """La taglia alla registrazione del piano dagli hook (C1, decisione 2)."""
+
+    def setUp(self):
+        self.lab = Lab(phase="plan")
+        self.plan = self.lab.wt / "docs/superpowers/plans/2026-10-09-somma.md"
+        self.plan.parent.mkdir(parents=True)
+
+    def tearDown(self):
+        self.lab.close()
+
+    def work(self):
+        return phases.get_work(self.lab.conn, self.lab.work)
+
+    def size_events(self):
+        return [json.loads(r[0]) for r in self.lab.conn.execute(
+            "SELECT data FROM events WHERE type = 'size_decided' ORDER BY seq")]
+
+    def reopen_plan(self):
+        scope.reset_plan(self.lab.conn, self.lab.work, now=self.lab.now)
+        phases.set_phase(self.lab.conn, self.lab.ts.state, self.lab.work, "plan", "reopen_plan",
+                         now=self.lab.now)
+
+    def test_plan_registration_decides_size(self):
+        self.plan.write_text(big_plan(tasks=5))
+        r = self.lab.post_edit(self.plan)
+        self.assertEqual(r.exit, 0, r.stderr)
+        self.assertEqual(self.work()["size"], "medium")
+        (ev,) = self.size_events()
+        self.assertEqual((ev["cause"], ev["signals"]["tasks"]), ("plan", 5))
+        line = next(x for x in r.stdout.splitlines() if "taglia:" in x)
+        self.assertIn("taglia: medio — piano con 5 task", line)
+
+    def test_injected_line_equals_decided_line(self):
+        self.plan.write_text(big_plan(tasks=5))
+        r = self.lab.post_edit(self.plan)
+        (ev,) = self.size_events()
+        expected = worksize.preview(worksize.Signals(**ev["signals"]), None, None,
+                                    cause="plan").line
+        self.assertIn(expected, r.stdout)
+
+    def test_l1_plan_with_three_slices_stays_medium(self):
+        self.plan.write_text(big_plan(tasks=2, slices=3))
+        r = self.lab.post_edit(self.plan)
+        self.assertEqual(r.exit, 0, r.stderr)
+        self.assertEqual(self.work()["size"], "medium")
+        (ev,) = self.size_events()
+        self.assertEqual((ev["proposed"], ev["applied"]), ("large", "medium"))
+        self.assertIn("/tollgate:approve spec", r.stdout)
+
+    def test_plan_after_reopen_does_not_shrink(self):
+        self.plan.write_text(big_plan(tasks=5))
+        self.lab.post_edit(self.plan)
+        self.assertEqual(self.work()["size"], "medium")
+        self.reopen_plan()
+        self.plan.write_text(plan_text(files=("- Modify: `src/app.py`",)).split("### Task 2")[0])
+        r = self.lab.post_edit(self.plan)
+        self.assertEqual(r.exit, 0, r.stderr)
+        self.assertEqual(self.work()["phase"], "execution")
+        self.assertEqual(self.work()["size"], "medium")
+        self.assertEqual(self.size_events()[-1]["proposed"], "small")
+
+    def test_reopen_plan_on_pre_c1_work(self):
+        self.plan.write_text(big_plan(tasks=2))
+        self.lab.post_edit(self.plan)
+        self.lab.conn.execute("UPDATE work_items SET size = NULL, size_by = NULL")
+        self.lab.conn.execute("DELETE FROM events WHERE type = 'size_decided'")
+        self.reopen_plan()
+        self.assertIsNone(self.work()["size"])
+        self.assertEqual(self.size_events(), [])
+        self.plan.write_text(big_plan(tasks=5))
+        self.lab.post_edit(self.plan)
+        self.assertEqual(self.work()["size"], "medium")
+        self.assertEqual(len(self.size_events()), 1)
+
+
+class LevelSizeTest(unittest.TestCase):
+    def test_level_rise_raises_size(self):
+        lab = Lab(phase="execution")
+        try:
+            sizes.decide(lab.conn, lab.work, worksize.Signals("L1", 1, 0, 1),
+                         cause="start", now=lab.now)
+            self.assertEqual(phases.get_work(lab.conn, lab.work)["size"], "small")
+            (lab.wt / "src/auth").mkdir()
+            (lab.wt / "src/auth/x.py").write_text("x = 1\n")
+            lab.post_edit(lab.wt / "src/auth/x.py", agent_id="a1")
+            w = phases.get_work(lab.conn, lab.work)
+            self.assertEqual((w["level"], w["size"]), ("L2", "medium"))
+            ev = json.loads(lab.conn.execute(
+                "SELECT data FROM events WHERE type = 'size_decided' "
+                "ORDER BY seq DESC").fetchone()[0])
+            self.assertEqual(ev["cause"], "level")
+        finally:
+            lab.close()
+
+    def test_level_rise_says_the_new_size(self):
+        """F3: la riga iniettata con il livello nuovo è quella dell'evento `size_decided`."""
+        lab = Lab(phase="execution")
+        try:
+            sizes.decide(lab.conn, lab.work, worksize.Signals("L1", 1, 0, 1),
+                         cause="start", now=lab.now)
+            (lab.wt / "src/auth").mkdir()
+            (lab.wt / "src/auth/x.py").write_text("x = 1\n")
+            r = lab.post_edit(lab.wt / "src/auth/x.py", agent_id="a1")
+            ev = json.loads(lab.conn.execute(
+                "SELECT data FROM events WHERE type = 'size_decided' "
+                "ORDER BY seq DESC").fetchone()[0])
+            self.assertEqual((ev["cause"], ev["applied"]), ("level", "medium"))
+            line = f"taglia: {worksize.LABELS[ev['applied']]} — {ev['reason']}"
+            self.assertIn("il lavoro sale a L2", r.stdout)
+            self.assertIn(line, json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"])
+        finally:
+            lab.close()
+
+    def test_level_cap_lowering_does_not_decide_size(self):
+        lab = Lab(level="L2", phase="plan")
+        try:
+            worksize_signals = worksize.Signals("L2", 0, 0, 1)
+            sizes.decide(lab.conn, lab.work, worksize_signals, cause="start", now=lab.now)
+            phases.set_level_cap(lab.conn, lab.work, "L1", "motivo", [], now=lab.now)
+            w = phases.get_work(lab.conn, lab.work)
+            self.assertEqual((w["level"], w["size"]), ("L1", "medium"))
+            self.assertEqual(lab.conn.execute(
+                "SELECT count(*) FROM events WHERE type = 'size_decided'").fetchone()[0], 1)
+        finally:
+            lab.close()
+
+    def test_level_op_with_same_or_lower_level_does_not_decide_size(self):
+        """Riga 9: l'operazione `level` decide la taglia solo quando il livello sale."""
+        lab = Lab(level="L2", phase="plan")
+        try:
+            ctx = types.SimpleNamespace(event=types.SimpleNamespace(session="s1"), now=lab.now)
+            apply.apply(lab.conn, None, ctx, record("level", work=lab.work, level="L2"))
+            with self.assertRaises(phases.TransitionError):
+                apply.apply(lab.conn, None, ctx, record("level", work=lab.work, level="L1"))
+            self.assertEqual(phases.get_work(lab.conn, lab.work)["level"], "L2")
+            self.assertEqual(lab.conn.execute(
+                "SELECT count(*) FROM events WHERE type = 'size_decided'").fetchone()[0], 0)
+        finally:
+            lab.close()
+
+    def test_no_size_event_without_level_rise(self):
+        lab = Lab(phase="execution")
+        try:
+            (lab.wt / "src/app.py").write_text("def somma(a, b):\n    return b + a\n")
+            lab.post_edit(lab.wt / "src/app.py")
+            self.assertEqual(lab.conn.execute(
+                "SELECT count(*) FROM events WHERE type = 'size_decided'").fetchone()[0], 0)
+        finally:
+            lab.close()
 
 
 if __name__ == "__main__":

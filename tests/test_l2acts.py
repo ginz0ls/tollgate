@@ -294,6 +294,47 @@ class ApproveSpecTest(L2Case):
         self.assertIn(f"Committa {SPEC_APPROVAL}", msg)
         self.assertEqual(fl.gh_calls(), [])
 
+    def size_events(self):
+        return self.fl.events("size_decided")
+
+    def test_approve_spec_records_slices_and_large(self):
+        fl = self.lab()
+        fl.write_spec(slices=3)
+        self.spec_round()
+        self.lens_closed()
+        msg = self.approve("spec 3")
+        w = self.work()
+        self.assertEqual((w["slices"], w["size"], w["size_by"]), (3, "large", "rules"))
+        ev = self.size_events()[-1]
+        self.assertEqual((ev["cause"], ev["confirmed"], ev["applied"]), ("approve_spec", True,
+                                                                         "large"))
+        lines = msg.splitlines()
+        row = next(i for i, x in enumerate(lines) if x.startswith("taglia: grande"))
+        self.assertLess(row, next(i for i, x in enumerate(lines) if x.startswith("Committa ")))
+        self.assertEqual(self.phase(), "plan")
+        self.assertIn("/tollgate:start #", msg)
+
+    def test_approve_spec_single_slice_keeps_size(self):
+        fl = self.lab()
+        fl.write_spec()
+        self.spec_round()
+        self.approve("spec 1")
+        w = self.work()
+        self.assertEqual((w["slices"], w["size"]), (1, "medium"))
+        self.assertIsNone(self.size_events()[-1]["confirmed"])
+
+    def test_approve_spec_on_pre_c1_work(self):
+        fl = self.lab()
+        fl.conn.execute("UPDATE work_items SET size = NULL, size_by = NULL, slices = NULL "
+                        "WHERE id = ?", (fl.work,))
+        fl.write_spec()
+        self.spec_round()
+        before = len(self.size_events())
+        self.approve("spec 1")
+        self.assertEqual(self.work()["size"], "medium")
+        self.assertEqual(len(self.size_events()), before + 1)
+        self.assertEqual(self.size_events()[-1]["previous"], None)
+
     def test_untrusted_slice_titles_stay_in_a_longer_fence(self):
         fl = self.lab()
         hostile = "``````` $(rm -rf ~) `x`"
@@ -487,6 +528,36 @@ class ApprovePlanTest(L2Case):
         self.assertEqual(len(fl.events("scope_registered")), 1)
         self.assertEqual(fl.conn.execute("SELECT count(*) FROM tasks WHERE work = ?",
                                          (fl.work,)).fetchone()[0], 1)
+
+    def test_approve_plan_decides_size(self):
+        fl = self.to_approval()
+        msg = self.approve("plan")
+        (ev,) = [e for e in fl.events("size_decided") if e["cause"] == "plan"]
+        self.assertEqual((ev["cause"], ev["applied"], ev["signals"]["level"]), ("plan", "medium",
+                                                                                "L2"))
+        self.assertEqual(self.work()["size"], "medium")
+        self.assertIn("taglia: medio", msg)
+
+    def test_approve_plan_says_size_before_the_commit_hint(self):
+        """Riga 8: come `approve spec`, la taglia sta prima dell'invito a committare."""
+        self.to_approval()
+        lines = self.approve("plan").splitlines()
+        size_at = next(i for i, x in enumerate(lines) if x.startswith("taglia:"))
+        commit_at = next(i for i, x in enumerate(lines) if x.startswith("Committa "))
+        self.assertLess(size_at, commit_at)
+        self.assertTrue(lines[commit_at].endswith("poi /tollgate:execute."), lines)
+
+    def test_size_decided_once_after_an_interrupted_approve_plan(self):
+        fl = self.to_approval()
+        with mock.patch.object(l2acts.phases, "set_phase",
+                               side_effect=phases.TransitionError("interrotto")):
+            self.assertIn("interrotto", self.refused("plan"))
+        self.assertEqual([e["cause"] for e in fl.events("size_decided")],
+                         ["approve_spec", "plan"])
+        msg = self.approve("plan")
+        self.assertEqual([e["cause"] for e in fl.events("size_decided")],
+                         ["approve_spec", "plan"])
+        self.assertNotIn("taglia:", msg)
 
     def test_plan_approval_committable_in_execution(self):
         fl = self.to_approval()

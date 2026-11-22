@@ -50,6 +50,8 @@ Prima del **primo** task (nessun task ancora avviato):
    - Verdetto rifiutato dal hook (veto): il revisore riscrive; dopo due veti si apre `needs_you`.
 6. Torna al punto 1 per il task successivo.
 
+**Scelte prese al posto dell'utente.** Quando l'utente ti dà in chat una scelta che il piano non diceva, o ne prendi una tu perché l'utente non c'è, registrala con `<programma> ruling add [--task k] [--by user] <<'RULING_FINE'` e tre righe (`cosa:`, `perché:`, `costo:`), chiuse da `RULING_FINE`: `--by user` per quella data dall'utente in chat (la registra solo il coordinatore). Nel testo non scrivere un'assegnazione `TOLLGATE_…=`: viene negata.
+
 ## Guardia del contesto
 
 All'avviso del hook (`warn_pct`) scrivi il checkpoint con `<programma> status --checkpoint`. A `stop_pct` il hook nega nuovi subagenti: scrivi il checkpoint, chiedi all'utente `/clear`, e dopo il `/clear` riprendi da questa skill, dal passo 0 (ingresso dalla riga «prossimo passo»).

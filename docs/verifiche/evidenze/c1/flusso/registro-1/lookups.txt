@@ -1,0 +1,25 @@
+# lookups: id, work, task, agent_id, kind, target, at
+1	1	1	a612d4b4c84dea4f1	read	.tollgate-run/1/task-1.md	2026-11-21T15:52:20.993214Z
+2	1	1	a612d4b4c84dea4f1	read	config.toml	2026-11-21T15:52:24.842388Z
+3	1	1	a612d4b4c84dea4f1	read	tests/test_smoke.py	2026-11-21T15:52:25.215314Z
+4	1	1	a612d4b4c84dea4f1	read	src/__init__.py	2026-11-21T15:52:25.634822Z
+5	1	1	a612d4b4c84dea4f1	read	tollgate.toml	2026-11-21T15:52:26.052448Z
+6	1	1	a612d4b4c84dea4f1	fetch	https://docs.python.org/3/library/tomllib.html	2026-11-21T15:52:30.362028Z
+# per tipo
+fetch: 1
+read: 5
+# task: work, number, state, research_ok
+1	1	done	1
+# nota salvata, lavoro 1 task 1
+## Letto nel progetto
+- config.toml
+- tests/test_smoke.py
+- src/__init__.py
+- tollgate.toml
+
+## Documentazione
+- https://docs.python.org/3/library/tomllib.html — tomllib.load(fp, /, *, parse_float=float) richiede un file binario (modo "rb"); TOMLDecodeError per TOML non valido; modulo aggiunto in Python 3.11. Il progetto non ha file delle dipendenze: la libreria è della stdlib, versione minima 3.11.
+
+## Cosa ho trovato
+config.toml contiene [app] nome = "prova-b1". I test usano unittest con discover -s tests -t . (tollgate.toml). Il pacchetto src esiste già. Implemento src/config.py con CONFIG_PREDEFINITO ancorato a __file__ (indipendente dalla directory corrente), open(..., "rb") e tomllib.load. Lo schema dei test segue tests/test_smoke.py. Nessun file di build/CI toccato.
+

@@ -10,6 +10,12 @@ from ._common import orphan_next, orphan_tg, status_lines
 
 CHECK = {"api": 1, "events": ["session_start"], "component": None, "order": 10}
 MAX_LINES, MAX_CHARS = 10, 1500
+SOURCE_MAX = 32
+
+
+def _source(v) -> str | None:
+    """Da dove parte la sessione (`startup`, `resume`…): solo una stringa, tagliata."""
+    return v[:SOURCE_MAX] if isinstance(v, str) else None
 
 
 def decide(event, ctx):
@@ -19,6 +25,8 @@ def decide(event, ctx):
                 ctx.db, row["session"], now=ctx.now, stale_minutes=ctx.stale_minutes):
             out.append(record("subagent_interrupt", agent_id=row["id"]))
     work = ctx.work
+    out.append(record("event", type="session_start", work=work["id"] if work is not None else None,
+                      data={"source": _source(event.raw.get("source"))}))
     if work is not None and not ctx.bound:
         out.append(record("bind", work=work["id"]))
     if work is None:

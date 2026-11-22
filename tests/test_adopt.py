@@ -29,9 +29,10 @@ def blob(text):
                           text=True, check=True).stdout.strip()
 
 
-def spec_approval(sha=None, path=SPEC_DOC):
+def spec_approval(sha=None, path=SPEC_DOC, slices=None):
+    extra = f"slices: {slices}\n" if slices else ""
     return (f"---\nkind: spec-approval\npath: {path}\nsha: {sha or blob(SPEC_TEXT)}\n"
-            "adversarial: true\nlens: sicurezza\n---\nOK\n")
+            f"{extra}adversarial: true\nlens: sicurezza\n---\nOK\n")
 
 
 def plan_approval(sha=None, path=PLAN, spec_sha=None):
@@ -492,3 +493,81 @@ class AdoptL2Test(AdoptCase):
         self.assertEqual((row["level"], row["phase"]), ("L2", "approval"))
         self.assertEqual(row["plan_path"], PLAN)
         self.assertIsNone(row["plan_sha"])
+
+
+class AdoptSizeTest(AdoptCase):
+    """La taglia di un lavoro adottato (C1, decisione 2)."""
+    OTHER_SPEC_FILE = "docs/superpowers/reviews/3/spec-approval.md"
+
+    def sized(self, fl, files):
+        fl2 = self.branch_lab(files) if fl is None else fl
+        r = self.adopt(fl2)
+        self.assertEqual(r.returncode, 0, out(r))
+        (row,) = self.rows(fl2)
+        return fl2, row, r
+
+    def test_adopt_decides_size_at_start(self):
+        fl, row, r = self.sized(None, L0_FILES)
+        self.assertEqual((row["size"], row["size_by"]), ("small", "rules"))
+        self.assertEqual([e["cause"] for e in fl.events("size_decided")], ["start"])
+        lines = r.stdout.strip().splitlines()
+        (size_at,) = [i for i, x in enumerate(lines) if x.startswith("taglia: piccolo")]
+        self.assertLess(size_at, len(lines) - 1)
+        self.assertTrue(lines[-1].startswith("prossimo passo: EnterWorktree "), lines)
+
+    def test_size_at_start_is_decided_after_the_level_cap(self):
+        """Riga 7: con un tetto che abbassa il livello la taglia «start» legge il livello dal DB."""
+        body = prblock.render({"issue": 7, "level": "L2", "level_cap": "L1",
+                               "level_cap_reason": "solo documentazione"})
+        fl = self.branch_lab(L2_FILES, push=True, prs=[pr(3, "OPEN", body=body)])
+        row = self.adopted(fl)
+        self.assertEqual(row["level"], "L1")
+        start = fl.events("size_decided")[0]
+        self.assertEqual((start["cause"], start["signals"]["level"]), ("start", "L1"))
+        self.assertEqual((row["size"], row["size_by"]), ("small", "rules"))
+
+    def test_adopt_with_registered_plan_decides_again(self):
+        fl, row, r = self.sized(None, L1_FILES)
+        self.assertEqual([e["cause"] for e in fl.events("size_decided")], ["start", "plan"])
+        self.assertEqual(row["size"], "small")
+        lines = r.stdout.strip().splitlines()
+        self.assertEqual(len([x for x in lines if x.startswith("taglia:")]), 1)
+        self.assertTrue(lines[-1].startswith("prossimo passo: EnterWorktree "), lines)
+
+    def test_l1_plan_with_three_slices_adopts_medium(self):
+        text = plan_text() + "\n## Fette previste\n1. a\n2. b\n3. c\n"
+        fl, row, r = self.sized(None, {**L1_FILES, PLAN: text})
+        self.assertEqual(row["size"], "medium")
+        self.assertIsNone(row["slices"])
+        self.assertIn("/tollgate:approve spec", r.stdout)
+
+    def test_own_spec_approval_with_three_slices_is_a_yes(self):
+        fl, row, r = self.sized(None, {
+            **L2_DOCS, SPEC_FILE: spec_approval(slices=3),
+            PLAN_FILE: plan_approval(spec_sha=blob(SPEC_TEXT))})
+        self.assertEqual((row["slices"], row["size"], row["size_by"]), (3, "large", "rules"))
+        events = fl.events("size_decided")
+        self.assertEqual([e["cause"] for e in events], ["start", "approve_spec", "plan"])
+        self.assertIs(events[1]["confirmed"], True)
+        self.assertEqual(events[2]["signals"]["slices"], 3)
+
+    def test_later_slice_keeps_slices_null_and_medium(self):
+        fl, row, r = self.sized(None, {
+            **L2_DOCS, self.OTHER_SPEC_FILE: spec_approval(slices=3),
+            PLAN_FILE: plan_approval(spec_sha=blob(SPEC_TEXT))})
+        self.assertEqual((row["level"], row["slices"], row["size"]), ("L2", None, "medium"))
+        causes = [e["cause"] for e in fl.events("size_decided")]
+        self.assertNotIn("approve_spec", causes)
+
+    def test_size_failure_is_incomplete_registration(self):
+        fl = self.branch_lab(L0_FILES)
+        with mock.patch.object(adopt.sizes, "decide", side_effect=sqlite3.Error("rotto")), \
+                mock.patch.dict(os.environ, fl.env()):
+            self.act(fl)
+            sessions.note_cli_call(fl.ts.state, SESSION, str(fl.main), ["adopt", "7"],
+                                   now=clock.now())
+            r = adopt.adopt(fl.ts.state, fl.main, 7, argv=["adopt", "7"])
+        text = "\n".join(r.lines)
+        self.assertEqual(r.code, adopt.INCOMPLETE, text)
+        self.assertIn("registrazione incompleta: taglia", text)
+        self.assertTrue(r.lines[-1].startswith("prossimo passo: EnterWorktree "), text)

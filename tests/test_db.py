@@ -195,8 +195,8 @@ class MigrationV4Test(unittest.TestCase):
     def tearDown(self):
         self.ts.cleanup()
 
-    def test_latest_version_is_6(self):
-        self.assertEqual(db.latest_version(), 6)
+    def test_latest_version_is_7(self):
+        self.assertEqual(db.latest_version(), 7)
 
     def test_from_v3_adds_columns_keeps_rows_and_backup(self):
         saved = db.MIGRATIONS[:]
@@ -330,7 +330,8 @@ class MigrationV6Test(unittest.TestCase):
         conn = db.open_db(self.ts.state)
         try:
             self.assertEqual(conn.execute(
-                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "6")
+                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0],
+                str(db.latest_version()))
             w = conn.execute("SELECT * FROM work_items").fetchone()
             self.assertEqual((w["phase"], w["research"]), ("execution", 0))
             t = conn.execute("SELECT * FROM tasks").fetchone()
@@ -343,6 +344,56 @@ class MigrationV6Test(unittest.TestCase):
     def test_fresh_db_makes_no_copy(self):
         db.open_db(self.ts.state).close()
         self.assertEqual(list(self.ts.state.backup_dir.glob("*migrazione-6*")), [])
+
+
+class MigrationV7Test(unittest.TestCase):
+    def setUp(self):
+        self.ts = TempState()
+
+    def tearDown(self):
+        self.ts.cleanup()
+
+    def test_migration_7_adds_size_columns(self):
+        conn = db.open_db(self.ts.state)
+        try:
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(work_items)")]
+            for name in ("size", "size_by", "slices"):
+                self.assertIn(name, cols)
+            self.assertEqual(db.latest_version(), 7)
+        finally:
+            conn.close()
+
+    def test_migration_7_from_6_keeps_rows_and_backs_up(self):
+        saved = db.MIGRATIONS[:]
+        try:
+            db.MIGRATIONS[:] = saved[:6]
+            conn = db.open_db(self.ts.state)
+            insert_work(conn, phase="execution")
+            conn.close()
+        finally:
+            db.MIGRATIONS[:] = saved
+        conn = db.open_db(self.ts.state)
+        try:
+            w = conn.execute("SELECT * FROM work_items").fetchone()
+            self.assertEqual((w["phase"], w["size"], w["size_by"], w["slices"]),
+                             ("execution", None, None, None))
+            self.assertEqual(conn.execute(
+                "SELECT value FROM meta WHERE key='schema_version'").fetchone()[0], "7")
+        finally:
+            conn.close()
+        self.assertTrue(list(self.ts.state.backup_dir.glob("tollgate-*-migrazione-7.db")))
+
+    def test_size_check_constraint(self):
+        conn = db.open_db(self.ts.state)
+        try:
+            insert_work(conn)
+            with self.assertRaises(sqlite3.IntegrityError):
+                conn.execute("UPDATE work_items SET size = 'enorme'")
+            with self.assertRaises(sqlite3.IntegrityError):
+                conn.execute("UPDATE work_items SET size_by = 'modello'")
+            conn.execute("UPDATE work_items SET size = 'large', size_by = 'user', slices = 3")
+        finally:
+            conn.close()
 
 
 _FROZEN = datetime(2026, 10, 9, 12, 0, 0, 123456, tzinfo=timezone.utc)

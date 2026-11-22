@@ -107,6 +107,18 @@ class CliTest(CliBase):
         self.assertEqual(r.stdout.strip(), "[]")
         self.assertFalse(self.t.state.db_path.exists())
 
+    def test_snapshot_cli_process(self):
+        r = self.run_cli("snapshot")
+        self.assertEqual((r.returncode, json.loads(r.stdout)["works"]), (0, []))
+        self.assertFalse(self.t.state.db_path.exists())
+        self.seed()
+        r = self.run_cli("snapshot", cwd=self.repo)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        snap = json.loads(r.stdout)
+        self.assertEqual(snap["v"], 1)
+        self.assertEqual({w["issue"]: w["turn"] for w in snap["works"]},
+                         {5: "decision", 6: "agent"})
+
     def test_status_detect_sentence(self):
         sentence = "in modalità detect il merge non è impedito, solo rilevato"
         conn = db.open_db(self.t.state)
@@ -389,6 +401,46 @@ class ResearchCliTest(unittest.TestCase):
         r = self.run_research("submit", "9", stdin="x")
         self.assertEqual(r.returncode, 2)
         self.assertIn("inesistente", r.stderr)
+
+
+class RulingCliTest(unittest.TestCase):
+    TEXT = "cosa: a\nperché: b\ncosto: c\n"
+
+    def setUp(self):
+        self.fl = FlowLab(issue=7, phase="plan")
+        self.addCleanup(self.fl.close)
+
+    def run_ruling(self, *argv, stdin=TEXT):
+        return subprocess.run([sys.executable, "-B", str(BIN / "tollgate"), "ruling", *argv],
+                              cwd=str(self.fl.wt), env=self.fl.env(), input=stdin,
+                              capture_output=True, text=True, timeout=120)
+
+    def test_cli_ruling_add(self):
+        r = self.run_ruling("add", "--by", "user")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("ruling registrata (evento", r.stdout)
+        data = json.loads(self.fl.conn.execute(
+            "SELECT data FROM events WHERE type = 'ruling'").fetchone()[0])
+        self.assertEqual((data["by"], data["what"], data["task"]), ("user", "a", None))
+
+    def test_cli_ruling_by_must_be_known(self):
+        r = self.run_ruling("add", "--by", "modello")
+        self.assertEqual(r.returncode, 2)
+        self.assertIsNone(self.fl.conn.execute(
+            "SELECT 1 FROM events WHERE type = 'ruling'").fetchone())
+
+    def test_cli_ruling_multiline_text_before_the_first_field(self):
+        r = self.run_ruling("add", stdin="intro\naltra riga\n" + self.TEXT)
+        self.assertEqual((r.returncode, r.stdout), (2, ""))
+        self.assertNotIn("Traceback", r.stderr)
+        self.assertIn("prima del primo campo", r.stderr)
+        self.assertIsNone(self.fl.conn.execute(
+            "SELECT 1 FROM events WHERE type = 'ruling'").fetchone())
+
+    def test_cli_ruling_refused_exit_2_on_stderr(self):
+        r = self.run_ruling("add", stdin="cosa: a")
+        self.assertEqual((r.returncode, r.stdout), (2, ""))
+        self.assertIn("perché", r.stderr)
 
 
 class ModelsCheckTest(unittest.TestCase):

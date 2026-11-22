@@ -51,13 +51,14 @@ Rimette il ramo del lavoro sul ramo predefinito e aggiorna la PR. Solo l'utente.
 
 Approvazioni dell'utente.
 
-- Argomenti: `level <L> <motivo> | spec <fette> | plan | finding <id> <gravità|dismiss> <motivo> | rounds <n> | unverified-review | rebase | waiver <id> | effect <id>`
+- Argomenti: `level <L> <motivo> | size <piccolo|medio|grande> <motivo> | spec <fette> | plan | finding <id> <gravità|dismiss> <motivo> | rounds <n> | unverified-review | rebase | waiver <id> | effect <id>`
 - Solo l'utente.
 
 Cosa fa ciascuno:
 
 - `level`: fissa un tetto al livello, con motivo. Il gate lo riporta tra le voci da leggere.
-- `spec` (L2, fase `spec_audit`): approva la spec, scrive il file di approvazione da committare e passa a `plan`. `<fette>` è il numero di fette della spec; per le fette dalla seconda in poi propone un'issue ciascuna.
+- `size <piccolo|medio|grande> <motivo>`: fissa la taglia del lavoro, anche verso il basso, con motivo. Non autorizza le fette.
+- `spec` (L2, fase `spec_audit`): approva la spec, scrive il file di approvazione da committare e passa a `plan`. `<fette>` è il numero di fette della spec; con più fette il lavoro diventa grande; per le fette dalla seconda in poi propone un'issue ciascuna.
 - `plan` (L2, fase `approval`): approva il piano, registra scope e task e passa a `execution`.
 - `finding`: declassa un rilievo della revisione finale (`blocker|major|moderate|minor`) o lo scarta (`dismiss`). Il motivo è obbligatorio.
 - `rounds <n>`: concede giri di correzione a un task fermo, o cicli di revisione finale oltre i quattro.
@@ -177,8 +178,10 @@ La CLI è `bin/tollgate` e si lancia con `python3` davanti al percorso, tra virg
 - `status [--json]`: lo stesso di `/tollgate:status`. `--checkpoint [--note TESTO]` scrive il checkpoint nel worktree del lavoro.
 - `stats [--since AAAA-MM-GG] [--work N]`: statistiche dagli eventi, in JSON (tempo per fase, veti per regola, blocchi, deroghe, token). Serve a vedere se tollgate rallenta più di quanto protegge.
 - `events --after-seq N`: esporta gli eventi in JSONL.
+- `snapshot`: una fotografia JSON dei lavori aperti (taglia, fase, task, a chi tocca, cosa aspetta l'utente, costo), in sola lettura, senza testo libero. Come usarla: [leggere lo stato da un gestionale](gestionale.md).
 - `init --propose` e `init --update`: come sopra.
 - `models check [--refresh]`: il controllo dei modelli sul repo corrente, senza aprire un lavoro. Vedi [il controllo dei modelli](#il-controllo-dei-modelli).
+- `ruling add [--task K] [--by agent|user]`: registra nello stato locale una decisione presa al posto dell'utente. Il testo va da stdin, in un heredoc, con tre righe: `cosa:`, `perché:`, `costo:` (al più 1000 caratteri per campo; le etichette valgono anche in maiuscolo). Lo usano gli agenti, e il coordinatore con `--by user` per una scelta data dall'utente in chat: un subagente non può usare `--by user`. Niente va su GitHub.
 - `db restore`: ripristina l'ultima copia integra del DB, solo da un terminale interattivo e solo se il DB è guasto. Nessuna skill lo chiama.
 - `gate -h`: i comandi del gate che girano nei workflow di GitHub Actions (`run`, `evaluate`, `guard`, `base-ids`, `base-publish`, `sentinel`). Senza stato locale. Il flag `--publish` vale solo dentro GitHub Actions.
 - `--version`.

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import sqlite3
 import traceback
@@ -28,6 +29,8 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[2]
 BUDGET = {"session_start": (10, 1500), "subagent_start": (None, 2000)}
 DEFAULT_BUDGET = (None, 1500)
 _CONTROL_HOOKS = {"PreToolUse"}
+# Il valore della prima occorrenza di "tool_name", come `json_str` del wrapper hooks/run.
+_TOOL_NAME = re.compile(r'"tool_name"\s*:\s*"((?:[^"\\]|\\.)*)"')
 # Eventi la cui protezione segue il bersaglio (I1): file per Edit/Write, `-C` o `cd` per Bash.
 _TARGET_KINDS = {"pre_edit", "pre_bash"}
 
@@ -196,11 +199,18 @@ def _record_lookup(conn, event, now) -> None:
                        now=now)
 
 
+def _asks_user(stdin_text: str) -> bool:
+    """Una domanda diretta all'utente (`AskUserQuestion`) non è mai un controllo: nemmeno se
+    l'input è illeggibile o l'hook scade o fallisce (decisione 4; il wrapper fa lo stesso)."""
+    m = _TOOL_NAME.search(stdin_text)
+    return m is not None and m.group(1) == "AskUserQuestion"
+
+
 def run_hook(hook_event: str, stdin_text: str, *, env=None, now=None, plugin_root=None,
              checks=None, alarm: bool = False) -> HookResult:
     env = os.environ if env is None else env
     state = resolve_state(env)
-    control = hook_event in _CONTROL_HOOKS
+    control = hook_event in _CONTROL_HOOKS and not _asks_user(stdin_text)
     now = now or clock.now()
     if alarm:
         _set_alarm(20)

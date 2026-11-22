@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tollgate_analysis import auditrules, report, specdoc
+from tollgate_analysis import auditrules, specdoc
 from tollgate_core import audits, git, subagents
 from tollgate_hooks.model import deny, record
 
@@ -43,13 +43,14 @@ def decide(event, ctx):
     if rnd is None:
         return []
     aid, kind = row["id"], rnd["kind"]
-    tokens = report.transcript_tokens(event.raw.get("agent_transcript_path") or "")
+    tokens, usage = _common.transcript_cost(event)
     if not ctx.component(audits.COMPONENTS[kind]):
-        return [record("subagent_finish", agent_id=aid, state="done", tokens=tokens)]
+        return [record("subagent_finish", agent_id=aid, state="done", tokens=tokens,
+                       usage=usage)]
     work = ctx.db.execute("SELECT * FROM work_items WHERE id = ?", (rnd["work"],)).fetchone()
     if ctx.component("readonly_check") and work["worktree"] \
             and _common.fingerprint_changed(ctx, row, Path(work["worktree"])):
-        return _common.tampered_records(row, work)
+        return _common.tampered_records(row, work, tokens=tokens, usage=usage)
     msg = event.raw.get("last_assistant_message") or row["report"]
     parsed = auditrules.parse_round_json(
         msg, kind=kind, number=rnd["number"], code=rnd["code"], spec_sha=rnd["spec_sha"],
@@ -58,7 +59,8 @@ def decide(event, ctx):
     if not parsed.valid:
         why = "; ".join(parsed.problems)
         if row["vetoes"] >= MAX_VETOES:
-            return [record("subagent_finish", agent_id=aid, state="done", tokens=tokens),
+            return [record("subagent_finish", agent_id=aid, state="done", tokens=tokens,
+                           usage=usage),
                     record("block", work=work["id"], type="needs_you",
                            reason=f"report del giro non valido: {why}"[:500])]
         return [record("subagent_veto", agent_id=aid),
@@ -69,6 +71,7 @@ def decide(event, ctx):
     counts = dict(parsed.counts)
     counts["major"] += len(extra)
     return [record("subagent_finish", agent_id=aid, state="done",
-                   declared_status=auditrules.outcome(counts), tokens=tokens),
+                   declared_status=auditrules.outcome(counts), tokens=tokens,
+                   usage=usage),
             record("audit_report", work=work["id"], kind=kind, number=rnd["number"],
                    counts=counts, body=msg, extra=extra)]

@@ -1,0 +1,35 @@
+{
+  "at": "2026-11-21T15:53:48.211386Z",
+  "host": "HOST",
+  "v": 1,
+  "works": [
+    {
+      "branch": "tg/1-leggi-il-nome-dell-app-da-config-toml",
+      "cost": {
+        "by_task": {
+          "1": 49528
+        },
+        "tokens": 81821
+      },
+      "created": "2026-11-21T15:50:21.037585Z",
+      "issue": 1,
+      "last_event_at": "2026-11-21T15:53:10.085742Z",
+      "level": "L1",
+      "level_cap": null,
+      "phase": "execution",
+      "phase_before_block": null,
+      "pr_number": null,
+      "repo_key": "/tmp/tollgate-b1/origin",
+      "size": "small",
+      "size_by": "rules",
+      "slices": null,
+      "tasks": {
+        "done": 1
+      },
+      "turn": "agent",
+      "updated": "2026-11-21T15:52:00.931459Z",
+      "waiting": [],
+      "waiting_user": 0
+    }
+  ]
+}

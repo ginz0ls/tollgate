@@ -20,10 +20,22 @@ class LoadTextTest(unittest.TestCase):
         self.assertEqual(c.get("tasks.max_tokens"), {"L0": 0, "L1": 400000, "L2": 800000})
         self.assertEqual(c.get("acts.ttl_minutes"), 10)
         self.assertEqual(c.get("review.stale_minutes"), 30)
-        self.assertEqual(c.get("retention.events_days"), 180)
+        self.assertEqual(c.get("retention.events_days"), 0)
+        self.assertEqual(c.get("retention.lookups_days"), 180)
         self.assertTrue(c.get("components.must_have_tests"))
         self.assertEqual(c.warnings, [])
         self.assertEqual(c.profiles, {})
+
+    def test_retention_days_out_of_range_is_config_error(self):
+        for key in ("events_days", "lookups_days", "retention_days"):
+            for value in (-1, 36501):
+                with self.subTest(key=key, value=value):
+                    with self.assertRaisesRegex(ConfigError, f"retention.{key}"):
+                        load_config_text(f"{MIN}[retention]\n{key} = {value}\n")
+            for value in (0, 36500):
+                with self.subTest(key=key, ok=value):
+                    c = load_config_text(f"{MIN}[retention]\n{key} = {value}\n")
+                    self.assertEqual(c.get(f"retention.{key}"), value)
 
     def test_missing_schema_version(self):
         with self.assertRaisesRegex(ConfigError, "schema_version"):

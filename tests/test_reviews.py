@@ -1,5 +1,7 @@
 import json
+import re
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from tests.helpers import TempState
@@ -421,6 +423,21 @@ class DecisionTest(ReviewsCase):
               and e["data"]["user_decision"]]
         self.assertEqual([(d["id"], d["user_decision"]) for d in ev],
                          [("f-1-1", "downgraded:minor"), ("f-1-2", "dismissed")])
+
+    def test_user_decision_written_only_by_set_decision(self):
+        """Decisione 6 di C1: `reviews.set_decision` è l'unico punto che scrive
+        `user_decision` (e quindi l'unico che emette l'evento `finding` con la decisione)."""
+        bin_dir = Path(__file__).resolve().parent.parent / "bin"
+        # `SET user_decision = …` anche su più righe o dopo un'altra colonna
+        write = re.compile(r"\bSET\s+(?:\w+\s*=\s*[^,;]+,\s*)*user_decision\s*=", re.IGNORECASE)
+        writers = sorted(str(p.relative_to(bin_dir)) for p in bin_dir.rglob("*.py")
+                         if write.search(p.read_text(encoding="utf-8")))
+        self.assertEqual(writers, ["tollgate_core/reviews.py"])
+        self.assertEqual(len(write.findall(Path(bin_dir / "tollgate_core/reviews.py").read_text(
+            encoding="utf-8"))), 1)
+        for text in ('"UPDATE f SET user_decision = ?"', '"UPDATE f SET\n   user_decision=?"',
+                     '"UPDATE f SET a = 1, user_decision = ?"'):
+            self.assertTrue(write.search(text), text)
 
     def test_approve_finding_reason_in_event(self):
         self.confirmed()

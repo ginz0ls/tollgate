@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 
-from tollgate_analysis import bash, level as lv, prref, profiles as prof
+from tollgate_analysis import bash, level as lv, prref, profiles as prof, report, worksize
 from tollgate_analysis.protected import is_protected
 from tollgate_core import audits, config, git, lookups, reviews, subagents, violations
 from tollgate_core.paths import program_command, repo_key
@@ -73,9 +73,20 @@ def fingerprint_changed(ctx, row, wt: Path) -> bool:
         git.fingerprint(wt, ctx.cfg("review.output_dirs")) != row["fingerprint"]
 
 
-def tampered_records(row, work) -> list:
+def transcript_cost(event) -> tuple[int, dict | None]:
+    """`(token, uso per modello)` della trascrizione del subagente che chiude (decisione 3 di C1),
+    letta una volta. I token sono input + cache_creation + output di tutti i modelli (0 senza
+    uso), come `report.transcript_tokens`; l'uso è `None` con file assente, illeggibile o senza
+    righe di uso: allora `subagents.finish` non registra `cost`."""
+    usage = report.transcript_usage(event.raw.get("agent_transcript_path") or "")
+    tokens = sum(report.new_tokens(u) for u in usage.values())
+    return tokens, usage or None
+
+
+def tampered_records(row, work, *, tokens=None, usage=None, cost_task=None) -> list:
     """7.3: il subagente di sola lettura ha cambiato file, il suo verdetto non vale."""
-    return [record("subagent_finish", agent_id=row["id"], state="tampered"),
+    return [record("subagent_finish", agent_id=row["id"], state="tampered", tokens=tokens,
+                   usage=usage, cost_task=cost_task),
             record("block", work=work["id"], type="needs_you",
                    reason=f"il subagente di sola lettura {row['type']} ha cambiato "
                           f"file: il suo verdetto non vale (7.3)")]
@@ -288,6 +299,15 @@ def scope_exempt(ctx, work, rel: str, scope: set[str]) -> bool:
     return violations.scope_exempt(ctx.config, work, rel, scope)
 
 
+def _size_line(ctx, work, new_level: str) -> str:
+    """La riga della taglia per un livello che sale (causa `level`): gli stessi segnali di
+    `apply._level`, la stessa funzione pura di `sizes.decide`, quindi riga ed evento coincidono."""
+    n_tasks = ctx.db.execute("SELECT count(*) FROM tasks WHERE work = ?",
+                             (work["id"],)).fetchone()[0]
+    signals = worksize.Signals(new_level, n_tasks, 0, work["slices"] or 1)
+    return worksize.preview(signals, work["size"], work["size_by"], cause="level").line
+
+
 def level_records(ctx, work) -> list:
     """Ricalcolo del livello sul diff dalla base, working tree e file nuovi compresi
     (decisione 18), senza le cartelle di output. Il livello sale e non scende mai."""
@@ -315,11 +335,13 @@ def level_records(ctx, work) -> list:
         out = [record("phase", work=work["id"], to="plan", cause="l0_grew")]
         if new == "L2":
             out.append(record("level", work=work["id"], level="L2"))
+        size = f" {_size_line(ctx, work, new)}." if new == "L2" else ""
         out.append(inject(f"tollgate: il diff supera le soglie di L0: il lavoro sale a {new} e "
-                          f"torna in fase plan. Serve un piano (writing-plans)."))
+                          f"torna in fase plan.{size} Serve un piano (writing-plans)."))
         return out
     return [record("level", work=work["id"], level=new),
-            inject(f"tollgate: il lavoro sale a {new} (percorsi sensibili o soglie).")]
+            inject(f"tollgate: il lavoro sale a {new} (percorsi sensibili o soglie). "
+                   f"{_size_line(ctx, work, new)}.")]
 
 
 _is_registered_plan = violations.is_registered_plan
