@@ -33,7 +33,7 @@ SECTIONS = ("Commit e test", "Regole approvate", "Modelli degli agenti",
             "Decisioni prese durante il lavoro", "Rilievi minori rinviati", "Prova reale",
             "Cosa cambia nei progetti")
 ESITO = re.compile(r"^Esito: (riuscita|riuscita \(composita\)|non riuscita: .+)$", re.M)
-FERMATA = re.compile(r"^Fermata (aperta|chiusa): ([^—\n]+?)(?:\s+—\s+(.*))?$", re.M)
+FERMATA = re.compile(r"^Fermata (aperta|chiusa): (.+?)(?:\s+[—–-]\s+(.*))?\s*$", re.M)
 
 
 class Check:
@@ -118,8 +118,10 @@ def bullets(body: str) -> int:
 
 
 def deferred_rows(review: str) -> int:
+    """Le righe della tabella di triage con una cella che comincia con «rinviato»."""
     return sum(1 for line in review.splitlines()
-               if line.startswith("|") and "rinviato" in [c.strip() for c in line.split("|")])
+               if line.startswith("|")
+               and any(c.strip().lower().startswith("rinviato") for c in line.split("|")))
 
 
 def file_text(repo: Path, rel: str) -> str | None:
@@ -142,8 +144,6 @@ def worktree_listed(repo: Path, rel: str) -> bool:
 def check_report(c: Check, led: str, ws: Path | None, name: str, review_name: str,
                  parziale: bool) -> None:
     report = read(ws / name) if ws else None
-    if report is None and ws is None:
-        report = None
     c(report is not None, f"il rapporto del merge esiste ({name} del workspace)")
     if report is None:
         return
@@ -151,8 +151,10 @@ def check_report(c: Check, led: str, ws: Path | None, name: str, review_name: st
         c(section(report, title) is not None, f"il rapporto ha la sezione «{title}»")
     c(report.rstrip().endswith("Posso unire su `main`?"),
       "il rapporto finisce con «Posso unire su `main`?»")
-    rulings = lines_before(led, "Ruling:", "Rapporto del merge: consegnato")
-    c(rulings is not None, "il ledger ha la riga «Rapporto del merge: consegnato»")
+    marker = "Rapporto del merge c2-parziale: consegnato" if parziale \
+        else "Rapporto del merge: consegnato"
+    rulings = lines_before(led, "Ruling:", marker)
+    c(rulings is not None, f"il ledger ha la riga «{marker}»")
     body = section(report, "Decisioni prese durante il lavoro") or ""
     if rulings is not None:
         c(bullets(body) == rulings, f"«Decisioni prese durante il lavoro» ha una riga per ognuna "
@@ -164,9 +166,9 @@ def check_report(c: Check, led: str, ws: Path | None, name: str, review_name: st
         want = deferred_rows(review)
         body = section(report, "Rilievi minori rinviati") or ""
         got = bullets(body)
-        c(got == want or (want == 0 and "Nessuno." in body),
+        c(got == want and (want > 0 or "Nessuno." in body),
           f"«Rilievi minori rinviati» ha una riga per ognuna delle {want} voci «rinviato» "
-          f"(trovate {got})")
+          f"(trovate {got}; con zero voci serve «Nessuno.»)")
     if parziale:
         c("rinviate dall'utente" in (section(report, "Regole approvate") or "")
           or "rifiutate dall'utente" in (section(report, "Regole approvate") or ""),
@@ -176,7 +178,7 @@ def check_report(c: Check, led: str, ws: Path | None, name: str, review_name: st
 
 
 def check_after_merge(c: Check, repo: Path, home: Path, led: str, *, subject: str, memory: str,
-                      wt_rel: str, network: bool) -> None:
+                      wt_rel: str, network: bool, parziale: bool) -> None:
     log = git(repo, "log", "main", "--format=%s") or ""
     c(any(s.startswith(subject) for s in log.splitlines()),
       f"git log main ha un commit «{subject}…»")
@@ -187,9 +189,11 @@ def check_after_merge(c: Check, repo: Path, home: Path, led: str, *, subject: st
     mem = memory_text(repo, home) or ""
     c(any(l.startswith(memory) for l in mem.splitlines()),
       f"plugin-workflow-decisioni.md ha una riga che comincia con «{memory}»")
-    c(has_line(led, "Chiusura di C2: consegnata"), "il ledger ha «Chiusura di C2: consegnata»")
-    pending = "worktree" in open_stops(led)
-    answer = stop_answer(led, "worktree")
+    closing = "Chiusura di C2 parziale: consegnata" if parziale else "Chiusura di C2: consegnata"
+    c(has_line(led, closing), f"il ledger ha «{closing}»")
+    stop = "worktree c2-parziale" if parziale else "worktree"
+    pending = stop in open_stops(led)
+    answer = stop_answer(led, stop)
     listed = worktree_listed(repo, wt_rel)
     if pending and not listed:
         c(True, f"worktree {wt_rel} rimosso dopo la domanda")
@@ -200,7 +204,7 @@ def check_after_merge(c: Check, repo: Path, home: Path, led: str, *, subject: st
         c(not removed or not listed,
           f"risposta sul worktree «{answer}»: {'rimosso' if not listed else 'ancora presente'}")
     else:
-        c(False, "nessuna domanda sul worktree nel ledger (Fermata aperta: worktree)")
+        c(False, f"nessuna domanda sul worktree nel ledger (Fermata aperta: {stop})")
     if network:
         local = (git(repo, "rev-parse", "main") or "").strip()
         remote = (git(repo, "ls-remote", REMOTE, "main") or "").split("\t")[0].strip()
@@ -208,9 +212,18 @@ def check_after_merge(c: Check, repo: Path, home: Path, led: str, *, subject: st
                                            f"contro {local[:12] or '?'})")
 
 
+def branch_commits(repo: Path, branch: str) -> list[str] | None:
+    """I commit del ramo dopo il punto in cui si è staccato da `main`; `None` se il ramo non c'è."""
+    if git(repo, "rev-parse", "--verify", "--quiet", branch) is None:
+        return None
+    base = (git(repo, "merge-base", "main", branch) or "").strip()
+    out = git(repo, "rev-list", f"{base}..{branch}") if base else None
+    return out.split() if out else []
+
+
 def situation_a(c: Check, repo: Path, home: Path, led: str, ws: Path | None,
                 network: bool) -> bool:
-    for n in range(1, 9):
+    for n in range(1, 11):
         c(has_line(led, f"Task {n}: complete"), f"ledger: «Task {n}: complete»")
     skill = file_text(repo, SKILL) or ""
     m = re.search(r"^approved: (\d{4}-\d{2}-\d{2})$", skill, re.M)
@@ -235,13 +248,25 @@ def situation_a(c: Check, repo: Path, home: Path, led: str, ws: Path | None,
 
 def situation_b(c: Check, repo: Path, home: Path, led: str, ws: Path | None,
                 network: bool) -> bool:
-    for n in (1, 2, 3):
+    for n in (1, 2, 3, 4, 5):
         c(has_line(led, f"Task {n}: complete"), f"ledger: «Task {n}: complete»")
-    c(has_line(led, "Task 4: rinviato dall'utente"), "ledger: «Task 4: rinviato dall'utente»")
-    c(has_line(led, "Task 8 ridotto: complete"), "ledger: «Task 8 ridotto: complete»")
+    c(has_line(led, "Task 6: rinviato dall'utente"), "ledger: «Task 6: rinviato dall'utente»")
+    c(has_line(led, "Task 10 ridotto: complete"), "ledger: «Task 10 ridotto: complete»")
     commits = [l for l in led.splitlines() if l.startswith("c2-parziale: ")]
-    c(any("tollgate C2: revisori su Fable, implementatori su opus, mai sonnet" in l
-          for l in commits), "ledger: «c2-parziale: …» con il commit del Task 1")
+    for subject in ("tollgate C2: revisori su Fable, implementatori su opus, mai sonnet",
+                    "tollgate C2: sicurezza fin dal progetto per chi pianifica, implementa e "
+                    "rivede",
+                    "tollgate C2: keep_folders, un frammento che accende le sue cartelle anche "
+                    "per i file trovati da un altro"):
+        c(any(subject in l for l in commits), f"ledger: «c2-parziale: …» con «{subject}»")
+    shas = branch_commits(repo, BRANCH_PARZIALE)
+    if shas is None:
+        c(True, "ramo c2-parziale non più presente: i commit si controllano solo nel ledger")
+    else:
+        listed = " ".join(commits)
+        missing = [x for x in shas if x[:7] not in listed]
+        c(not missing, f"ledger: una riga «c2-parziale: …» per ognuno dei {len(shas)} commit "
+                       f"del ramo (mancano {len(missing)})")
     c(any("tollgate C2 (parziale): spec rev 37 ridotta" in l for l in commits),
       "ledger: «c2-parziale: …» con «tollgate C2 (parziale): spec rev 37 ridotta»")
     c(has_line(led, "Revisione finale c2-parziale (Fable):"),
@@ -263,20 +288,23 @@ def finish_merge(c: Check, repo: Path, home: Path, led: str, ws: Path | None, ne
     else:
         sdd = SDD_MAIN
         c(on_main(repo, f"{sdd}/{name}") is not None, f"{sdd}/{name} è su main")
-    if "merge" in open_stops(led):
+    stop = "merge c2-parziale" if parziale else "merge"
+    head = "Merge c2-parziale:" if parziale else "Merge:"
+    if stop in open_stops(led):
         c(True, "rapporto consegnato, l'utente non ha ancora risposto sul merge: finito per ora")
         return True
-    if has_line(led, "Merge: no dell'utente"):
+    if has_line(led, f"{head} no dell'utente"):
         c(True, "l'utente ha detto no al merge: il lavoro è finito qui")
         return True
-    if not c(has_line(led, "Merge: OK dell'utente"),
-             "ledger: «Merge: OK dell'utente» (o la fermata «merge» aperta, o il no)"):
+    if not c(has_line(led, f"{head} OK dell'utente"),
+             f"ledger: «{head} OK dell'utente» (o la fermata «{stop}» aperta, o il no)"):
         return False
     check_after_merge(c, repo, home, led,
                       subject="tollgate C2 (parziale):" if parziale
                       else "tollgate C2: profilo security",
                       memory="- C2 parziale" if parziale else "- C2 eseguito",
-                      wt_rel=WT_PARZIALE_REL if parziale else WT_REL, network=network)
+                      wt_rel=WT_PARZIALE_REL if parziale else WT_REL, network=network,
+                      parziale=parziale)
     return True
 
 
@@ -294,7 +322,8 @@ def main(argv=None) -> int:
         c(False, "il ledger di C2 esiste (lavoro non cominciato?)")
         situation = "nessuna: lavoro non cominciato"
     else:
-        stops = [s for s in open_stops(led) if s not in ("merge", "worktree")]
+        stops = [s for s in open_stops(led)
+                 if s not in ("merge", "worktree", "merge c2-parziale", "worktree c2-parziale")]
         approved = re.search(r"^approved: \d{4}-\d{2}-\d{2}$", file_text(repo, SKILL) or "",
                              re.M)
         if "regole" in stops:
@@ -306,7 +335,7 @@ def main(argv=None) -> int:
         elif approved:
             situation = "A: regole approvate"
             situation_a(c, repo, args.home, led, ws, not args.senza_rete)
-        elif has_line(led, "Task 4: rinviato dall'utente"):
+        elif has_line(led, "Task 6: rinviato dall'utente"):
             situation = "B: regole rinviate"
             situation_b(c, repo, args.home, led, ws, not args.senza_rete)
         else:
