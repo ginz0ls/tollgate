@@ -90,8 +90,8 @@ C4a costruisce il **trasporto** verso GitHub. Le bacheche vere (bacheca principa
 
 Due cose, gratis (il repo privato e i Projects di un account personale non costano niente). I passi, per chi non è del mestiere, sono nella sezione «La sonda su GitHub vero» del piano, punti 1-4:
 1. **Il repo di prova privato** `tollgate-c4-probe` nel suo account, con un README (punto 1). Lo può creare anche prima che la sessione cominci. Resta anche dopo C4a: serve a C4b e a C6.
-2. **Il token delle bacheche**: un token classico con il solo scope `project`, scadenza 90 giorni (punto 2). Lo può creare anche prima.
-3. **Il token nel file**, con `board token set` lanciato in un **suo** terminale dalla cartella del worktree (punto 3). Questo si può fare solo **dopo il Task 2**, perché il comando nasce lì; poi `board token status` deve dire `token delle bacheche: presente`.
+2. **Il token delle bacheche**: un token classico con il solo scope `project`, scadenza 90 giorni (punto 2). Lo crea **solo quando la sessione glielo chiede**, alla fermata `sonda`, e subito dopo lo mette nel file (punto 3): GitHub lo mostra una volta sola, e crearlo prima vorrebbe dire tenerlo da qualche parte.
+3. **Il token nel file**, con `board token set` lanciato in un **suo** terminale dalla cartella del worktree (punto 3). Il comando nasce col Task 2, quindi anche questo si fa alla fermata `sonda`; poi `board token status` deve dire `token delle bacheche: presente`.
 4. **Mai incollare il token nella chat** (punto 4); se succede, si cancella e si rifà.
 
 **Quando gli verrà chiesto:** alla fermata `sonda`, dopo i Task 1-3 (circa uno o due giorni di calendario dall'avvio). L'utente può rispondere «Sì, pronte», «Non ora: rinvia la sonda a C4b» (C4a va avanti e si unisce lo stesso; la sonda diventa il primo passo della sessione che scrive C4b) o «Ho un dubbio». Il suo tempo: circa 15 minuti.
