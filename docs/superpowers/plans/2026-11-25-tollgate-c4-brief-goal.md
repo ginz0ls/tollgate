@@ -37,7 +37,7 @@ A ogni fermata la sessione scrive nel ledger `Fermata aperta: <caso>`, manda il 
 
 ## Finito quando
 
-**Ogni condizione si controlla leggendo un file su `main` o nel worktree, mai solo il transcript.** Lo script `docs/superpowers/plans/2026-11-25-tollgate-c4-verifica-fine.py` (**provato a secco su <N> situazioni**) le controlla tutte e stampa la situazione e l'esito di ognuna: **nell'ultimo messaggio della sessione lancialo dalla radice del repo e incollane l'uscita**. Esce con 0 quando il lavoro è finito, anche «finito per ora» in attesa dell'utente, con 1 altrimenti.
+**Ogni condizione si controlla leggendo un file su `main` o nel worktree, mai solo il transcript.** Lo script `docs/superpowers/plans/2026-11-25-tollgate-c4-verifica-fine.py` (**provato a secco su 69 situazioni**) le controlla tutte e stampa la situazione e l'esito di ognuna: **nell'ultimo messaggio della sessione lancialo dalla radice del repo e incollane l'uscita**. Esce con 0 quando il lavoro è finito, anche «finito per ora» in attesa dell'utente, con 1 altrimenti.
 
 Le condizioni dipendono da **una sola** delle tre situazioni, scelta da ciò che è scritto. **Si controlla prima C** (una fermata aperta nel ledger, diversa da `merge` e `worktree`): se vale, prevale su A e B. Tra A e B decide la riga `Esito:` del rapporto della sonda (nel worktree, o su `main` se il worktree non c'è più): `Esito: riuscita` o `Esito: riuscita con differenze` dà A; `Esito: rinviata a C4b` dà B. Se l'utente prepara la sonda dopo averla rinviata e la sonda si fa, l'`Esito:` cambia e vale A. Senza ledger, con più di un workspace, o senza rapporto della sonda e senza fermate aperte, il lavoro non è finito.
 
@@ -50,7 +50,7 @@ Le condizioni dipendono da **una sola** delle tre situazioni, scelta da ciò che
 2. La sonda:
    - il ledger ha una riga che comincia con `Fermata chiusa: sonda — ` e righe che cominciano con `Sonda: controlla`, `Sonda: esegui`, `Sonda: pulisci` e `Sonda: S13 notifica — `;
    - `docs/verifiche/2026-11-25-c4-sonda.md` ha una riga `Esito: riuscita` o `Esito: riuscita con differenze`, e una riga di tabella che comincia con `| S<n> |` per ognuno dei fatti S1-S22;
-   - il rapporto della sonda non contiene il login `ginz0ls`, il nome del repo di prova `tollgate-c4-probe`, `/home/`, né una forma di token (`gh` seguito da una lettera tra `p`, `o`, `u`, `s`, `r`, un trattino basso e almeno 20 caratteri; oppure `github_pat_`).
+   - il rapporto della sonda non contiene il login `ginz0ls`, il nome del repo di prova `tollgate-c4-probe`, `/home/`, né una forma di token (`gh` seguito da una lettera tra `p`, `o`, `u`, `s`, `r`, un trattino basso e almeno 20 lettere, cifre o trattini bassi; oppure `github_pat_`).
 3. Il ledger ha una riga che comincia con `Revisione finale (Fable):` e, dopo, una che comincia con `Revisione finale chiusa: 0 critical, 0 important aperti`.
 4. Il ledger ha le tre righe che cominciano con `Suite finale corsa 1: verde su python3.11 e python3`, `Suite finale corsa 2: verde su python3.11 e python3`, `Suite finale corsa 3: verde su python3.11 e python3`.
 5. Il rapporto del merge `rapporto-merge.md` del workspace (o, se il worktree non c'è più, la sua copia su `main`):
@@ -126,5 +126,5 @@ Specifica per chi scrive lo script `docs/superpowers/plans/2026-11-25-tollgate-c
 32. Remoto diverso: `git ls-remote` del repo nudo che fa da remoto dà uno SHA diverso da `git rev-parse main`: 1; uguale: verde; con `--senza-rete` il controllo si salta.
 33. B: sonda rinviata, Task 1-11 `complete`, `Fermata chiusa: sonda — Non ora: rinvia la sonda a C4b`, `Sonda: rinviata a C4b — …`, rapporto con `Esito: rinviata a C4b`, tutto il resto di A, merge OK e passi dopo il merge fatti: 0.
 34. B senza la riga `Sonda: rinviata a C4b`: 1; variante con il rapporto del merge che nella sezione «La sonda» non dice `rinviata a C4b`: 1.
-35. B poi A: il rapporto della sonda passa a `Esito: riuscita` dopo un rinvio: valgono le condizioni di A (con le righe `Sonda: esegui`, `Sonda: pulisci`, `Sonda: S13 notifica — ` e la tabella S1-S22).
+35. B poi A: il rapporto della sonda passa a `Esito: riuscita` dopo un rinvio: valgono le condizioni di A (con le righe `Sonda: esegui`, `Sonda: pulisci`, `Sonda: S13 notifica — ` e la tabella S1-S22): con tutto il resto di A vero, 0; variante senza `Sonda: pulisci`: 1.
 36. Rapporto della sonda con una riga `Esito:` diversa dai tre valori (per esempio `Esito: fallita`): 1.
