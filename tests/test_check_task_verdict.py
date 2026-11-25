@@ -351,6 +351,38 @@ class DatabaseProfileNoStepTest(DatabaseProfileTest):
         self.assertEqual(self.outcome("R-DATABASE-01"), "changes")
 
 
+class SecurityProfileTest(Base):
+    """Il blocco `security` (regole di una skill finta, scritto nel test): solo le `[blocca]`
+    fermano il task."""
+    research = True
+    toml = DEFAULT_TOML + """
+[profiles]
+active = ["security"]
+[profiles.security]
+paths = ["**"]
+rules = ["R-SECURITY-01", "R-SECURITY-03", "R-SECURITY-11"]
+blocking_rules = ["R-SECURITY-01", "R-SECURITY-03"]
+"""
+
+    def outcome(self, rule):
+        self.stop(text=self.verdict(outcome="approved", findings=[dict(GOOD, rule=rule)]))
+        return self.task()["verdict"]
+
+    def test_security_profile_blocking_rule_changes(self):
+        self.assertEqual(self.outcome("R-SECURITY-03"), "changes")
+
+    def test_security_profile_non_blocking_rule_approves(self):
+        self.assertEqual(self.outcome("R-SECURITY-11"), "approved")
+
+
+class SecurityProfileNoStepTest(SecurityProfileTest):
+    """Senza il passo (nessuna nota) le `[blocca]` di `security` fermano comunque."""
+    research = False
+
+    def test_security_blocking_rule_without_step(self):
+        self.assertEqual(self.outcome("R-SECURITY-01"), "changes")
+
+
 class BaseRulesTest(Base):
     """Le `R-BASE-…` di `rules-base`: note sempre, bloccanti solo se `[blocca]`, con l'interruttore
     acceso e il passo di ricerca attivo nel lavoro."""

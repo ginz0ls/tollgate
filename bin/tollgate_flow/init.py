@@ -381,13 +381,15 @@ def profile_blocks(files: dict[str, int], current_text: str, plugin_root: Path, 
         area = fragment.area
         skip = EXCLUDED_PREFIXES + fragment.exclude
         # Un file che questo frammento accende solo per percorso e che il rilevamento per
-        # contenuto assegna a un altro frammento non lo accende (I-1 di B5).
+        # contenuto assegna a un altro frammento non lo accende (I-1 di B5), salvo che il
+        # frammento dichiari `[detect] keep_paths`: allora tutte le sue forme lo accendono
+        # (C2, decisione 4).
         mine = set((detected or {}).get(area, []))
         taken = {f for other_area, files_found in (detected or {}).items()
                  if other_area != area for f in files_found}
         lighting = [f for f in candidates
                     if concrete_for(f, fragment.patterns, fragment.exclude)
-                    and (f in mine or f not in taken)]
+                    and (f in mine or f not in taken or fragment.keep_paths)]
         found = sorted({f for f in (detected or {}).get(area, [])
                         if not f.startswith(skip)} - set(lighting))
         rules = fragments.rules(fragment)

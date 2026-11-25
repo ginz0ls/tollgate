@@ -77,6 +77,18 @@ blocking_rules = ["R-DATABASE-01"]
 """
 DATABASE_TOML = DEFAULT_TOML + DATABASE_BLOCK
 BACKEND_DATABASE_TOML = DEFAULT_TOML + BACKEND_BLOCK + DATABASE_BLOCK
+SECURITY_BLOCK = """
+[profiles.security]
+paths = ["**/auth/**", "**/middleware.*"]
+skills = []
+reviewer_skills = []
+agent = "tollgate:implementer-security"
+reviewer = "tollgate:reviewer-security"
+rules = ["R-SECURITY-01", "R-SECURITY-11"]
+blocking_rules = ["R-SECURITY-01"]
+"""
+SECURITY_TOML = DEFAULT_TOML + SECURITY_BLOCK
+BACKEND_SECURITY_TOML = DEFAULT_TOML + BACKEND_BLOCK + SECURITY_BLOCK
 BACKEND_FRONTEND_TOML = DEFAULT_TOML + BACKEND_BLOCK + FRONTEND_BLOCK
 BACKEND_INFRA_TOML = DEFAULT_TOML + BACKEND_BLOCK + INFRA_BLOCK.replace(
     'paths = ["vercel.json"]', 'paths = ["wrangler.jsonc"]')
@@ -139,7 +151,7 @@ class TaskStartTest(TaskCase):
             self.assertIn(part, summary)
         self.assertNotIn("\n", summary)
         self.assertIn("revisore: tollgate:task-reviewer", summary)
-        self.assertNotIn("model: inherit", summary)
+        self.assertNotIn("model:", summary)
         self.assertIn("verify", brief)
         self.assertIn(f"{program_command(BIN / 'tollgate')} verify", brief)
 
@@ -245,17 +257,10 @@ class TaskStartTest(TaskCase):
         self.assertIn("tg-7-t2", path.read_text())
 
     def test_models_override_in_summary(self):
-        self.make(toml=DEFAULT_TOML + '[review]\nmodels = {"tollgate:implementer" = "sonnet"}\n')
+        self.make(toml=DEFAULT_TOML + '[review]\nmodels = {"tollgate:implementer" = "fable"}\n')
         path, summary = self.start()
-        self.assertIn("model: sonnet", summary)
-        self.assertIn("model: sonnet", path.read_text())
-        for _ in (1, 2, 3):
-            self.to_changes()
-            self.start(fix=True)
-        self.to_changes()
-        path, summary = self.start(fix=True)      # giro 4: nuovo implementatore, resta inherit
-        self.assertIn("model: inherit", summary)
-        self.assertNotIn("sonnet", summary)
+        self.assertIn("model: fable", summary)
+        self.assertIn("model: fable", path.read_text())
 
     def test_rules_base_not_required(self):
         """Guardia (decisione 2): `rules-base` si precarica, non è una skill da usare."""
@@ -393,6 +398,25 @@ class TaskStartTest(TaskCase):
         self.assertEqual((row["agent_type"], row["reviewer_type"]),
                          ("tollgate:implementer", "tollgate:task-reviewer"))
 
+    def test_security_task_routed_to_area_agents(self):
+        """Un blocco `security` scritto nel test (regole di una skill finta, non i file veri)."""
+        self.make(toml=SECURITY_TOML, plan=plan_text("- Create: `app/auth/login.py`"))
+        _, summary = self.start(2)
+        row = self.row(2)
+        self.assertEqual((row["agent_type"], row["reviewer_type"]),
+                         ("tollgate:implementer-security", "tollgate:reviewer-security"))
+        self.assertIn("tollgate:implementer-security", summary)
+        self.assertIn("revisore: tollgate:reviewer-security", summary)
+
+    def test_security_and_backend_task_goes_generic(self):
+        """Due aree nello stesso task: agenti generici (il task è da dividere)."""
+        self.make(toml=BACKEND_SECURITY_TOML,
+                  plan=plan_text("- Create: `server/app.py`\n- Create: `app/auth/login.py`"))
+        self.start(2)
+        row = self.row(2)
+        self.assertEqual((row["agent_type"], row["reviewer_type"]),
+                         ("tollgate:implementer", "tollgate:task-reviewer"))
+
     def test_absent_skill_removed_from_required(self):
         self.make(toml=WEB_TOML, plan=plan_text("- Create: `web/page.tsx`"))
         # registrazione del piano: i primi 3 dei profili
@@ -472,7 +496,7 @@ class FixRoundsTest(TaskCase):
             self.assertEqual(path.name, f"task-1-fix-{i}.md")
             self.assertIn("manca il caso zero", path.read_text())
             self.assertIn("resume", summary)
-            self.assertNotIn("model: inherit", summary)
+            self.assertNotIn("model:", summary)
             tasks.take_pending(self.fl.conn, self.fl.work, agent_type="tollgate:implementer",
                                resume=True)
 
@@ -488,10 +512,41 @@ class FixRoundsTest(TaskCase):
             row = self.row()
             self.assertEqual((row["fix_rounds"], row["implementer"], row["pending"]),
                              (i, name, "launch"))
-            self.assertIn("model: inherit", summary)
+            self.assertIn("model: opus", summary)
             self.assertIn(name, summary)
-            self.assertIn("model: inherit", path.read_text())
+            self.assertIn("model: opus", path.read_text())
             self.assertIn(f"`{name}`", path.read_text())
+
+    def test_fix_round_4_hints_opus(self):
+        """Decisione 14 di C2: senza `[review] models` il nuovo implementatore del giro 4 è opus."""
+        self.make()
+        self.start()
+        for _ in (1, 2, 3):
+            self.to_changes()
+            self.start(fix=True)
+        self.to_changes()
+        path, summary = self.start(fix=True)
+        self.assertEqual(taskcmd.MODEL_HINT, "opus")
+        self.assertIn("model: opus", summary)
+        self.assertIn("model: opus", path.read_text())
+        self.assertNotIn("inherit", summary)
+
+    def test_fix_round_4_uses_review_models(self):
+        """Decisione 14 di C2: dal giro 4 vale `[review] models` dell'implementatore, se c'è."""
+        self.make(toml=DEFAULT_TOML + '[review]\nmodels = {"tollgate:implementer" = "fable"}\n')
+        path, summary = self.start()
+        self.assertIn("model: fable", summary)
+        self.assertIn("model: fable", path.read_text())
+        for _ in (1, 2, 3):
+            self.to_changes()
+            self.start(fix=True)
+        self.to_changes()
+        path, summary = self.start(fix=True)
+        self.assertEqual(self.row()["implementer"], "tg-7-t1-r4")
+        self.assertIn("model: fable", summary)
+        self.assertIn("model: fable", path.read_text())
+        self.assertNotIn("opus", summary)
+        self.assertNotIn("inherit", summary)
 
     def test_sixth_fix_opens_needs_you(self):
         fl = self.make()
@@ -508,8 +563,8 @@ class FixRoundsTest(TaskCase):
         self.assertEqual(phases.get_work(fl.conn, fl.work)["phase"], "blocked")
         self.assertEqual(self.row()["fix_rounds"], 5)
 
-    def test_sixth_round_name_launch_inherit(self):
-        """Dopo `approve rounds 1` il sesto giro ha nome -r6, si lancia e usa model: inherit."""
+    def test_sixth_round_name_launch_opus(self):
+        """Dopo `approve rounds 1` il sesto giro ha nome -r6, si lancia e usa model: opus."""
         fl = self.make()
         self.start()
         for _ in range(5):
@@ -525,9 +580,9 @@ class FixRoundsTest(TaskCase):
         row = self.row()
         self.assertEqual((row["fix_rounds"], row["implementer"], row["pending"]),
                          (6, "tg-7-t1-r6", "launch"))
-        self.assertIn("model: inherit", summary)
+        self.assertIn("model: opus", summary)
         self.assertIn("tg-7-t1-r6", summary)
-        self.assertIn("model: inherit", path.read_text())
+        self.assertIn("model: opus", path.read_text())
         self.assertIn("`tg-7-t1-r6`", path.read_text())
 
     def test_fix_needs_changes_verdict_and_a_fresh_one_each_round(self):

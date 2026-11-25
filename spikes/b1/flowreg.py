@@ -28,7 +28,7 @@ WANTED = ("research_note", "research_reminder", "veto")
 C1_WANTED = ("size_decided", "cost", "ruling")
 RULES_TITLE = "# Regole di base (versione 1)"
 AREA_TITLES = ("# Regole ai (versione 1)", "# Regole infra (versione 1)", "# Regole backend (versione 1)", "# Regole frontend (versione 1)",
-               "# Regole database (versione 1)", RULES_TITLE)
+               "# Regole database (versione 1)", "# Regole security (versione 1)", RULES_TITLE)
 WEB_TOOLS = ("WebFetch", "WebSearch")
 SAVED_TOOLS = ("Read", "Grep", "Bash")  # su una copia salvata da Claude Code in tool-results/ portano lo stesso testo di terzi, a qualunque lunghezza
 SAVED_DIR = "tool-results"

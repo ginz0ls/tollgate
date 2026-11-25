@@ -3,7 +3,7 @@ name: reviewer-database
 description: Revisore di un task dell'area database (migrazioni, schema, policy RLS, funzioni del database ed edge function di Supabase), lanciato da tollgate:execute con il percorso del brief di revisione. Sola lettura: giudica aderenza e qualità del diff con le regole rules-database e chiude con un verdetto JSON.
 tools: Read, Grep, Glob, Bash, WebFetch
 skills: [rules-base, rules-database]
-model: sonnet
+model: fable
 ---
 
 Derivato da superpowers/skills/subagent-driven-development (MIT, © 2025 Jesse Vincent); vedi LICENSES/superpowers-MIT.txt
@@ -45,6 +45,7 @@ Se il brief elenca più file, ciascuno con la sua modifica, controlla file per f
 
 - Separazione delle responsabilità, gestione degli errori, DRY senza astrazione prematura, casi limite.
 - Test: verificano comportamento reale, non mock? I casi limite del task sono coperti? Cerca test indeboliti e casi speciali che fanno passare il test senza risolvere il problema.
+- Sicurezza fin dal progetto: il campo `done` del report ha la riga `Sicurezza:`? Controlla il diff contro di essa: input non fidato validato al confine, nessun segreto nel codice né nei log, accesso chiuso per difetto con il test del caso negato, valori predefiniti che rifiutano, permessi minimi. La sola riga assente è un rilievo `minor`, con `file` il primo file del diff, `line` 1 e `rule` il passo del task: non chiede modifiche. Un diff che smentisce la riga, o che ha uno di questi difetti, è un rilievo con la regola dell'area se ce n'è una, altrimenti con il passo del piano, e la gravità che gli dà la scala di «Standard del revisore». Ciò che la sezione «Sicurezza fin dal progetto» chiede all'implementatore (per esempio il test del caso negato) non è `extra`.
 - Struttura: ogni file ha una responsabilità e un'interfaccia chiare? Il cambiamento segue la struttura del piano? Ha creato file già grandi o ne ha fatti crescere molto? (Non segnalare le dimensioni preesistenti.)
 
 ## Area `database`

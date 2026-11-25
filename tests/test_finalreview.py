@@ -132,6 +132,67 @@ class PrepareNewCycleTest(FinalCase):
         self.lab(toml=self.real_database_toml(), extra=self.MIGRATION)
         self.assertEqual([x.agent_type for x in self.prepare().launches], [REVIEWER])
 
+    AUTH = {"app/auth/x.py": "def consentito(utente):\n    return utente is not None\n"}
+
+    def real_toml(self, areas, files):
+        """I frammenti veri di `areas`, come li propone `init` in un repo temporaneo con i file
+        `files` e le skill e gli agenti veri del plugin (decisione 10 di C2)."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        (root / "templates" / "profiles").mkdir(parents=True)
+        (root / "agents").mkdir()
+        for area in areas:
+            shutil.copy(ROOT / "templates" / "profiles" / f"{area}.toml",
+                        root / "templates" / "profiles" / f"{area}.toml")
+            (root / "skills" / f"rules-{area}").mkdir(parents=True)
+            shutil.copy(ROOT / "skills" / f"rules-{area}" / "SKILL.md",
+                        root / "skills" / f"rules-{area}" / "SKILL.md")
+            for kind in ("implementer", "reviewer", "final"):
+                shutil.copy(ROOT / "agents" / f"{kind}-{area}.md",
+                            root / "agents" / f"{kind}-{area}.md")
+        got = init.profile_blocks({f: 10 for f in files}, DEFAULT_TOML, root)
+        for area in areas:
+            self.assertIn(f"[profiles.{area}]", got.text)
+        return DEFAULT_TOML + got.text
+
+    def test_real_security_specialist_in_l2(self):
+        self.lab(toml=self.real_toml(("security",), self.AUTH), level="L2", extra=self.AUTH)
+        r = self.prepare()
+        specialist = "tollgate:final-security"
+        self.assertEqual([x.agent_type for x in r.launches], [REVIEWER, specialist])
+        self.assertEqual(json.loads(self.cycle()["reviewers"]), [REVIEWER, specialist])
+        brief = self.run_dir() / "final-1-security.md"
+        self.assertEqual(r.launches[1].brief, brief)
+        text = brief.read_text()
+        self.assertIn("Lista di controllo dell'area", text)
+        self.assertIn("accesso negato provato da un test", text)
+        self.assertIn(specialist, text)
+
+    def test_real_security_specialist_not_in_l1(self):
+        self.lab(toml=self.real_toml(("security",), self.AUTH), extra=self.AUTH)
+        self.assertEqual([x.agent_type for x in self.prepare().launches], [REVIEWER])
+
+    def test_real_security_and_database_specialists_together(self):
+        """Un lavoro L2 che tocca un file di `security` e una migrazione lancia tutti e due gli
+        specialisti, ognuno con il suo brief e la sua lista di controllo."""
+        files = {**self.AUTH, **self.MIGRATION}
+        self.lab(toml=self.real_toml(("database", "security"), files), level="L2", extra=files)
+        r = self.prepare()
+        db, sec = "tollgate:final-database", "tollgate:final-security"
+        self.assertEqual(sorted(x.agent_type for x in r.launches[1:]), [db, sec])
+        self.assertEqual(r.launches[0].agent_type, REVIEWER)
+        self.assertEqual(sorted(json.loads(self.cycle()["reviewers"])), sorted([REVIEWER, db, sec]))
+        db_text = (self.run_dir() / "final-1-database.md").read_text()
+        sec_text = (self.run_dir() / "final-1-security.md").read_text()
+        self.assertIn("migrazioni reversibili e dati esistenti", db_text)
+        self.assertNotIn("accesso negato provato da un test", db_text)
+        self.assertIn("accesso negato provato da un test", sec_text)
+        self.assertNotIn("migrazioni reversibili e dati esistenti", sec_text)
+        general = (self.run_dir() / "final-1.md").read_text()
+        self.assertIn("migrazioni reversibili e dati esistenti", general)
+        self.assertIn("accesso negato provato da un test", general)
+
     def test_l1_has_no_specialists(self):
         self.lab(toml=SEC_TOML)
         self.assertEqual([x.agent_type for x in self.prepare().launches], [REVIEWER])

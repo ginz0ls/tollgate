@@ -1,0 +1,60 @@
+--- spikes/c2/input/spec-L2.md	2026-11-23 16:50:23.933519141 +0100
++++ /tmp/tollgate-b1/flow/.claude/worktrees/tg-1-scadenza-dei-token-e-lettura-delle-note/docs/superpowers/specs/2026-11-22-prova-c2.md	2026-11-23 21:11:10.416951088 +0100
+@@ -8,27 +8,50 @@
+ 
+ - Chi lo usa: un utente con un token firmato da `sign`, che porta il suo nome e la scadenza.
+ - Dati: le note dell'archivio in memoria di `app/notes.py`, ognuna con il suo proprietario.
+-- Segreti: uno solo, la chiave di firma dei token, che si legge dalla variabile d'ambiente `C2_PROVA_SECRET`; nei test vale `PROVA-123` e nel progetto non c'è nessun altro valore.
+-- Input ostile: un token alterato o scaduto non vale.
++- Segreti: uno solo, la chiave di firma dei token, che si legge dalla variabile d'ambiente `C2_PROVA_SECRET`; nei test vale `PROVA-123` e nel progetto non c'è nessun altro valore valido; i valori non validi di M5 e M13 (vuoto, `"\udcff"`) servono solo a provare il rifiuto.
++- Input ostile: un token alterato, malformato o scaduto non vale; un token valido di un altro utente non legge la nota. `token` e `note_id` sono input non fidati; `now` lo fornisce il codice chiamante fidato (l'orologio del server) e non viene mai da chi presenta il token.
++
++## Interfacce
++
++- `app/auth/tokens.py`: `verify(token: str, secret: bytes, *, now: int) -> str | None` mantiene la firma attuale e in più controlla la scadenza. Non solleva mai per un token malformato: restituisce `None`. Sono malformati anche un token non codificabile in UTF-8 (per esempio con un surrogato isolato) e un token con utente vuoto. Con `secret` vuoto `verify` restituisce sempre `None`, così il rifiuto della chiave vuota non dipende dal chiamante. La docstring di `verify`, che oggi dice «La scadenza non è ancora controllata», si aggiorna al nuovo comportamento.
++- `app/auth/tokens.py`: nuova `signing_key() -> bytes`, l'unico punto in `app/` che legge `C2_PROVA_SECRET`. La legge a ogni chiamata, non all'import, e la codifica in UTF-8 senza `strip`; con la variabile assente, vuota (lunghezza zero) o non codificabile in UTF-8 solleva `RuntimeError` e non restituisce mai una chiave vuota. Il messaggio del `RuntimeError` nomina la variabile e mai il suo valore; l'eccezione si solleva con `from None`. I test impostano la variabile con `mock.patch.dict` e firmano i token con `signing_key()` o con il valore letto dall'ambiente, come fa già `tests/test_tokens.py`.
++- `app/auth/access.py` (nuovo): `can_read(user: str, owner: str) -> bool`, vero solo se `user == owner`. Riceve il proprietario come stringa, così `access.py` non importa `app/notes.py` e non c'è import circolare.
++- `app/notes.py`: nuova `read_note(token: str, note_id: int, *, now: int) -> Note | None`. Come prima istruzione ottiene la chiave da `signing_key()`, poi l'utente da `verify`, la nota da `get_note`, il permesso da `can_read`. Restituisce la nota solo al proprietario; in ogni altro caso (token non valido, nota inesistente, utente diverso dal proprietario) restituisce lo stesso `None`, così chi non è proprietario non distingue una nota altrui da una inesistente. Il contratto vale per argomenti del tipo dichiarato. `NotesTest` chiama `clear_notes()` nel `setUp`, così i test non dipendono dall'ordine.
+ 
+ ## Fette previste
+ 
+-1. Scadenza dei token e lettura di una nota con il token, con un test per ciascuna.
++1. Scadenza dei token e lettura di una nota con il token, con un test per ciascun comportamento.
+ 
+ ## Must-have
+ 
+ - M1. Un token scaduto non è valido: `verify` restituisce `None` — test: tests.test_tokens.TokensTest::test_expired_token_is_rejected
+ - M2. Il proprietario legge la propria nota con un token valido — test: tests.test_notes.NotesTest::test_owner_reads_own_note
++- M3. Un token con `expires_at == now` è già scaduto (`None`), con `now == expires_at - 1` è valido — test: tests.test_tokens.TokensTest::test_token_expiring_now_is_rejected
++- M4. Un token firmato con scadenza non valida (per esempio `abc`, ` 12 `, `1_000`, cifre non ASCII, 21 cifre) fa restituire `None` a `verify`, senza eccezioni, mentre una scadenza valida di 20 cifre è accettata; il test passa la scadenza a `sign` come stringa, fuori contratto di proposito, per avere una firma valida su una scadenza malformata — test: tests.test_tokens.TokensTest::test_malformed_expiry_is_rejected
++- M5. Con `C2_PROVA_SECRET` assente, vuota o non codificabile in UTF-8 (con il valore `"\udcff"`: in `os.environ` entrano solo i surrogati U+DC80-U+DCFF; quel ramo si omette con un `if` se `sys.getfilesystemencoding()` non è `utf-8`, senza `skipTest`: il test resta verde e i rami assente e vuota si eseguono sempre) `signing_key()` solleva `RuntimeError` — test: tests.test_tokens.TokensTest::test_missing_secret_is_refused
++- M6. Un token valido di un altro utente non legge la nota: `read_note` restituisce `None` — test: tests.test_notes.NotesTest::test_other_user_cannot_read_note
++- M7. Un token scaduto, alterato o non codificabile in UTF-8 non legge la nota: `read_note` restituisce `None` — test: tests.test_notes.NotesTest::test_invalid_token_cannot_read_note
++- M8. Una nota inesistente dà lo stesso `None` di una nota altrui — test: tests.test_notes.NotesTest::test_missing_note_returns_none
++- M9. Un token non codificabile in UTF-8 (per esempio `"\ud800.1.x"`) fa restituire `None` a `verify`, senza eccezioni — test: tests.test_tokens.TokensTest::test_unencodable_token_is_rejected
++- M10. Un token firmato con utente vuoto fa restituire `None` a `verify` — test: tests.test_tokens.TokensTest::test_empty_user_is_rejected
++- M11. Con `C2_PROVA_SECRET` assente `read_note` lascia passare il `RuntimeError` di `signing_key()`, non restituisce `None`, anche con nota inesistente e token qualsiasi — test: tests.test_notes.NotesTest::test_missing_secret_raises
++- M12. `can_read` è vero solo se l'utente è il proprietario: vero per `("anna", "anna")`, falso per `("bruno", "anna")` — test: tests.test_access.AccessTest::test_only_owner_can_read
++- M13. Con `secret` vuoto `verify` restituisce `None` anche per un token firmato con la chiave vuota — test: tests.test_tokens.TokensTest::test_empty_secret_is_rejected
+ 
+ ## Tane di coniglio
+ 
+-- Rinnovo dei token: scelta fatta, nessun rinnovo; chi ha un token scaduto ne riceve uno nuovo da `sign`.
+-- Formato del token: scelta fatta, resta quello di `sign` (utente, scadenza, firma).
++- Emissione e rinnovo dei token: scelta fatta, restano fuori da questo lavoro; nessuna funzione di rinnovo né punto di emissione nuovo. `sign` resta com'è.
++- Formato del token: scelta fatta, resta quello di `sign` (utente, scadenza, firma). Per contratto `expires_at` è un `int` non negativo; la validazione dei suoi argomenti in `sign` resta fuori di proposito, perché `sign` lo chiama solo chi ha la chiave.
+ - Orologio: scelta fatta, l'istante corrente arriva come argomento `now`, in secondi; le funzioni non leggono l'orologio.
+-- Token che scade nell'istante `now`: scelta fatta, è già scaduto.
++- Token che scade nell'istante `now`: scelta fatta, è già scaduto (valido solo se `now < expires_at`).
++- Ordine dei controlli in `verify`: scelta fatta, prima di tutto `secret` vuoto dà `None`, poi la codifica del token in UTF-8 (`UnicodeEncodeError` dà `None`), poi la forma (tre parti con `rsplit(".", 2)`, come oggi: l'utente può contenere punti), poi la firma, poi l'utente non vuoto, poi la scadenza. La scadenza vale solo se è fatta di sole cifre ASCII (`isascii()` e `isdigit()`) e ha al più 20 cifre, poi si converte con `int`; altrimenti `None`. Il limite resta sotto quello di Python sulla conversione di stringhe lunghe (4300 cifre), quindi `int` non solleva.
++- Confronto della firma: scelta fatta, a tempo costante con `hmac.compare_digest` sui byte UTF-8 delle due firme, così caratteri non ASCII non sollevano `TypeError`.
++- Chiave assente, vuota o non codificabile in UTF-8: scelta fatta, `signing_key()` solleva `RuntimeError`; `read_note` non la intercetta, perché è un errore di configurazione e non un accesso negato.
++- Numero di fette: scelta fatta, una sola. I due passi sono piccoli e la lettura dipende dalla scadenza; restano separati nei commit e nei test.
+ 
+ ## Cosa non fare
+ 
+ - Nessuna libreria fuori dalla libreria standard di Python, nessun programma di servizi o di pacchetti, nessuna rete.
+-- Nessuna credenziale né file `.env` nel progetto, nessun valore di chiave oltre a quello finto dei test.
++- Nessuna credenziale né file `.env` nel progetto, nessun valore valido di chiave oltre a quello finto dei test (i valori non validi di M5 e M13 servono solo a provare il rifiuto); nessun valore predefinito per `C2_PROVA_SECRET`.
++- Nessuna funzione di emissione o rinnovo dei token.
+ - Nessuna modifica a `tools/unittest_junit.py`.

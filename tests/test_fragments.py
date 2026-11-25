@@ -152,6 +152,28 @@ class FragmentsTest(unittest.TestCase):
         self.assertIn("ai.toml", str(cm.exception))
         self.assertIn("sconosciuta", str(cm.exception))
 
+    def test_keep_paths_default_false(self):
+        self.put("ai.toml", GOOD)
+        self.assertIs(fragments.load(self.root)[0].keep_paths, False)
+
+    def test_keep_paths_true_read(self):
+        self.put("ai.toml", '[profile]\npaths = ["**/ai/**"]\n[detect]\nkeep_paths = true\n')
+        self.assertIs(fragments.load(self.root)[0].keep_paths, True)
+        self.put("ai.toml", '[profile]\npaths = ["**/ai/**"]\n[detect]\nkeep_paths = false\n')
+        self.assertIs(fragments.load(self.root)[0].keep_paths, False)
+
+    def test_keep_paths_not_bool_rejected(self):
+        # `1 == True` in Python: il controllo è sul tipo, non sul valore (D7).
+        for value in ('"sì"', '1', '0', '"true"', '[true]'):
+            with self.subTest(value=value):
+                self.put("ai.toml", f'[profile]\npaths = ["**/ai/**"]\n[detect]\n'
+                                    f'keep_paths = {value}\n')
+                with self.assertRaises(fragments.FragmentError) as cm:
+                    fragments.load(self.root)
+                self.assertIn("ai.toml", str(cm.exception))
+                self.assertIn("keep_paths", str(cm.exception))
+                self.assertNotIn("sconosciuta", str(cm.exception))
+
     def test_approved_needs_approved_skill(self):
         self.put("ai.toml", GOOD)
         f = fragments.load(self.root)[0]
@@ -276,6 +298,16 @@ class RealFragmentsTest(unittest.TestCase):
         self.assertTrue(found["database"].detect)
         self.assertEqual(found["database"].exclude, ())
         self.assertEqual(found["database"].patterns[3], fragments.Pattern("ext", "sql"))
+        self.assertIn("security", found)
+        self.assertEqual(found["security"].profile["agent"], "tollgate:implementer-security")
+        self.assertEqual(found["security"].profile["final_specialist"], "tollgate:final-security")
+        self.assertTrue(found["security"].detect)
+        self.assertEqual(found["security"].exclude, ("supabase/",))
+        self.assertTrue(found["security"].keep_paths)
+        self.assertEqual(found["security"].patterns[1], fragments.Pattern("name", "middleware.*"))
+        for area in ("ai", "infra", "backend", "frontend", "database"):
+            with self.subTest(area=area):
+                self.assertFalse(found[area].keep_paths)
 
     def test_real_ai_fragment_approved(self):
         found = {f.area: f for f in fragments.load(ROOT)}
@@ -296,6 +328,10 @@ class RealFragmentsTest(unittest.TestCase):
     def test_real_database_fragment_approved(self):
         found = {f.area: f for f in fragments.load(ROOT)}
         self.assertTrue(fragments.approved(found["database"]))
+
+    def test_real_security_fragment_approved(self):
+        found = {f.area: f for f in fragments.load(ROOT)}
+        self.assertTrue(fragments.approved(found["security"]))
 
 
 if __name__ == "__main__":

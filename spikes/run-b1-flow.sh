@@ -2,7 +2,7 @@
 # spikes/run-b1-flow.sh — prova reale di un lavoro L1 con la nota di ricerca di B1. Lo esegue solo il controller.
 # Deriva da spikes/run-p4-flow.sh e spikes/run-p3a-flow.sh, senza GitHub: `gh` finto (tests/fakegh.py), `origin` nudo locale.
 # Modo `controlla`: nessuna rete, nessun `claude`, nessuna scrittura: stampa i passi e i comandi.
-# Uso: run-b1-flow.sh controlla | prepara | passo1 | passo2 | registra  (con B1_FLOW_CASE=database anche passo3 ... passo6 e libero "<prompt>")
+# Uso: run-b1-flow.sh controlla | prepara | passo1 | passo2 | registra  (con B1_FLOW_CASE=database o security anche passo3 ... passo6 e libero "<prompt>")
 #
 # B1_FLOW_RULES: `prova` (il predefinito: la rules-base di prova di B1) oppure `vere` (B2, decisione 12: la copia tiene la
 # rules-base vera e approvata e le uscite vanno in docs/verifiche/evidenze/b2/flusso). B1_FLOW_SRC: la radice da copiare
@@ -26,6 +26,11 @@
 # `execute` fino alla chiusura dei due task, passo6 `finish` fino a `finish open-pr` col gh finto; `libero "<prompt>"` si ripete
 # (cartelle libero-1, libero-2, ...). `--disallowedTools` nega anche psql, postgres, pg_ctl, pg_dump, prisma e drizzle-kit; i file
 # .sql, .ts e .toml del progetto di prova sono solo testo e non si eseguono.
+# `security` (C2, decisione 16): come `database` (L2, sei passi più `libero`), col progetto di spikes/c2/flow, la spec e il piano di
+# spikes/c2/input e il profilo `security` (le uscite vanno in docs/verifiche/evidenze/c2/flusso). `prepara` vuole nel blocco proposto
+# anche min_level = "L2", lo specialista finale e la lista di controllo (vale per ogni caso L2). `--disallowedTools` nega gli stessi
+# programmi di `backend` più psql, openssl e i caricatori di segreti (dotenv, dotenvx, cross-env, env-cmd, doppler, infisical, op).
+# Il progetto di prova usa solo la libreria standard di Python; l'unico segreto è il valore finto dei test (C2_PROVA_SECRET).
 #
 #   controlla  stampa i passi e i comandi `claude`, controlla i file (nessuna scrittura)
 #   prepara    copia il plugin in /tmp/tollgate-b1/plugin e vi aggiunge SOLO NELLA COPIA skills/rules-base/SKILL.md con
@@ -57,7 +62,7 @@ DEFAULT_TMP=/tmp/tollgate-b1
 CHECK="${B1_FLOW_CHECK:-0}"                              # 1 solo nei test: permette un'altra radice
 TMP="${B1_FLOW_ROOT:-$DEFAULT_TMP}"
 RULES="${B1_FLOW_RULES:-prova}"                          # prova (B1) | vere (B2, decisione 12)
-CASE="${B1_FLOW_CASE:-b1}"                               # b1 | ai (B3, decisione 16) | infra (B4, decisione 14) | backend (B5, decisione 14) | frontend (B6, decisione 15) | database (B7, decisione 16)
+CASE="${B1_FLOW_CASE:-b1}"                               # b1 | ai (B3, decisione 16) | infra (B4, decisione 14) | backend (B5, decisione 14) | frontend (B6, decisione 15) | database (B7, decisione 16) | security (C2, decisione 16)
 SRC="$root"                                              # la radice da copiare; un'altra solo nei test
 OUT="$root/docs/verifiche/evidenze/b1/flusso"
 [ "$RULES" = vere ] && OUT="$root/docs/verifiche/evidenze/b2/flusso"
@@ -66,6 +71,7 @@ OUT="$root/docs/verifiche/evidenze/b1/flusso"
 [ "$CASE" = backend ] && OUT="$root/docs/verifiche/evidenze/b5/flusso"
 [ "$CASE" = frontend ] && OUT="$root/docs/verifiche/evidenze/b6/flusso"
 [ "$CASE" = database ] && OUT="$root/docs/verifiche/evidenze/b7/flusso"
+[ "$CASE" = security ] && OUT="$root/docs/verifiche/evidenze/c2/flusso"
 # C1: B1_FLOW_EVIDENCE=<x> sceglie docs/verifiche/evidenze/<x>/flusso e vince su B1_FLOW_RULES e B1_FLOW_CASE; B1_FLOW_OUT dei test vince ancora
 EVIDENCE="${B1_FLOW_EVIDENCE:-}"
 case "$EVIDENCE" in ""|*[!a-z0-9-]*) [ -z "$EVIDENCE" ] || { echo "ERRORE: B1_FLOW_EVIDENCE vale '$EVIDENCE': ammessi solo lettere minuscole, cifre e trattini" >&2; exit 1; } ;; esac
@@ -80,7 +86,7 @@ GH_DATA="$TMP/fakegh-data.json"
 GH_LOG="$TMP/fakegh.log"
 ORIGIN_URL=https://github.com/prova/flow.git
 ISSUE=1
-MODEL=sonnet
+MODEL=opus
 STEP_TIMEOUT="${B1_FLOW_TIMEOUT:-2400}"
 MAX_ATTEMPTS=3
 KILL_AFTER="${B1_FLOW_KILL:-60}"       # dopo il tetto, SIGKILL al solo processo claude se ignora SIGTERM
@@ -132,9 +138,22 @@ if [ "$CASE" = database ]; then
   START_LEVEL=L2
   SLICES=1  # il numero di fette della spec di prova, per `approve spec`
 fi
+if [ "$CASE" = security ]; then
+  # C2, decisione 16: lavoro L2 come `database`, con spec e piano di prova in spikes/c2/input/
+  PROJ="$here/c2/flow"
+  SPEC_SRC="$here/c2/input/spec-L2.md"
+  PLAN_SRC="$here/c2/input/piano-L2.md"
+  SPEC_REL=docs/superpowers/specs/2026-11-22-prova-c2.md
+  PLAN_REL=docs/superpowers/plans/2026-11-22-prova-c2.md
+  ISSUE_TITLE="Scadenza dei token e lettura delle note con il token"
+  PROJ_FILES="tollgate.toml issue-1.md .gitignore tools/unittest_junit.py tests/__init__.py tests/test_tokens.py app/__init__.py app/notes.py app/auth/__init__.py app/auth/tokens.py"
+  PROFILE_AREA=security; PROFILE_FILE=app/auth/tokens.py
+  START_LEVEL=L2
+  SLICES=1
+fi
 # PROPOSE: il caso propone un profilo con init --propose (e ha il gh finto con la protezione); SERVICES: nega i programmi dei servizi
 PROPOSE=0; SERVICES=0
-case "$CASE" in ai) PROPOSE=1 ;; infra|backend|frontend|database) PROPOSE=1; SERVICES=1 ;; esac
+case "$CASE" in ai) PROPOSE=1 ;; infra|backend|frontend|database|security) PROPOSE=1; SERVICES=1 ;; esac
 # la risposta sulla protezione nei dati del gh finto (solo nel caso `ai`): Free, repo privato, `init` sceglie `detect`
 PROTECTION_KEY='repos/{owner}/{repo}/branches/main/protection'
 DETECT_MSG="Upgrade to GitHub Pro or make this repository public to enable this feature."
@@ -152,9 +171,11 @@ Bash(curl:*),Bash(wget:*),Bash(*/curl:*),Bash(*/wget:*)"
 # B6, decisione 15: la prova di `frontend` aggiunge gli strumenti dell'interfaccia e i browser, e il server statico di Python
 # (due parole: si negano in un ciclo a parte)
 DEPLOY_CLIS="vercel wrangler docker npx bunx pnpx bun npm pnpm yarn"
-[ "$CASE" = backend ] || [ "$CASE" = frontend ] || [ "$CASE" = database ] && DEPLOY_CLIS="$DEPLOY_CLIS supabase deno node"
+[ "$CASE" = backend ] || [ "$CASE" = frontend ] || [ "$CASE" = database ] || [ "$CASE" = security ] && DEPLOY_CLIS="$DEPLOY_CLIS supabase deno node"
 # B7, decisione 16: la prova di `database` aggiunge i programmi del database e degli strumenti di migrazione
 [ "$CASE" = database ] && DEPLOY_CLIS="$DEPLOY_CLIS psql postgres pg_ctl pg_dump prisma drizzle-kit"
+# C2, decisione 16: la prova di `security` aggiunge psql e openssl (Global Constraints di C2) e i programmi che caricano segreti
+[ "$CASE" = security ] && DEPLOY_CLIS="$DEPLOY_CLIS psql openssl dotenv dotenvx cross-env env-cmd doppler infisical op"
 [ "$CASE" = frontend ] && DEPLOY_CLIS="$DEPLOY_CLIS vite next tsc eslint vitest playwright chromium chromium-browser google-chrome firefox"
 if [ "$SERVICES" = 1 ]; then
   for p in $DEPLOY_CLIS; do DISALLOWED="$DISALLOWED,Bash($p:*),Bash(*/$p:*),Bash(command $p:*),Bash(env $p:*)"; done
@@ -166,7 +187,7 @@ fi
 die() { echo "ERRORE: $*" >&2; exit 1; }
 
 case "$RULES" in prova|vere) ;; *) die "B1_FLOW_RULES vale '$RULES': i valori ammessi sono prova e vere" ;; esac
-case "$CASE" in b1|ai|infra|backend|frontend|database) ;; *) die "B1_FLOW_CASE vale '$CASE': i valori ammessi sono b1, ai, infra, backend, frontend e database" ;; esac
+case "$CASE" in b1|ai|infra|backend|frontend|database|security) ;; *) die "B1_FLOW_CASE vale '$CASE': i valori ammessi sono b1, ai, infra, backend, frontend, database e security" ;; esac
 [ "$CASE" = b1 ] || [ "$RULES" = vere ] || die "B1_FLOW_CASE=$CASE richiede B1_FLOW_RULES=vere (vale '$RULES'): il profilo $CASE usa le regole vere"
 [ "$CHECK" = 1 ] || [ -z "${B1_FLOW_SRC:-}" ] || die "B1_FLOW_SRC vale solo con B1_FLOW_CHECK=1"
 
@@ -222,9 +243,10 @@ PIANO>>>
 TESTO
 }
 
-# B7, decisione 16: i prompt dei passi del caso `database`. La spec e il piano si scrivono con Write (nel worktree del lavoro) dal testo
-# dato tra i marcatori: così passano da spec-audit e da plan-check, e il controller li confronta con spikes/b7/input/ prima degli atti.
-prompt_database_passo1() {
+# B7, decisione 16: i prompt dei passi dei casi L2 (`database`, e `security` di C2). La spec e il piano si scrivono con Write (nel
+# worktree del lavoro) dal testo dato tra i marcatori: così passano da spec-audit e da plan-check, e il controller li confronta con
+# spikes/b7/input/ (o spikes/c2/input/) prima degli atti.
+prompt_l2_passo1() {
   cat <<TESTO
 /tollgate:start #$ISSUE $START_LEVEL
 Non avviare il brainstorming e non scrivere una spec tua. Scrivi con lo strumento Write, nel worktree del lavoro, nel file $SPEC_REL, esattamente il testo tra i marcatori <<<SPEC e SPEC>>> (i marcatori esclusi), e committalo con git (git add e git commit). Poi segui /tollgate:spec-audit finché audit prepare non chiede /tollgate:approve spec $SLICES.
@@ -234,7 +256,7 @@ SPEC>>>
 TESTO
 }
 
-prompt_database_passo3() {
+prompt_l2_passo3() {
   cat <<TESTO
 Per l'issue #$ISSUE, nel worktree del lavoro: scrivi con lo strumento Write il piano nel file $PLAN_REL, con esattamente il testo tra i marcatori <<<PIANO e PIANO>>> (i marcatori esclusi), così passa da plan-check, e committalo con git (git add e git commit). Poi segui /tollgate:spec-audit per l'avversario del piano finché non chiede /tollgate:approve plan.
 <<<PIANO
@@ -260,7 +282,7 @@ modo_controlla() {
   else
     echo "  prepara   copia del plugin in $DEFAULT_TMP/plugin con skills/rules-base/SKILL.md (approved: prova-b1) solo nella copia; progetto in $DEFAULT_TMP/flow"
   fi
-  if [ "$CASE" = database ]; then
+  if [ "$START_LEVEL" = L2 ]; then
     echo "  passo1    claude plugin validate --strict sulla copia, poi claude -p \"/tollgate:start #$ISSUE $START_LEVEL\" dal checkout, con la spec scritta con Write nel worktree del lavoro"
     echo "  passo2    dal worktree: /tollgate:approve spec $SLICES"
     echo "  passo3    dal worktree: Write del piano, commit, poi l'avversario del piano fino a /tollgate:approve plan"
@@ -276,13 +298,13 @@ modo_controlla() {
   echo "--- i comandi claude (--plugin-dir, tetto di ${STEP_TIMEOUT} s)"
   PLUGIN="$DEFAULT_TMP/plugin"
   printf '  %s\n' "claude plugin validate --strict ."
-  if [ "$CASE" = database ]; then
-    comando_claude passo1 "$(prompt_database_passo1)"
+  if [ "$START_LEVEL" = L2 ]; then
+    comando_claude passo1 "$(prompt_l2_passo1)"
   else
     comando_claude passo1 "/tollgate:start #$ISSUE L1"
   fi
   printf '  passo1 (cwd %s/flow): ' "$DEFAULT_TMP"; printf '%q ' "${CMD[@]:0:${#CMD[@]}-1}"; echo "<prompt>"
-  if [ "$CASE" = database ]; then
+  if [ "$START_LEVEL" = L2 ]; then
     local id
     for id in passo2 passo3 passo4 passo5 passo6 libero; do
       comando_claude "$id" "<prompt>"
@@ -298,7 +320,7 @@ modo_controlla() {
   for f in $PROJ_FILES; do
     [ -f "$PROJ/$f" ] || { echo "  manca ${PROJ#"$here"/}/$f"; rc=1; }
   done
-  if [ "$CASE" = database ]; then
+  if [ "$START_LEVEL" = L2 ]; then
     for f in "$SPEC_SRC" "$PLAN_SRC"; do [ -f "$f" ] || { echo "  manca ${f#"$here"/}"; rc=1; }; done
   fi
   [ "$rc" = 0 ] && echo "CONTROLLA: ok" || echo "CONTROLLA: FALLITO"
@@ -307,7 +329,7 @@ modo_controlla() {
 
 # ---------------------------------------------------------------- prepara
 
-# scrivi_dati_gh <sha>: i dati del gh finto; con <sha> vuoto senza gli stati. Nei casi `ai`, `infra`, `backend`, `frontend` e `database` c'è anche la risposta sulla
+# scrivi_dati_gh <sha>: i dati del gh finto; con <sha> vuoto senza gli stati. Nei casi `ai`, `infra`, `backend`, `frontend`, `database` e `security` c'è anche la risposta sulla
 # protezione (la chiave letterale con {owner}/{repo}, come la usa tests/fakegh.py), perché `init` determini la modalità
 scrivi_dati_gh() {
   python3 -B - "$GH_DATA" "$1" "$PROJ/issue-1.md" "$ISSUE_TITLE" "$PROPOSE" "$PROTECTION_KEY" "$DETECT_MSG" <<'PY'
@@ -326,8 +348,9 @@ pathlib.Path(path).write_text(json.dumps(data))
 PY
 }
 
-# proponi_profilo <area> <file> (casi `ai`, `infra`, `backend`, `frontend` e `database`): init --propose sulla copia del plugin, col gh finto; il tollgate.toml proposto
-# (con il blocco [profiles.<area>] che copre <file>) si copia nel repo, si committa e si spinge; la cartella della proposta si sposta fuori dal repo (start avvisa se resta)
+# proponi_profilo <area> <file> (casi `ai`, `infra`, `backend`, `frontend`, `database` e `security`): init --propose sulla copia del plugin, col gh finto; il tollgate.toml proposto
+# (con il blocco [profiles.<area>] che copre <file>) si copia nel repo, si committa e si spinge; la cartella della proposta si sposta fuori dal repo (start avvisa se resta).
+# Nei casi L2 il blocco deve avere anche min_level = "L2", lo specialista finale (final_specialist) e la lista di controllo (checklist).
 proponi_profilo() {
   local area="$1" file="$2" out="$TMP/init-propose.txt" prop="$REPO/docs/superpowers/tollgate-init"
   ( cd "$REPO" && env PATH="$GHBIN:$PATH" TOLLGATE_STATE="$STATE" TOLLGATE_GH="$root/tests/fakegh.py" \
@@ -345,6 +368,18 @@ cfg = config.load_config_text(Path(sys.argv[2]).read_text())
 profile = cfg.profiles.get(sys.argv[3])
 sys.exit(0 if profile and globs.match_any(profile["paths"], sys.argv[4]) else 1)
 PY
+  if [ "$START_LEVEL" = L2 ]; then
+    python3 -B - "$prop/files/tollgate.toml" "$area" <<'PY' || die "il blocco [profiles.$area] proposto non ha min_level = \"L2\", final_specialist e checklist: la prova L2 non proverebbe lo specialista"
+import sys, tomllib
+from pathlib import Path
+profile = tomllib.loads(Path(sys.argv[1]).read_text()).get("profiles", {}).get(sys.argv[2], {})
+missing = [k for k in ("final_specialist", "checklist") if not profile.get(k)]
+if profile.get("min_level") != "L2":
+    missing.insert(0, 'min_level = "L2"')
+print("blocco L2:", "ok" if not missing else "mancano " + ", ".join(missing))
+sys.exit(1 if missing else 0)
+PY
+  fi
   cp -- "$prop/files/tollgate.toml" "$REPO/tollgate.toml" || die "tollgate.toml proposto non copiato"
   mv -- "$prop" "$TMP/tollgate-init.proposta-$(date +%Y%m%d-%H%M%S)-$$" || die "cartella della proposta non spostata"
   (
@@ -426,7 +461,7 @@ from pathlib import Path
 sys.path.insert(0, sys.argv[1] + "/bin")
 from tollgate_core import config
 from tollgate_analysis import plan, specdoc
-if sys.argv[5]:  # caso `database` (L2): la spec di prova ha le sezioni del pitch e una sola fetta
+if sys.argv[5]:  # casi L2 (`database`, `security`): la spec di prova ha le sezioni del pitch e una sola fetta
     spec = Path(sys.argv[5]).read_text()
     problems = specdoc.pitch_problems(spec)
     print("spec-check:", "ok" if not problems else problems, "fette:", specdoc.slices(spec))
@@ -497,7 +532,7 @@ claude_step() {
 }
 
 modo_passo1() {
-  if [ "$CASE" = database ]; then claude_step passo1 "$REPO" "$(prompt_database_passo1)"
+  if [ "$START_LEVEL" = L2 ]; then claude_step passo1 "$REPO" "$(prompt_l2_passo1)"
   else claude_step passo1 "$REPO" "/tollgate:start #$ISSUE L1"; fi
 }
 
@@ -511,24 +546,24 @@ passo_worktree() {
 }
 
 modo_passo2() {
-  if [ "$CASE" = database ]; then passo_worktree passo2 "/tollgate:approve spec $SLICES"
+  if [ "$START_LEVEL" = L2 ]; then passo_worktree passo2 "/tollgate:approve spec $SLICES"
   else passo_worktree passo2 "$(prompt_passo2)"; fi
 }
 
-# B7, decisione 16: i passi 3-6 e `libero` esistono solo nel caso `database`
-solo_database() { [ "$CASE" = database ] || die "il passo $MODE esiste solo con B1_FLOW_CASE=database"; }
-modo_passo3() { solo_database; passo_worktree passo3 "$(prompt_database_passo3)"; }
-modo_passo4() { solo_database; passo_worktree passo4 "/tollgate:approve plan"; }
+# B7, decisione 16 (e C2): i passi 3-6 e `libero` esistono solo nei casi L2, `database` e `security`
+solo_l2() { [ "$START_LEVEL" = L2 ] || die "il passo $MODE esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security"; }
+modo_passo3() { solo_l2; passo_worktree passo3 "$(prompt_l2_passo3)"; }
+modo_passo4() { solo_l2; passo_worktree passo4 "/tollgate:approve plan"; }
 modo_passo5() {
-  solo_database
+  solo_l2
   passo_worktree passo5 "$(printf '/tollgate:execute\nVai avanti fino alla chiusura dei due task del piano. Non lanciare /tollgate:finish.')"
 }
-modo_passo6() { solo_database; passo_worktree passo6 "/tollgate:finish"; }
+modo_passo6() { solo_l2; passo_worktree passo6 "/tollgate:finish"; }
 # libero "<prompt>": un prompt dato dal worktree, per esempio il giro di correzione dopo un needs_fix (/tollgate:execute sul task
 # di correzione, poi di nuovo /tollgate:finish); ogni volta una cartella nuova libero-<n>
 modo_libero() {
   local n=1
-  solo_database
+  solo_l2
   [ -n "${1:-}" ] || die "uso: $0 libero \"<prompt>\""
   while [ -e "$OUT/libero-$n" ] || [ -n "$(compgen -G "$OUT/libero-$n.prev-*")" ]; do n=$((n + 1)); done
   passo_worktree "libero-$n" "$1"
@@ -553,14 +588,14 @@ Limiti della prova reale (da citare nel rapporto)
 TESTO
   if [ "$SERVICES" = 1 ]; then
     cat >> "$1" <<'TESTO'
-- (infra, backend, frontend, database) DISALLOWED nega vercel, wrangler, docker, npx, bunx, pnpx, bun, npm, pnpm e yarn da soli, con un percorso, dopo `command`
+- (infra, backend, frontend, database, security) DISALLOWED nega vercel, wrangler, docker, npx, bunx, pnpx, bun, npm, pnpm e yarn da soli, con un percorso, dopo `command`
   e dopo `env`, ma non chiude `env VAR=... <programma>`, `sudo`, `xargs`, `bash -c '...'`. La difesa vera è l'hook `effects` di
   tollgate più un progetto di prova senza credenziali (nessun .vercel, .env, .dev.vars o file di Wrangler).
 TESTO
   fi
-  if [ "$CASE" = backend ] || [ "$CASE" = frontend ] || [ "$CASE" = database ]; then
+  if [ "$CASE" = backend ] || [ "$CASE" = frontend ] || [ "$CASE" = database ] || [ "$CASE" = security ]; then
     cat >> "$1" <<'TESTO'
-- (backend, frontend, database) in più nega supabase, deno e node, con le stesse quattro forme.
+- (backend, frontend, database, security) in più nega supabase, deno e node, con le stesse quattro forme.
 TESTO
   fi
   if [ "$CASE" = database ]; then
@@ -570,6 +605,15 @@ TESTO
   Un test di testo su una migrazione non prova che la migrazione giri su PostgreSQL.
 - (database) I limiti della grep di `registra` valgono anche qui: un `(yarn)` nudo, un comando dopo un backtick e i falsi positivi
   su `echo` non sono coperti.
+TESTO
+  fi
+  if [ "$CASE" = security ]; then
+    cat >> "$1" <<'TESTO'
+- (security) in più nega psql, openssl, dotenv, dotenvx, cross-env, env-cmd, doppler, infisical e op, con le stesse quattro forme.
+  Il progetto di prova usa solo la libreria standard di Python e un segreto finto (PROVA-123, dalla variabile C2_PROVA_SECRET che
+  impostano i test): i test chiamano le funzioni e non provano un servizio di login vero.
+- (security) I limiti della grep di `registra` valgono anche qui: un `(openssl)` nudo, un comando dopo un backtick e i falsi
+  positivi su `echo` non sono coperti.
 TESTO
   fi
   if [ "$CASE" = backend ]; then
@@ -615,9 +659,9 @@ modo_registra() {
   ( cd "$REPO" && "${TG[@]}" snapshot > "$d/snapshot.json" 2> "$d/snapshot.err" ); fallisce snapshot $?
   python3 -B "$here/b1/flowreg.py" lookups "$STATE/tollgate.db" > "$d/lookups.txt" 2> "$d/lookups.err"; fallisce lookups $?
   # una sola chiamata con i flussi di tutti i tentativi e di tutti e due i passi: i conteggi sono somme
-  # (con `database` anche passo3 ... passo6 e le cartelle libero-<n>, mai quelle spostate .prev-*)
+  # (nei casi L2, `database` e `security`, anche passo3 ... passo6 e le cartelle libero-<n>, mai quelle spostate .prev-*)
   for f in "$OUT"/passo1/tentativo-*/claude.jsonl "$OUT"/passo2/tentativo-*/claude.jsonl; do [ -f "$f" ] && files+=("$f"); done
-  if [ "$CASE" = database ]; then
+  if [ "$START_LEVEL" = L2 ]; then
     for f in "$OUT"/passo3/tentativo-*/claude.jsonl "$OUT"/passo4/tentativo-*/claude.jsonl "$OUT"/passo5/tentativo-*/claude.jsonl \
              "$OUT"/passo6/tentativo-*/claude.jsonl "$OUT"/libero-*/tentativo-*/claude.jsonl; do
       case "$f" in */libero-*.prev-*/*) continue ;; esac
@@ -680,5 +724,5 @@ case "$MODE" in
   passo6) modo_passo6 ;;
   libero) modo_libero "${2:-}" ;;
   registra) modo_registra ;;
-  *) echo "uso: $0 controlla | prepara | passo1 | passo2 | registra (con B1_FLOW_CASE=database anche passo3 | passo4 | passo5 | passo6 | libero \"<prompt>\")" >&2; exit 2 ;;
+  *) echo "uso: $0 controlla | prepara | passo1 | passo2 | registra (con B1_FLOW_CASE=database o security anche passo3 | passo4 | passo5 | passo6 | libero \"<prompt>\")" >&2; exit 2 ;;
 esac

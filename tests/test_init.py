@@ -1105,6 +1105,90 @@ class ProfileBlocksTest(PluginMixin, unittest.TestCase):
         self.assertFalse([l for l in got.lines if "profiles.x" in l and "paths: aggiungi" in l],
                          got.lines)
 
+    def keep_paths_profiles(self, keep=True):
+        """Il frammento `x` (`**/auth/**`, `**/guard.ts`, `**/*.mjs`, con `keep_paths` se
+        `keep`) e un frammento `y` (`**/server/**`, con un marcatore)."""
+        toml = FRAGMENT_X.replace('["**/x/**"]', '["**/auth/**", "**/guard.ts", "**/*.mjs"]')
+        if keep:
+            toml += "[detect]\nkeep_paths = true\n"
+        root = self.plugin(fragment=toml)
+        (root / "templates" / "profiles" / "y.toml").write_text(
+            '[profile]\npaths = ["**/server/**"]\n[detect]\ncontent = ["import y_server"]\n',
+            encoding="utf-8")
+        (root / "skills" / "rules-y").mkdir()
+        (root / "skills" / "rules-y" / "SKILL.md").write_text(
+            SKILL_X.replace("rules-x", "rules-y").replace("R-X-", "R-Y-"), encoding="utf-8")
+        return root
+
+    KEEP_FILES = ["server/auth/login.ts", "server/auth/token.ts", "server/guard.ts",
+                  "server/app.mjs"]
+
+    def test_keep_paths_lights_folder_of_file_found_by_other(self):
+        files = ["server/auth/login.ts", "server/auth/token.ts"]
+        got = self.blocks(files, root=self.keep_paths_profiles(), detected={"y": files})
+        self.assertEqual(self.profile(got)["paths"], ["server/auth/**"])
+        self.assertEqual(tomllib.loads(BASE_TOML + got.text)["profiles"]["y"]["paths"],
+                         ["/server/**"])
+
+    def test_keep_paths_lights_name_of_file_found_by_other(self):
+        files = ["server/guard.ts"]
+        got = self.blocks(files, root=self.keep_paths_profiles(), detected={"y": files})
+        self.assertEqual(self.profile(got)["paths"], ["server/guard.ts"])
+
+    def test_keep_paths_lights_ext_of_file_found_by_other(self):
+        files = ["server/app.mjs"]
+        got = self.blocks(files, root=self.keep_paths_profiles(), detected={"y": files})
+        self.assertEqual(self.profile(got)["paths"], ["**/*.mjs"])
+
+    def test_without_keep_paths_rule_i1_unchanged(self):
+        root = self.keep_paths_profiles(keep=False)
+        for files in (self.KEEP_FILES[:2], self.KEEP_FILES[2:3], self.KEEP_FILES[3:],
+                      self.KEEP_FILES):
+            with self.subTest(files=files):
+                got = self.blocks(files, root=root, detected={"y": files})
+                self.assertNotIn("profiles.x]", got.text)
+                self.assertTrue([l for l in got.lines if "profilo x" in l and "nessun file" in l],
+                                got.lines)
+        got = self.blocks(self.KEEP_FILES, root=root)
+        self.assertEqual(self.profile(got)["paths"],
+                         ["**/*.mjs", "server/auth/**", "server/guard.ts"])
+
+    def test_keep_paths_does_not_change_other_fragment(self):
+        detected = {"y": self.KEEP_FILES}
+        with_key = self.blocks(self.KEEP_FILES, root=self.keep_paths_profiles(),
+                               detected=detected)
+        without = self.blocks(self.KEEP_FILES, root=self.keep_paths_profiles(keep=False),
+                              detected=detected)
+        self.assertEqual(tomllib.loads(BASE_TOML + with_key.text)["profiles"]["y"],
+                         tomllib.loads(BASE_TOML + without.text)["profiles"]["y"])
+        self.assertEqual(with_key.text.split("# profilo y", 1)[1],
+                         without.text.split("# profilo y", 1)[1])
+        # Le sole righe di `y` in più sono le sovrapposizioni con il blocco `x`, che ora c'è.
+        own = [l for l in with_key.lines if l.startswith("profilo y")]
+        self.assertEqual([l for l in own if "corrisponde anche a «x»" not in l],
+                         [l for l in without.lines if l.startswith("profilo y")])
+        self.assertEqual(own[1:], [
+            "profilo y: server/app.mjs corrisponde anche a «x»: vince y",
+            "profilo y: server/auth/login.ts corrisponde anche a «x»: vince x",
+            "profilo y: server/auth/token.ts corrisponde anche a «x»: vince x",
+            "profilo y: server/guard.ts corrisponde anche a «x»: vince x"])
+        self.assertEqual(self.profile(with_key)["paths"],
+                         ["**/*.mjs", "server/auth/**", "server/guard.ts"])
+
+    def test_keep_paths_lights_in_drift_too(self):
+        """D7: per un `x` già dichiarato, `init --update` propone i percorsi anche per i file
+        che il rilevamento assegna a `y`."""
+        files = ["server/auth/login.ts"]
+        current = BASE_TOML + DECLARED_X
+        got = self.blocks(files, current=current, root=self.keep_paths_profiles(),
+                          detected={"y": files})
+        self.assertIn('profilo x: [profiles.x] paths: aggiungi "server/auth/**" (1 file)',
+                      got.lines)
+        got = self.blocks(files, current=current, root=self.keep_paths_profiles(keep=False),
+                          detected={"y": files})
+        self.assertFalse([l for l in got.lines if "profiles.x" in l and "paths: aggiungi" in l],
+                         got.lines)
+
     def test_real_content_match_of_ai_keeps_nested_routes_out_of_backend(self):
         """I-1 coi frammenti veri: un file in `ai/routes/` con un marcatore vero di `ai`
         non dà `src/ai/routes/**` a `backend`."""
@@ -1826,6 +1910,468 @@ class DatabasePrecedenceTest(unittest.TestCase):
                    {"prisma/ai/seed.sql": "ai", "prisma/schema.prisma": "database"})
 
 
+class SecurityPrecedenceTest(unittest.TestCase):
+    """La tabella delle precedenze di `security` (C2, decisione 5), con i frammenti veri: stessa
+    forma di `FrontendPrecedenceTest` (la `Proposta` di `init` per ogni profilo e il `Runtime` di
+    `vertical_for`). `detected` è ciò che il rilevamento per contenuto trova: lo dà il test, di
+    norma senza i file sotto un `exclude` (come farebbe `detect_files`); S43 ne dà uno apposta,
+    come la sua riga della tabella. Dove la tabella scrive «(`X` attivo)», e dove un file sotto
+    `auth/` va a un altro profilo, `check_active` controlla anche `active_profiles` del file con i
+    blocchi proposti (`security` resta attivo)."""
+
+    check = FrontendPrecedenceTest.check
+
+    def check_active(self, files, active, detected=None):
+        root = _real_fragments_root(self)
+        got = init.profile_blocks({f: 10 for f in files}, DEFAULT_TOML, root, detected=detected)
+        declared = tomllib.loads(DEFAULT_TOML + got.text).get("profiles", {})
+        self.assertEqual({f: sorted(profiles.active_profiles([f], declared, [])) for f in active},
+                         {f: sorted(names) for f, names in active.items()}, "Attivi")
+
+    def test_real_precedence_s1(self):
+        self.check(["src/auth/login.ts"], {"security": ["src/auth/**"]},
+                   {"src/auth/login.ts": "security"})
+
+    def test_real_precedence_s2(self):
+        self.check(["server/app.py", "server/auth/jwt.py"],
+                   {"backend": ["/server/**"], "security": ["server/auth/**"]},
+                   {"server/app.py": "backend", "server/auth/jwt.py": "security"})
+
+    def test_real_precedence_s3(self):
+        self.check(["api/users.ts", "api/auth/login.ts"],
+                   {"backend": ["/api/**"], "security": ["api/auth/**"]},
+                   {"api/users.ts": "backend", "api/auth/login.ts": "security"})
+
+    def test_real_precedence_s4(self):
+        self.check(["src/components/Button.tsx", "src/components/auth/LoginForm.tsx"],
+                   {"frontend": ["src/components/**"], "security": ["src/components/auth/**"]},
+                   {"src/components/auth/LoginForm.tsx": "security"})
+        self.check_active(["src/components/Button.tsx", "src/components/auth/LoginForm.tsx"],
+                          {"src/components/auth/LoginForm.tsx": ["frontend", "security"]})
+
+    def test_real_precedence_s5(self):
+        self.check(["app/page.tsx", "app/auth/callback/route.ts"],
+                   {"frontend": ["**/*.tsx"], "security": ["app/auth/**"]},
+                   {"app/auth/callback/route.ts": "security"})
+
+    def test_real_precedence_s6(self):
+        self.check(["app/(auth)/login/page.tsx"], {"frontend": ["**/*.tsx"]},
+                   {"app/(auth)/login/page.tsx": "frontend"})
+
+    def test_real_precedence_s7(self):
+        self.check(["middleware.ts", "app/page.tsx"],
+                   {"frontend": ["**/*.tsx"], "security": ["/middleware.ts"]},
+                   {"middleware.ts": "security"})
+
+    def test_real_precedence_s8(self):
+        self.check(["src/middleware.ts", "src/main.ts"], {"security": ["src/middleware.ts"]},
+                   {"src/main.ts": None})
+
+    def test_real_precedence_s9(self):
+        self.check(["server/app.ts", "server/middleware.ts"],
+                   {"backend": ["/server/**"], "security": ["server/middleware.ts"]},
+                   {"server/middleware.ts": "security"})
+
+    def test_real_precedence_s10(self):
+        self.check(["src/lib/supabase/middleware.ts", "src/lib/supabase/client.ts"],
+                   {"security": ["src/lib/supabase/middleware.ts"]},
+                   {"src/lib/supabase/client.ts": None})
+
+    def test_real_precedence_s11(self):
+        self.check(
+            ["supabase/functions/auth/index.ts", "supabase/migrations/1.sql"],
+            {"database": ["/supabase/**"]},
+            {"supabase/functions/auth/index.ts": "database",
+             "supabase/migrations/1.sql": "database"})
+
+    def test_real_precedence_s12(self):
+        self.check(["supabase/rls/policies.sql", "supabase/config.toml"],
+                   {"database": ["/supabase/**"]},
+                   {"supabase/rls/policies.sql": "database", "supabase/config.toml": "database"})
+
+    def test_real_precedence_s13(self):
+        self.check(["db/rls/policies.sql", "db/schema.sql"],
+                   {"database": ["**/*.sql"], "security": ["db/rls/**"]},
+                   {"db/rls/policies.sql": "security", "db/schema.sql": "database"})
+        self.check_active(["db/rls/policies.sql", "db/schema.sql"],
+                          {"db/rls/policies.sql": ["database", "security"]})
+
+    def test_real_precedence_s14(self):
+        self.check(["src/auth/llm/client.py", "src/auth/login.py"],
+                   {"ai": ["src/auth/llm/**"], "security": ["src/auth/**"]},
+                   {"src/auth/llm/client.py": "ai"})
+        self.check_active(["src/auth/llm/client.py", "src/auth/login.py"],
+                          {"src/auth/llm/client.py": ["ai", "security"]})
+
+    def test_real_precedence_s15(self):
+        self.check(["src/ai/auth/key.py", "src/ai/agent.py"],
+                   {"ai": ["src/ai/**"], "security": ["src/ai/auth/**"]},
+                   {"src/ai/auth/key.py": "security"})
+
+    def test_real_precedence_s16(self):
+        self.check(["src/auth/components/Login.tsx", "src/auth/session.ts"],
+                   {"frontend": ["src/auth/components/**"], "security": ["src/auth/**"]},
+                   {"src/auth/components/Login.tsx": "frontend"})
+        self.check_active(["src/auth/components/Login.tsx", "src/auth/session.ts"],
+                          {"src/auth/components/Login.tsx": ["frontend", "security"]})
+
+    def test_real_precedence_s17(self):
+        self.check(["server/routes/auth/login.ts", "server/app.ts"],
+                   {"backend": ["/server/**"], "security": ["server/routes/auth/**"]},
+                   {"server/routes/auth/login.ts": "security"})
+
+    def test_real_precedence_s18(self):
+        self.check(["src/routes/auth/login.ts", "src/routes/users.ts"],
+                   {"backend": ["src/routes/**"], "security": ["src/routes/auth/**"]},
+                   {"src/routes/auth/login.ts": "security"})
+
+    def test_real_precedence_s19(self):
+        self.check(["infra/auth/policy.json", "infra/main.ts"],
+                   {"infra": ["/infra/**"], "security": ["infra/auth/**"]},
+                   {"infra/auth/policy.json": "security"})
+
+    def test_real_precedence_s20(self):
+        self.check(["src/auth/Dockerfile", "src/auth/main.go"],
+                   {"infra": ["src/auth/Dockerfile"], "security": ["src/auth/**"]},
+                   {"src/auth/Dockerfile": "infra"})
+        self.check_active(["src/auth/Dockerfile", "src/auth/main.go"],
+                          {"src/auth/Dockerfile": ["infra", "security"]})
+
+    def test_real_precedence_s21(self):
+        self.check(
+            ["src/auth/schema.sql", "src/auth/migrations/1.sql"],
+            {"database": ["**/*.sql", "src/auth/migrations/**"], "security": ["src/auth/**"]},
+            {"src/auth/schema.sql": "security", "src/auth/migrations/1.sql": "database"})
+
+    def test_real_precedence_s22(self):
+        self.check(["tests/auth/test_login.py", "app/main.py"], {"security": ["tests/auth/**"]},
+                   {"tests/auth/test_login.py": "security"})
+
+    def test_real_precedence_s23(self):
+        self.check(["docs/security/policy.md", "SECURITY.md"], {},
+                   {"docs/security/policy.md": None, "SECURITY.md": None})
+
+    def test_real_precedence_s24(self):
+        self.check(["docs/security/policy.md", "docs/security/check.py"],
+                   {"security": ["docs/security/**"]},
+                   {"docs/security/policy.md": "security", "docs/security/check.py": "security"})
+
+    def test_real_precedence_s25(self):
+        self.check(
+            [".github/tollgate/bin/auth/x.py", ".github/workflows/security/a.yml",
+             ".claude/auth/x.md", "src/main.py"],
+            {},
+            {".github/tollgate/bin/auth/x.py": None, ".github/workflows/security/a.yml": None,
+             ".claude/auth/x.md": None, "src/main.py": None})
+
+    def test_real_precedence_s26(self):
+        self.check(["src/lib/jwt.ts", "src/lib/date.ts"], {"security": ["src/lib/jwt.ts"]},
+                   {"src/lib/date.ts": None}, detected={"security": ["src/lib/jwt.ts"]})
+
+    def test_real_precedence_s27(self):
+        self.check(["api/login.ts", "api/users.ts"],
+                   {"backend": ["/api/**"], "security": ["api/login.ts"]},
+                   {"api/login.ts": "security"}, detected={"security": ["api/login.ts"]})
+
+    def test_real_precedence_s28(self):
+        self.check(["api/login.ts"], {"backend": ["/api/**"], "security": ["api/login.ts"]},
+                   {"api/login.ts": "security"},
+                   detected={"security": ["api/login.ts"], "backend": ["api/login.ts"]})
+
+    def test_real_precedence_s29(self):
+        self.check(
+            ["src/lib/auth-client.ts"],
+            {"ai": ["src/lib/auth-client.ts"], "security": ["src/lib/auth-client.ts"]},
+            {"src/lib/auth-client.ts": "ai"},
+            detected={"ai": ["src/lib/auth-client.ts"], "security": ["src/lib/auth-client.ts"]})
+
+    def test_real_precedence_s30(self):
+        self.check(["web/auth/login.tsx", "web/index.html"],
+                   {"frontend": ["/web/**"], "security": ["web/auth/**"]},
+                   {"web/auth/login.tsx": "security"})
+
+    def test_real_precedence_s31(self):
+        self.check(["src/security/csp.ts", "src/security/headers.ts"],
+                   {"security": ["src/security/**"]},
+                   {"src/security/csp.ts": "security", "src/security/headers.ts": "security"})
+
+    def test_real_precedence_s32(self):
+        self.check(["src/session.ts", "src/agents/session.py"], {"ai": ["src/agents/**"]},
+                   {"src/session.ts": None, "src/agents/session.py": "ai"})
+
+    def test_real_precedence_s33(self):
+        self.check(["functions/auth/index.js", "functions/api.js"],
+                   {"backend": ["/functions/**"], "security": ["functions/auth/**"]},
+                   {"functions/auth/index.js": "security"})
+
+    def test_real_precedence_s34(self):
+        self.check(["prisma/auth/schema.prisma", "prisma/schema.prisma"],
+                   {"database": ["/prisma/**"], "security": ["prisma/auth/**"]},
+                   {"prisma/auth/schema.prisma": "security"})
+
+    def test_real_precedence_s35(self):
+        self.check(["src/auth/middleware.ts", "src/auth/jwt.ts"], {"security": ["src/auth/**"]},
+                   {"src/auth/middleware.ts": "security", "src/auth/jwt.ts": "security"})
+
+    def test_real_precedence_s36(self):
+        self.check(["middleware.py", "app/views.py"], {"security": ["/middleware.py"]},
+                   {"app/views.py": None})
+
+    def test_real_precedence_s37(self):
+        self.check(["supabase/functions/x/index.ts"], {"database": ["/supabase/**"]},
+                   {"supabase/functions/x/index.ts": "database"})
+
+    def test_real_precedence_s38(self):
+        self.check(["src/auth/README.md", "src/auth/guida.md"], {},
+                   {"src/auth/README.md": None, "src/auth/guida.md": None})
+
+    def test_real_precedence_s39(self):
+        self.check(
+            ["src/components/auth/Login.tsx", "src/components/auth/login.css",
+             "src/components/Nav.tsx"],
+            {"frontend": ["src/components/**"], "security": ["src/components/auth/**"]},
+            {"src/components/auth/login.css": "security", "src/components/Nav.tsx": "frontend"})
+
+    def test_real_precedence_s40(self):
+        self.check(
+            ["src/prompts/auth/system.md", "src/prompts/auth/build.ts"],
+            {"ai": ["src/prompts/**"], "security": ["src/prompts/auth/**"]},
+            {"src/prompts/auth/system.md": "security", "src/prompts/auth/build.ts": "security"})
+
+    def test_real_precedence_s41(self):
+        self.check(["server/auth.ts", "server/app.ts"],
+                   {"backend": ["/server/**"], "security": ["server/auth.ts"]},
+                   {"server/auth.ts": "security"}, detected={"security": ["server/auth.ts"]})
+
+    def test_real_precedence_s42(self):
+        self.check(["src/auth/index.ts", "src/auth/jwt.ts"],
+                   {"ai": ["src/auth/index.ts"], "security": ["src/auth/**"]},
+                   {"src/auth/index.ts": "ai"}, detected={"ai": ["src/auth/index.ts"]})
+        self.check_active(["src/auth/index.ts", "src/auth/jwt.ts"],
+                          {"src/auth/index.ts": ["ai", "security"]},
+                          detected={"ai": ["src/auth/index.ts"]})
+
+    def test_real_precedence_s43(self):
+        self.check(
+            ["supabase/functions/login/index.ts", "supabase/config.toml"],
+            {"database": ["/supabase/**"]},
+            {"supabase/functions/login/index.ts": "database", "supabase/config.toml": "database"},
+            detected={"security": ["supabase/functions/login/index.ts"]})
+
+    def test_real_precedence_s44(self):
+        self.check([".github/workflows/security.yml", ".github/security/policy.yml", "src/a.py"],
+                   {"security": [".github/security/**"]},
+                   {".github/security/policy.yml": "security"})
+
+    def test_real_precedence_s45(self):
+        self.check(["proxy.ts", "app/page.tsx"],
+                   {"frontend": ["**/*.tsx"], "security": ["/proxy.ts"]}, {"proxy.ts": "security"})
+
+    def test_real_precedence_s46(self):
+        self.check(["src/utils/proxy.ts", "vite.config.ts"], {"security": ["src/utils/proxy.ts"]},
+                   {"src/utils/proxy.ts": "security"})
+
+    def test_real_precedence_s47(self):
+        self.check(["src/proxy.js", "server/proxy.js", "server/app.js"],
+                   {"backend": ["/server/**"], "security": ["server/proxy.js", "src/proxy.js"]},
+                   {"server/proxy.js": "security"})
+
+    def test_real_precedence_s48(self):
+        self.check(["proxy.py", "src/proxy.tsx"], {"frontend": ["**/*.tsx"]},
+                   {"proxy.py": None, "src/proxy.tsx": "frontend"})
+
+    def test_real_precedence_s49(self):
+        self.check(
+            ["src/app/api/auth/x/route.ts", "src/app/page.tsx"],
+            {"backend": ["src/app/api/auth/x/route.ts"], "frontend": ["**/*.tsx"],
+             "security": ["src/app/api/auth/**"]},
+            {"src/app/api/auth/x/route.ts": "backend"},
+            detected={"backend": ["src/app/api/auth/x/route.ts"]})
+        self.check_active(["src/app/api/auth/x/route.ts", "src/app/page.tsx"],
+                          {"src/app/api/auth/x/route.ts": ["backend", "security"]},
+                          detected={"backend": ["src/app/api/auth/x/route.ts"]})
+
+    def test_real_precedence_s50(self):
+        self.check(
+            ["app/auth/callback/route.ts", "app/auth/actions.ts", "app/page.tsx"],
+            {"backend": ["app/auth/callback/route.ts"], "frontend": ["**/*.tsx"],
+             "security": ["app/auth/**"]},
+            {"app/auth/callback/route.ts": "backend", "app/auth/actions.ts": "security"},
+            detected={"backend": ["app/auth/callback/route.ts"]})
+        self.check_active(["app/auth/callback/route.ts", "app/auth/actions.ts", "app/page.tsx"],
+                          {"app/auth/callback/route.ts": ["backend", "security"]},
+                          detected={"backend": ["app/auth/callback/route.ts"]})
+
+    def test_real_precedence_s51(self):
+        self.check(["src/auth/routes/login.ts", "src/auth/jwt.ts"],
+                   {"backend": ["src/auth/routes/**"], "security": ["src/auth/**"]},
+                   {"src/auth/routes/login.ts": "backend"})
+        self.check_active(["src/auth/routes/login.ts", "src/auth/jwt.ts"],
+                          {"src/auth/routes/login.ts": ["backend", "security"]})
+
+    def test_real_precedence_s52(self):
+        self.check(["src/auth/handlers/login.ts", "src/auth/jwt.ts"],
+                   {"backend": ["src/auth/handlers/**"], "security": ["src/auth/**"]},
+                   {"src/auth/handlers/login.ts": "backend"})
+        self.check_active(["src/auth/handlers/login.ts", "src/auth/jwt.ts"],
+                          {"src/auth/handlers/login.ts": ["backend", "security"]})
+
+    def test_real_precedence_s53(self):
+        files = ["server/auth/login.ts", "server/auth/router.ts", "server/app.ts"]
+        self.check(files, {"backend": ["/server/**"], "security": ["server/auth/**"]},
+                   {"server/auth/login.ts": "security", "server/auth/router.ts": "security",
+                    "server/app.ts": "backend"},
+                   detected={"backend": files})
+
+    def test_real_precedence_s54(self):
+        self.check(["src/components/auth/Login.tsx", "src/components/A.tsx"],
+                   {"frontend": ["src/components/**"], "security": ["src/components/auth/**"]},
+                   {"src/components/auth/Login.tsx": "security"},
+                   detected={"frontend": ["src/components/auth/Login.tsx"]})
+
+    def test_real_precedence_s55(self):
+        self.check(["src/login.ts"], {"backend": ["src/login.ts"], "security": ["src/login.ts"]},
+                   {"src/login.ts": "backend"},
+                   detected={"backend": ["src/login.ts"], "security": ["src/login.ts"]})
+
+    def test_real_precedence_s56(self):
+        self.check(
+            ["apps/web/supabase/functions/auth/index.ts", "apps/web/supabase/migrations/1.sql"],
+            {"database": ["apps/web/supabase/migrations/**"],
+             "security": ["apps/web/supabase/functions/auth/**"]},
+            {"apps/web/supabase/functions/auth/index.ts": "security"})
+
+    def test_real_precedence_s57(self):
+        self.check(["infra/middleware.ts", "infra/main.tf"],
+                   {"infra": ["/infra/**"], "security": ["infra/middleware.ts"]},
+                   {"infra/middleware.ts": "security"})
+
+    def test_real_precedence_s58(self):
+        self.check(["src/auth/Guard.ts", "src/auth/x.ts"],
+                   {"frontend": ["src/auth/Guard.ts"], "security": ["src/auth/**"]},
+                   {"src/auth/Guard.ts": "frontend"}, detected={"frontend": ["src/auth/Guard.ts"]})
+        self.check_active(["src/auth/Guard.ts", "src/auth/x.ts"],
+                          {"src/auth/Guard.ts": ["frontend", "security"]},
+                          detected={"frontend": ["src/auth/Guard.ts"]})
+
+    def test_real_precedence_s59(self):
+        self.check(
+            ["src/middleware.test.ts", "middleware.config.json", "docs/middleware.md"],
+            {"security": ["/middleware.config.json", "src/middleware.test.ts"]},
+            {"src/middleware.test.ts": "security", "middleware.config.json": "security",
+             "docs/middleware.md": None})
+
+    def test_real_precedence_s60(self):
+        self.check(["src/Auth/Login.cs", "functions/_middleware.ts", "functions/api.ts"],
+                   {"backend": ["/functions/**"]},
+                   {"src/Auth/Login.cs": None, "functions/_middleware.ts": "backend"})
+
+    def test_real_precedence_s61(self):
+        self.check(["server/middleware.ts", "server/app.ts"],
+                   {"backend": ["/server/**"], "security": ["server/middleware.ts"]},
+                   {"server/middleware.ts": "security"},
+                   detected={"backend": ["server/middleware.ts", "server/app.ts"]})
+
+    def test_real_precedence_s62(self):
+        self.check(["src/middleware.ts", "src/main.ts"],
+                   {"backend": ["src/middleware.ts"], "security": ["src/middleware.ts"]},
+                   {"src/middleware.ts": "backend"}, detected={"backend": ["src/middleware.ts"]})
+        self.check_active(["src/middleware.ts", "src/main.ts"],
+                          {"src/middleware.ts": ["backend", "security"]},
+                          detected={"backend": ["src/middleware.ts"]})
+
+    def test_real_precedence_s63(self):
+        self.check(["src/middleware.ts", "src/x.ts"],
+                   {"ai": ["src/middleware.ts"], "security": ["src/middleware.ts"]},
+                   {"src/middleware.ts": "ai"}, detected={"ai": ["src/middleware.ts"]})
+        self.check_active(["src/middleware.ts", "src/x.ts"],
+                          {"src/middleware.ts": ["ai", "security"]},
+                          detected={"ai": ["src/middleware.ts"]})
+
+    def test_real_precedence_s64(self):
+        self.check(["proxy.ts", "app/page.tsx"],
+                   {"backend": ["/proxy.ts"], "frontend": ["**/*.tsx"], "security": ["/proxy.ts"]},
+                   {"proxy.ts": "backend"}, detected={"backend": ["proxy.ts"]})
+        self.check_active(["proxy.ts", "app/page.tsx"], {"proxy.ts": ["backend", "security"]},
+                          detected={"backend": ["proxy.ts"]})
+
+    def test_real_precedence_s65(self):
+        self.check(["src/auth/schema.ts", "src/auth/x.ts"],
+                   {"database": ["src/auth/schema.ts"], "security": ["src/auth/**"]},
+                   {"src/auth/schema.ts": "database", "src/auth/x.ts": "security"},
+                   detected={"database": ["src/auth/schema.ts"]})
+        self.check_active(["src/auth/schema.ts", "src/auth/x.ts"],
+                          {"src/auth/schema.ts": ["database", "security"]},
+                          detected={"database": ["src/auth/schema.ts"]})
+
+    def test_real_precedence_s66(self):
+        self.check(
+            ["src/middleware.d.ts", "src/Middleware.ts", "src/middlewarex.ts"],
+            {"security": ["src/middleware.d.ts"]},
+            {"src/middleware.d.ts": "security", "src/Middleware.ts": None,
+             "src/middlewarex.ts": None})
+
+    def test_real_precedence_s67_manual_block(self):
+        """Solo runtime (decisione 6): due blocchi scritti a mano. Con `**/auth/**` aggiunto a
+        `security` i due pattern hanno un segmento letterale come `/supabase/**`, vince il primo
+        dichiarato (`database`) e `security` è solo attivo; con `supabase/functions/auth/**` vince
+        `security`."""
+        path = "supabase/functions/auth/index.ts"
+        wide = {"database": {"paths": ["/supabase/**"]}, "security": {"paths": ["**/auth/**"]}}
+        self.assertEqual(profiles.vertical_for(path, wide), "database")
+        self.assertEqual(profiles.active_profiles([path], wide, []), ["database", "security"])
+        narrow = {"database": {"paths": ["/supabase/**"]},
+                  "security": {"paths": ["supabase/functions/auth/**"]}}
+        self.assertEqual(profiles.vertical_for(path, narrow), "security")
+
+    def test_real_precedence_s68(self):
+        self.check(["db/migrations/auth/001.sql", "db/migrations/002.sql"],
+                   {"database": ["db/migrations/**"], "security": ["db/migrations/auth/**"]},
+                   {"db/migrations/auth/001.sql": "security"})
+        self.check_active(["db/migrations/auth/001.sql", "db/migrations/002.sql"],
+                          {"db/migrations/auth/001.sql": ["database", "security"]})
+
+    def test_real_precedence_s69(self):
+        self.check(["infra/security/sg.tf", "infra/main.tf"],
+                   {"infra": ["/infra/**"], "security": ["infra/security/**"]},
+                   {"infra/security/sg.tf": "security"})
+
+    def test_real_precedence_s70(self):
+        self.check(
+            ["packages/auth/package.json", "packages/auth/src/index.ts", "packages/web/x.ts"],
+            {"security": ["packages/auth/**"]},
+            {"packages/auth/package.json": "security", "packages/auth/src/index.ts": "security"})
+
+    def test_real_precedence_s71(self):
+        self.check(["src/ai/middleware.ts", "src/ai/agent.py"],
+                   {"ai": ["src/ai/**"], "security": ["src/ai/middleware.ts"]},
+                   {"src/ai/middleware.ts": "security"})
+
+    def test_real_precedence_s72(self):
+        """Revisione finale di C2 (F3, casi X20 e X24): dentro una cartella `auth/` il percorso
+        esatto di un `middleware.*` non si propone (è coperto dalla cartella, S35), quindi la
+        cartella più profonda di `ai` o di `backend` vince anche sul nome (al contrario di S71)."""
+        files = ["src/auth/llm/middleware.ts", "src/auth/llm/client.py", "src/auth/a.py"]
+        self.check(files, {"ai": ["src/auth/llm/**"], "security": ["src/auth/**"]},
+                   {"src/auth/llm/middleware.ts": "ai"})
+        self.check_active(files, {"src/auth/llm/middleware.ts": ["ai", "security"]})
+        files = ["src/auth/routes/middleware.ts", "src/auth/a.ts"]
+        self.check(files, {"backend": ["src/auth/routes/**"], "security": ["src/auth/**"]},
+                   {"src/auth/routes/middleware.ts": "backend"})
+        self.check_active(files, {"src/auth/routes/middleware.ts": ["backend", "security"]})
+
+    def test_real_precedence_s73(self):
+        """Revisione finale di C2 (F3, caso X23): un `.tsx` dentro `auth/` riconosciuto da
+        `frontend` per contenuto va a `security`, perché `frontend` lo copre già con `**/*.tsx` e
+        non ne propone il percorso esatto (S58 vale per un `.ts`)."""
+        files = ["src/auth/Guard.tsx", "src/auth/x.ts"]
+        detected = {"frontend": ["src/auth/Guard.tsx"]}
+        self.check(files, {"frontend": ["**/*.tsx"], "security": ["src/auth/**"]},
+                   {"src/auth/Guard.tsx": "security"}, detected=detected)
+        self.check_active(files, {"src/auth/Guard.tsx": ["frontend", "security"]},
+                          detected=detected)
+
+
 class DatabaseAgentsProposeTest(unittest.TestCase):
     """Decisione 10 di B7: `init` propone `final_specialist` solo se `agents/final-database.md`
     esiste nel plugin (`_agent_exists`); con i file veri del plugin c'è."""
@@ -1847,6 +2393,26 @@ class DatabaseAgentsProposeTest(unittest.TestCase):
         self.assertEqual((prof["agent"], prof["reviewer"], prof["final_specialist"]),
                          ("tollgate:implementer-database", "tollgate:reviewer-database",
                           "tollgate:final-database"))
+        self.assertTrue(prof["checklist"])
+
+    def test_real_security_proposes_final_specialist(self):
+        """Decisione 10 di C2: `final_specialist` si propone solo quando l'agente esiste."""
+        root = _real_fragments_root(self, areas=("security",))
+        (root / "agents").mkdir()
+        for name in ("implementer-security", "reviewer-security"):
+            shutil.copy(ROOT / "agents" / f"{name}.md", root / "agents" / f"{name}.md")
+        files = {"app/auth/x.py": 10}
+        got = init.profile_blocks(files, DEFAULT_TOML, root)
+        prof = tomllib.loads(DEFAULT_TOML + got.text)["profiles"]["security"]
+        self.assertNotIn("final_specialist", prof)
+        self.assertTrue(any("final_specialist" in l and "final-security.md" in l
+                            for l in got.lines), got.lines)
+        shutil.copy(ROOT / "agents" / "final-security.md", root / "agents" / "final-security.md")
+        got = init.profile_blocks(files, DEFAULT_TOML, root)
+        prof = tomllib.loads(DEFAULT_TOML + got.text)["profiles"]["security"]
+        self.assertEqual((prof["agent"], prof["reviewer"], prof["final_specialist"]),
+                         ("tollgate:implementer-security", "tollgate:reviewer-security",
+                          "tollgate:final-security"))
         self.assertTrue(prof["checklist"])
 
 

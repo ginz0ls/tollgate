@@ -247,7 +247,7 @@ class RunShTest(EvalRunBase):
         self.assertEqual(args[:2], ["plugin", "eval"])
         for flag in ("--scaffold", "--trust-plugin", "--keep-temp"):
             self.assertIn(flag, args)
-        self.assertEqual(args[args.index("--model") + 1], "claude-sonnet-5-5")
+        self.assertEqual(args[args.index("--model") + 1], "claude-opus-5-5")
         self.assertEqual(args[args.index("--threshold") + 1], "0.66")
         i = args.index("--allow-tools")
         self.assertEqual(args[i + 1:i + 4], ["Bash", "Write", "Edit"])

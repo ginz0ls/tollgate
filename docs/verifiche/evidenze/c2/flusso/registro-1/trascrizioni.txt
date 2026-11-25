@@ -1,0 +1,39 @@
+# tentativo-1: sessione 1, cartella -tmp-tollgate-b1-flow
+nessuna trascrizione di subagente
+# tentativo-1: sessione 2, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-scadenza-dei-token-e-lettura-delle-note
+nessuna trascrizione di subagente
+# tentativo-1: sessione 3, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-scadenza-dei-token-e-lettura-delle-note
+agent-a18e236c89b1a5762.jsonl: nessun titolo
+agent-a45476d5f34a1754b.jsonl: nessun titolo
+agent-a47826854f43d67e3.jsonl: nessun titolo
+agent-a6796383d31fd13e6.jsonl: nessun titolo
+agent-aae342378c5b4139a.jsonl: nessun titolo
+agent-af10b9b3bc6ee7b92.jsonl: nessun titolo
+# tentativo-1: sessione 4, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-scadenza-dei-token-e-lettura-delle-note
+nessuna trascrizione di subagente
+# tentativo-1: sessione 5, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-scadenza-dei-token-e-lettura-delle-note
+agent-a2bb65c96dac90216.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a2bb65c96dac90216.jsonl: # Regole security (versione 1) (isMeta: sì)
+agent-a2bb65c96dac90216.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a2bb65c96dac90216.jsonl: # Regole security (versione 1) (isMeta: no)
+agent-a2d75153a5e107063.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a2d75153a5e107063.jsonl: # Regole security (versione 1) (isMeta: sì)
+agent-a2d75153a5e107063.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a2d75153a5e107063.jsonl: # Regole security (versione 1) (isMeta: no)
+agent-ae98c72c316504801.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-ae98c72c316504801.jsonl: # Regole security (versione 1) (isMeta: sì)
+agent-ae98c72c316504801.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-ae98c72c316504801.jsonl: # Regole security (versione 1) (isMeta: no)
+agent-af6aaab823d558b30.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-af6aaab823d558b30.jsonl: # Regole security (versione 1) (isMeta: sì)
+agent-af6aaab823d558b30.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-af6aaab823d558b30.jsonl: # Regole security (versione 1) (isMeta: no)
+# tentativo-1: sessione 6, cartella -tmp-tollgate-b1-flow--claude-worktrees-tg-1-scadenza-dei-token-e-lettura-delle-note
+agent-a015a113d981547d5.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a015a113d981547d5.jsonl: # Regole security (versione 1) (isMeta: sì)
+agent-a015a113d981547d5.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a015a113d981547d5.jsonl: # Regole security (versione 1) (isMeta: no)
+agent-a19a07b7a8ccce631.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a19a07b7a8ccce631.jsonl: # Regole di base (versione 1) (isMeta: no)
+agent-a75543819b542c127.jsonl: # Regole di base (versione 1) (isMeta: sì)
+agent-a75543819b542c127.jsonl: # Regole di base (versione 1) (isMeta: no)

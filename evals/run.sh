@@ -44,7 +44,7 @@ fi
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/.." && pwd)"
 TARGET="${TOLLGATE_EVAL_TARGET:-/tmp/tollgate-eval-target}"
-MODEL=claude-sonnet-5-5
+MODEL=claude-opus-5-5
 THRESHOLD=0.66
 DEFAULT_RUNS=3         # decisione 8: tre corse per caso
 TOKEN_PATTERN='gh[pos]_[A-Za-z0-9_]{8,}|github_pat_[A-Za-z0-9_]{8,}|sk-ant-[A-Za-z0-9_-]{8,}|AKIA[0-9A-Z]{16}'

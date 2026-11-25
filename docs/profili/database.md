@@ -4,6 +4,8 @@ Questa pagina è per te: dice quali sono le regole per il codice che cambia il d
 
 Approvata dall'utente il 2026-11-17.
 
+Il 2026-11-24, con il tuo OK, è stata corretta una frase su `verify` e `dod`.
+
 ## Cosa sono
 
 Sono sedici regole in più rispetto a quelle di base. Quindici di queste bloccano il lavoro se non sono rispettate. Dicono, per esempio, di leggere prima le migrazioni che ci sono già, di non modificare una migrazione già scritta, di accendere la protezione delle righe (RLS) su ogni tabella nuova e di non mandare nessuna scrittura al database vero senza il tuo permesso.
@@ -104,7 +106,7 @@ commands = { db_reset = "supabase db reset --local", db_test = "supabase test db
 dod = ["db_reset", "db_test"]
 ```
 
-Attenzione: i comandi di `dod` li lancia tollgate stesso a fine lavoro, senza chiedere e senza nessun controllo sugli effetti, con le credenziali che hai salvato sul computer. Un comando lì dentro non deve mai avere `--remote`, `--linked` né `--db-url`: scriverebbe sul progetto vero. L'agente `implementer-database` non lancia mai `supabase`, `psql`, `docker`, `prisma`, `drizzle-kit` né un lanciatore di pacchetti: le prove del database passano da `verify` (i comandi che metti nel `dod`).
+Attenzione: i comandi di `dod` li lancia tollgate stesso a fine lavoro, senza chiedere e senza nessun controllo sugli effetti, con le credenziali che hai salvato sul computer. Un comando lì dentro non deve mai avere `--remote`, `--linked` né `--db-url`: scriverebbe sul progetto vero. L'agente `implementer-database` non lancia mai `supabase`, `psql`, `docker`, `prisma`, `drizzle-kit` né un lanciatore di pacchetti: le prove del database passano da `verify`, che esegue i controlli del progetto e i comandi che scrivi nella riga `gate` del blocco del profilo. I comandi di `dod` girano solo a fine lavoro: se vuoi un comando anche durante il task, aggiungi anche a `gate` i comandi, nello stesso ordine (per esempio `gate = ["db_reset", "db_test"]`); i comandi di `gate` girano anche nel controllo prima della pull request.
 
 **Permessi della CLI di Supabase.** Da B7 tollgate guarda ogni comando `supabase` (anche dietro `npx`) e chiede il permesso prima di quelli che possono scrivere sul progetto vero. È la scelta che hai fatto il 12 novembre, e vale in tutti i progetti, non solo con il profilo database. La regola è chiusa: un comando passa senza chiedere solo se sta in una lista; tutto il resto chiede, compresi i comandi che la CLI aggiungerà.
 

@@ -2,7 +2,7 @@
 name: spec-auditor
 description: Auditor della spec in L2, lanciato da tollgate:spec-audit con il percorso del brief. Un solo ciclo, da un solo punto di vista, con le dieci lenti; sola lettura, chiude con una riga JSON.
 tools: Read, Grep, Glob, WebFetch
-model: sonnet
+model: fable
 ---
 
 Metodo derivato da prd-audit (sAInapse), con l'accordo dell'autore.

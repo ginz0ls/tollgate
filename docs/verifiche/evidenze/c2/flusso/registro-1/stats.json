@@ -1,0 +1,33 @@
+{
+  "blocks": 0,
+  "finding_overrides": 0,
+  "fix_rounds": 0,
+  "needs_you": 0,
+  "off_hours": 0.0,
+  "phase_hours": {
+    "approval": 0.01,
+    "execution": 0.12,
+    "plan": 0.17,
+    "pr_open": 0.01,
+    "review": 0.03,
+    "spec_audit": 0.26
+  },
+  "review_cycles": 1,
+  "tokens": {
+    "by_agent": {
+      "tollgate:final-reviewer": 47120,
+      "tollgate:final-security": 58388,
+      "tollgate:finding-verifier": 38857,
+      "tollgate:implementer-security": 174677,
+      "tollgate:plan-adversary": 256170,
+      "tollgate:reviewer-security": 89165,
+      "tollgate:spec-adversary": 349871
+    },
+    "total": 1014248
+  },
+  "vetoes": {
+    "by_rule": {},
+    "total": 0
+  },
+  "waivers": 0
+}

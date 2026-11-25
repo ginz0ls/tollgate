@@ -1,6 +1,6 @@
 # tollgate C: tracciamento, piano a fette e bacheche su GitHub
 
-Avanzamento: **C1 eseguita** il 21/11/2026 sul ramo `c1-tracciamento-locale`, in attesa del merge su `main`. Prova reale corta riuscita (`docs/verifiche/2026-11-20-c1-prova-flusso.md`, un tentativo per passo, circa 0,93 USD equivalenti, nessun addebito); spec del nucleo alla revisione 36. C2-C6 non ancora cominciate.
+Avanzamento: **C1 eseguita** il 21/11/2026 e unita su `main` il 22/11/2026 (`e0929a8`). Prova reale corta riuscita (`docs/verifiche/2026-11-20-c1-prova-flusso.md`, un tentativo per passo, circa 0,93 USD equivalenti, nessun addebito); spec del nucleo alla revisione 36. **C2 costruita** sul ramo `c2-profilo-security`, in attesa del merge: profilo `security` con le 17 regole approvate dall'utente il 23/11/2026, agenti di area e `final-security`, modelli degli agenti scelti dall'utente il 22/11/2026, sicurezza fin dal progetto in ogni lavoro; prova reale L2 riuscita (`docs/verifiche/2026-11-22-c2-prova-flusso.md`, 19,55 USD equivalenti, nessun addebito); spec del nucleo alla revisione 37. C3-C6 non ancora cominciate.
 
 Progetto del sotto-progetto C (20 novembre 2026). È scritto dopo una conversazione con l'utente. Le scelte marcate **utente** non si discutono; quelle marcate **mia scelta** sono del progettista e chi costruisce le può correggere con un motivo scritto.
 
@@ -181,7 +181,7 @@ Un comando porta sulle bacheche i lavori già fatti, a partire da ciò che il re
   - agenti di area;
   - tabella delle precedenze con gli altri profili, con un test ciascuna;
   - prova reale.
-- **Fable dove serve giudizio** (utente: «usando Fable»; mia scelta su dove): la verifica delle fonti, la scrittura delle regole, la revisione del piano, la revisione finale e, se il catalogo lo conferma, il modello di `final-security` e del revisore `security`. Gli implementatori meccanici possono restare sonnet. Il modello di ogni agente si scrive nel suo frontmatter, come per gli altri profili.
+- **Fable dove serve giudizio** (utente: «usando Fable»; mia scelta su dove): la verifica delle fonti, la scrittura delle regole, la revisione del piano, la revisione finale e, se il catalogo lo conferma, il modello di `final-security` e del revisore `security`. Gli implementatori meccanici possono restare sonnet. Il modello di ogni agente si scrive nel suo frontmatter, come per gli altri profili. **Aggiornato il 23/11/2026, a C2 costruita:** la frase sugli implementatori sonnet non vale più. L'ha superata la scelta dell'utente del 22/11/2026 sui modelli (sotto): chi scrive o corregge usa opus, chi cerca i difetti Fable, mai sonnet, sia per chi costruisce le fette sia per gli agenti di tollgate. `reviewer-security` e `final-security` sono su Fable, `implementer-security` su opus.
 - **Cosa non cambia.** I profili approvati di B (`base`, `ai`, `infra`, `backend`, `frontend`, `database`) non si toccano. Dove una regola di `security` si sovrappone a una già approvata (i segreti di `backend` e `database`, RLS di `database`), la pagina del profilo lo dice e l'utente decide all'approvazione.
 - **`ci`.** Percorsi del catalogo: `.github/workflows/**` (esclusi i `tollgate-*`, che sono del gate), `.gitlab-ci.yml`, `scripts/ci/**`; livello minimo L2; regole `rules-ci` dalle fonti del catalogo (`ci-cd-and-automation` di agent-skills, MIT; `gha-security-review` di getsentry, Apache-2.0, da leggere prima). Si costruisce come `security`, con Fable negli stessi punti, e con la stessa approvazione dell'utente.
 - **Ordine.** È una fetta indipendente dal tracciamento: il piano principale di C decide dove metterla, e la può far girare anche prima delle bacheche.
@@ -213,6 +213,6 @@ Un comando porta sulle bacheche i lavori già fatti, a partire da ciò che il re
 ## 14. Vincoli
 
 - Come il resto di tollgate: Python ≥ 3.11 e solo libreria standard in `bin/` e nei test; strati del nucleo rispettati (`tests/test_layers.py`); suite verde su Python 3.11 e 3.13 con `PYTHONWARNINGS=error::ResourceWarning`.
-- Nessun modello di linguaggio nel codice di C (la presa di 3.3 resta vuota di modelli). Fable si usa per costruire la fetta `security` (sezione 11), non dentro tollgate.
+- Nessun modello di linguaggio nel codice di C (la presa di 3.3 resta vuota di modelli). Fable si usa per costruire la fetta `security` (sezione 11), non dentro tollgate. Dal 22/11/2026 gli agenti di tollgate dichiarano `fable` o `opus` nella riga `model:` (scelta dell'utente, sezione 11): è il modello con cui Claude Code fa girare i subagenti, non un modello chiamato dal codice di C.
 - Profili e regole approvati di B non si toccano.
 - Il repo `ginz0ls/tollgate` è pubblico: nei test e nei documenti niente nomi di progetti privati, nome utente, host o token.

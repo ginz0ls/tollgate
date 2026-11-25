@@ -1,0 +1,6 @@
+passo1: tentativo 1, uscita 0
+passo2: tentativo 1, uscita 0
+passo3: tentativo 1, uscita 0
+passo4: tentativo 1, uscita 0
+passo5: tentativo 1, uscita 0
+passo6: tentativo 1, uscita 0

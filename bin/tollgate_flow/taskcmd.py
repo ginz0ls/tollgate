@@ -19,7 +19,7 @@ from . import prereq, ruling_cmd
 from .research_cmd import note_path
 
 MAX_FIX_ROUNDS = tasks.BASE_FIX_ROUNDS
-MODEL_HINT = "inherit"
+MODEL_HINT = "opus"
 
 
 class TaskError(Exception):
@@ -171,8 +171,11 @@ def _task_start(state, conn, cwd: Path, number: int, *, fix: bool, claude_dir: P
             "resume"
     else:
         name, pending = naming.implementer_name(work["issue"], number, round_), "launch"
-    # decisione 21: il modello di `[review] models`; dal giro 4 il nuovo implementatore è inherit
-    hint = MODEL_HINT if renamed else cfg.get("review.models").get(routing.implementer)
+    # decisione 21: il modello di `[review] models`; dal giro 4 il nuovo implementatore ha sempre un
+    # modello, quello di `[review] models` o opus (decisione 14 di C2: la chiamata vuole un alias)
+    hint = cfg.get("review.models").get(routing.implementer)
+    if renamed:
+        hint = hint or MODEL_HINT
 
     research_on = _research_on(work, cfg)
     delivered, delivered_ok = lookups.note(conn, work["id"], number) \

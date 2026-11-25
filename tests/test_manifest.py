@@ -6,14 +6,22 @@ import unittest
 
 from tests.helpers import ROOT
 
-AREAS = ("ai", "infra", "backend", "frontend", "database")
-# Le aree con uno specialista della revisione finale (decisione 11 di B7).
-FINAL_AREAS = ("database",)
+AREAS = ("ai", "infra", "backend", "frontend", "database", "security")
+# Le aree con uno specialista della revisione finale (decisione 11 di B7, decisione 10 di C2).
+FINAL_AREAS = ("database", "security")
 ATTRIBUTION = ("Derivato da superpowers/skills/subagent-driven-development (MIT, © 2025 Jesse "
                "Vincent); vedi LICENSES/superpowers-MIT.txt")
 
 FINAL_ATTRIBUTION = ("Derivato da superpowers/skills/requesting-code-review (MIT, © 2025 Jesse "
                      "Vincent); vedi LICENSES/superpowers-MIT.txt")
+
+# Decisione 14 di C2 (scelta dell'utente del 22/11/2026): chi rivede usa Fable, chi scrive opus.
+REVIEW_MODEL = "fable"
+WRITER_MODEL = "opus"
+# Una riga che fissa un modello sonnet o haiku (decisione 14 di C2).
+SONNET_PIN = re.compile(r"model: ['\"]?(sonnet|haiku)|--model[ =]['\"]?(sonnet|haiku)"
+                        r"|MODEL=['\"]?(sonnet|haiku|claude-sonnet|claude-haiku)"
+                        r"|:-['\"]?(sonnet|haiku)")
 
 
 def frontmatter(path) -> dict[str, str]:
@@ -95,7 +103,7 @@ class ManifestTest(unittest.TestCase):
         impl = ROOT / "agents" / "implementer.md"
         fm = frontmatter(impl)
         self.assertEqual(fm["name"], "implementer")
-        self.assertEqual(fm["model"], "inherit")
+        self.assertEqual(fm["model"], WRITER_MODEL)
         self.assertEqual(fm["maxTurns"], "60")
         self.assertEqual([t.strip() for t in fm["tools"].split(",")],
                          ["Read", "Edit", "Write", "Bash", "Grep", "Glob", "Skill", "WebFetch",
@@ -104,13 +112,56 @@ class ManifestTest(unittest.TestCase):
         rev = ROOT / "agents" / "task-reviewer.md"
         fm = frontmatter(rev)
         self.assertEqual(fm["name"], "task-reviewer")
-        self.assertEqual(fm["model"], "sonnet")
+        self.assertEqual(fm["model"], REVIEW_MODEL)
         tools = [t.strip() for t in fm["tools"].split(",")]
         self.assertEqual(tools, ["Read", "Grep", "Glob", "Bash"])
         self.assertNotIn("Edit", tools)
         self.assertNotIn("Write", tools)
         for path in (impl, rev):
             self.assertIn(ATTRIBUTION, path.read_text())
+
+    def test_no_agent_on_sonnet(self):
+        for path in sorted((ROOT / "agents").glob("*.md")):
+            with self.subTest(agent=path.stem):
+                self.assertNotRegex(frontmatter(path)["model"], r"sonnet|haiku")
+
+    def test_agent_models_by_role(self):
+        """Decisione 14 di C2: i revisori di sola lettura su Fable, gli implementatori su opus."""
+        from tollgate_core import config
+        reviewers = {t.removeprefix("tollgate:")
+                     for t in config.DEFAULTS["review"]["readonly_agents"] if t != "Explore"}
+        agents = {p.stem: frontmatter(p) for p in (ROOT / "agents").glob("*.md")}
+        writers = {n for n in agents if n == "implementer" or n.startswith("implementer-")}
+        self.assertEqual(set(agents), reviewers | writers, "un agente senza un ruolo")
+        for name in sorted(reviewers):
+            with self.subTest(agent=name):
+                self.assertEqual(agents[name]["model"], REVIEW_MODEL)
+        for name in sorted(writers):
+            with self.subTest(agent=name):
+                self.assertEqual(agents[name]["model"], WRITER_MODEL)
+
+    def test_sonnet_pin_sees_every_form(self):
+        """Triage 4 della revisione finale di C2: `SONNET_PIN` vede anche le virgolette e
+        `--model=`; una riga che nomina un modello senza fissarlo non conta."""
+        for line in ("model: sonnet", "--model sonnet", "--model=haiku", "MODEL=sonnet",
+                     'MODEL="sonnet"', "MODEL='claude-haiku-5-5'", 'MODEL="claude-sonnet-5-5"',
+                     "${B1_MODEL:-sonnet}", '--model "sonnet"'):
+            with self.subTest(line=line):
+                self.assertTrue(SONNET_PIN.search(line))
+        for line in ("model: opus", 'MODEL="claude-opus-5-5"', "…/models/sonnet-5-5/guide"):
+            with self.subTest(line=line):
+                self.assertFalse(SONNET_PIN.search(line))
+
+    def test_no_sonnet_in_skills_and_scripts(self):
+        paths = sorted((ROOT / "skills").glob("*/SKILL.md")) + [
+            ROOT / "spikes" / "run-b1-flow.sh", ROOT / "spikes" / "b1" / "run-b1-checks.sh",
+            ROOT / "evals" / "run.sh"]
+        for path in paths:
+            text = path.read_text()
+            with self.subTest(path=str(path.relative_to(ROOT))):
+                self.assertFalse([line for line in text.splitlines() if SONNET_PIN.search(line)])
+                if path.name == "SKILL.md":
+                    self.assertNotIn("model: inherit", text)
 
     def test_implementer_tools(self):
         tools = [t.strip() for t in frontmatter(ROOT / "agents" / "implementer.md")
@@ -238,6 +289,90 @@ class ManifestTest(unittest.TestCase):
                 self.assertIn("revisore del task", section)
                 self.assertIn("lista di controllo", section.lower())
 
+    def test_security_by_design_in_every_implementer(self):
+        """Decisione 20 di C2: una sola sezione «Sicurezza fin dal progetto», dopo «Il lavoro» e
+        fuori dalla sezione «Area», con le cinque voci (i titoli in grassetto) e le due forme
+        della riga `Sicurezza:`; il campo `done` del report la richiama. Niente id di regola né le
+        frasi delle regole sul report e sul diff (D13)."""
+        titles = ("**Input non fidato validato al confine**",
+                  "**Nessun segreto nel codice né nei log**", "**Accesso chiuso per difetto**",
+                  "**Valori predefiniti che rifiutano**", "**Permessi minimi**")
+        for name in ("implementer", *(f"implementer-{area}" for area in AREAS)):
+            with self.subTest(agent=name):
+                text = (ROOT / "agents" / f"{name}.md").read_text()
+                self.assertEqual(text.count("\n## Sicurezza fin dal progetto\n"), 1)
+                self.assertLess(text.index("\n## Il lavoro\n"),
+                                text.index("\n## Sicurezza fin dal progetto\n"))
+                raw = text.split("\n## Sicurezza fin dal progetto\n")[1].split("\n## ")[0]
+                section = " ".join(raw.split())
+                items = [line for line in raw.splitlines() if line.startswith("- **")]
+                self.assertEqual([line.split(":", 1)[0][2:] for line in items], list(titles))
+                self.assertIn("caso negato", section)
+                # la riga sta dentro il valore JSON di `done`: mai un a capo vero (m3)
+                self.assertIn("senza andare a capo", section)
+                self.assertIn("`Sicurezza: <cosa hai considerato>`", section)
+                self.assertIn("`Sicurezza: il task non tocca input esterni, accessi, dati o "
+                              "segreti`", section)
+                self.assertNotRegex(section, r"R-[A-Z]+-\d\d")
+                for phrase in ("sul tuo report", "si giudicano sul report",
+                               "si giudicano sul diff"):
+                    self.assertNotIn(phrase, section)
+                done = [line for line in text.split("\n## Report finale\n")[1].splitlines()
+                        if line.startswith("- `done`")]
+                self.assertEqual(len(done), 1)
+                self.assertIn("`Sicurezza:`", done[0])
+                self.assertIn("senza andare a capo", done[0])
+
+    def test_reviewers_check_security_line(self):
+        """Decisione 20 di C2: il revisore del task controlla in «Parte 2: qualità» la riga
+        `Sicurezza:` e il diff contro di essa; il revisore finale ha la sicurezza fin dal progetto
+        in «Cosa controllare». Si guarda la voce, non tutta la sezione."""
+        def item(text, title, start):
+            part = text.split(f"\n## {title}\n")[1].split("\n## ")[0]
+            items = [line for line in part.splitlines() if line.startswith(start)]
+            self.assertEqual(len(items), 1, f"«{title}»: voce «{start}» assente o ripetuta")
+            return items[0]
+
+        for name in ("task-reviewer", *(f"reviewer-{area}" for area in AREAS)):
+            with self.subTest(agent=name):
+                line = item((ROOT / "agents" / f"{name}.md").read_text(), "Parte 2: qualità",
+                            "- Sicurezza fin dal progetto:")
+                for word in ("`Sicurezza:`", "diff", "caso negato", "valori predefiniti",
+                             # la sola riga assente: un `minor` con file, riga e passo (m2)
+                             "La sola riga assente è un rilievo `minor`", "`line` 1",
+                             "`rule` il passo del task",
+                             # ciò che la sezione chiede non è `extra` (m4)
+                             "non è `extra`"):
+                    self.assertIn(word, line)
+                self.assertNotRegex(line, r"R-[A-Z]+-\d\d")
+        for name in ("final-reviewer", *(f"final-{area}" for area in FINAL_AREAS)):
+            with self.subTest(agent=name):
+                line = item((ROOT / "agents" / f"{name}.md").read_text(), "Cosa controllare",
+                            "- **Sicurezza fin dal progetto**")
+                for word in ("validato al confine", "segret", "caso negato",
+                             "si segnala una volta sola"):
+                    self.assertIn(word, line)
+                self.assertNotRegex(line, r"R-[A-Z]+-\d\d")
+                self.assertNotIn("si giudicano sul report", line)
+
+    def test_adversaries_look_for_security(self):
+        """Decisione 20 di C2: gli avversari di spec e piano cercano, quando si tocca un input
+        dall'esterno, chi può usare ciò che si costruisce, quali dati e segreti tocca e cosa
+        succede con un input ostile."""
+        for name in ("spec-adversary", "plan-adversary"):
+            with self.subTest(agent=name):
+                text = (ROOT / "agents" / f"{name}.md").read_text()
+                part = text.split("\n## Cosa cercare\n")[1].split("\n## ")[0]
+                items = [line for line in part.splitlines()
+                         if line.startswith("- **Sicurezza fin dal progetto**")]
+                self.assertEqual(len(items), 1, "voce sulla sicurezza assente o ripetuta")
+                for word in ("input dall'esterno", "chi può usare", "dati", "segreti",
+                             "input ostile", "rilievo"):
+                    self.assertIn(word, items[0])
+                if name == "plan-adversary":
+                    # basta la spec approvata a cui il piano rimanda (m6)
+                    self.assertIn("spec approvata", items[0])
+
     def test_real_infra_agent_names_uncovered_commands(self):
         """Decisione 10: la sezione «Area `infra`» non dice più che le scritture remote di KV, D1
         e R2 sono non coperte (tollgate le ferma), e nomina ancora le build Docker con push."""
@@ -270,6 +405,56 @@ class ManifestTest(unittest.TestCase):
                      "yarn", "bunx", "verify", "dod", "Non lanci"):
             self.assertIn(word, section)
 
+    def test_real_security_agent_names_forbidden_tools(self):
+        """Decisione 11 di C2: la sezione «Area `security`» dell'implementatore vieta i programmi
+        delle Global Constraints e le credenziali vere, e dice che le prove passano da
+        `<programma> verify`."""
+        text = (ROOT / "agents" / "implementer-security.md").read_text()
+        section = " ".join(text.split("\n## Area `security`\n")[1].split("\n## ")[0].split())
+        # ogni programma tra accenti gravi: `bun` non si trova dentro `bunx`, né `npm` dentro `pnpm`
+        for prog in ("node", "npm", "npx", "pnpm", "yarn", "bun", "bunx", "deno", "supabase",
+                     "psql", "docker", "wrangler", "vercel", "openssl"):
+            self.assertIn(f"`{prog}`", section)
+        for word in ("credenziali vere", "<programma> verify", "dod", "Non lanci"):
+            self.assertIn(word, section)
+
+    def test_real_verify_channel_is_the_gate(self):
+        """Revisione finale di C2 (F1, U2): `<programma> verify` esegue il gate del progetto e i
+        comandi del `gate` del profilo, non quelli di `dod`, che girano a `finish check`
+        (`runner.gate_commands`, `finishcheck`). Gli agenti di `security` e `database`, le loro
+        righe di `docs/uso/comandi.md` e la pagina di `database` lo dicono così."""
+        wrong = "che esegue i comandi che l'utente ha messo in `dod`"
+        for area in ("security", "database"):
+            text = (ROOT / "agents" / f"implementer-{area}.md").read_text()
+            section = " ".join(text.split(f"\n## Area `{area}`\n")[1].split("\n## ")[0].split())
+            self.assertIn("nel `gate` del profilo", section, area)
+            self.assertIn("finish check", section, area)
+            self.assertNotIn(wrong, section, area)
+        usage = " ".join((ROOT / "docs" / "uso" / "comandi.md").read_text().split())
+        self.assertNotIn("con i comandi che metti nel `dod`", usage)
+        self.assertIn("nel `gate` del profilo", usage)
+        page = " ".join((ROOT / "docs" / "profili" / "database.md").read_text().split())
+        self.assertNotIn("(i comandi che metti nel `dod`)", page)
+        self.assertIn("nella riga `gate` del blocco del profilo", page)
+
+    def test_final_security_reviews_by_risk(self):
+        """Decisione 10 di C2 (catalogo 2.1): lo specialista guarda l'intero diff per rischio e
+        raggio d'azione (confini di fiducia, chi raggiunge il codice cambiato, dati e permessi)
+        prima delle regole e della lista di controllo."""
+        text = (ROOT / "agents" / "final-security.md").read_text()
+        section = " ".join(text.split("\n## Area `security`\n")[1].split("\n## ")[0].split())
+        for word in ("intero diff", "rischio", "raggio d'azione", "confini di fiducia",
+                     "chi può raggiungere il codice cambiato", "dati", "permessi",
+                     "lista di controllo"):
+            self.assertIn(word, section)
+        self.assertLess(section.index("raggio d'azione"), section.index("si giudicano sul diff"))
+        # un rischio senza regola si segnala, ma una regola del revisore del task non diventa un rilievo nuovo
+        self.assertIn("Un rischio che nessuna regola di `rules-security` copre, nemmeno una di quelle che spettano al "
+                      "revisore del task, si segnala lo stesso", section)
+        # scritta per un lavoro con `security` attivo: niente regole di `ci` (C3)
+        self.assertNotIn("rules-ci", text)
+        self.assertNotIn("R-CI-", text)
+
     def test_final_reviewers_leave_report_rules_of_areas(self):
         for name in ("final-reviewer", "finding-verifier"):
             with self.subTest(agent=name):
@@ -291,12 +476,16 @@ class ManifestTest(unittest.TestCase):
         self.assertNotIn("file delle dipendenze", section)
 
     def test_reviewers_cite_base_rules(self):
-        for name in ("task-reviewer", "final-reviewer"):
+        # la frase sulla nota di ricerca, non quella della voce sulla sicurezza (minore del
+        # Task 2 di C2): «si segnala una volta sola» da sola compare anche lì
+        once = {"task-reviewer": "un difetto della nota si segnala una volta sola",
+                "final-reviewer": "un suo difetto si segnala una volta sola"}
+        for name, phrase in once.items():
             with self.subTest(agent=name):
                 text = (ROOT / "agents" / f"{name}.md").read_text()
                 self.assertIn("R-BASE-", text)
                 self.assertIn("[blocca]", text)
-                self.assertIn("si segnala una volta sola", text)
+                self.assertIn(phrase, text)
 
     def test_reviewers_know_where_report_and_note_rules_are_judged(self):
         task = " ".join((ROOT / "agents" / "task-reviewer.md").read_text().split())
@@ -472,8 +661,8 @@ class ManifestTest(unittest.TestCase):
     def test_final_agents_frontmatter(self):
         rev = ROOT / "agents" / "final-reviewer.md"
         ver = ROOT / "agents" / "finding-verifier.md"
-        for path, name, model in ((rev, "final-reviewer", "inherit"),
-                                  (ver, "finding-verifier", "sonnet")):
+        for path, name, model in ((rev, "final-reviewer", REVIEW_MODEL),
+                                  (ver, "finding-verifier", REVIEW_MODEL)):
             fm = frontmatter(path)
             self.assertEqual(fm["name"], name)
             self.assertEqual(fm["model"], model)
@@ -559,9 +748,9 @@ class ManifestTest(unittest.TestCase):
         resolve = (ROOT / "skills" / "resolve" / "SKILL.md").read_text()
         self.assertIn("concede **un** ciclo", resolve)
 
-    AUDIT_AGENTS = {"spec-adversary": (["Read", "Grep", "Glob", "WebFetch"], "inherit"),
-                    "spec-auditor": (["Read", "Grep", "Glob", "WebFetch"], "sonnet"),
-                    "plan-adversary": (["Read", "Grep", "Glob"], "inherit")}
+    AUDIT_AGENTS = {"spec-adversary": (["Read", "Grep", "Glob", "WebFetch"], REVIEW_MODEL),
+                    "spec-auditor": (["Read", "Grep", "Glob", "WebFetch"], REVIEW_MODEL),
+                    "plan-adversary": (["Read", "Grep", "Glob"], REVIEW_MODEL)}
     AUDIT_ATTRIBUTION = "Metodo derivato da prd-audit (sAInapse), con l'accordo dell'autore"
 
     def test_audit_agents_frontmatter(self):

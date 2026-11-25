@@ -1,0 +1,58 @@
+# lookups: id, work, task, agent_id, kind, target, at
+1	1	1	a2bb65c96dac90216	read	.tollgate-run/1/task-1.md	2026-11-23T20:24:47.243648Z
+2	1	1	a2bb65c96dac90216	read	app/auth/tokens.py	2026-11-23T20:24:52.024145Z
+3	1	1	a2bb65c96dac90216	read	tests/test_tokens.py	2026-11-23T20:24:52.794021Z
+4	1	1	a2bb65c96dac90216	read	docs/superpowers/plans/2026-11-22-prova-c2.md	2026-11-23T20:24:53.490646Z
+5	1	1	a2bb65c96dac90216	read	app/notes.py	2026-11-23T20:24:54.099149Z
+6	1	1	a2bb65c96dac90216	read	tollgate.toml	2026-11-23T20:24:54.788291Z
+7	1	1	a2bb65c96dac90216	read	tools/unittest_junit.py	2026-11-23T20:24:55.431216Z
+8	1	1	a2bb65c96dac90216	read	docs/superpowers/specs/2026-11-22-prova-c2.md	2026-11-23T20:24:58.609797Z
+9	1	1	a2bb65c96dac90216	fetch	https://docs.python.org/3/library/hmac.html	2026-11-23T20:25:04.365783Z
+10	1	1	a2bb65c96dac90216	fetch	https://docs.python.org/3/library/stdtypes.html	2026-11-23T20:25:05.969719Z
+11	1	2	ae98c72c316504801	read	.tollgate-run/1/task-2.md	2026-11-23T20:28:06.327857Z
+12	1	2	ae98c72c316504801	read	app/notes.py	2026-11-23T20:28:11.002723Z
+13	1	2	ae98c72c316504801	read	app/auth/tokens.py	2026-11-23T20:28:11.652074Z
+14	1	2	ae98c72c316504801	read	tests/test_tokens.py	2026-11-23T20:28:12.294171Z
+15	1	2	ae98c72c316504801	read	app/auth/__init__.py	2026-11-23T20:28:12.990289Z
+16	1	2	ae98c72c316504801	read	tollgate.toml	2026-11-23T20:28:13.568315Z
+17	1	2	ae98c72c316504801	read	tools/unittest_junit.py	2026-11-23T20:28:19.892093Z
+18	1	2	ae98c72c316504801	read	docs/superpowers/plans/2026-11-22-prova-c2.md	2026-11-23T20:28:20.898332Z
+# per tipo
+fetch: 2
+read: 16
+# task: work, number, state, research_ok
+1	1	done	1
+1	2	done	1
+# nota salvata, lavoro 1 task 1
+## Letto nel progetto
+- app/auth/tokens.py
+- tests/test_tokens.py
+- app/notes.py
+- docs/superpowers/plans/2026-11-22-prova-c2.md
+- docs/superpowers/specs/2026-11-22-prova-c2.md
+- tollgate.toml
+- tools/unittest_junit.py
+
+## Documentazione
+- https://docs.python.org/3/library/hmac.html — compare_digest accetta due str solo ASCII o due bytes-like dello stesso tipo, confronta senza uscire al primo byte diverso; la doc consiglia di codificare il testo in bytes prima.
+- https://docs.python.org/3/library/stdtypes.html#str.isdigit — isdigit() è vero anche per cifre non ASCII (arabo-indiane, apici come ²), isascii() è vero solo per U+0000-U+007F: servono tutte e due per ammettere solo cifre ASCII.
+
+## Cosa ho trovato
+Il progetto usa solo la libreria standard (nessun file di dipendenze: niente requirements/pyproject; spec, «Cosa non fare»). verify oggi confronta la firma con != e non controlla la scadenza. Applico l'ordine della spec: secret vuoto -> None; token.encode("utf-8") con UnicodeEncodeError -> None; rsplit(".", 2) in tre parti; hmac.compare_digest sui byte UTF-8 delle due firme (la firma ricevuta può contenere non ASCII, quindi codifico: il token è già codificabile al passo 2); utente non vuoto; scadenza isascii() e isdigit() e len <= 20, poi int, valida solo se now < expires_at. signing_key() legge os.environ a ogni chiamata, codifica UTF-8 senza strip, RuntimeError(...) from None per assente/vuota/non codificabile, messaggio che nomina C2_PROVA_SECRET e mai il valore. sign non cambia. La suite non registra subTest: niente subTest, cicli con msg=.
+
+# nota salvata, lavoro 1 task 2
+## Letto nel progetto
+- app/notes.py
+- app/auth/tokens.py
+- app/auth/__init__.py
+- tests/test_tokens.py
+- tools/unittest_junit.py
+- tollgate.toml
+- docs/superpowers/plans/2026-11-22-prova-c2.md
+
+## Nessuna fonte esterna
+Il progetto usa solo la libreria standard di Python (piano, «Fatti verificati»): il diff usa unittest, unittest.mock e os, e le funzioni gia' presenti signing_key, verify, sign, get_note, add_note, clear_notes. Nessuna libreria di token, password o sessioni e nessun servizio esterno.
+
+## Cosa ho trovato
+verify(token, secret, *, now) di Task 1 e' completo e non solleva mai; signing_key() solleva RuntimeError se C2_PROVA_SECRET manca. read_note(token, note_id, *, now) chiamera' signing_key() come prima istruzione senza try (M11), poi verify, get_note e can_read(user, note.owner); stesso None per token invalido, nota assente e nota altrui. can_read in app/auth/access.py confronta due nomi utente (non segreti) e non importa app/notes.py. I test seguono lo schema di tests/test_tokens.py (setUp con mock.patch.dict fermato da addCleanup, valore finto PROVA-123); NotesTest chiama clear_notes() nel setUp perche' _NOTES e' globale.
+

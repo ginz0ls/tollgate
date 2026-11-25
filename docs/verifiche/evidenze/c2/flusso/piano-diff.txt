@@ -1,0 +1,91 @@
+--- spikes/c2/input/piano-L2.md	2026-11-23 16:50:23.937519098 +0100
++++ /tmp/tollgate-b1/flow/.claude/worktrees/tg-1-scadenza-dei-token-e-lettura-delle-note/docs/superpowers/plans/2026-11-22-prova-c2.md	2026-11-23 21:22:30.058628499 +0100
+@@ -2,52 +2,72 @@
+ 
+ ## Fatti verificati
+ 
+-- Il progetto ha `app/auth/tokens.py` (`sign` e `verify`, firma HMAC-SHA256 della libreria standard; `verify` non controlla ancora la scadenza), `app/notes.py` (`Note` e l'archivio in memoria, con `add_note`, `get_note` e `clear_notes`) e `tests/test_tokens.py`.
++- Il progetto ha `app/auth/tokens.py` (`sign` e `verify`, firma HMAC-SHA256 della libreria standard; `verify` non controlla ancora la scadenza, confronta la firma con `!=` e fa `payload.encode()` senza protezione), `app/notes.py` (`Note` e l'archivio in memoria `_NOTES`, globale al modulo, con `add_note`, `get_note` e `clear_notes`) e `tests/test_tokens.py` (il `setUp` imposta `C2_PROVA_SECRET=PROVA-123` con `mock.patch.dict`).
++- `app/auth/access.py`, `tests/test_notes.py` e `tests/test_access.py` non esistono ancora.
+ - Il progetto usa solo la libreria standard di Python e non è collegato a nessun servizio.
+ - La suite si lancia con `python3 tools/unittest_junit.py`, che scrive `reports/junit.xml`.
+ 
+ ## Decisioni
+ 
+-- Un token con la scadenza uguale o precedente a `now` è scaduto (tana «token che scade nell'istante `now`» della spec).
+-- L'istante corrente arriva come argomento `now`, in secondi (tana «orologio» della spec).
+-- `read_note` verifica il token con la chiave di firma letta dalla variabile d'ambiente `C2_PROVA_SECRET`; nei test vale `PROVA-123`.
+-- Il permesso di lettura sta in una funzione sola, `can_read`, in `app/auth/access.py`.
++- Un token con la scadenza uguale o precedente a `now` è scaduto: vale solo se `now < expires_at` (tana «token che scade nell'istante `now`» della spec).
++- L'istante corrente arriva come argomento `now`, in secondi; le funzioni non leggono l'orologio (tana «orologio» della spec).
++- La chiave di firma la legge solo `signing_key()` in `app/auth/tokens.py`, a ogni chiamata, dalla variabile d'ambiente `C2_PROVA_SECRET`, codificata in UTF-8 senza `strip`; nei test vale `PROVA-123`. Nessun valore predefinito.
++- Con la variabile assente, vuota o non codificabile in UTF-8 `signing_key()` solleva `RuntimeError` con `from None`, con un messaggio che nomina la variabile e mai il suo valore; `read_note` non la intercetta.
++- Ordine dei controlli in `verify` (tana della spec): 1) `secret` vuoto → `None`; 2) codifica del token in UTF-8 (`UnicodeEncodeError` → `None`); 3) forma con `rsplit(".", 2)`, tre parti; 4) firma confrontata con `hmac.compare_digest` sui byte UTF-8 delle due firme; 5) utente non vuoto; 6) scadenza di sole cifre ASCII (`isascii()` e `isdigit()`), al più 20 cifre, poi `int`, valida solo se `now < expires_at`. Ogni caso negativo restituisce `None`, mai un'eccezione.
++- Il permesso di lettura sta in una funzione sola, `can_read`, in `app/auth/access.py`; riceve il proprietario come stringa, così `access.py` non importa `app/notes.py` e non c'è import circolare.
++- `read_note` restituisce lo stesso `None` per token non valido, nota inesistente e utente diverso dal proprietario.
++- `sign` resta com'è.
+ 
+ ## Interfacce
+ 
+-- `app/auth/tokens.py`: `verify(token: str, secret: bytes, *, now: int) -> str | None` controlla anche la scadenza.
+-- `app/auth/access.py`: `can_read(user: str, note: Note) -> bool`.
+-- `app/notes.py`: `read_note(token: str, note_id: int, *, now: int) -> Note | None`.
++- `app/auth/tokens.py`: `verify(token: str, secret: bytes, *, now: int) -> str | None` mantiene la firma e controlla anche la scadenza; la docstring si aggiorna al nuovo comportamento.
++- `app/auth/tokens.py`: `signing_key() -> bytes`, l'unico punto in `app/` che legge `C2_PROVA_SECRET`.
++- `app/auth/access.py`: `can_read(user: str, owner: str) -> bool`, vero solo se `user == owner`.
++- `app/notes.py`: `read_note(token: str, note_id: int, *, now: int) -> Note | None`; come prima istruzione chiama `signing_key()`, poi `verify`, `get_note` e `can_read(user, note.owner)`.
+ 
+ ## Must-have
+ 
+ - M1. Un token scaduto non è valido: `verify` restituisce `None` — test: tests.test_tokens.TokensTest::test_expired_token_is_rejected
+ - M2. Il proprietario legge la propria nota con un token valido — test: tests.test_notes.NotesTest::test_owner_reads_own_note
++- M3. Un token con `expires_at == now` è già scaduto (`None`), con `now == expires_at - 1` è valido — test: tests.test_tokens.TokensTest::test_token_expiring_now_is_rejected
++- M4. Un token firmato con scadenza non valida (`abc`, ` 12 `, `1_000`, cifre non ASCII, 21 cifre) fa restituire `None` a `verify`, senza eccezioni, mentre una scadenza valida di 20 cifre è accettata — test: tests.test_tokens.TokensTest::test_malformed_expiry_is_rejected
++- M5. Con `C2_PROVA_SECRET` assente, vuota o non codificabile in UTF-8 (`"\udcff"`) `signing_key()` solleva `RuntimeError` — test: tests.test_tokens.TokensTest::test_missing_secret_is_refused
++- M6. Un token valido di un altro utente non legge la nota: `read_note` restituisce `None` — test: tests.test_notes.NotesTest::test_other_user_cannot_read_note
++- M7. Un token scaduto, alterato o non codificabile in UTF-8 non legge la nota: `read_note` restituisce `None` — test: tests.test_notes.NotesTest::test_invalid_token_cannot_read_note
++- M8. Una nota inesistente dà lo stesso `None` di una nota altrui — test: tests.test_notes.NotesTest::test_missing_note_returns_none
++- M9. Un token non codificabile in UTF-8 (per esempio `"\ud800.1.x"`) fa restituire `None` a `verify`, senza eccezioni — test: tests.test_tokens.TokensTest::test_unencodable_token_is_rejected
++- M10. Un token firmato con utente vuoto fa restituire `None` a `verify` — test: tests.test_tokens.TokensTest::test_empty_user_is_rejected
++- M11. Con `C2_PROVA_SECRET` assente `read_note` lascia passare il `RuntimeError` di `signing_key()`, non restituisce `None`, anche con nota inesistente e token qualsiasi — test: tests.test_notes.NotesTest::test_missing_secret_raises
++- M12. `can_read` è vero solo se l'utente è il proprietario: vero per `("anna", "anna")`, falso per `("bruno", "anna")` — test: tests.test_access.AccessTest::test_only_owner_can_read
++- M13. Con `secret` vuoto `verify` restituisce `None` anche per un token firmato con la chiave vuota — test: tests.test_tokens.TokensTest::test_empty_secret_is_rejected
+ 
+ ## Scope
+ 
+-- `app/auth/tokens.py`, `app/auth/access.py`, `app/notes.py`, `tests/test_tokens.py`, `tests/test_notes.py`.
++- `app/auth/tokens.py`, `app/auth/access.py`, `app/notes.py`, `tests/test_tokens.py`, `tests/test_notes.py`, `tests/test_access.py`.
+ 
+ ## Punti di arresto
+ 
+-- Nessuno: sono due passi piccoli. Nessun programma di servizi o di pacchetti.
++- Nessuno: sono due passi piccoli. Nessun programma di servizi o di pacchetti, nessuna rete, nessuna modifica a `tools/unittest_junit.py`.
+ 
+ ## Rischi
+ 
+ - I test chiamano le funzioni: non provano un servizio di login vero. È un limite dichiarato della prova.
++- Il ramo di M5 con `"\udcff"` dipende dalla codifica del filesystem: si omette con un `if` se `sys.getfilesystemencoding()` non è `utf-8`, senza `skipTest`; i rami assente e vuota si eseguono sempre.
++- `tools/unittest_junit.py` non registra i `subTest` (non ridefinisce `addSubTest`), quindi un `subTest` fallito non comparirebbe in `reports/junit.xml`: i test con più casi (M4, M5, M7) usano un ciclo con asserzioni dirette e `msg=` che nomina il caso, senza `subTest`.
++- Tre vincoli della spec non hanno un must-have con un test e li controlla la revisione del task: il confronto della firma a tempo costante, la codifica della chiave in `signing_key()` senza `strip`, e `signing_key()` come unico punto in `app/` che legge `C2_PROVA_SECRET`.
+ 
+-### Task 1: Scadenza dei token
++### Task 1: Scadenza dei token e chiave di firma
+ 
+ - Modify: `app/auth/tokens.py`
+ - Test: `tests/test_tokens.py`
+-- Must-have: M1
++- Must-have: M1, M3, M4, M5, M9, M10, M13
+ 
+-In TDD: aggiungi in `tests/test_tokens.py` un `TokensTest.test_expired_token_is_rejected` che firma un token con una scadenza passata e controlla che `verify` restituisca `None`; poi aggiungi a `verify` il controllo della scadenza. Esegui `python3 tools/unittest_junit.py` e committa.
++In TDD, per incrementi: per ogni test qui sotto scrivi il test in `TokensTest` (rosso), poi aggiungi a `verify` o a `signing_key()` solo il controllo che lo fa passare (verde); a fine task `verify` rispetta l'ordine dei controlli delle Decisioni. Un test che nasce verde perché il comportamento c'è già (per esempio M3 dopo M1) resta come test di conferma, senza codice in più, e il report lo dichiara. I test, nell'ordine: `test_expired_token_is_rejected` (M1), `test_token_expiring_now_is_rejected` (M3), `test_malformed_expiry_is_rejected` (M4: la scadenza si passa a `sign` come stringa, fuori contratto di proposito, per avere una firma valida su una scadenza malformata; i casi malformati si verificano con `now=0`, minore di qualsiasi valore che `int` darebbe, così l'unica causa del `None` è la forma; una scadenza di 20 cifre con `now` minore è accettata), `test_unencodable_token_is_rejected` (M9), `test_empty_user_is_rejected` (M10: firma valida, scadenza 2000 e `now=1000`), `test_empty_secret_is_rejected` (M13: token firmato con `b""` e verificato con `b""`, scadenza 2000 e `now=1000`; in M10 e M13 il token non è scaduto, così l'unica causa del `None` è il controllo sotto prova), `test_missing_secret_is_refused` (M5: `mock.patch.dict` con la variabile tolta, vuota e, solo se `sys.getfilesystemencoding()` è `utf-8`, uguale a `"\udcff"`; il test controlla anche che il messaggio nomini `C2_PROVA_SECRET` e, nel ramo `"\udcff"`, che `"\udcff"` non compaia in `str(exc)`, che `exc.__cause__` sia `None` e che `exc.__suppress_context__` sia vero). Nel codice `verify` usa `hmac.compare_digest` sui byte UTF-8 delle firme e la sua docstring si aggiorna; `signing_key()` legge `os.environ` a ogni chiamata e solleva `RuntimeError(...) from None` per variabile assente, vuota o non codificabile. `sign` non cambia; i test esistenti restano verdi. Esegui `python3 tools/unittest_junit.py` e committa.
+ 
+ ### Task 2: Lettura di una nota con il token
+ 
+-- Create: `app/auth/access.py`, `tests/test_notes.py`
++- Create: `app/auth/access.py`, `tests/test_access.py`, `tests/test_notes.py`
+ - Modify: `app/notes.py`
+-- Must-have: M2
++- Must-have: M2, M6, M7, M8, M11, M12
+ 
+-In TDD: crea `tests/test_notes.py` con un `NotesTest.test_owner_reads_own_note` che mette una nota nell'archivio, firma un token valido per il suo proprietario e controlla che `read_note` restituisca la nota; poi scrivi `can_read` in `app/auth/access.py` e `read_note` in `app/notes.py`, che verifica il token, cerca la nota e la restituisce se `can_read` lo permette, altrimenti `None`. Esegui `python3 tools/unittest_junit.py` e committa.
++In TDD, per incrementi (un test rosso, poi il codice minimo che lo fa passare): crea `tests/test_access.py` con `AccessTest.test_only_owner_can_read` (M12), poi scrivi `can_read(user: str, owner: str) -> bool` in `app/auth/access.py`, senza importare `app/notes.py`. Crea `tests/test_notes.py` con `NotesTest`, il cui `setUp` imposta `C2_PROVA_SECRET=PROVA-123` con `mock.patch.dict` (fermato con `addCleanup`), chiama `clear_notes()` e firma i token con `signing_key()`. I test, nell'ordine: `test_missing_secret_raises` (M11: variabile tolta con `mock.patch.dict`, nota inesistente e token qualsiasi, `assertRaises(RuntimeError)`; è il primo, rosso perché `read_note` non esiste), `test_owner_reads_own_note` (M2), `test_other_user_cannot_read_note` (M6: la nota esiste ed è di `anna`, il token di `bruno` è valido e non scaduto), `test_invalid_token_cannot_read_note` (M7: la nota esiste ed è di `anna`; un token valido di `anna` la legge, a riprova; poi danno `None` il token scaduto `sign("anna", now, key)`, un token di `anna` con la firma modificata o con la scadenza modificata in un valore ancora futuro, lasciata la parte utente, e `"\ud800.1.x"`), `test_missing_note_returns_none` (M8: token di `anna` valido e non scaduto, `note_id` assente dall'archivio; stesso `None` di una nota altrui). M7 può nascere verde come test di conferma, perché `verify` è completo da Task 1. `read_note` in `app/notes.py` cresce con i test: come prima istruzione `key = signing_key()` senza intercettarne l'eccezione, poi `verify(token, key, now=now)`, `get_note(note_id)` e `can_read(user, note.owner)`; restituisce la nota solo al proprietario, altrimenti `None`. Esegui `python3 tools/unittest_junit.py` e committa.

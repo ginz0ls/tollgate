@@ -62,12 +62,12 @@ class ImplementerBriefTest(unittest.TestCase):
     def test_fix_brief_includes_findings_in_fence(self):
         f = [{"severity": "major", "file": "a.py", "line": 3, "rule": "R-1",
               "text": "usa ``` male"}]
-        out = brief.implementer_brief(impl(fix_findings=f, fix_round=4, model_hint="inherit"))
+        out = brief.implementer_brief(impl(fix_findings=f, fix_round=4, model_hint="opus"))
         self.assertIn("giro di correzione 4", out)
         self.assertIn("a.py:3", out)
         self.assertIn("usa ``` male", out)
         self.assertIn("````\n- [major]", out)
-        self.assertIn("model: inherit", out)
+        self.assertIn("model: opus", out)
         self.assertNotIn("giro di correzione", brief.implementer_brief(impl()))
 
 

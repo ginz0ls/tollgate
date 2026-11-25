@@ -31,7 +31,7 @@ Prima del **primo** task (nessun task ancora avviato):
 
 ## Per ogni task non `done`, in ordine
 
-1. **Avvio.** `<programma> task start k` (solo da `pending`). Stampa il percorso del brief e un riepilogo del tipo `task k: <tipo agente> name=<nome> [model: inherit] launch|resume revisore: <tipo revisore>`.
+1. **Avvio.** `<programma> task start k` (solo da `pending`). Stampa il percorso del brief e un riepilogo del tipo `task k: <tipo agente> name=<nome> [model: <modello>] launch|resume revisore: <tipo revisore>`: `model` compare se il progetto lo fissa in `[review] models` e sempre dal giro 4, con `opus` quando il progetto non lo fissa.
 2. **Implementatore.** Con lo strumento `Agent`, **in primo piano** (mai `run_in_background`): `subagent_type` = il tipo del riepilogo, `name` = il `name` del riepilogo, `prompt` = il percorso del brief. Passa `model` solo se il riepilogo lo indica. Un solo `Agent` per volta.
 3. **Risposta dell'implementatore.**
    - DONE o DONE_WITH_CONCERNS: vai alla revisione.
@@ -43,7 +43,7 @@ Prima del **primo** task (nessun task ancora avviato):
    - se rifiuta perché il verdetto è `changes`, lancia `<programma> task start k --fix`, che scrive il file dei rilievi e un riepilogo:
      - giri 1-3 (riepilogo con `resume`): `SendMessage` al `name` dell'implementatore con il percorso del file dei rilievi;
        se `SendMessage` non lo raggiunge perché la sessione che lo aveva lanciato è finita, lancia un `Agent` nuovo dello stesso tipo e con lo stesso `name`, in primo piano, con il percorso del brief di correzione: l'hook lo ammette solo in questo caso;
-     - giri 4-5 (riepilogo con `launch` e nome `-r<giro>`): un nuovo `Agent` con quel `name`, `model: inherit` e il percorso del brief;
+     - giri 4-5 (riepilogo con `launch` e nome `-r<giro>`): un nuovo `Agent` con quel `name`, il `model` del riepilogo (`opus`, o il valore di `[review] models`) e il percorso del brief;
      - dopo il quinto giro non approvato, il `task start k --fix` successivo apre un blocco `needs_you` e rifiuta: fermati, riferisci e indica `/tollgate:resolve`;
    - se `--fix` rifiuta perché il verdetto è `approved`, lancia `task done k`;
    - se `task done` rifiuta per altro (verdetto assente, worktree sporco, SHA non coperto), leggi il messaggio: serve una nuova `review-prepare` o un commit dei file del coordinatore.

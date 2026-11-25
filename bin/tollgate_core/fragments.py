@@ -54,6 +54,7 @@ class Fragment:
     source: Path
     patterns: tuple[Pattern, ...]
     exclude: tuple[str, ...] = ()
+    keep_paths: bool = False
 
 
 def _parse(path: Path, plugin_root: Path) -> Fragment:
@@ -91,7 +92,7 @@ def _parse(path: Path, plugin_root: Path) -> Fragment:
     if not isinstance(paths, list) or None in parsed:
         raise FragmentError(f"{name}: i pattern di paths devono avere la forma **/<cartella>/**, "
                             "<cartella>/**, **/<nome-file> o **/*.<estensione>")
-    extra = sorted(set(detect) - {"content", "exclude"})
+    extra = sorted(set(detect) - {"content", "exclude", "keep_paths"})
     if extra:
         raise FragmentError(f"{name}: chiave sconosciuta in [detect]: {', '.join(extra)}")
     content = detect.get("content", [])
@@ -102,12 +103,15 @@ def _parse(path: Path, plugin_root: Path) -> Fragment:
             isinstance(e, str) and _EXCLUDE.fullmatch(e) for e in exclude):
         raise FragmentError(f"{name}: [detect] exclude deve essere una lista di cartelle "
                             f"letterali con la barra finale (per esempio \"supabase/\")")
+    keep_paths = detect.get("keep_paths", False)
+    if not isinstance(keep_paths, bool):  # `1 == True` in Python: si controlla il tipo
+        raise FragmentError(f"{name}: [detect] keep_paths deve essere true o false")
     if not paths:
         raise FragmentError(f"{name}: [profile] paths è obbligatorio e non vuoto "
                             f"(senza, il profilo si accenderebbe su ogni file)")
     skill = plugin_root / "skills" / f"rules-{area}" / "SKILL.md"
     return Fragment(area, profile, tuple(content), skill, path, tuple(parsed),
-                    tuple(exclude))
+                    tuple(exclude), keep_paths)
 
 
 def load(plugin_root) -> list[Fragment]:

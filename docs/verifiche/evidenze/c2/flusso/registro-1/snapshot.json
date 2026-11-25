@@ -1,0 +1,36 @@
+{
+  "at": "2026-11-23T20:33:43.354552Z",
+  "host": "HOST",
+  "v": 1,
+  "works": [
+    {
+      "branch": "tg/1-scadenza-dei-token-e-lettura-delle-note",
+      "cost": {
+        "by_task": {
+          "1": 151072,
+          "2": 112770
+        },
+        "tokens": 1014248
+      },
+      "created": "2026-11-23T19:58:03.539260Z",
+      "issue": 1,
+      "last_event_at": "2026-11-23T20:33:02.775020Z",
+      "level": "L2",
+      "level_cap": null,
+      "phase": "pr_open",
+      "phase_before_block": null,
+      "pr_number": 1,
+      "repo_key": "/tmp/tollgate-b1/origin",
+      "size": "medium",
+      "size_by": "rules",
+      "slices": 1,
+      "tasks": {
+        "done": 2
+      },
+      "turn": "user",
+      "updated": "2026-11-23T20:33:02.775020Z",
+      "waiting": [],
+      "waiting_user": 1
+    }
+  ]
+}

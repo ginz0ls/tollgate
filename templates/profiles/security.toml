@@ -1,0 +1,99 @@
+# Frammento del profilo `security`: autenticazione, autorizzazione, middleware e proxy delle
+# richieste, intestazioni e politiche di sicurezza, librerie di password e di token. `init` lo
+# completa con `rules` e `blocking_rules`, che calcola dalle righe `R-SECURITY-NN` di
+# skills/rules-security/SKILL.md. Il profilo si propone solo dopo l'approvazione di quella skill
+# (campo `approved`). Restano fuori i file con «session» nel nome (scelta dell'utente del
+# 22/11/2026), le cartelle `middleware/` e `middlewares/`, le cartelle con la maiuscola (`Auth/`),
+# le route group di Next.js come `(auth)`, `proxy.page.ts`, `_middleware.ts` delle Pages Functions
+# di Cloudflare e le librerie di login complete. La cartella `supabase/` alla radice è di
+# `database` (edge function e policy RLS comprese): questo profilo la esclude.
+
+[profile]
+kind = "vertical"
+# Un cambio all'accesso o al login è delicato: il lavoro sale a L2 (catalogo 2, riga `security`).
+min_level = "L2"
+paths = [
+  # Cartelle a qualunque profondità (il pattern è del catalogo 2, riga `security`); che ci stia
+  # il codice di login e di controllo d'accesso è una lettura nostra. Accendono anche i file di
+  # quella cartella che non sono di login (immagini, testi tradotti, codice di terzi copiato nel
+  # repo): la pagina del profilo lo dice.
+  "**/auth/**",
+  # Il middleware delle richieste per nome di file (catalogo 2, riga `security`): Next.js fino
+  # alla 15 e i framework che usano lo stesso nome. Il percorso esatto vince anche contro la
+  # cartella di un altro profilo.
+  "**/middleware.*",
+  # Dalla 16 il middleware di Next.js si chiama Proxy, in `proxy.ts` o `proxy.js` alla radice o
+  # in `src/` (https://nextjs.org/docs/app/api-reference/file-conventions/proxy).
+  "**/proxy.ts",
+  "**/proxy.js",
+  # Il pattern è del catalogo 2, riga `security`, che non dice cosa contiene la cartella: che ci
+  # stiano intestazioni e politiche di sicurezza è una lettura nostra.
+  "**/security/**",
+  # Il pattern è del catalogo 2, riga `security`, che non dice cosa contiene la cartella: che ci
+  # stiano policy di accesso alle righe è una lettura nostra. Quelle sotto `supabase/` alla radice
+  # restano a `database` (progetto di B, sezione 12).
+  "**/rls/**",
+]
+# Vuoti di proposito: `rules-security` la precaricano gli agenti dell'area; il comando che esegue
+# i test dei casi di accesso negato (catalogo 2.3) dipende dal progetto e un `dod` scritto da
+# `init` fallirebbe dove il programma manca: lo chiede una regola, e l'utente lo aggiunge a mano.
+skills = []
+reviewer_skills = []
+commands = {}
+dod = []
+agent = "tollgate:implementer-security"
+reviewer = "tollgate:reviewer-security"
+# Lo specialista della revisione finale (catalogo 2.1) e la lista di controllo che `finalreview`
+# mette nel suo brief e in quello del revisore generale.
+final_specialist = "tollgate:final-security"
+checklist = "chi arriva al codice cambiato e cosa può fare; accesso negato provato da un test; nessun segreto nel diff; valori predefiniti che rifiutano"
+
+# Solo le librerie di hashing delle password e di firma e verifica dei token (scelta dell'utente
+# del 22/11/2026), come testo fisso, ogni riga come la mostra la pagina ufficiale della libreria.
+# Non sono marcatori le librerie di login complete (NextAuth/Auth.js, better-auth, Lucia, Clerk), i
+# client dei servizi (`@supabase/ssr`, `@supabase/supabase-js`, Firebase) né `crypto`, `hashlib`
+# e `hmac` della libreria standard. Il testo fisso accende anche un commento o un nome più lungo
+# (`import jwt` anche `import jwt_utils`, `import jwtDecode from 'jwt-decode'` e
+# `import jwt from 'jsonwebtoken'`, cioè la forma ESM di un marcatore tolto perché la pagina di
+# jsonwebtoken mostra solo `require`).
+[detect]
+# Le edge function sotto `supabase/` alla radice sono di `database` (progetto di B, sezione 12);
+# vale anche per il rilevamento per contenuto.
+exclude = ["supabase/"]
+# Un file trovato per contenuto da un altro profilo accende anche le forme di questo, se è in un
+# percorso di `security` (scelta dell'utente del 22/11/2026 per le cartelle; nostra per i nomi).
+keep_paths = true
+content = [
+  # bcrypt per Node.js (https://github.com/kelektiv/node.bcrypt.js, «Usage» e «ESM import»).
+  "from 'bcrypt'",
+  "from \"bcrypt\"",
+  "require('bcrypt')",
+  "require(\"bcrypt\")",
+  # bcryptjs (https://github.com/dcodeIO/bcrypt.js, «Usage»): la pagina mostra solo l'import.
+  "from 'bcryptjs'",
+  "from \"bcryptjs\"",
+  # argon2 per Node.js (https://github.com/ranisalt/node-argon2, «Usage» e «TypeScript usage»).
+  "from 'argon2'",
+  "from \"argon2\"",
+  "require('argon2')",
+  "require(\"argon2\")",
+  # jsonwebtoken (https://github.com/auth0/node-jsonwebtoken): la pagina mostra solo `require`.
+  "require('jsonwebtoken')",
+  "require(\"jsonwebtoken\")",
+  # jose (https://github.com/panva/jose, «Documentation»).
+  "from 'jose'",
+  "from \"jose\"",
+  # iron-session, sessioni in un cookie cifrato e firmato (https://github.com/vvo/iron-session,
+  # «Usage»).
+  "from 'iron-session'",
+  "from \"iron-session\"",
+  # Python: bcrypt (https://pypi.org/project/bcrypt/), argon2-cffi
+  # (https://pypi.org/project/argon2-cffi/), passlib
+  # (https://passlib.readthedocs.io/en/stable/narr/hash-tutorial.html), PyJWT
+  # (https://pypi.org/project/PyJWT/), python-jose (https://pypi.org/project/python-jose/).
+  "import bcrypt",
+  "from argon2 import",
+  "from passlib",
+  "import jwt",
+  "from jose import",
+]

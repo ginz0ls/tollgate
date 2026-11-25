@@ -187,7 +187,7 @@ class ChecksTest(unittest.TestCase):
         self.assertIn("--plugin-dir", args)
         self.assertEqual(Path(args[args.index("--plugin-dir") + 1]), PLUGIN)
         self.assertEqual(args[args.index("--permission-mode") + 1], "acceptEdits")
-        self.assertEqual(args[args.index("--model") + 1], "sonnet")
+        self.assertEqual(args[args.index("--model") + 1], "opus")
         self.assertEqual(args[args.index("--output-format") + 1], "json")
         allowed = args[args.index("--allowedTools") + 1].split(",")
         for tool in ("Read", "Grep", "Glob", "Bash", "Agent", "Skill", "Write", "Edit", "WebFetch", "WebSearch",
@@ -502,25 +502,25 @@ class FlowBench(Bench):
         return [c for c in self.calls() if c["args"][:1] == ["-p"]]
 
     def src_repo(self, *, approved=True, case="b1", ai_approved=True, infra_approved=True, backend_approved=True, frontend_approved=True,
-                 database_approved=True):
+                 database_approved=True, security_approved=True):
         """Un piccolo repo git che traccia `bin/` del repo e una `skills/rules-base/SKILL.md`: la radice sorgente (`B1_FLOW_SRC`).
-        Con `case="ai"`, `case="infra"`, `case="backend"`, `case="frontend"` o `case="database"` copia invece i file veri (e tracciati)
-        che servono a `init --propose`: `bin/`, `templates/`, `gate/`, `agents/`, `skills/rules-base/`, `skills/rules-ai/`,
-        `skills/rules-infra/`, `skills/rules-backend/`, `skills/rules-frontend/` e `skills/rules-database/`; con `ai_approved=False`,
-        `infra_approved=False`, `backend_approved=False`, `frontend_approved=False` o `database_approved=False` toglie `approved`
-        dalla skill dell'area (solo quella del caso)."""
+        Con `case="ai"`, `case="infra"`, `case="backend"`, `case="frontend"`, `case="database"` o `case="security"` copia invece i file
+        veri (e tracciati) che servono a `init --propose`: `bin/`, `templates/`, `gate/`, `agents/`, `skills/rules-base/`,
+        `skills/rules-ai/`, `skills/rules-infra/`, `skills/rules-backend/`, `skills/rules-frontend/`, `skills/rules-database/` e
+        `skills/rules-security/`; con `ai_approved=False`, `infra_approved=False`, `backend_approved=False`, `frontend_approved=False`,
+        `database_approved=False` o `security_approved=False` toglie `approved` dalla skill dell'area (solo quella del caso)."""
         src = self.dir / "src"
         (src / "skills" / "rules-base").mkdir(parents=True)
         parts = ("bin",) if case == "b1" else ("bin", "templates", "gate", "agents", "skills/rules-base", "skills/rules-ai",
                                                "skills/rules-infra", "skills/rules-backend", "skills/rules-frontend", "skills/rules-database",
-                                               ".claude-plugin")
+                                               "skills/rules-security", ".claude-plugin")
         tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z", "--", *parts], capture_output=True, check=True).stdout
         for rel in filter(None, tracked.decode().split("\0")):
             (src / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / rel, src / rel)
-        if case in ("ai", "infra", "backend", "frontend", "database"):
+        if case in ("ai", "infra", "backend", "frontend", "database", "security"):
             if not {"ai": ai_approved, "infra": infra_approved, "backend": backend_approved, "frontend": frontend_approved,
-                    "database": database_approved}[case]:
+                    "database": database_approved, "security": security_approved}[case]:
                 skill = src / "skills" / f"rules-{case}" / "SKILL.md"
                 skill.write_text(re.sub(r"(?m)^approved:.*\n", "", skill.read_text()))
         else:
@@ -566,7 +566,7 @@ class FlowScriptTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("CONTROLLA: ok", r.stdout)
         for word in ("prepara", "passo1", "passo2", "registra", "/tmp/tollgate-b1/plugin", "approved: prova-b1", "plugin validate --strict",
-                     "--plugin-dir", "--allowedTools", "--disallowedTools", "acceptEdits", "--model sonnet", "/tollgate:start #1 L1"):
+                     "--plugin-dir", "--allowedTools", "--disallowedTools", "acceptEdits", "--model opus", "/tollgate:start #1 L1"):
             self.assertIn(word, r.stdout)
         self.assertEqual(r.stderr, "")
 
@@ -750,7 +750,7 @@ class FlowScriptTest(unittest.TestCase):
             args = call["args"]
             self.assertEqual(Path(args[args.index("--plugin-dir") + 1]), self.b.plugin)
             self.assertEqual(args[args.index("--permission-mode") + 1], "acceptEdits")
-            self.assertEqual(args[args.index("--model") + 1], "sonnet")
+            self.assertEqual(args[args.index("--model") + 1], "opus")
             self.assertEqual(args[args.index("--output-format") + 1], "stream-json")
             allowed = args[args.index("--allowedTools") + 1]
             self.assertEqual(allowed, FLOW_TOOLS)
@@ -2241,6 +2241,445 @@ class FlowScriptTest(unittest.TestCase):
     def test_real_scrivi_limiti_heading_is_generic_database(self):
         self.assertEqual(self.database_prepara().returncode, 0)
         d = self._flow_stream(["ls"], **self.DATABASE_EXTRA)
+        self.assertEqual((d / "limiti.txt").read_text().splitlines()[0], "Limiti della prova reale (da citare nel rapporto)")
+
+    # ------------------------------------------------------------------ il caso `security` (C2, Task 8)
+
+    SECURITY_EXTRA = dict(B1_FLOW_CASE="security", B1_FLOW_RULES="vere")
+    SECURITY_PROJECT = ROOT / "spikes" / "c2" / "flow"
+    SECURITY_INPUT = ROOT / "spikes" / "c2" / "input"
+    # i programmi delle Global Constraints di C2 (tutti con le quattro forme) e i caricatori di segreti delle istruzioni di C2
+    SECURITY_CLIS = ("node", "npm", "npx", "pnpm", "yarn", "bun", "bunx", "deno", "supabase", "psql", "docker", "wrangler", "vercel",
+                     "openssl", "dotenv", "dotenvx", "cross-env", "env-cmd", "doppler", "infisical", "op")
+    # ciò che le regole di `rules-security` (e la sicurezza fin dal progetto) chiedono e che il lavoro di prova non dice
+    SECURITY_FORBIDDEN = (r"caso negat\w*", r"cas\w* negat\w*", r"altr\w* utent\w*", r"compare_digest", r"timingSafeEqual",
+                          r"tempo costante", r"modello delle minacce", r"raggio d'azione", r"segreto mancante", r"manca il segreto",
+                          r"senza (il )?segreto", r"senza (un )?token", r"non è il proprietari\w*", r"non proprietari\w*",
+                          r"R-SECURITY")
+
+    def security_src(self, **kw):
+        return self.b.src_repo(case="security", **kw)
+
+    def security_prepara(self, **kw):
+        return self.b.run("prepara", B1_FLOW_SRC=str(self.security_src(**kw)), **self.SECURITY_EXTRA)
+
+    def security_flow(self):
+        """prepara e il worktree del lavoro: ritorna il worktree."""
+        self.assertEqual(self.security_prepara().returncode, 0)
+        return self.b.worktree()
+
+    def test_flow_case_security_out_dir(self):
+        for extra in ({}, {"B1_FLOW_EVIDENCE": "c2"}):
+            with self.subTest(**extra):
+                r = self.b.run("controlla", B1_FLOW_OUT="", **self.SECURITY_EXTRA, **extra)
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+                self.assertIn("CONTROLLA: ok", r.stdout)
+                self.assertIn("B1_FLOW_CASE: security", r.stdout)
+                self.assertIn("[profiles.security]", r.stdout)
+                self.assertIn("spikes/c2/flow", r.stdout)
+                self.assertIn(f"cartella delle uscite: {ROOT}/docs/verifiche/evidenze/c2/flusso\n", r.stdout)
+                self.assertEqual(r.stderr, "")
+
+    def test_flow_case_security_requires_real_rules(self):
+        for rules in (None, "prova"):
+            for mode in ("controlla", "prepara", *self.DATABASE_STEPS, "libero", "registra"):
+                with self.subTest(rules=rules, mode=mode):
+                    extra = {} if rules is None else {"B1_FLOW_RULES": rules}
+                    r = self.b.run(mode, B1_FLOW_CASE="security", **extra)
+                    self.assertNotEqual(r.returncode, 0)
+                    self.assertIn("B1_FLOW_RULES", r.stderr)
+        self.assertEqual(self.b.calls(), [])
+        self.assertFalse(self.b.root.exists())
+
+    def test_flow_case_unknown_value_names_security(self):
+        r = self.b.run("controlla", B1_FLOW_CASE="altro")
+        self.assertNotEqual(r.returncode, 0)
+        for value in ("b1", "ai", "infra", "backend", "frontend", "database", "security"):
+            self.assertIn(value, r.stderr)
+
+    def test_flow_case_l2_steps_refused_for_other_cases(self):
+        """I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`."""
+        for case in ("ai", "infra", "backend", "frontend"):
+            for mode in ("passo3", "passo4", "passo5", "passo6", "libero"):
+                with self.subTest(case=case, mode=mode):
+                    r = self.b.run(mode, B1_FLOW_CASE=case, B1_FLOW_RULES="vere")
+                    self.assertNotEqual(r.returncode, 0)
+                    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+        for mode in ("passo3", "libero"):
+            with self.subTest(case="b1", mode=mode):
+                r = self.b.run(mode)
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn("B1_FLOW_CASE=security", r.stderr)
+        self.assertEqual(self.b.calls(), [])
+
+    def test_real_flow_case_security_prepara_proposes_profile(self):
+        fragment = tomllib.loads((ROOT / "templates" / "profiles" / "security.toml").read_text())
+        r = self.security_prepara()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("plan-check: ok", r.stdout)
+        self.assertIn("spec-check: ok", r.stdout)
+        text = (self.b.flow / "tollgate.toml").read_text()
+        profiles = tomllib.loads(text)["profiles"]
+        profile = profiles["security"]
+        self.assertEqual(profile["paths"], ["app/auth/**"])
+        self.assertEqual(profile["min_level"], "L2")
+        self.assertEqual(profile["final_specialist"], "tollgate:final-security")
+        self.assertEqual(profile["agent"], "tollgate:implementer-security")
+        self.assertEqual(profile["reviewer"], "tollgate:reviewer-security")
+        self.assertEqual(profile["checklist"], fragment["profile"]["checklist"])
+        self.assertTrue(profile["checklist"])
+        self.assertTrue([x for x in profile["rules"] if x.startswith("R-SECURITY-")])
+        self.assertEqual(sorted(profiles), ["security"], "il progetto di prova accende il solo profilo security")
+        self.assertIn('mode = "detect"', text)
+        for part in ("app/__init__.py", "app/notes.py", "app/auth/__init__.py", "app/auth/tokens.py", "tests/__init__.py",
+                     "tests/test_tokens.py", "tools/unittest_junit.py", ".gitignore"):
+            self.assertTrue((self.b.flow / part).is_file(), part)
+        for part in ("issue-1.md", "piano-L2.md", "spec-L2.md", "app/auth/access.py", "tests/test_notes.py"):
+            self.assertFalse((self.b.flow / part).exists(), part)
+        self.assertFalse((self.b.flow / "docs" / "superpowers" / "tollgate-init").exists(), "la cartella della proposta si toglie")
+        self.assertTrue(list(self.b.root.glob("tollgate-init.proposta-*")))
+        git = ["git", "-C", str(self.b.flow)]
+        self.assertEqual(subprocess.run([*git, "status", "--porcelain"], capture_output=True, text=True).stdout, "")
+        self.assertEqual(subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True).stdout,
+                         subprocess.run([*git, "rev-parse", "origin/main"], capture_output=True, text=True).stdout)
+        data = json.loads((self.b.root / "fakegh-data.json").read_text())
+        self.assertIn("token", data["issues"]["1"]["title"])
+        self.assertIn("read_note", data["issues"]["1"]["body"])
+        self.assertIn("repos/{owner}/{repo}/branches/main/protection", data["api_status"])
+        sha = subprocess.run([*git, "rev-parse", "origin/main"], capture_output=True, text=True).stdout.strip()
+        self.assertIn(sha, data["statuses"])
+        self.assertEqual(self.b.calls(), [])
+
+    def test_real_flow_case_security_prepara_refuses_without_profile(self):
+        r = self.security_prepara(security_approved=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("profiles.security", r.stderr)
+
+    def test_real_flow_case_security_prepara_refuses_a_block_without_specialist(self):
+        """`prepara` (caso L2) vuole nel blocco proposto anche `min_level = "L2"`, lo specialista finale e la lista di controllo."""
+        src = self.security_src()
+        fragment = src / "templates" / "profiles" / "security.toml"
+        fragment.write_text(re.sub(r'(?m)^final_specialist = .*\n', "", fragment.read_text()))
+        git = ["git", "-C", str(src), "-c", "user.name=prova", "-c", "user.email=prova@example.com", "-c", "commit.gpgsign=false"]
+        subprocess.run([*git, "commit", "-qam", "senza specialista"], check=True, capture_output=True, env=self.b.env())
+        r = self.b.run("prepara", B1_FLOW_SRC=str(src), **self.SECURITY_EXTRA)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("final_specialist", r.stderr)
+        self.assertEqual(self.b.calls(), [])
+
+    def test_real_flow_case_security_prepara_checks_l2_plan(self):
+        """`prepara` controlla il piano di prova con `level="L2"` e rifiuta un piano L2 senza must-have."""
+        tmp = Path(tempfile.mkdtemp(prefix="tollgate-c2-script-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / "tests").mkdir()
+        shutil.copy2(ROOT / "tests" / "fakegh.py", tmp / "tests" / "fakegh.py")
+        spikes = tmp / "spikes"
+        shutil.copytree(ROOT / "spikes" / "b1", spikes / "b1", ignore=shutil.ignore_patterns("__pycache__"))
+        shutil.copytree(ROOT / "spikes" / "c2", spikes / "c2", ignore=shutil.ignore_patterns("__pycache__", "reports"))
+        shutil.copy2(FLOW_SCRIPT, spikes / "run-b1-flow.sh")
+        plan = spikes / "c2" / "input" / "piano-L2.md"
+        plan.write_text(re.sub(r"(?m)^- M\d\..*\n", "", plan.read_text()))
+        r = subprocess.run(["bash", str(spikes / "run-b1-flow.sh"), "prepara"], capture_output=True, text=True,
+                           env=self.b.env(B1_FLOW_SRC=str(self.security_src()), **self.SECURITY_EXTRA), timeout=300)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("il piano di prova non passa plan-check", r.stderr)
+        self.assertIn("must-have", r.stdout)
+        self.assertEqual(self.b.calls(), [])
+
+    def test_real_flow_case_security_project_verifies(self):
+        """Il `verify` del progetto (da `spikes/c2/flow`, in una copia temporanea) passa, fa girare almeno un test e scrive
+        `reports/junit.xml`; senza `C2_PROVA_SECRET` nell'ambiente: la impostano i test."""
+        r = self.security_prepara()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        verify = re.search(r'(?m)^verify = "(.*)"$', (self.SECURITY_PROJECT / "tollgate.toml").read_text()).group(1)
+        self.assertEqual(verify, "python3 tools/unittest_junit.py")
+        copy = Path(tempfile.mkdtemp(prefix="tollgate-c2-project-"))
+        self.addCleanup(shutil.rmtree, copy, ignore_errors=True)
+        shutil.copytree(self.SECURITY_PROJECT, copy / "flow", ignore=shutil.ignore_patterns("__pycache__", "reports"))
+        cmd = verify.replace("python3 ", "python3 -B ", 1)
+        v = subprocess.run(cmd, shell=True, cwd=copy / "flow", capture_output=True, text=True, env=clean_env(PATH=os.environ["PATH"]))
+        self.assertEqual(v.returncode, 0, v.stdout + v.stderr)
+        ran = re.search(r"Ran (\d+) tests?", v.stderr)
+        self.assertTrue(ran and int(ran.group(1)) >= 2, "il verify deve far girare i test dei token")
+        xml = (copy / "flow" / "reports" / "junit.xml").read_text()
+        self.assertIn('classname="tests.test_tokens.TokensTest" name="test_valid_token_returns_user"', xml)
+        self.assertNotIn("<failure", xml)
+        self.assertFalse(list((copy / "flow").rglob("__pycache__")))
+        # il progetto copiato da `prepara` ha lo stesso `verify` e lo stesso `report`
+        text = (self.b.flow / "tollgate.toml").read_text()
+        self.assertIn(f'verify = "{verify}"', text)
+        self.assertIn('report = "junit:reports/junit.xml"', text)
+        self.assertTrue((self.b.flow / "tools" / "unittest_junit.py").is_file())
+
+    def test_real_flow_case_security_project_declares_junit_report(self):
+        """In L2 i test dei must-have si contano solo con un rapporto: il `tollgate.toml` lo dichiara e il progetto ha lo script
+        (la stessa copia di quello di B7)."""
+        cfg = tomllib.loads((self.SECURITY_PROJECT / "tollgate.toml").read_text())
+        self.assertEqual(cfg["commands"]["report"], "junit:reports/junit.xml")
+        self.assertEqual(cfg["commands"]["verify"], "python3 tools/unittest_junit.py")
+        self.assertEqual((self.SECURITY_PROJECT / "tools" / "unittest_junit.py").read_text(),
+                         (self.DATABASE_PROJECT / "tools" / "unittest_junit.py").read_text())
+        self.assertIn("reports/", (self.SECURITY_PROJECT / ".gitignore").read_text().split())
+        self.assertIn("tools/unittest_junit.py", (self.SECURITY_INPUT / "spec-L2.md").read_text())
+
+    def test_flow_disallows_tools_security(self):
+        denied = self.disallowed(**self.SECURITY_EXTRA)
+        for prog in self.SECURITY_CLIS:
+            for form in (f"Bash({prog}:*)", f"Bash(*/{prog}:*)", f"Bash(command {prog}:*)", f"Bash(env {prog}:*)"):
+                self.assertIn(form, denied)
+        self.assertIn("Bash(*/gh:*)", denied)
+        self.assertIn("Bash(curl:*)", denied)
+        for case in ("backend", "frontend", "database"):
+            other = self.disallowed(B1_FLOW_CASE=case, B1_FLOW_RULES="vere")
+            self.assertFalse([x for x in other if "openssl" in x or "doppler" in x], "openssl e i caricatori di segreti sono del caso security")
+
+    def test_real_flow_case_security_project_has_no_credentials(self):
+        """Nel progetto di prova l'unico segreto è il valore finto `PROVA-123`, letto dalla variabile `C2_PROVA_SECRET`."""
+        project = self.SECURITY_PROJECT
+        found = [p.relative_to(project).as_posix() for p in project.rglob("*")
+                 if p.name in (".vercel", ".wrangler", "node_modules", "package.json", "auth.json")
+                 or p.name.startswith((".env", ".dev.vars", ".npmrc")) or p.suffix in (".pem", ".key", ".p12", ".crt")]
+        self.assertEqual(found, [])
+        ignore = (project / ".gitignore").read_text().split()
+        for entry in ("reports/", "__pycache__/", ".env*"):
+            self.assertIn(entry, ignore)
+        names, fakes = set(), set()
+        for path in sorted(project.rglob("*")):
+            if not path.is_file() or "__pycache__" in path.parts or "reports" in path.parts:
+                continue
+            text = path.read_text(errors="replace")
+            names |= set(re.findall(r"\b[A-Z][A-Z0-9_]*(?:SECRET|KEY|TOKEN|PASSWORD)[A-Z0-9_]*\b", text))
+            fakes |= set(re.findall(r"PROVA-\w+", text))
+            self.assertFalse(re.search(r"eyJ[A-Za-z0-9_-]{10,}|-----BEGIN|\b(?:sk|pk|rk)[-_][A-Za-z0-9_-]{10,}|\bgh[pousr]_[A-Za-z0-9]{10,}"
+                                       r"|\bAKIA[0-9A-Z]{12,}|[0-9a-f]{32,}", text),
+                             f"{path.name}: un valore che somiglia a una credenziale")
+        self.assertEqual(names, {"C2_PROVA_SECRET"})
+        self.assertEqual(fakes, {"PROVA-123"})
+        tests = (project / "tests" / "test_tokens.py").read_text()
+        self.assertIn('"C2_PROVA_SECRET": "PROVA-123"', tests)
+        for path in (project / "app").rglob("*.py"):
+            self.assertNotIn("PROVA-123", path.read_text(), f"{path.name}: il valore finto sta solo nei test")
+
+    def test_real_flow_case_security_plan_does_not_list_rule_requirements(self):
+        """Il piano, la spec, l'issue e il codice di partenza non nominano ciò che le regole chiedono (il test del caso negato, il
+        confronto a tempo costante, il rifiuto senza segreto, il modello delle minacce e il raggio d'azione), così compare solo se le
+        regole e gli agenti l'hanno portato."""
+        paths = [self.SECURITY_INPUT / "piano-L2.md", self.SECURITY_INPUT / "spec-L2.md", self.SECURITY_PROJECT / "issue-1.md",
+                 *sorted((self.SECURITY_PROJECT / "app").rglob("*.py")), self.SECURITY_PROJECT / "tests" / "test_tokens.py"]
+        for path in paths:
+            text = " ".join(path.read_text().split())
+            for word in self.SECURITY_FORBIDDEN:
+                self.assertNotRegex(text, rf"(?i){word}", f"{path.name}: {word}")
+        for path in paths[:3]:
+            text = " ".join(path.read_text().split())
+            self.assertIn("token", text)
+            self.assertRegex(text, r"(?i)\btest\b")
+
+    def test_real_flow_case_security_starting_code_is_incomplete(self):
+        """Il codice di partenza ha le firme della decisione 16 e non controlla ancora la scadenza: un token scaduto vale ancora
+        (provato in una copia temporanea, con `python3 -B`, senza `C2_PROVA_SECRET` nell'ambiente)."""
+        copy = Path(tempfile.mkdtemp(prefix="tollgate-c2-start-"))
+        self.addCleanup(shutil.rmtree, copy, ignore_errors=True)
+        shutil.copytree(self.SECURITY_PROJECT, copy / "flow", ignore=shutil.ignore_patterns("__pycache__", "reports"))
+        probe = (
+            "import dataclasses, inspect\n"
+            "from app.auth import tokens\n"
+            "from app import notes\n"
+            "t = tokens.sign('anna', 100, b'PROVA-123')\n"
+            "assert tokens.verify(t, b'PROVA-123', now=50) == 'anna'\n"
+            "assert tokens.verify(t, b'PROVA-123', now=200) == 'anna', 'scadenza'\n"
+            "assert tokens.verify(t + 'x', b'PROVA-123', now=50) is None\n"
+            "assert tokens.verify(t, b'altro', now=50) is None\n"
+            "assert [f.name for f in dataclasses.fields(notes.Note)] == ['id', 'owner', 'text']\n"
+            "assert not hasattr(notes, 'read_note')\n"
+            "print(inspect.signature(tokens.sign), inspect.signature(tokens.verify))\n")
+        v = subprocess.run([sys.executable, "-B", "-c", probe], cwd=copy / "flow", capture_output=True, text=True,
+                           env=clean_env(PATH=os.environ["PATH"]))
+        self.assertEqual(v.returncode, 0, v.stdout + v.stderr)
+        self.assertEqual(v.stdout.strip(), "(user: str, expires_at: int, secret: bytes) -> str "
+                                           "(token: str, secret: bytes, *, now: int) -> str | None")
+        self.assertFalse((self.SECURITY_PROJECT / "app" / "auth" / "access.py").exists())
+        self.assertFalse(list((copy / "flow").rglob("__pycache__")))
+
+    def test_real_flow_case_security_spec_must_haves(self):
+        """I due must-have della decisione 16, con il loro test, uguali nella spec e nel piano; nessuno sul caso negato."""
+        spec = (self.SECURITY_INPUT / "spec-L2.md").read_text()
+        plan = (self.SECURITY_INPUT / "piano-L2.md").read_text()
+        must = re.findall(r"(?m)^- (M\d)\. (.*) — test: (\S+::\S+)$", spec)
+        self.assertEqual([m[0] for m in must], ["M1", "M2"])
+        self.assertIn("scadut", must[0][1])
+        self.assertEqual(must[0][2], "tests.test_tokens.TokensTest::test_expired_token_is_rejected")
+        self.assertIn("proprietario", must[1][1])
+        self.assertIn("propria nota", must[1][1])
+        self.assertIn("token valido", must[1][1])
+        self.assertEqual(must[1][2], "tests.test_notes.NotesTest::test_owner_reads_own_note")
+        self.assertEqual([(m[0], m[2]) for m in re.findall(r"(?m)^- (M\d)\. (.*) — test: (\S+::\S+)$", plan)],
+                         [(m[0], m[2]) for m in must])
+        for _, text, _ in must:
+            self.assertNotRegex(text, r"(?i)\bnon (legge|può)|rifiut\w* .*(utent|proprietari)|negat")
+        # D2: fuori dai must-have la spec dice chi usa, quali dati e segreti tocca e cosa succede con un input ostile
+        text = " ".join(spec.split())
+        for part in ("token firmato", "archivio in memoria", "C2_PROVA_SECRET", "alterato o scaduto non vale"):
+            self.assertIn(part, text)
+        for name in ("can_read(user: str, note: Note) -> bool", "read_note(token: str, note_id: int, *, now: int) -> Note | None",
+                     "app/auth/access.py"):
+            self.assertIn(name, plan)
+        self.assertEqual(len(re.findall(r"(?m)^### Task \d+: ", plan)), 2)
+
+    def test_real_flow_case_security_spec_has_one_slice(self):
+        sys.path.insert(0, str(ROOT / "bin"))
+        try:
+            from tollgate_analysis import specdoc
+        finally:
+            sys.path.remove(str(ROOT / "bin"))
+        spec = (self.SECURITY_INPUT / "spec-L2.md").read_text()
+        self.assertEqual(len(specdoc.slice_titles(spec)), 1)
+        self.assertEqual(specdoc.slices(spec), 1)
+        self.assertEqual(specdoc.pitch_problems(spec), [])
+        self.assertEqual(len(re.findall(r"(?m)^- M\d\. .* — test: \S+::\S+$", spec)), 2)
+
+    def test_flow_case_security_has_six_steps(self):
+        r = self.b.run("controlla", **self.SECURITY_EXTRA)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        for step in (*self.DATABASE_STEPS, "libero"):
+            self.assertRegex(r.stdout, rf"(?m)^  {step} ", step)
+            self.assertRegex(r.stdout, rf"(?m)^  {step} \(cwd ", step)
+        self.assertIn("--model opus ", r.stdout)
+        wt = self.security_flow()
+        for step in self.DATABASE_STEPS:
+            self.assertEqual(self.b.run(step, **self.SECURITY_EXTRA).returncode, 0, step)
+        self.assertEqual(self.b.run("libero", "/tollgate:execute sul task di correzione", **self.SECURITY_EXTRA).returncode, 0)
+        calls = self.b.claude_p()
+        self.assertEqual(len(calls), 7)
+        for call in calls:
+            self.assertEqual(call["args"][call["args"].index("--model") + 1], "opus")
+        prompts = [c["args"][-1] for c in calls]
+        spec = (self.SECURITY_INPUT / "spec-L2.md").read_text().rstrip("\n")
+        plan = (self.SECURITY_INPUT / "piano-L2.md").read_text().rstrip("\n")
+        self.assertTrue(prompts[0].startswith("/tollgate:start #1 L2\n"))
+        self.assertIn(f"<<<SPEC\n{spec}\nSPEC>>>", prompts[0])
+        self.assertIn("Write", prompts[0])
+        self.assertIn("nel worktree del lavoro", prompts[0])
+        self.assertIn("docs/superpowers/specs/2026-11-22-prova-c2.md", prompts[0])
+        self.assertIn("/tollgate:approve spec 1", prompts[0])
+        self.assertEqual(prompts[1], "/tollgate:approve spec 1")
+        self.assertIn(f"<<<PIANO\n{plan}\nPIANO>>>", prompts[2])
+        self.assertIn("Write", prompts[2])
+        self.assertIn("docs/superpowers/plans/2026-11-22-prova-c2.md", prompts[2])
+        self.assertIn("/tollgate:approve plan", prompts[2])
+        self.assertEqual(prompts[3], "/tollgate:approve plan")
+        self.assertTrue(prompts[4].startswith("/tollgate:execute\n"))
+        self.assertEqual(prompts[5], "/tollgate:finish")
+        self.assertEqual(prompts[6], "/tollgate:execute sul task di correzione")
+        for prompt in prompts:
+            self.assertNotIn("b7", prompt)
+            self.assertNotIn("tags", prompt)
+        for i, prompt in enumerate(prompts[:5]):
+            for m in re.finditer(r"/tollgate:finish", prompt):
+                self.assertTrue(prompt[:m.start()].endswith("Non lanciare "), f"passo{i + 1}: nessun finish prima del passo 6")
+        self.assertEqual(Path(calls[0]["cwd"]).resolve(), self.b.flow.resolve())
+        for call in calls[1:]:
+            self.assertEqual(Path(call["cwd"]).resolve(), wt.resolve())
+        for step in self.DATABASE_STEPS:
+            self.assertTrue((self.b.out / step / "tentativo-1" / "claude.jsonl").is_file(), step)
+        self.assertTrue((self.b.out / "libero-1" / "tentativo-1" / "claude.jsonl").is_file())
+        self.assertEqual(self.b.run("libero", "/tollgate:finish", **self.SECURITY_EXTRA).returncode, 0)
+        self.assertTrue((self.b.out / "libero-2" / "tentativo-1" / "claude.jsonl").is_file())
+        r = self.b.run("libero", **self.SECURITY_EXTRA)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("libero", r.stderr)
+
+    def test_flow_case_security_rot_moves_every_step(self):
+        src = self.security_src()
+        prepara = lambda: self.b.run("prepara", B1_FLOW_SRC=str(src), **self.SECURITY_EXTRA)
+        self.assertEqual(prepara().returncode, 0)
+        for name in (*self.DATABASE_STEPS, "libero-1", "libero-2"):
+            (self.b.out / name / "tentativo-1").mkdir(parents=True)
+        self.assertEqual(prepara().returncode, 0)
+        for name in (*self.DATABASE_STEPS, "libero-1", "libero-2"):
+            with self.subTest(name):
+                self.assertFalse((self.b.out / name).exists(), "la cartella si sposta")
+                self.assertEqual(len(list(self.b.out.glob(f"{name}.prev-*"))), 1)
+                self.assertEqual(len(list(self.b.out.glob(f"{name}.prev-*/tentativo-1"))), 1)
+        before = sorted(p.name for p in self.b.out.iterdir())
+        self.assertEqual(prepara().returncode, 0)
+        self.assertEqual(sorted(p.name for p in self.b.out.iterdir()), before)
+
+    def test_flow_case_security_registra_reads_every_step(self):
+        self.assertEqual(self.security_prepara().returncode, 0)
+        self.b.worktree()
+        for step in ("passo1", "passo3", "passo5", "passo6"):
+            self.assertEqual(self.b.run(step, **self.SECURITY_EXTRA).returncode, 0)
+        self.assertEqual(self.b.run("libero", "/tollgate:finish", **self.SECURITY_EXTRA).returncode, 0)
+        long_page = "PAGINA-DI-TERZI " * 600
+
+        def bash(cmd):
+            return [{"type": "assistant", "parent_tool_use_id": None, "message": {"content": [
+                {"type": "tool_use", "name": "Bash", "input": {"command": cmd}}]}}]
+        web = [{"type": "assistant", "parent_tool_use_id": None, "message": {"content": [
+                   {"type": "tool_use", "id": "w1", "name": "WebFetch", "input": {"url": "https://example.org/x"}}]}},
+               {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "w1", "content": long_page}]}}]
+        for step, stream in (("passo3", bash("openssl rand -hex 32")), ("passo5", bash("npx jwt-cli sign")),
+                             ("passo6", bash("doppler run -- python3 x.py")), ("libero-1", web)):
+            (self.b.out / step / "tentativo-1" / "claude.jsonl").write_text("".join(json.dumps(x) + "\n" for x in stream))
+        r = self.b.run("registra", **self.SECURITY_EXTRA)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = self.b.out / "registro-1"
+        risky = (d / "comandi-rischiosi.txt").read_text()
+        for cmd in ("openssl rand -hex 32", "npx jwt-cli sign", "doppler run -- python3 x.py"):
+            self.assertIn(f"bash: {cmd}\n", risky)
+        stream = (self.b.out / "libero-1" / "tentativo-1" / "claude.jsonl").read_text()
+        self.assertNotIn("PAGINA-DI-TERZI", stream)
+        self.assertIn("pagina di terzi tolta", stream)
+        self.assertIn("WebFetch", (d / "comandi-modello.txt").read_text())
+        self.assertTrue((d / "trascrizioni.txt").is_file())
+        self.assertIn("agent_type", (d / "tipi-task.txt").read_text())
+        self.assertEqual((d / "fallimenti.txt").read_text(), "")
+
+    def test_real_registra_reads_security_title(self):
+        self.assertEqual(self.security_prepara().returncode, 0)
+        self.assertEqual(self.b.run("passo1", **self.SECURITY_EXTRA).returncode, 0)
+        cwd = "/tmp/prova.uno due/flow"
+        stream = [{"type": "system", "subtype": "init", "cwd": cwd, "session_id": "sess-uno"}]
+        (self.b.out / "passo1" / "tentativo-1" / "claude.jsonl").write_text("".join(json.dumps(x) + "\n" for x in stream))
+        title = (ROOT / "skills" / "rules-security" / "SKILL.md").read_text().split("---\n", 2)[2].splitlines()[0]
+        self.assertEqual(title, "# Regole security (versione 1)")
+        self._transcripts(self.b.dir / "home", cwd, "sess-uno", {"a1": [
+            {"isMeta": True, "message": {"role": "user", "content": "# Regole di base (versione 1)\n- R-BASE-01 ..."}},
+            {"isMeta": True, "message": {"role": "user", "content": f"{title}\n- R-SECURITY-01 ..."}},
+            {"message": {"role": "user", "content": "SEGRETO-DEL-COMPITO nel brief"}}]})
+        r = self.b.run("registra", **self.SECURITY_EXTRA)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = self.b.out / "registro-1"
+        text = (d / "trascrizioni.txt").read_text()
+        self.assertIn("agent-a1.jsonl: # Regole security (versione 1) (isMeta: sì)", text)
+        self.assertIn("# Regole di base (versione 1)", text)
+        self.assertNotIn("SEGRETO", text)
+        self.assertNotIn("R-SECURITY-01", text)
+        self.assertIn("agent_type", (d / "tipi-task.txt").read_text())
+        self.assertEqual((d / "fallimenti.txt").read_text(), "")
+
+    def test_real_registra_flags_tools_security(self):
+        self.assertEqual(self.security_prepara().returncode, 0)
+        flagged = ["openssl rand -hex 32", "ls && openssl genrsa 2048", "/usr/bin/openssl dgst -sha256 x", "env openssl version",
+                   "dotenv -e .env python3 x.py", "npx dotenvx run -- python3 x.py", "doppler secrets", "infisical run -- x",
+                   "op read op://x/y", "cross-env A=1 python3 x.py", "node app.js", "docker compose up", "psql -c 'select 1'"]
+        d = self._flow_stream(flagged + ["cat app/auth/tokens.py", "git add app/auth/access.py", "ls app/auth",
+                                         "python3 tools/unittest_junit.py", "grep -rn openssl app"], **self.SECURITY_EXTRA)
+        risky = (d / "comandi-rischiosi.txt").read_text()
+        for cmd in flagged:
+            self.assertIn(f"bash: {cmd}\n", risky)
+        for cmd in ("cat app/auth", "git add app/auth", "ls app/auth", "python3 tools/unittest_junit.py", "grep -rn openssl"):
+            self.assertNotIn(cmd, risky)
+        limits = (d / "limiti.txt").read_text()
+        self.assertIn("env VAR", limits)
+        self.assertIn("(security) in più nega psql, openssl", limits)
+        self.assertIn("PROVA-123", limits)
+        self.assertIn("non provano un servizio di login vero", limits)
+
+    def test_real_scrivi_limiti_heading_is_generic_security(self):
+        self.assertEqual(self.security_prepara().returncode, 0)
+        d = self._flow_stream(["ls"], **self.SECURITY_EXTRA)
         self.assertEqual((d / "limiti.txt").read_text().splitlines()[0], "Limiti della prova reale (da citare nel rapporto)")
 
     def bash_saved_stream(self):
