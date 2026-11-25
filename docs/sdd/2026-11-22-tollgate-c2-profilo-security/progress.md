@@ -210,3 +210,5 @@ Nota: trascrizioni — tutte le sessioni del lavoro sono partite dalla radice de
 Nota: fermati — nessun subagente: `ListAgents` mostra i 33 subagenti di questa sessione tutti fermi (idle), nessuno attivo; due sessioni di altri lavori dell'utente non toccate.
 Chiusura di C2: consegnata
 Fermata aperta: worktree
+Nota: registro copiato in docs/sdd/2026-11-22-tollgate-c2-profilo-security/ su main (commit 87c8fa2, 104 file, senza .diff, log della suite e fonti/; anonimizzato; nessun nome utente, host, /home reale né token); i due commit di documenti (21d2b12, 87c8fa2) inviati in un solo push dopo la guardia; remoto e locale allineati a 87c8fa2; `git diff 401cb7e c2-profilo-security -- . ':(exclude).superpowers'` vuoto prima della domanda sul worktree.
+Fermata chiusa: worktree — rimuovi worktree e ramo
