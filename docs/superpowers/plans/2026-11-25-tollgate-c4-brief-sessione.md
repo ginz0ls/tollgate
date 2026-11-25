@@ -7,11 +7,11 @@ Questa sessione parte con il contesto pulito. Qui c'è quello che serve per eseg
 Esegui il piano `docs/superpowers/plans/2026-11-25-tollgate-c4-ponte-github.md` (C4a, fondamenta del ponte con GitHub) con `superpowers:subagent-driven-development`, seguendo **alla lettera** `docs/superpowers/plans/2026-11-25-tollgate-c4-esecuzione.md`: ramo `c4-ponte-github`, worktree `.claude/worktrees/c4`, sessione avviata dalla radice del repo. Il piano ha 11 task:
 1. `ghcli` per le bacheche: segreto, redazione, classi d'errore, GraphQL;
 2. il token delle bacheche, `[board]`, la protezione del file, `/tollgate:setup`;
-3. profilo `c4` della guardia, script della sonda, `fakegh` di base;
+3. `ghqueries`, profilo `c4` della guardia, script della sonda, `fakegh` di base;
 4. la sonda su GitHub vero (solo il controller);
 5. `fakegh` allineato alla sonda, e i guasti;
 6. le operazioni verso GitHub;
-7. migrazione 8, la coda, il tipo `sync`;
+7. migrazione 8, la coda, i tipi di voce, il tipo `sync`;
 8. il filtro di ciò che esce, `submit`, `repo_key`;
 9. lo svuotamento, l'avvio staccato, i comandi `board`;
 10. la fotografia, l'avvio di sessione, le pagine d'uso;
@@ -29,7 +29,7 @@ C4a costruisce il **trasporto** verso GitHub. Le bacheche vere (bacheca principa
 - **dopo il merge** (solo con l'OK dell'utente) tutti i passi del punto 5 di «Chiusura» sono fatti, uno per uno: push, CI verde, stato nel piano principale, memoria, trascrizioni, rapporto «Chiusura di C4a», copia del registro, un solo push dei documenti, di nuovo la CI verde sull'ultimo commit, subagenti fermati, domanda diretta sul worktree e copia finale del ledger;
 - nell'ultimo messaggio hai lanciato `python3 -B docs/superpowers/plans/2026-11-25-tollgate-c4-verifica-fine.py` e ne hai incollato l'uscita.
 
-**Il merge su `main` non si fa senza l'OK dell'utente.**
+**Il merge su `main` non si fa senza l'OK dell'utente.** Con l'OK è uno solo: `git merge --no-ff` con l'oggetto fissato nei Global Constraints del piano (mai in avanti veloce né `--squash`).
 
 **Le condizioni esatte stanno nel brief corto** `docs/superpowers/plans/2026-11-25-tollgate-c4-brief-goal.md`, sezione «Finito quando», e lo script di verifica le controlla tutte **sui file**. Ogni fermata si scrive nel ledger (`Fermata aperta: <caso>`, poi `Fermata chiusa: <caso> — <risposta>`) e si accompagna a una **domanda diretta** con `AskUserQuestion`.
 
@@ -73,14 +73,14 @@ C4a costruisce il **trasporto** verso GitHub. Le bacheche vere (bacheca principa
 - Il repo `ginz0ls/tollgate` è pubblico: niente nomi di progetti privati, nome utente, host o token nei file.
 - I profili e le regole approvati non si toccano.
 - **C4 in due parti (25/11/2026).** Prima le fondamenta (C4a, questo piano), poi le bacheche (C4b), con il piano di C4b scritto dopo la sonda. Costo accettato: una sessione di scrittura, una d'esecuzione e un merge in più.
-- **Il token delle bacheche in un file protetto (25/11/2026).** Token classico, in un file nella cartella personale dell'utente, fuori dai progetti, leggibile solo dal suo utente; lo scrive un comando che l'utente lancia nel suo terminale e che chiede il valore senza mostrarlo; solo il codice di tollgate lo legge e tollgate impedisce al modello di aprirlo. Scartata la variabile d'ambiente.
+- **Il token delle bacheche in un file protetto (25/11/2026).** Token classico, in un file nella cartella personale dell'utente, fuori dai progetti, leggibile solo dal suo utente; lo scrive un comando che l'utente lancia nel suo terminale e che chiede il valore senza mostrarlo; solo il codice di tollgate lo legge e tollgate blocca le letture dirette del file da parte del modello dove è attivo (non è una cassaforte: un programma che gira con l'utente può leggerlo; decisione 10 del piano). Scartata la variabile d'ambiente.
 
 ## Punti delicati di C4a
 
-- **Il token e la sua protezione.** Il file è `~/.config/tollgate/board-token` (cartella 0700, file 0600, decisione 3). Lo legge solo `boardtoken.read`, che lo tiene in un `ghcli.Secret` e lo passa solo come `GH_TOKEN` nell'ambiente del figlio, togliendo `GH_HOST` e `GH_DEBUG`. Nessuno, controller compreso, apre quel file o `~/.config/gh/`. Dopo il Task 2 il guardrail nega anche al modello i comandi che nominano quel percorso: un messaggio di commit o un `grep` che lo nomina si riformula.
-- **Il token vero sulla macchina.** Dopo la fermata `sonda` il file vero esiste. Ogni test deve usare `TOLLGATE_BOARD_TOKEN_FILE` con la sentinella o una `HOME` temporanea; un test che arriva alla `HOME` vera è un difetto `critical`. Nei test il token vale `PROVA-123`; una forma di token vero si costruisce a pezzi.
-- **La sonda.** Solo il controller, solo con `spikes/c4/probe.py` e la guardia (profilo `c4`), solo sul repo `tollgate-c4-probe` e sui Projects che la sonda crea, prima a secco (`controlla`), poi `esegui`, `pulisci`, `rapporto`. Il rapporto non ha login, nome del repo, id o numeri dell'account: segnaposto. La domanda sulla notifica (S13) non è una fermata. I fatti diversi dall'atteso cambiano i task dopo con una `Ruling:`.
-- **Il figlio staccato.** Hook e comandi mettono solo in coda; lo svuotamento parte con un doppio `fork` e non deve far aspettare nessun hook (un hook ha 20 s). Lo scan lo prova a secco prima del codice; i test del Task 9 non lasciano processi vivi né zombie.
+- **Il token e la sua protezione.** Il file è `~/.config/tollgate/board-token` (cartella 0700, file 0600, decisione 3). Lo legge solo `boardtoken.read`, che lo tiene in un `ghcli.Secret` e lo passa solo come `GH_TOKEN` nell'ambiente del figlio, togliendo `GH_HOST` e `GH_DEBUG` e aggiungendo `--hostname github.com`. Nessuno, controller compreso, apre quel file o `~/.config/gh/`. Dopo il Task 2 il guardrail nega al modello i comandi Bash che nominano `.config/tollgate`, `board-token` o la cartella `~/.config`, e i `Read` e `Grep` sulla cartella del token o su una sua cartella madre (`/`, la home, `~/.config`): un messaggio di commit o un `grep` che li nomina si riformula. È una protezione dalle letture dirette, non una cassaforte (decisione 10).
+- **Il token vero sulla macchina.** Dopo la fermata `sonda` il file vero esiste. In modo di test il token viene **solo** da `TOLLGATE_BOARD_TOKEN_FILE`, mai dal percorso vero: senza la variabile è assente, e scrivere o cancellare il percorso vero è rifiutato anche se la variabile lo nomina (decisione 3). Ogni test usa la sentinella con la variabile o una `HOME` temporanea; un test che arriva al file vero o alla `HOME` vera è un difetto `critical`. Nei test il token vale `PROVA-123`; una forma di token vero si costruisce a pezzi.
+- **La sonda.** Solo il controller, solo con `spikes/c4/probe.py` e la guardia (profilo `c4`), solo sul repo `tollgate-c4-probe` e sui Projects che la sonda crea, prima a secco (`controlla`), poi `esegui` per intero senza fermarsi, sempre `pulisci`, e solo dopo, sugli esiti, le fermate; poi `rapporto`, che scrive la bozza. Il rapporto lo scrive un implementatore opus dalla bozza e dal ledger, mai da `esiti.json`. Il rapporto non ha login, nome del repo, id o numeri dell'account: segnaposto (`<ID-PROGETTO>`, `<proprietario>`, `<repo di prova>`). La domanda sulla notifica (S13) non è una fermata. I fatti diversi dall'atteso cambiano i task dopo con una `Ruling:`.
+- **Il figlio staccato.** Hook e comandi mettono solo in coda; lo svuotamento parte solo dalla fine di un hook (`kick`, mai dalla CLI), con un doppio `fork` e non deve far aspettare nessun hook (un hook ha 20 s). Lo scan lo prova a secco prima del codice; i test del Task 9 non lasciano processi vivi né zombie.
 - **I canarini.** Il test `tests/test_outbound_canaries.py` (Task 8 e 9) è la prova che niente della lista «non va mai» arriva alla coda o a `gh`. C4b e C5 lo estendono: va scritto in modo che un tipo nuovo senza filtro lo faccia fallire.
 - **`fakegh` è l'unica verità dei test.** Nessun test parla con GitHub vero. Il Task 5 allinea `fakegh` a ciò che la sonda ha visto, con il numero del fatto accanto a ogni valore; un `fakegh` più gentile di GitHub (che non simula il 500 **dopo** la scrittura, per esempio) farebbe passare un doppione.
 - **La migrazione 8.** Rompe i test che fissano la 7 (`test_latest_version_is_7`, `MigrationV7Test`): il Task 7 li sistema tutti; un DB a 7 si migra con la copia `-migrazione-8`.

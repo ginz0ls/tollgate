@@ -29,6 +29,9 @@ SONDA = "docs/verifiche/2026-11-25-c4-sonda.md"
 PIANO_PRINCIPALE = "docs/superpowers/plans/2026-11-20-tollgate-c-piano-principale.md"
 REMOTE = "https://github.com/ginz0ls/tollgate.git"
 MERGE_SUBJECT = "tollgate C4a:"
+# L'oggetto del merge fissato nei Global Constraints del piano (`git merge --no-ff`).
+MERGE_FULL = ("tollgate C4a: fondamenta del ponte con GitHub (token delle bacheche, coda delle "
+              "scritture, filtro, sonda)")
 MEMORY_LINE = "- C4a eseguito"
 MERGE_MARKER = "Rapporto del merge: consegnato"
 CLOSING = "Chiusura di C4a: consegnata"
@@ -314,12 +317,23 @@ def check_worktree(c: Check, repo: Path, lines: list[str], from_main: bool) -> N
 
 def check_after_merge(c: Check, repo: Path, home: Path, lines: list[str], from_main: bool,
                       remote: str, network: bool) -> None:
-    log = git(repo, "log", "--first-parent", "main", "--format=%H %s") or ""
-    merges = [sha for sha, _, subject in (l.partition(" ") for l in log.splitlines())
-              if subject.startswith(MERGE_SUBJECT)]
-    merge = merges[-1] if merges else None
+    log = git(repo, "log", "--first-parent", "main", "--format=%H %P%x09%s") or ""
+    found = []
+    for line in log.splitlines():
+        head, _, subject = line.partition("\t")
+        sha, *parents = head.split()
+        if subject.startswith(MERGE_SUBJECT):
+            found.append((sha, len(parents), subject))
+    merge = found[-1][0] if found else None
     c(merge, f"6.1 git log --first-parent main ha un commit «{MERGE_SUBJECT} …»"
-             + (f" (il merge: {merge[:12]})" if merge else ""))
+             + (f" (il più vecchio: {merge[:12]})" if merge else ""))
+    if found:
+        _, parents, subject = found[-1]
+        c(parents >= 2, f"6.1 il più vecchio commit «{MERGE_SUBJECT} …» della storia "
+                        f"--first-parent è un commit di merge (git merge --no-ff; genitori: "
+                        f"{parents})")
+        c(subject == MERGE_FULL, f"6.1 il commit del merge ha l'oggetto fissato nel piano "
+                                 f"(«{MERGE_FULL}»)")
     plan = on_main(repo, PIANO_PRINCIPALE) or ""
     row = next((l for l in plan.splitlines() if l.startswith("| **C4a")), "")
     c("unita su" in row, "6.2 il piano principale su main ha «unita su» nella riga «| **C4a»")

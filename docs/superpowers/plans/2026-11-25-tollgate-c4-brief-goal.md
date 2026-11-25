@@ -10,7 +10,7 @@ Leggi questo file per intero, poi `docs/superpowers/plans/2026-11-25-tollgate-c4
 
 ## Cosa fare
 
-Esegui il piano `docs/superpowers/plans/2026-11-25-tollgate-c4-ponte-github.md` (11 task: `ghcli` per le bacheche, token delle bacheche con la protezione del file e il passo di setup, profilo `c4` della guardia con lo script della sonda, la sonda su GitHub vero, `fakegh` allineato, le operazioni verso GitHub, migrazione 8 e coda, filtro di ciò che esce, svuotamento staccato e comandi `board`, fotografia e pagine d'uso, spec rev 38) con `superpowers:subagent-driven-development`, seguendo alla lettera `docs/superpowers/plans/2026-11-25-tollgate-c4-esecuzione.md`:
+Esegui il piano `docs/superpowers/plans/2026-11-25-tollgate-c4-ponte-github.md` (11 task: `ghcli` per le bacheche, token delle bacheche con la protezione del file e il passo di setup, documenti verso GitHub in un solo modulo (`ghqueries`) con il profilo `c4` della guardia e lo script della sonda, la sonda su GitHub vero, `fakegh` allineato, le operazioni verso GitHub, migrazione 8 con la coda e i tipi di voce, filtro di ciò che esce, svuotamento staccato e comandi `board`, fotografia e pagine d'uso, spec rev 38) con `superpowers:subagent-driven-development`, seguendo alla lettera `docs/superpowers/plans/2026-11-25-tollgate-c4-esecuzione.md`:
 - ramo `c4-ponte-github`, worktree `.claude/worktrees/c4`;
 - sessione avviata dalla radice del repo;
 - scan pre-flight, revisori, ri-revisioni e revisione finale su **Fable**; implementatori e ogni correzione su **opus**; **mai sonnet né haiku**;
@@ -29,7 +29,7 @@ Scrivi nel ledger le righe esatte che le condizioni qui sotto cercano, con quest
 
 A ogni fermata la sessione scrive nel ledger `Fermata aperta: <caso>`, manda il messaggio e fa una **domanda diretta** all'utente (`AskUserQuestion`); quando l'utente risponde con un sì, un no o una scelta, scrive `Fermata chiusa: <caso> — <risposta>`. Se l'utente risponde con una domanda, la sessione risponde, ripete la richiesta e la fermata resta aperta.
 - **Prima della sonda** (`sonda`, Task 4 Step 1, dopo i Task 1-3): il repo privato `tollgate-c4-probe` e il token delle bacheche messo nel file con `board token set`, con i passi del piano. Risposte: «Sì, pronte»; «Non ora: rinvia la sonda a C4b»; «Ho un dubbio».
-- **Durante la sonda**, solo se serve: `scope repo` (il solo `project` non basta: domanda già scritta nelle istruzioni), `sotto-issue` (GitHub rifiuta sotto-issue o dipendenze sull'account), `fatto diverso` (un fatto cambia un task e tocca una scelta dell'utente o aggiunge una sessione o un merge). La domanda sulla notifica dopo S13 non è una fermata: la risposta va nella riga `Sonda: S13 notifica — <risposta>`.
+- **Dopo `esegui` e `pulisci`**, sugli esiti, solo se serve: `scope repo` (il solo `project` non basta: domanda già scritta nelle istruzioni), `sotto-issue` (GitHub rifiuta sotto-issue o dipendenze sull'account), `fatto diverso` (un fatto cambia un task e tocca una scelta dell'utente o aggiunge una sessione o un merge). La domanda sulla notifica dopo S13 non è una fermata: la risposta va nella riga `Sonda: S13 notifica — <risposta>`.
 - **Una scelta della revisione finale** (`revisione finale`) che tocca una scelta dell'utente: il messaggio comincia con `Fermata: revisione finale`.
 - **Prima del merge** (`merge`): il rapporto salvato in `rapporto-merge.md` e mandato all'utente, la riga `Rapporto del merge: consegnato`, poi la domanda. Senza OK non si unisce niente.
 - **Dopo il merge** (`worktree`): nel ledger, in quest'ordine e **prima** della copia del registro, `Chiusura di C4a: consegnata` e `Fermata aperta: worktree`; poi la copia del registro, il push, la CI, i subagenti; per ultima, la domanda sul worktree, e dopo la risposta la copia finale del ledger su `main`.
@@ -37,7 +37,7 @@ A ogni fermata la sessione scrive nel ledger `Fermata aperta: <caso>`, manda il 
 
 ## Finito quando
 
-**Ogni condizione si controlla leggendo un file su `main` o nel worktree, mai solo il transcript.** Lo script `docs/superpowers/plans/2026-11-25-tollgate-c4-verifica-fine.py` (**provato a secco su 69 situazioni**) le controlla tutte e stampa la situazione e l'esito di ognuna: **nell'ultimo messaggio della sessione lancialo dalla radice del repo e incollane l'uscita**. Esce con 0 quando il lavoro è finito, anche «finito per ora» in attesa dell'utente, con 1 altrimenti.
+**Ogni condizione si controlla leggendo un file su `main` o nel worktree, mai solo il transcript.** Lo script `docs/superpowers/plans/2026-11-25-tollgate-c4-verifica-fine.py` (**provato a secco su 72 situazioni**) le controlla tutte e stampa la situazione e l'esito di ognuna: **nell'ultimo messaggio della sessione lancialo dalla radice del repo e incollane l'uscita**. Esce con 0 quando il lavoro è finito, anche «finito per ora» in attesa dell'utente, con 1 altrimenti.
 
 Le condizioni dipendono da **una sola** delle tre situazioni, scelta da ciò che è scritto. **Si controlla prima C** (una fermata aperta nel ledger, diversa da `merge` e `worktree`): se vale, prevale su A e B. Tra A e B decide la riga `Esito:` del rapporto della sonda (nel worktree, o su `main` se il worktree non c'è più): `Esito: riuscita` o `Esito: riuscita con differenze` dà A; `Esito: rinviata a C4b` dà B. Se l'utente prepara la sonda dopo averla rinviata e la sonda si fa, l'`Esito:` cambia e vale A. Senza ledger, con più di un workspace, o senza rapporto della sonda e senza fermate aperte, il lavoro non è finito.
 
@@ -50,7 +50,7 @@ Le condizioni dipendono da **una sola** delle tre situazioni, scelta da ciò che
 2. La sonda:
    - il ledger ha una riga che comincia con `Fermata chiusa: sonda — ` e righe che cominciano con `Sonda: controlla`, `Sonda: esegui`, `Sonda: pulisci` e `Sonda: S13 notifica — `;
    - `docs/verifiche/2026-11-25-c4-sonda.md` ha una riga `Esito: riuscita` o `Esito: riuscita con differenze`, e una riga di tabella che comincia con `| S<n> |` per ognuno dei fatti S1-S22;
-   - il rapporto della sonda non contiene il login `ginz0ls`, il nome del repo di prova `tollgate-c4-probe`, `/home/`, né una forma di token (`gh` seguito da una lettera tra `p`, `o`, `u`, `s`, `r`, un trattino basso e almeno 20 lettere, cifre o trattini bassi; oppure `github_pat_`).
+   - il rapporto della sonda non contiene il login `ginz0ls`, il nome del repo di prova `tollgate-c4-probe`, `/home/`, né una forma di token (`gh` seguito da una lettera tra `p`, `o`, `u`, `s`, `r`, un trattino basso e almeno 20 lettere, cifre o trattini bassi; oppure `github_pat_`). Il nome del repo non è un segreto (sta nel piano e nella guardia, e il `grep` del Task 4 non lo cerca), ma il piano vuole i segnaposto al posto dei nomi del repo e del Project (`<repo di prova>`), quindi un rapporto scritto come dice il piano non lo nomina mai, nemmeno nel titolo del Project che ne porta il prefisso.
 3. Il ledger ha una riga che comincia con `Revisione finale (Fable):` e, dopo, una che comincia con `Revisione finale chiusa: 0 critical, 0 important aperti`.
 4. Il ledger ha le tre righe che cominciano con `Suite finale corsa 1: verde su python3.11 e python3`, `Suite finale corsa 2: verde su python3.11 e python3`, `Suite finale corsa 3: verde su python3.11 e python3`.
 5. Il rapporto del merge `rapporto-merge.md` del workspace (o, se il worktree non c'è più, la sua copia su `main`):
@@ -64,7 +64,7 @@ Le condizioni dipendono da **una sola** delle tre situazioni, scelta da ciò che
    - il ledger ha `Fermata aperta: merge` senza la sua chiusura e nessuna riga `Merge:`: l'utente non ha ancora risposto, il lavoro è finito per ora;
    - l'ultima riga `Merge:` è `Merge: no dell'utente`: il lavoro è finito qui;
    - l'ultima riga `Merge:` è `Merge: OK dell'utente`, e valgono **tutti** i passi dopo il merge, uno per uno:
-     1. **Merge.** `git log --first-parent main` ha un commit con l'oggetto che comincia con `tollgate C4a:`; il più vecchio di questi è il commit del merge (da qui `M`).
+     1. **Merge.** `git log --first-parent main` ha un commit con l'oggetto che comincia con `tollgate C4a:`; il più vecchio di questi è il commit del merge (da qui `M`). `M` è un commit di merge (due genitori: `git merge --no-ff`) con l'oggetto fissato nel piano, `tollgate C4a: fondamenta del ponte con GitHub (token delle bacheche, coda delle scritture, filtro, sonda)`. Con `--no-ff` i commit dei task (anche loro `tollgate C4a: …`) stanno sul ramo, fuori dalla storia `--first-parent`; dopo `M` ci sono i commit di documenti del punto 5 delle istruzioni. Un merge in avanti veloce porta i commit dei task nella storia `--first-parent`: il più vecchio è allora il commit del Task 1, che non è un merge, e la condizione non vale; così anche un `--squash`.
      2. **Stato nel piano principale.** Il piano principale di C su `main` ha le parole «unita su» nella riga che comincia con `| **C4a`.
      3. **Memoria.** `plugin-workflow-decisioni.md` della memoria ha una riga che comincia con `- C4a eseguito`.
      4. **Chiusura.** Il ledger ha `Chiusura di C4a: consegnata` e, dopo di essa, `Fermata aperta: worktree`.
@@ -90,7 +90,7 @@ Le condizioni dipendono da **una sola** delle tre situazioni, scelta da ciò che
 
 ## Situazioni della prova a secco
 
-Specifica per chi scrive lo script `docs/superpowers/plans/2026-11-25-tollgate-c4-verifica-fine.py` (sul modello di `2026-11-22-tollgate-c2-verifica-fine.py`, con le opzioni `--repo`, `--home` e `--senza-rete` per le prove, e una per sostituire il remoto con un repo nudo locale). Ogni situazione si prepara in un repo git temporaneo con un ramo `main`, un worktree finto o vero, un ledger, i file e una `HOME` temporanea con la memoria; per ognuna è scritto l'esito atteso dello script (uscita 0 = finito o finito per ora; 1 = non finito). Il numero di situazioni provate va scritto nel segnaposto della prima frase di «Finito quando».
+Specifica per chi scrive lo script `docs/superpowers/plans/2026-11-25-tollgate-c4-verifica-fine.py` (sul modello di `2026-11-22-tollgate-c2-verifica-fine.py`, con le opzioni `--repo`, `--home` e `--senza-rete` per le prove, e una per sostituire il remoto con un repo nudo locale). Ogni situazione si prepara in un repo git temporaneo con un ramo `main`, un worktree finto o vero, un ledger, i file e una `HOME` temporanea con la memoria; dopo il merge, il ramo ha più commit `tollgate C4a: …` e si unisce con un vero `git merge --no-ff` (salvo la situazione 37); per ognuna è scritto l'esito atteso dello script (uscita 0 = finito o finito per ora; 1 = non finito). Il numero di situazioni provate va scritto nel segnaposto della prima frase di «Finito quando».
 
 1. Nessun ledger, né nel worktree né su `main`: 1 («lavoro non cominciato»).
 2. Due cartelle sotto `.claude/worktrees/c4/.superpowers/sdd/`: 1.
@@ -128,3 +128,4 @@ Specifica per chi scrive lo script `docs/superpowers/plans/2026-11-25-tollgate-c
 34. B senza la riga `Sonda: rinviata a C4b`: 1; variante con il rapporto del merge che nella sezione «La sonda» non dice `rinviata a C4b`: 1.
 35. B poi A: il rapporto della sonda passa a `Esito: riuscita` dopo un rinvio: valgono le condizioni di A (con le righe `Sonda: esegui`, `Sonda: pulisci`, `Sonda: S13 notifica — ` e la tabella S1-S22): con tutto il resto di A vero, 0; variante senza `Sonda: pulisci`: 1.
 36. Rapporto della sonda con una riga `Esito:` diversa dai tre valori (per esempio `Esito: fallita`): 1.
+37. Dopo il merge, tutto il resto vero, ma il merge è sbagliato: fatto in avanti veloce per errore (i commit dei task `tollgate C4a: …` finiscono nella storia `--first-parent` e il più vecchio non è un merge): 1; con `--squash` (un commit solo con l'oggetto del piano, un genitore): 1; con `--no-ff` e un oggetto diverso da quello del piano: 1.
