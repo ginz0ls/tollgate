@@ -1,0 +1,649 @@
+FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEEFFFEEFEEEFFF
+======================================================================
+ERROR: test_real_flow_case_security_plan_does_not_list_rule_requirements (tests.test_b1_scripts.FlowScriptTest.test_real_flow_case_security_plan_does_not_list_rule_requirements)
+Il piano, la spec, l'issue e il codice di partenza non nominano ciò che le regole chiedono (il test del caso negato, il
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2468, in test_real_flow_case_security_plan_does_not_list_rule_requirements
+    text = " ".join(path.read_text().split())
+                    ~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/pathlib/_local.py", line 548, in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/pathlib/_abc.py", line 632, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/pathlib/_local.py", line 539, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/spikes/c2/input/piano-L2.md'
+
+======================================================================
+ERROR: test_real_flow_case_security_prepara_checks_l2_plan (tests.test_b1_scripts.FlowScriptTest.test_real_flow_case_security_prepara_checks_l2_plan)
+`prepara` controlla il piano di prova con `level="L2"` e rifiuta un piano L2 senza must-have.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2376, in test_real_flow_case_security_prepara_checks_l2_plan
+    shutil.copytree(ROOT / "spikes" / "c2", spikes / "c2", ignore=shutil.ignore_patterns("__pycache__", "reports"))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/shutil.py", line 591, in copytree
+    with os.scandir(src) as itr:
+         ~~~~~~~~~~^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/spikes/c2'
+
+======================================================================
+ERROR: test_real_flow_case_security_project_declares_junit_report (tests.test_b1_scripts.FlowScriptTest.test_real_flow_case_security_project_declares_junit_report)
+In L2 i test dei must-have si contano solo con un rapporto: il `tollgate.toml` lo dichiara e il progetto ha lo script
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2415, in test_real_flow_case_security_project_declares_junit_report
+    cfg = tomllib.loads((self.SECURITY_PROJECT / "tollgate.toml").read_text())
+                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/pathlib/_local.py", line 548, in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/pathlib/_abc.py", line 632, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/pathlib/_local.py", line 539, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/spikes/c2/flow/tollgate.toml'
+
+======================================================================
+ERROR: test_real_flow_case_security_project_has_no_credentials (tests.test_b1_scripts.FlowScriptTest.test_real_flow_case_security_project_has_no_credentials)
+Nel progetto di prova l'unico segreto è il valore finto `PROVA-123`, letto dalla variabile `C2_PROVA_SECRET`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2441, in test_real_flow_case_security_project_has_no_credentials
+    ignore = (project / ".gitignore").read_text().split()
+             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/pathlib/_local.py", line 548, in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/pathlib/_abc.py", line 632, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/pathlib/_local.py", line 539, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/spikes/c2/flow/.gitignore'
+
+======================================================================
+ERROR: test_real_flow_case_security_spec_has_one_slice (tests.test_b1_scripts.FlowScriptTest.test_real_flow_case_security_spec_has_one_slice)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2533, in test_real_flow_case_security_spec_has_one_slice
+    spec = (self.SECURITY_INPUT / "spec-L2.md").read_text()
+  File "/usr/lib/python3.13/pathlib/_local.py", line 548, in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/pathlib/_abc.py", line 632, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/pathlib/_local.py", line 539, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/spikes/c2/input/spec-L2.md'
+
+======================================================================
+ERROR: test_real_flow_case_security_spec_must_haves (tests.test_b1_scripts.FlowScriptTest.test_real_flow_case_security_spec_must_haves)
+I due must-have della decisione 16, con il loro test, uguali nella spec e nel piano; nessuno sul caso negato.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2504, in test_real_flow_case_security_spec_must_haves
+    spec = (self.SECURITY_INPUT / "spec-L2.md").read_text()
+  File "/usr/lib/python3.13/pathlib/_local.py", line 548, in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/pathlib/_abc.py", line 632, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/pathlib/_local.py", line 539, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/spikes/c2/input/spec-L2.md'
+
+======================================================================
+ERROR: test_real_flow_case_security_starting_code_is_incomplete (tests.test_b1_scripts.FlowScriptTest.test_real_flow_case_security_starting_code_is_incomplete)
+Il codice di partenza ha le firme della decisione 16 e non controlla ancora la scadenza: un token scaduto vale ancora
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2481, in test_real_flow_case_security_starting_code_is_incomplete
+    shutil.copytree(self.SECURITY_PROJECT, copy / "flow", ignore=shutil.ignore_patterns("__pycache__", "reports"))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/shutil.py", line 591, in copytree
+    with os.scandir(src) as itr:
+         ~~~~~~~~~~^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/spikes/c2/flow'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='ai', mode='passo3')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo3 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo3 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='ai', mode='passo4')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo4 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo4 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='ai', mode='passo5')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo5 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo5 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='ai', mode='passo6')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo6 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo6 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='ai', mode='libero')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo libero esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo libero esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='infra', mode='passo3')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo3 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo3 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='infra', mode='passo4')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo4 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo4 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='infra', mode='passo5')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo5 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo5 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='infra', mode='passo6')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo6 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo6 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='infra', mode='libero')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo libero esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo libero esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='backend', mode='passo3')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo3 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo3 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='backend', mode='passo4')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo4 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo4 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='backend', mode='passo5')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo5 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo5 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='backend', mode='passo6')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo6 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo6 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='backend', mode='libero')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo libero esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo libero esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='frontend', mode='passo3')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo3 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo3 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='frontend', mode='passo4')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo4 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo4 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='frontend', mode='passo5')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo5 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo5 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='frontend', mode='passo6')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo passo6 esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo6 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases) (case='frontend', mode='libero')
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2307, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn(f"il passo {mode} esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'il passo libero esiste solo con B1_FLOW_CASE=database o B1_FLOW_CASE=security' not found in 'ERRORE: il passo libero esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_l2_steps_refused_for_other_cases (tests.test_b1_scripts.FlowScriptTest.test_flow_case_l2_steps_refused_for_other_cases)
+I passi 3-6 e `libero` esistono solo nei casi L2 (`database` e `security`): negli altri casi rifiutano senza `claude`.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2310, in test_flow_case_l2_steps_refused_for_other_cases
+    self.assertIn("B1_FLOW_CASE=security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_CASE=security' not found in 'ERRORE: il passo passo3 esiste solo con B1_FLOW_CASE=database\n'
+
+======================================================================
+FAIL: test_flow_case_security_has_six_steps (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_has_six_steps)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2541, in test_flow_case_security_has_six_steps
+    self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database
+
+
+======================================================================
+FAIL: test_flow_case_security_out_dir (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_out_dir) (<subtest>)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2275, in test_flow_case_security_out_dir
+    self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database
+
+
+======================================================================
+FAIL: test_flow_case_security_out_dir (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_out_dir) (B1_FLOW_EVIDENCE='c2')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2275, in test_flow_case_security_out_dir
+    self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database
+
+
+======================================================================
+FAIL: test_flow_case_security_registra_reads_every_step (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_registra_reads_every_step)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2607, in test_flow_case_security_registra_reads_every_step
+    self.assertEqual(self.security_prepara().returncode, 0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules=None, mode='controlla')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules=None, mode='prepara')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules=None, mode='passo1')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules=None, mode='passo2')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules=None, mode='passo3')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules=None, mode='passo4')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules=None, mode='passo5')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules=None, mode='passo6')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules=None, mode='libero')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules=None, mode='registra')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules='prova', mode='controlla')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules='prova', mode='prepara')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules='prova', mode='passo1')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules='prova', mode='passo2')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules='prova', mode='passo3')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules='prova', mode='passo4')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules='prova', mode='passo5')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules='prova', mode='passo6')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules='prova', mode='libero')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_requires_real_rules (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_requires_real_rules) (rules='prova', mode='registra')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2290, in test_flow_case_security_requires_real_rules
+    self.assertIn("B1_FLOW_RULES", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'B1_FLOW_RULES' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_case_security_rot_moves_every_step (tests.test_b1_scripts.FlowScriptTest.test_flow_case_security_rot_moves_every_step)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2593, in test_flow_case_security_rot_moves_every_step
+    self.assertEqual(prepara().returncode, 0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+======================================================================
+FAIL: test_flow_case_unknown_value_names_security (tests.test_b1_scripts.FlowScriptTest.test_flow_case_unknown_value_names_security)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2298, in test_flow_case_unknown_value_names_security
+    self.assertIn(value, r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: 'security' not found in "ERRORE: B1_FLOW_CASE vale 'altro': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_flow_disallows_tools_security (tests.test_b1_scripts.FlowScriptTest.test_flow_disallows_tools_security)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2424, in test_flow_disallows_tools_security
+    denied = self.disallowed(**self.SECURITY_EXTRA)
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 1497, in disallowed
+    self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database
+
+
+======================================================================
+FAIL: test_real_flow_case_security_prepara_proposes_profile (tests.test_b1_scripts.FlowScriptTest.test_real_flow_case_security_prepara_proposes_profile)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2316, in test_real_flow_case_security_prepara_proposes_profile
+    self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database
+
+
+======================================================================
+FAIL: test_real_flow_case_security_prepara_refuses_a_block_without_specialist (tests.test_b1_scripts.FlowScriptTest.test_real_flow_case_security_prepara_refuses_a_block_without_specialist)
+`prepara` (caso L2) vuole nel blocco proposto anche `min_level = "L2"`, lo specialista finale e la lista di controllo.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2365, in test_real_flow_case_security_prepara_refuses_a_block_without_specialist
+    self.assertIn("final_specialist", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'final_specialist' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_real_flow_case_security_prepara_refuses_without_profile (tests.test_b1_scripts.FlowScriptTest.test_real_flow_case_security_prepara_refuses_without_profile)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2354, in test_real_flow_case_security_prepara_refuses_without_profile
+    self.assertIn("profiles.security", r.stderr)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'profiles.security' not found in "ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database\n"
+
+======================================================================
+FAIL: test_real_flow_case_security_project_verifies (tests.test_b1_scripts.FlowScriptTest.test_real_flow_case_security_project_verifies)
+Il `verify` del progetto (da `spikes/c2/flow`, in una copia temporanea) passa, fa girare almeno un test e scrive
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2391, in test_real_flow_case_security_project_verifies
+    self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : ERRORE: B1_FLOW_CASE vale 'security': i valori ammessi sono b1, ai, infra, backend, frontend e database
+
+
+======================================================================
+FAIL: test_real_registra_flags_tools_security (tests.test_b1_scripts.FlowScriptTest.test_real_registra_flags_tools_security)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2661, in test_real_registra_flags_tools_security
+    self.assertEqual(self.security_prepara().returncode, 0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+======================================================================
+FAIL: test_real_registra_reads_security_title (tests.test_b1_scripts.FlowScriptTest.test_real_registra_reads_security_title)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2638, in test_real_registra_reads_security_title
+    self.assertEqual(self.security_prepara().returncode, 0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+======================================================================
+FAIL: test_real_scrivi_limiti_heading_is_generic_security (tests.test_b1_scripts.FlowScriptTest.test_real_scrivi_limiti_heading_is_generic_security)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/tests/test_b1_scripts.py", line 2679, in test_real_scrivi_limiti_heading_is_generic_security
+    self.assertEqual(self.security_prepara().returncode, 0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+----------------------------------------------------------------------
+Ran 22 tests in 3.968s
+
+FAILED (failures=55, errors=7)

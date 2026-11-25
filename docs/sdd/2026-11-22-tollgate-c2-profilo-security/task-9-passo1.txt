@@ -1,0 +1,3 @@
+validate: ok (/home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/docs/verifiche/evidenze/c2/flusso/validate/validate-1.txt)
+passo1, tentativo 1: claude -p da /tmp/tollgate-b1/flow (tetto 2400 s)
+passo1: tentativo 1, uscita 0

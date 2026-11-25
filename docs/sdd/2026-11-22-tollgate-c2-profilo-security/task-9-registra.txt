@@ -1,0 +1,3 @@
+registrato in /home/USER/MEGA/BIZ/VIBE/Plugin IT workflow/.claude/worktrees/c2/docs/verifiche/evidenze/c2/flusso/registro-1
+Grep del modello: 2; letture registrate (read): 16
+I Grep dell'implementatore non sono registrati (B1-V6): non entrano in lookups.

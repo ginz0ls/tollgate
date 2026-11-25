@@ -1,0 +1,2 @@
+passo2, tentativo 1: claude -p da /tmp/tollgate-b1/flow/.claude/worktrees/tg-1-scadenza-dei-token-e-lettura-delle-note (tetto 2400 s)
+passo2: tentativo 1, uscita 0

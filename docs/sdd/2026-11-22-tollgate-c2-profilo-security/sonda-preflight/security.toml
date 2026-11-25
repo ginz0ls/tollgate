@@ -1,0 +1,28 @@
+# Frammento CANDIDATO del profilo `security`, scritto dallo scan pre-flight dalle decisioni 2, 3,
+# 4, 10, 12 e 13 del piano C2. Serve solo alla sonda: il frammento vero lo scrive il Task 4.
+
+[profile]
+kind = "vertical"
+min_level = "L2"
+paths = ["**/auth/**", "**/middleware.*", "**/proxy.ts", "**/proxy.js", "**/security/**", "**/rls/**"]
+skills = []
+reviewer_skills = []
+commands = {}
+dod = []
+agent = "tollgate:implementer-security"
+reviewer = "tollgate:reviewer-security"
+final_specialist = "tollgate:final-security"
+checklist = "chi arriva al codice cambiato e cosa può fare; accesso negato provato da un test; nessun segreto nel diff; valori predefiniti che rifiutano"
+
+[detect]
+exclude = ["supabase/"]
+keep_paths = true
+content = [
+  "from 'bcrypt'", "from \"bcrypt\"", "require('bcrypt')", "require(\"bcrypt\")",
+  "from 'bcryptjs'", "from \"bcryptjs\"", "require('bcryptjs')", "require(\"bcryptjs\")",
+  "from 'argon2'", "from \"argon2\"", "require('argon2')", "require(\"argon2\")",
+  "from 'jsonwebtoken'", "from \"jsonwebtoken\"", "require('jsonwebtoken')", "require(\"jsonwebtoken\")",
+  "from 'jose'", "from \"jose\"",
+  "from 'iron-session'", "from \"iron-session\"",
+  "import bcrypt", "from argon2 import", "from passlib", "import jwt", "from jose import",
+]

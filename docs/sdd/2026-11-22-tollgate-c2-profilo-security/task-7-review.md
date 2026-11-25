@@ -1,0 +1,59 @@
+# Task 7: revisione (commit `b78813e`, pacchetto `review-45bb07d..b78813e.diff`)
+
+Revisore in sola lettura. File letti dal pacchetto e con `git show b78813e:<percorso>`; nessun test rilanciato, nessuna copia creata.
+
+## Aderenza
+
+- ✅ **Tre agenti creati** (`agents/implementer-security.md`, `agents/reviewer-security.md`, `agents/final-security.md`), `description` che nomina l'area.
+- ✅ **Deriva parola per parola.** Controllo mio, più stretto del test (che prova solo «ogni paragrafo del generico è nella copia»): tolta la sezione «Area `security`», il corpo di ciascuna copia è **identico byte per byte** al generico (`implementer`, `task-reviewer`, `final-reviewer`) al commit `b78813e`. Quindi ci sono anche i paragrafi del Task 2 e nessun testo in più fuori dalla sezione. La sezione sta nello stesso punto delle copie `database` (prima di «Il lavoro» / prima di «Standard del revisore (8.6)»).
+- ✅ **Frontmatter** (decisioni 10, 11, 14): stesse chiavi del generico; `model: opus` l'implementatore, `fable` i due revisori; `tools` uguali, più `WebFetch` al solo `reviewer-security`; `final-security` ha `Read, Grep, Glob, Bash`, la riga di attribuzione di `final-reviewer`, `skills: [rules-base, rules-security]`.
+- ✅ **Id delle regole contro la skill approvata.** Dalla skill: sul report 01, 02, 15, 16, 17; sul diff 03-14. `final-security.md:38` nomina solo 03-14 e nessun id del report in tutto il file; `reviewer-security.md:55` nomina i cinque del report e i dodici del diff nelle due frasi giuste; `implementer-security.md:51` i cinque del report nella frase «sul tuo report». Nessun errore di numero. L'elenco di ciò che l'implementatore scrive nel `done` copre tutte e cinque le regole sul report (01 chi arriva, 02 documentazione e versione, 15 limite dei tentativi, 16 raggio d'azione, 17 prova locale).
+- ✅ **Decisione 10, testo della sezione dello specialista**: prima l'intero diff per rischio e raggio d'azione (confini di fiducia, chi raggiunge il codice, dati e permessi), poi regole sul diff e lista di controllo voce per voce; le regole sul report lasciate al revisore del task senza id; nessun `rules-ci` né `R-CI-`. Coincide con la pagina approvata (`docs/profili/security.md:90` e `:100`: «guarda solo il diff, per rischio e per quanto lontano arriva il cambio», «controlla le regole di sicurezza che si giudicano sul diff»).
+- ✅ **Elenchi**: `hooks/run:61` e `bin/tollgate_core/config.py:78-81` con i due agenti di sola lettura. Rischio controllato: un altro elenco di agenti rimasto senza `security` (lo specialista o il revisore non riconosciuti). Controllo: `git grep` di `(final|reviewer|implementer)-database`, `tollgate:reviewer-frontend` e `readonly_agents` fuori da test ed evidenze: restano solo `comandi.md`, `hooks/run`, `config.py` (tutti aggiornati) e i frammenti; nessuna skill elenca i tipi.
+- ✅ **Elenco delle aree** in `final-reviewer.md:35` e `finding-verifier.md:12`: una riga ciascuno, solo l'aggiunta di `R-SECURITY-…`.
+- ✅ **D1**: `final-database.md:39` cambia solo in quel paragrafo; confronto mio: il paragrafo è identico in `final-reviewer.md`, `final-database.md` e `final-security.md`. La sezione «Area `database`» non cambia. `git diff --stat` sugli agenti: tre righe cambiate in tutto negli esistenti.
+- ✅ **Decisione 11, implementatore**: i 14 programmi sono esattamente quelli delle Global Constraints (`node`, `npm`, `npx`, `pnpm`, `yarn`, `bun`, `bunx`, `deno`, `supabase`, `psql`, `docker`, `wrangler`, `vercel`, `openssl`); credenziali vere e servizi in linea vietati con le stesse parole di R-SECURITY-17; le prove passano da `<programma> verify`; nessun invito a usare la rete oltre a ciò che il generico già chiede (documentazione con `WebFetch`).
+- ✅ **Minore del Task 2**: `tests/test_manifest.py:441-451` cerca ora «un difetto della nota si segnala una volta sola» (`task-reviewer`) e «un suo difetto si segnala una volta sola» (`final-reviewer`): tutte e due le frasi stanno solo nel paragrafo della nota di ricerca, non nella voce sulla sicurezza.
+- ✅ **Test dello specialista (review-focus 3).** `real_toml` copia frammenti, skill e agenti veri e passa da `init.profile_blocks`: è il frammento vero come lo propone `init`. `test_real_security_specialist_in_l2` controlla i lanci, `review_cycles.reviewers`, il percorso `final-1-security.md` e la voce vera della lista («accesso negato provato da un test»). `_not_in_l1` usa lo stesso blocco senza L2. `_together` prova che partono tutti e due, che ogni brief ha la sua lista **e non quella dell'altro**, e che il generale le ha tutte e due. `test_real_security_proposes_final_specialist` prova i due versi (senza l'agente la chiave manca e c'è la riga d'avviso; con l'agente le tre chiavi e la `checklist`). `test_readonly_list_matches_config_and_agents` confronta `hooks/run`, `config.py` e `agents/` per forma: copre i due nomi nuovi senza modifiche (lo scostamento dichiarato su `tests/test_wrapper.py` è giusto).
+- ✅ **`docs/uso/comandi.md:34` e `:41`**: nominano i tre agenti; le frasi corrispondono al testo degli agenti e ai test (due specialisti insieme, ognuno con la sua lista).
+- ✅ **Non toccati**: `skills/rules-security/`, `docs/profili/`, frammenti, `finalreview`, `vertical_for`, `task_routing`, `reviews`, `dod`, gate, `init` (lo stat del pacchetto lo conferma).
+- ✅ **Evidenze**: RED con 21 errori e 2 fallimenti attesi, GREEN 596 test, suite 4494 test verdi su 3.11.16 e 3.13.5 con `exit 0`, nessun «unclosed» né avviso nel log. Onesto il report sui cinque test verdi già al RED (provano il meccanismo con un blocco scritto nel test).
+- ⚠️ **Sonda 70 su 70**: non rilanciata (lavora su `HEAD` del worktree vivo, che non è il commit rivisto). Coperta in modo indiretto dalla suite verde (`SecurityPrecedenceTest` con i frammenti veri).
+- ⚠️ **`claude plugin validate --strict`**: esito riportato, non verificabile dal diff.
+
+## Punti di forza
+
+- Copie generate e non riscritte: zero deriva, verificata byte per byte.
+- La sezione dello specialista ordina il lavoro (prima rischio e raggio d'azione, poi regole e lista) e `test_final_security_reviews_by_risk` protegge l'ordine con `assertLess`.
+- `test_real_security_and_database_specialists_together` asserisce anche l'assenza della lista dell'altro in ogni brief: è il test che scopre uno scambio di liste.
+- Gli elenchi degli id li ricavano i test dalla skill, non da una riga scritta a mano.
+
+## Rilievi
+
+### Critical
+
+Nessuno.
+
+### Important
+
+Nessuno.
+
+### Minor
+
+1. **`agents/final-security.md:36`, la frase in più («Un rischio che nessuna regola copre si segnala lo stesso, con il passo del piano che tocca e la gravità del suo effetto»): si può tenere, con una precisazione.** Risposta alle domande del dispatch:
+   - *Coerente con il formato di `rule`?* Sì: `final-reviewer` ammette «la regola `R-…` violata o il passo del piano», e la voce «Sicurezza fin dal progetto» dice già «con la regola dell'area se ce n'è una, altrimenti con il passo del piano». È coerente anche con la pagina approvata (revisione «per rischio»): senza quella frase la lettura per rischio non avrebbe un modo dichiarato di diventare un rilievo.
+   - *Può bloccare un lavoro senza una regola approvata?* Sì, con `blocker` o `major`. Rischio controllato: che la frase dia allo specialista un potere nuovo. Controllo: `bin/tollgate_analysis/verdicts.py:91-101` (`is_blocking`: una `rule` che non comincia con `R-` blocca sempre) e `bin/tollgate_core/reviews.py:259-266`. È lo stesso potere che `final-reviewer` ha già oggi con «passo del piano» (e che lo specialista eredita da «Il piano è una visione» e da «Qualità e architettura»). **Non è una regola nuova né un potere nuovo.** Il rilievo passa comunque dal verificatore dei rilievi.
+   - *La precisazione.* «Che nessuna regola copre» è ambiguo per i temi delle regole sul report, che lo specialista non può citare: per esempio un login nuovo senza limite dei tentativi (tema di R-SECURITY-15, nota non bloccante approvata dall'utente) potrebbe essere aperto come «rischio senza regola» con il passo del piano e `major`, cioè una nota approvata che diventa bloccante in revisione finale. Correzione proposta, una riga: «Un rischio che nessuna regola di `rules-security` copre, nemmeno una di quelle del revisore del task, si segnala lo stesso…». La frase oggi non ha un test che la protegga: se resta, aggiungere la parola a `test_final_security_reviews_by_risk`.
+2. **`agents/implementer-security.md:53` contro «Il lavoro» del generico (`:57-61`): in un progetto JavaScript o TypeScript l'implementatore non può lanciare un test mirato. Imposto dal piano (decisione 11).** I file che il profilo cerca per nome sono `middleware.*` e `proxy.ts`/`proxy.js`: lì il TDD del generico («lancia il test mirato», «riscontro RED e GREEN») passa da `node`, `npx`, `pnpm` e simili, tutti vietati. Il testo dà la via d'uscita (`<programma> verify`), quindi non è una contraddizione che ferma il modello, e la copia `database` approvata vieta già i lanciatori di pacchetti; qui in più cadono `node`, `bun` e `deno`. Non lo classifico Important perché è una scelta del piano con il costo scritto in `comandi.md:34`, ma la pagina approvata `docs/profili/security.md` non dice all'utente che in un progetto Node l'agente di sicurezza prova solo attraverso `verify`. Da decidere dal controller: dirlo all'utente (Task 10 o prova reale del Task 9), senza toccare la pagina in questo task.
+3. **`agents/reviewer-security.md:53`: «Se nello stesso task è attiva un'altra area»; la skill dice «nello stesso lavoro»** (`skills/rules-security/SKILL.md:19`). Un profilo è attivo nel lavoro, non nel task. L'effetto pratico è nullo (i file di un task instradato a `reviewer-security` sono dell'area `security`), ma l'agente ha nel contesto due frasi diverse sulla stessa cosa. Correzione: «nello stesso lavoro».
+4. **`agents/final-security.md:38`: «con la regola dell'area del file» chiede allo specialista una regola che non ha nel contesto.** Per un file di `backend` con un segreto nei log, lo specialista dovrebbe citare `R-BACKEND-07`, di cui vede solo l'id nella riga «Si sovrappone a»: non sa se è `[blocca]` né dove si giudica. È una ripetizione fedele della skill approvata, quindi non è un errore del task; l'effetto è limitato perché in revisione finale la gravità non si ricalcola dalle regole. Da annotare per la prossima revisione di `rules-security`, non da correggere qui.
+5. **`tests/test_manifest.py:395-404`: i nomi dei programmi si cercano come sottostringhe.** `bun` è dentro `bunx`, `npm` dentro `pnpm`: tolto `bun` dall'agente il test resta verde. Stessa forma del test di `database` (precedente accettato). Correzione: cercare ogni nome tra accenti gravi (`` `bun` ``).
+6. **Fuori dal task, per il controller: la riga sulla `supabase/` alla radice e il rimedio manuale della pagina (punto 20).** Se l'utente aggiunge a mano `supabase/functions/auth/**` a `security`, come la pagina suggerisce, quel file arriva agli agenti di sicurezza, che hanno nel contesto (dalla skill, e ripetuto in `implementer-security.md:49` e `final-security.md:38`) «ha le regole di `database`, non queste», e le regole di `database` non le hanno caricate. La frase viene dalla skill approvata: togliere la ripetizione dagli agenti non basterebbe. Da portare tra i rinvii.
+
+Sui due dubbi dichiarati dall'implementatore: la frase in più si tiene (rilievo 1); le due ripetizioni della skill sono fedeli e non inventano regole (rilievi 3, 4 e 6 ne annotano i limiti, nessuno dovuto a questo task salvo la parola «task»).
+
+## Valutazione
+
+**Qualità del task:** Approvato
+
+**Motivo:** I tre agenti sono copie esatte dei generici con sezioni di area corrette negli id, coerenti con la skill e con la pagina approvate; elenchi, D1 e test dello specialista provano ciò che dichiarano. Restano sei minori, di cui due (1 e 3) si chiudono con una riga ciascuno e gli altri sono note per il controller.

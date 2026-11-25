@@ -1,0 +1,15 @@
+86b3dff tollgate C2: rapporto della prova, correzioni dopo la revisione
+3855816 tollgate C2: spec rev 37, catalogo, progetto e piano principale
+d9639cc tollgate C2: prova reale L2 con il profilo security e lo specialista finale
+348bfec tollgate C2: agenti di security, ritocchi dopo la revisione
+2485d3d tollgate C2: prova reale L2 con il profilo security, script e progetto di prova
+b78813e tollgate C2: agenti implementer-security e reviewer-security, specialista final-security
+45bb07d tollgate C2: rules-security approvata dall'utente
+3610a18 tollgate C2: pagina di security, correzioni dopo la revisione
+12c0b2d tollgate C2: fonti di rules-security verificate e pagina per l'utente
+1749ee8 tollgate C2: rules-security, correzioni dopo la revisione e la verifica delle fonti
+abccbe0 tollgate C2: bozza di rules-security, frammento del profilo security e tabella delle precedenze
+c0a60df tollgate C2: sicurezza fin dal progetto, rifiniture dopo la revisione
+e27db19 tollgate C2: keep_paths, un frammento che accende i suoi percorsi anche per i file trovati da un altro
+cf770f1 tollgate C2: sicurezza fin dal progetto per chi pianifica, implementa e rivede
+0ae01de tollgate C2: revisori su Fable, implementatori su opus, mai sonnet

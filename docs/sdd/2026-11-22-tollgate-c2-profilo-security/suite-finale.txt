@@ -1,0 +1,27 @@
+== corsa 1
+HEAD 1517fd3 inizio 16:40
+== Python 3.11.16
+Ran 4520 tests in 2842.109s
+OK (skipped=16)
+== Python 3.13.5
+Ran 4520 tests in 2447.966s
+OK (skipped=14)
+exit 0
+== corsa 2
+HEAD 1517fd3 inizio 18:08
+== Python 3.11.16
+Ran 4520 tests in 2266.621s
+OK (skipped=16)
+== Python 3.13.5
+Ran 4520 tests in 2761.814s
+OK (skipped=14)
+exit 0
+== corsa 3
+HEAD 1517fd3 inizio 19:32
+== Python 3.11.16
+Ran 4520 tests in 3502.990s
+OK (skipped=16)
+== Python 3.13.5
+Ran 4520 tests in 2145.204s
+OK (skipped=14)
+exit 0
